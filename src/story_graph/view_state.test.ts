@@ -297,3 +297,108 @@ describe('selection carried between layers', () => {
 		expect(selected(state)).toEqual(['5', '6']);
 	});
 });
+
+/**
+ * Carrying upward can land on more than one node, the same way carrying downward
+ * does. The real data never shows it — its coarse nodes leave a gap at lines
+ * 12-13 that no fine node crosses — so these use purpose-built layers.
+ */
+describe('carrying upward onto several nodes', () => {
+	const FINE_SPLIT: Layer = {
+		id: '1',
+		nodes: [
+			node('before', 1, 4),
+			node('straddling', 8, 13),
+			node('between', 11, 12),
+			node('after', 18, 20),
+		],
+		edges: [],
+	};
+
+	/** Two halves with a clean boundary: nothing shared, nothing skipped. */
+	const COARSE_SPLIT: Layer = {
+		id: '2',
+		nodes: [node('first', 1, 10), node('second', 11, 20)],
+		edges: [],
+	};
+
+	/** Two halves that share line 10. */
+	const COARSE_TOUCHING: Layer = {
+		id: '2',
+		nodes: [node('first', 1, 10), node('second', 10, 20)],
+		edges: [],
+	};
+
+	/** Two halves with lines 11-13 belonging to neither. */
+	const COARSE_GAPPED: Layer = {
+		id: '2',
+		nodes: [node('first', 1, 10), node('second', 14, 20)],
+		edges: [],
+	};
+
+	const stateWith = (coarse: Layer) => {
+		const state = new GraphViewState();
+		state.setLayers([FINE_SPLIT, coarse]);
+		return state;
+	};
+
+	it('selects both coarse nodes when a fine node crosses the boundary', () => {
+		const state = stateWith(COARSE_SPLIT);
+		state.selectNode('straddling'); // 8-13, across the 10/11 divide
+		state.switchTo('2');
+
+		expect(selected(state)).toEqual(['first', 'second']);
+	});
+
+	it('reports the lines of both of them to the manuscript', () => {
+		const state = stateWith(COARSE_SPLIT);
+		state.selectNode('straddling');
+		state.switchTo('2');
+
+		expect(state.selectedSpans()).toEqual([
+			{ start: 1, end: 10 },
+			{ start: 11, end: 20 },
+		]);
+	});
+
+	it('selects both when the fine node only touches a shared boundary line', () => {
+		const state = stateWith(COARSE_TOUCHING);
+		state.selectNode('between'); // 11-12, inside "second" only
+		state.switchTo('2');
+		expect(selected(state)).toEqual(['second']);
+
+		// 8-13 reaches line 10, which both coarse nodes claim.
+		state.switchTo('1');
+		state.selectNode('straddling');
+		state.switchTo('2');
+		expect(selected(state)).toEqual(['first', 'second']);
+	});
+
+	it('selects nothing when the fine node sits in the gap between coarse nodes', () => {
+		const state = stateWith(COARSE_GAPPED);
+		state.selectNode('between'); // 11-12, claimed by neither coarse node
+		state.switchTo('2');
+
+		expect(selected(state)).toEqual([]);
+		expect(state.selectedSpans()).toEqual([]);
+	});
+
+	it('still selects just one when the fine node sits wholly inside a coarse node', () => {
+		const state = stateWith(COARSE_SPLIT);
+		state.selectNode('before'); // 1-4, inside "first" only
+		state.switchTo('2');
+
+		expect(selected(state)).toEqual(['first']);
+	});
+
+	it('widens on the round trip back down, as overlap dictates', () => {
+		const state = stateWith(COARSE_SPLIT);
+		state.selectNode('before'); // 1-4
+		state.switchTo('2'); // -> "first", 1-10
+		state.switchTo('1');
+
+		// The anchor is still 1-4, so only nodes overlapping those lines return.
+		expect(state.getAnchor()).toEqual([{ start: 1, end: 4 }]);
+		expect(selected(state)).toEqual(['before']);
+	});
+});
