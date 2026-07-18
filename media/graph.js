@@ -2,8 +2,11 @@
 //
 // Runs inside the webview, so this is plain browser JS with no imports — it is
 // loaded directly by a <script> tag rather than bundled. The extension host
-// sends a normalized {nodes, edges} graph; everything below is layout, drawing
-// and the pan/zoom/click handling on top of it.
+// sends a normalized list of layers; everything below is layout, drawing and the
+// pan/zoom/click handling on top of it.
+//
+// Node ids are only unique within a layer, so anything keyed by node id is kept
+// per layer rather than globally.
 
 (function () {
 	const vscode = acquireVsCodeApi();
@@ -19,31 +22,88 @@
 	const svg = document.getElementById('canvas');
 	const viewport = document.getElementById('viewport');
 	const status = document.getElementById('status');
+	const layerBar = document.getElementById('layers');
 
 	/** Current pan/zoom, applied as a transform on the viewport group. */
 	let view = { k: 1, x: 0, y: 0 };
-	let selectedId = null;
-	/** Nodes the manuscript selection currently touches — there can be several. */
-	let activeIds = new Set();
-	let graph = { nodes: [], edges: [] };
+
+	let layers = [];
+	let currentLayerId = null;
+	/** layer id -> the node clicked in it. */
+	let selectedByLayer = new Map();
+	/** layer id -> set of nodes the manuscript selection touches. */
+	let activeByLayer = new Map();
+	/** Laid-out nodes of the layer on screen right now. */
 	let placed = new Map();
 
 	window.addEventListener('message', (event) => {
 		const message = event.data;
 		if (message.type === 'graph') {
-			render(message.graph);
+			setLayers(message.layers || []);
 		} else if (message.type === 'active') {
-			// ...and moving in the manuscript drops the clicked node. A graph reload
-			// sets keepSelection, since that isn't the user picking a side.
-			activeIds = new Set(message.ids || []);
+			// Moving in the manuscript drops the clicked node. A graph reload sets
+			// keepSelection, since that isn't the user picking a side.
+			activeByLayer = new Map(
+				Object.entries(message.active || {}).map(([id, ids]) => [id, new Set(ids)])
+			);
 			if (!message.keepSelection) {
-				selectedId = null;
+				selectedByLayer.clear();
 			}
 			applySelection();
 		} else if (message.type === 'error') {
 			showStatus(message.message);
 		}
 	});
+
+	// -----------------------------------------------------------------------
+	// Layers
+	// -----------------------------------------------------------------------
+
+	function setLayers(next) {
+		layers = next;
+		// Hold the current layer across reloads where it still exists, so a
+		// background rewrite doesn't yank the view back to the first layer.
+		if (!layers.some((layer) => layer.id === currentLayerId)) {
+			currentLayerId = layers.length > 0 ? layers[0].id : null;
+		}
+		renderLayerBar();
+		renderLayer();
+	}
+
+	function renderLayerBar() {
+		while (layerBar.firstChild) {
+			layerBar.removeChild(layerBar.firstChild);
+		}
+		// Nothing to switch between when there's only one.
+		layerBar.hidden = layers.length < 2;
+		if (layerBar.hidden) {
+			return;
+		}
+
+		for (const layer of layers) {
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.textContent = `Layer ${layer.id}`;
+			const current = layer.id === currentLayerId;
+			button.classList.toggle('current', current);
+			button.setAttribute('aria-pressed', String(current));
+			button.addEventListener('click', () => switchTo(layer.id));
+			layerBar.appendChild(button);
+		}
+	}
+
+	function switchTo(id) {
+		if (id === currentLayerId) {
+			return;
+		}
+		currentLayerId = id;
+		renderLayerBar();
+		renderLayer();
+	}
+
+	function currentLayer() {
+		return layers.find((layer) => layer.id === currentLayerId);
+	}
 
 	// -----------------------------------------------------------------------
 	// Layout
@@ -55,9 +115,9 @@
 	 * appear in the manuscript, which keeps the picture stable across reloads and
 	 * roughly matches reading order.
 	 */
-	function layout(g) {
+	function layout(layer) {
 		const byId = new Map();
-		for (const node of g.nodes) {
+		for (const node of layer.nodes) {
 			byId.set(node.id, {
 				id: node.id,
 				title: node.title,
@@ -79,7 +139,7 @@
 		// terminates and keeps a cyclic graph from spinning forever.
 		for (let pass = 0; pass < byId.size; pass++) {
 			let changed = false;
-			for (const edge of g.edges) {
+			for (const edge of layer.edges) {
 				const from = byId.get(edge.from);
 				const to = byId.get(edge.to);
 				if (from && to && to.depth < from.depth + 1) {
@@ -146,9 +206,9 @@
 	// Drawing
 	// -----------------------------------------------------------------------
 
-	function render(next) {
-		graph = next;
-		placed = layout(graph);
+	function renderLayer() {
+		const layer = currentLayer();
+		placed = layer ? layout(layer) : new Map();
 
 		while (viewport.firstChild) {
 			viewport.removeChild(viewport.firstChild);
@@ -162,7 +222,7 @@
 
 		// Edges first so nodes paint over their endpoints.
 		const edgeLayer = svgEl('g');
-		for (const edge of graph.edges) {
+		for (const edge of layer.edges) {
 			const from = placed.get(edge.from);
 			const to = placed.get(edge.to);
 			if (!from || !to) {
@@ -238,8 +298,8 @@
 	function select(id) {
 		// The two directions are mutually exclusive: picking a node drops whatever
 		// the manuscript selection had lit up.
-		selectedId = id;
-		activeIds = new Set();
+		selectedByLayer.set(currentLayerId, id);
+		activeByLayer.clear();
 		applySelection();
 
 		const item = placed.get(id);
@@ -249,9 +309,12 @@
 	}
 
 	function applySelection() {
+		const selectedId = selectedByLayer.get(currentLayerId) ?? null;
+		const active = activeByLayer.get(currentLayerId) || new Set();
+
 		for (const group of viewport.querySelectorAll('.node')) {
 			group.classList.toggle('selected', group.dataset.id === selectedId);
-			group.classList.toggle('active', activeIds.has(group.dataset.id));
+			group.classList.toggle('active', active.has(group.dataset.id));
 		}
 		for (const path of viewport.querySelectorAll('.edge')) {
 			const incident = path.dataset.from === selectedId || path.dataset.to === selectedId;

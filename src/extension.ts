@@ -50,8 +50,13 @@ class ManuscriptProvider implements vscode.TreeDataProvider<string> {
 // Story graph
 // ---------------------------------------------------------------------------
 
-/** The graph as the webview wants it — ids normalized to strings, edges as from/to. */
-interface Graph {
+/**
+ * One layer of the story, as the webview wants it — ids normalized to strings,
+ * edges as from/to. Node ids are only unique within a layer, so nothing keyed by
+ * node id may be shared between them.
+ */
+interface Layer {
+	id: string;
 	nodes: GraphNode[];
 	edges: GraphEdge[];
 }
@@ -83,7 +88,7 @@ class StoryGraphPanel {
 	private readonly disposables: vscode.Disposable[] = [];
 
 	/** Last graph read from disk, kept so selections can be matched against it. */
-	private graph: Graph = { nodes: [], edges: [] };
+	private layers: Layer[] = [];
 
 	/** Marks the lines belonging to the node that was last clicked. */
 	private readonly highlight = vscode.window.createTextEditorDecorationType({
@@ -174,8 +179,8 @@ class StoryGraphPanel {
 	private async load(): Promise<void> {
 		try {
 			const bytes = await vscode.workspace.fs.readFile(this.graphUri);
-			this.graph = normalize(parseYaml(new TextDecoder().decode(bytes)));
-			void this.panel.webview.postMessage({ type: 'graph', graph: this.graph });
+			this.layers = normalize(parseYaml(new TextDecoder().decode(bytes)));
+			void this.panel.webview.postMessage({ type: 'graph', layers: this.layers });
 
 			// Reflect wherever the cursor already is, rather than waiting for it to move.
 			const editor = vscode.window.visibleTextEditors.find(
@@ -223,20 +228,29 @@ class StoryGraphPanel {
 	 * line range overlaps the selection at all, so a bare cursor (an empty
 	 * selection) and a dragged range go through the same test — and a line sitting
 	 * inside several nodes lights up all of them.
+	 *
+	 * Every layer is matched, not just the visible one, so switching layers shows
+	 * the right highlights immediately without a round trip back to the host.
 	 */
 	private sendActive(selections: readonly vscode.Selection[], keepSelection = false): void {
-		const ids = new Set<string>();
-		for (const selection of selections) {
-			const first = selection.start.line + 1;
-			const last = selection.end.line + 1;
-			for (const node of this.graph.nodes) {
-				// Inclusive 1-based ranges overlap unless one ends before the other starts.
-				if (node.start <= last && node.end >= first) {
-					ids.add(node.id);
+		const active: Record<string, string[]> = {};
+
+		for (const layer of this.layers) {
+			const ids = new Set<string>();
+			for (const selection of selections) {
+				const first = selection.start.line + 1;
+				const last = selection.end.line + 1;
+				for (const node of layer.nodes) {
+					// Inclusive 1-based ranges overlap unless one ends before the other starts.
+					if (node.start <= last && node.end >= first) {
+						ids.add(node.id);
+					}
 				}
 			}
+			active[layer.id] = [...ids];
 		}
-		void this.panel.webview.postMessage({ type: 'active', ids: [...ids], keepSelection });
+
+		void this.panel.webview.postMessage({ type: 'active', active, keepSelection });
 	}
 
 	private dispose(): void {
@@ -265,6 +279,7 @@ class StoryGraphPanel {
 </head>
 <body>
 	<div id="status" class="status" hidden></div>
+	<div id="layers" class="layers" role="group" aria-label="Story layers" hidden></div>
 	<svg id="canvas" role="img" aria-label="Story graph">
 		<defs>
 			<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
@@ -286,15 +301,28 @@ function graphUriFor(docUri: vscode.Uri): vscode.Uri {
 }
 
 /**
- * Flatten the on-disk shape into what the webview draws.
+ * Flatten the on-disk shape into the layers the webview draws.
  *
+ * `layer:` may be a list of layers or, as it was written originally, a single
+ * mapping; both are accepted so an older file still opens.
+ */
+function normalize(raw: unknown): Layer[] {
+	const root = (raw ?? {}) as Record<string, unknown>;
+	const declared = root.layer ?? root.layers ?? root;
+	const list = Array.isArray(declared) ? declared : [declared];
+
+	return list
+		.map((entry, index) => normalizeLayer(entry, index))
+		.filter((layer) => layer.nodes.length > 0);
+}
+
+/**
  * Note that `start`/`end` mean different things in the two sections: line numbers
  * on a node, but node ids on an edge. Renaming them here keeps that ambiguity out
  * of the rest of the code.
  */
-function normalize(raw: unknown): Graph {
-	const root = (raw ?? {}) as Record<string, unknown>;
-	const layer = (root.layer ?? root) as Record<string, unknown>;
+function normalizeLayer(entry: unknown, index: number): Layer {
+	const layer = (entry ?? {}) as Record<string, unknown>;
 
 	const nodes: GraphNode[] = asArray(layer.nodes)
 		.map((entry) => {
@@ -322,7 +350,7 @@ function normalize(raw: unknown): Graph {
 		})
 		.filter((edge) => known.has(edge.from) && known.has(edge.to));
 
-	return { nodes, edges };
+	return { id: String(layer.id ?? index + 1), nodes, edges };
 }
 
 function asArray(value: unknown): unknown[] {

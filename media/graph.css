@@ -86,6 +86,49 @@ body {
 	fill: var(--vscode-editorLineNumber-foreground);
 }
 
+/* Layer switcher, floating over the top-left of the canvas. */
+.layers {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	z-index: 2;
+	display: flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background);
+}
+
+.layers[hidden] {
+	display: none;
+}
+
+.layers button {
+	padding: 3px 10px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+}
+
+.layers button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.layers button.current {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.layers button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+
 .status {
 	position: absolute;
 	top: 0;
