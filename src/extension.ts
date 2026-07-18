@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { StoryGraphPanel } from './story_graph/panel';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -19,6 +20,19 @@ export function activate(context: vscode.ExtensionContext) {
 			'authorship.manuscript',
 			new ManuscriptProvider()
 		)
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.showStoryGraph', () => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || editor.document.languageId !== 'markdown') {
+				vscode.window.showInformationMessage(
+					'Open a markdown file to see its story graph.'
+				);
+				return;
+			}
+			StoryGraphPanel.reveal(context, editor.document.uri, editor.viewColumn);
+		})
 	);
 }
 
