@@ -40,6 +40,21 @@ Check the manuscript against a set of rules:
 These are large features. They may deserve multiple plugins — something like GitKraken, a
 suite of tools for writers.
 
+### 4. Story editor
+
+It should be easy to identify elements of the story to rewrite. 
+Removing a paragraph should bring up a list of connected paragraphs that may require rewriting.
+
+Undo/redo should be supported.
+
+Not sure yet what the UI/UX for this should look and feel like. This should go beyond editing words, and focus on editing concepts.
+
+Examples of such edits:
+- throwing out a plot that is irrelevant
+- changing the communication style of a character
+- injecting a new fact and identifying which story parts it should affect
+
+
 ## Building and testing
 
 1. Build it for myself first and test it extensively while writing. I write a lot of stories —
