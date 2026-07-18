@@ -137,7 +137,7 @@ class StoryGraphPanel {
 		this.disposables.push(
 			this.panel.webview.onDidReceiveMessage((message) => {
 				if (message?.type === 'select') {
-					void this.focusLines(Number(message.start), Number(message.end));
+					void this.focusRanges(message.ranges);
 				}
 			})
 		);
@@ -200,27 +200,62 @@ class StoryGraphPanel {
 	}
 
 	/**
-	 * Scroll the manuscript to a node's lines and highlight them. Focus stays in
-	 * the graph, so you can keep clicking your way around the story.
+	 * Scroll the manuscript to the selected lines and highlight them. Focus stays
+	 * in the graph, so you can keep clicking your way around the story.
+	 *
+	 * Several ranges arrive at once when a coarse node's selection is carried into
+	 * a finer layer and lands on more than one node.
 	 */
-	private async focusLines(start: number, end: number): Promise<void> {
-		if (!Number.isFinite(start) || !Number.isFinite(end)) {
+	private async focusRanges(raw: unknown): Promise<void> {
+		const input = Array.isArray(raw) ? raw : [];
+		const doc = await vscode.workspace.openTextDocument(this.docUri);
+		const lastLine = doc.lineCount - 1;
+
+		const ranges: vscode.Range[] = [];
+		for (const entry of input) {
+			const start = Number((entry as { start?: unknown })?.start);
+			const end = Number((entry as { end?: unknown })?.end);
+			if (!Number.isFinite(start) || !Number.isFinite(end)) {
+				continue;
+			}
+			const first = clamp(Math.min(start, end) - 1, 0, lastLine);
+			const final = clamp(Math.max(start, end) - 1, 0, lastLine);
+			ranges.push(new vscode.Range(first, 0, final, doc.lineAt(final).text.length));
+		}
+
+		// Node ranges can share lines. Left alone, two overlapping ranges stack their
+		// translucent backgrounds and the shared lines read as a second selection.
+		ranges.sort((a, b) => a.start.line - b.start.line);
+		const merged: vscode.Range[] = [];
+		for (const range of ranges) {
+			const previous = merged[merged.length - 1];
+			if (previous && range.start.line <= previous.end.line) {
+				if (range.end.line > previous.end.line) {
+					merged[merged.length - 1] = new vscode.Range(previous.start, range.end);
+				}
+			} else {
+				merged.push(range);
+			}
+		}
+		// An empty selection still has to be applied — switching to a layer that
+		// matches nothing must clear the old highlight, not leave it behind.
+		if (merged.length === 0) {
+			const open = vscode.window.visibleTextEditors.find(
+				(candidate) => candidate.document.uri.toString() === this.docUri.toString()
+			);
+			open?.setDecorations(this.highlight, []);
 			return;
 		}
-		const doc = await vscode.workspace.openTextDocument(this.docUri);
+
 		const editor = await vscode.window.showTextDocument(doc, {
 			viewColumn: this.sourceColumn,
 			preserveFocus: true,
 			preview: false,
 		});
+		editor.setDecorations(this.highlight, merged);
 
-		const last = doc.lineCount - 1;
-		const first = clamp(Math.min(start, end) - 1, 0, last);
-		const final = clamp(Math.max(start, end) - 1, 0, last);
-		const range = new vscode.Range(first, 0, final, doc.lineAt(final).text.length);
-
-		editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-		editor.setDecorations(this.highlight, [range]);
+		// Scroll to the earliest of them, so the top of the selection is on screen.
+		editor.revealRange(merged[0], vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 	}
 
 	/**

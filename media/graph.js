@@ -29,8 +29,12 @@
 
 	let layers = [];
 	let currentLayerId = null;
-	/** layer id -> the node clicked in it. */
-	let selectedByLayer = new Map();
+	/** Selected nodes in the layer on screen. A set, because one node in a coarse
+	 *  layer can land on several in a finer one. Recomputed on every switch. */
+	let selectedIds = new Set();
+	/** What the user actually picked, in line space. Every layer's selection is
+	 *  derived from this, so switching never accumulates. */
+	let anchorRanges = [];
 	/** layer id -> set of nodes the manuscript selection touches. */
 	let activeByLayer = new Map();
 	/** Laid-out nodes of the layer on screen right now. */
@@ -47,7 +51,8 @@
 				Object.entries(message.active || {}).map(([id, ids]) => [id, new Set(ids)])
 			);
 			if (!message.keepSelection) {
-				selectedByLayer.clear();
+				selectedIds = new Set();
+				anchorRanges = [];
 			}
 			applySelection();
 		} else if (message.type === 'error') {
@@ -66,6 +71,7 @@
 		if (!layers.some((layer) => layer.id === currentLayerId)) {
 			currentLayerId = layers.length > 0 ? layers[0].id : null;
 		}
+		selectFromAnchor();
 		renderLayerBar();
 		renderLayer();
 	}
@@ -97,8 +103,50 @@
 			return;
 		}
 		currentLayerId = id;
+		selectFromAnchor();
 		renderLayerBar();
 		renderLayer();
+		sendSelection();
+	}
+
+	/**
+	 * Work out which nodes in the current layer the selection lands on, by line
+	 * overlap. Going coarse, a fine node's lines fall inside one broad node; going
+	 * fine, that broad node's lines cover several narrow ones and all are picked up.
+	 *
+	 * Always derived from `anchorRanges` — what the user actually picked — and never
+	 * from whatever the previous layer resolved to. Deriving from the previous result
+	 * is what made the selection creep outward on every switch.
+	 */
+	function selectFromAnchor() {
+		selectedIds = new Set();
+
+		const layer = currentLayer();
+		if (!layer || anchorRanges.length === 0) {
+			return;
+		}
+		for (const node of layer.nodes) {
+			const hit = anchorRanges.some(
+				(range) => node.start <= range.end && node.end >= range.start
+			);
+			if (hit) {
+				selectedIds.add(node.id);
+			}
+		}
+	}
+
+	/** Push the lines of whatever is selected right now to the manuscript. */
+	function sendSelection() {
+		const layer = currentLayer();
+		const ranges = [];
+		if (layer) {
+			for (const node of layer.nodes) {
+				if (selectedIds.has(node.id)) {
+					ranges.push({ start: node.start, end: node.end });
+				}
+			}
+		}
+		vscode.postMessage({ type: 'select', ranges });
 	}
 
 	function currentLayer() {
@@ -296,29 +344,33 @@
 	// -----------------------------------------------------------------------
 
 	function select(id) {
+		const item = placed.get(id);
+		if (!item) {
+			return;
+		}
+
+		// This node becomes the anchor every other layer resolves against.
+		anchorRanges = [{ start: item.start, end: item.end }];
+		selectedIds = new Set([id]);
+
 		// The two directions are mutually exclusive: picking a node drops whatever
 		// the manuscript selection had lit up.
-		selectedByLayer.set(currentLayerId, id);
 		activeByLayer.clear();
 		applySelection();
-
-		const item = placed.get(id);
-		if (item) {
-			vscode.postMessage({ type: 'select', id, start: item.start, end: item.end });
-		}
+		sendSelection();
 	}
 
 	function applySelection() {
-		const selectedId = selectedByLayer.get(currentLayerId) ?? null;
 		const active = activeByLayer.get(currentLayerId) || new Set();
 
 		for (const group of viewport.querySelectorAll('.node')) {
-			group.classList.toggle('selected', group.dataset.id === selectedId);
+			group.classList.toggle('selected', selectedIds.has(group.dataset.id));
 			group.classList.toggle('active', active.has(group.dataset.id));
 		}
 		for (const path of viewport.querySelectorAll('.edge')) {
-			const incident = path.dataset.from === selectedId || path.dataset.to === selectedId;
-			path.classList.toggle('incident', Boolean(selectedId) && incident);
+			const incident =
+				selectedIds.has(path.dataset.from) || selectedIds.has(path.dataset.to);
+			path.classList.toggle('incident', selectedIds.size > 0 && incident);
 		}
 	}
 
