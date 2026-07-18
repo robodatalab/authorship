@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Set fill to none for outlines, and stroke to white with a 2px width -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="1" stroke-linecap="butt" stroke-linejoin="miter">
+    
+    <!-- Unified single-line body and paper outline -->
+    <rect x="4" y="1" width="16" height="8" />
+    <rect x="2" y="9" width="20" height="14" />
+    
+    <!-- Paper lines (top section) -->
+    <line x1="6" y1="3.5" x2="15" y2="3.5" stroke-width="1" />
+    <line x1="6" y1="6" x2="13" y2="6" stroke-width="1" />
+    
+    <!-- Grid of 5 squares (bottom section) -->
+    
+    <rect x="4.7" y="14.5" width="0.5" height="0.5" />
+    <rect x="8.5" y="14.5" width="0.5" height="0.5" />
+    <rect x="12" y="14.5" width="0.5" height="0.5" />
+    <rect x="15.5" y="14.5" width="0.5" height="0.5" />
+    <rect x="19" y="14.5" width="0.5" height="0.5" />
+    
+    <rect x="6.5" y="17.5" width="0.5" height="0.5" />
+    <rect x="10.3" y="17.5" width="0.5" height="0.5" />
+    <rect x="14" y="17.5" width="0.5" height="0.5" />
+    <rect x="17.5" y="17.5" width="0.5" height="0.5" />
+
+    <rect x="5" y="20.5" width="1" height="0.5" />
+    <rect x="8.5" y="20.5" width="7" height="0.5" />
+    <rect x="18" y="20.5" width="1" height="0.5" />
+
+  </g>
+</svg>
