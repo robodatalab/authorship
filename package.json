@@ -12,6 +12,23 @@
     "activationEvents": [],
     "main": "./dist/extension.js",
     "contributes": {
+        "commands": [
+            {
+                "command": "authorship.showStoryGraph",
+                "title": "Open Story Graph",
+                "category": "Authorship",
+                "icon": "$(type-hierarchy)"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "authorship.showStoryGraph",
+                    "when": "resourceExtname == .md",
+                    "group": "navigation"
+                }
+            ]
+        },
         "viewsContainers": {
             "activitybar": [
                 {
@@ -43,20 +60,23 @@
         "test": "vscode-test"
     },
     "devDependencies": {
-        "@types/vscode": "^1.125.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "24.x",
-        "typescript-eslint": "^8.61.1",
-        "eslint": "^10.5.0",
-        "typescript": "^6.0.3",
-        "ts-loader": "^9.6.2",
-        "webpack": "^5.107.2",
-        "webpack-cli": "^7.0.3",
+        "@types/vscode": "^1.125.0",
         "@vscode/test-cli": "^0.0.15",
-        "@vscode/test-electron": "^3.0.0"
+        "@vscode/test-electron": "^3.0.0",
+        "eslint": "^10.5.0",
+        "ts-loader": "^9.6.2",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.61.1",
+        "webpack": "^5.107.2",
+        "webpack-cli": "^7.0.3"
     },
     "overrides": {
         "diff": "^8.0.4",
         "serialize-javascript": "^7.0.6"
+    },
+    "dependencies": {
+        "yaml": "^2.9.0"
     }
 }
