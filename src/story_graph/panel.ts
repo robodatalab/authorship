@@ -9,7 +9,15 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml } from 'yaml';
 
-import { graphPathFor, mergeSpans, normalize, type Layer, type LineSpan } from './model';
+import {
+	graphPathFor,
+	mergeSpans,
+	nodesTouching,
+	normalize,
+	type ActiveByLayer,
+	type Layer,
+	type LineSpan,
+} from './model';
 
 /**
  * A webview showing one manuscript's story graph, opened beside the document it
@@ -197,21 +205,15 @@ export class StoryGraphPanel {
 	 * the right highlights immediately without a round trip back to the host.
 	 */
 	private sendActive(selections: readonly vscode.Selection[], keepSelection = false): void {
-		const active: Record<string, string[]> = {};
+		// Editor positions count lines from zero; the graph file counts from one.
+		const spans: LineSpan[] = selections.map((selection) => ({
+			start: selection.start.line + 1,
+			end: selection.end.line + 1,
+		}));
 
+		const active: ActiveByLayer = {};
 		for (const layer of this.layers) {
-			const ids = new Set<string>();
-			for (const selection of selections) {
-				const first = selection.start.line + 1;
-				const last = selection.end.line + 1;
-				for (const node of layer.nodes) {
-					// Inclusive 1-based ranges overlap unless one ends before the other starts.
-					if (node.start <= last && node.end >= first) {
-						ids.add(node.id);
-					}
-				}
-			}
-			active[layer.id] = [...ids];
+			active[layer.id] = nodesTouching(layer, spans);
 		}
 
 		void this.panel.webview.postMessage({ type: 'active', active, keepSelection });

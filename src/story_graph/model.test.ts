@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
-import { graphPathFor, mergeSpans, normalize } from './model';
+import {
+	graphPathFor,
+	mergeSpans,
+	nodesTouching,
+	normalize,
+	spansOverlap,
+	type Layer,
+} from './model';
 
 /** The shape currently in data/story_1.graph.yaml — two layers with repeating node ids. */
 const TWO_LAYERS = `
@@ -175,6 +182,92 @@ describe('graphPathFor — locating the graph beside the manuscript', () => {
 
 	it('only the trailing extension is replaced', () => {
 		expect(graphPathFor('/work/notes.md/chapter.md')).toBe('/work/notes.md/chapter.graph.yaml');
+	});
+});
+
+describe('spansOverlap — the one rule tying the graph to the manuscript', () => {
+	it('is true when the spans share several lines', () => {
+		expect(spansOverlap({ start: 3, end: 8 }, { start: 5, end: 11 })).toBe(true);
+	});
+
+	it('is true when they share only a boundary line', () => {
+		// Nodes routinely end where the next begins — node 5 is 16-17, node 6 is 17-21.
+		expect(spansOverlap({ start: 16, end: 17 }, { start: 17, end: 21 })).toBe(true);
+	});
+
+	it('is true when one span contains the other', () => {
+		expect(spansOverlap({ start: 1, end: 11 }, { start: 3, end: 3 })).toBe(true);
+		expect(spansOverlap({ start: 3, end: 3 }, { start: 1, end: 11 })).toBe(true);
+	});
+
+	it('is false when they miss by a line', () => {
+		expect(spansOverlap({ start: 3, end: 5 }, { start: 6, end: 9 })).toBe(false);
+		expect(spansOverlap({ start: 6, end: 9 }, { start: 3, end: 5 })).toBe(false);
+	});
+
+	it('is symmetric', () => {
+		const pairs = [
+			[
+				{ start: 1, end: 5 },
+				{ start: 5, end: 9 },
+			],
+			[
+				{ start: 1, end: 4 },
+				{ start: 5, end: 9 },
+			],
+			[
+				{ start: 2, end: 2 },
+				{ start: 2, end: 2 },
+			],
+		] as const;
+
+		for (const [a, b] of pairs) {
+			expect(spansOverlap(a, b)).toBe(spansOverlap(b, a));
+		}
+	});
+
+	it('treats a single line as a span of length one', () => {
+		expect(spansOverlap({ start: 3, end: 3 }, { start: 3, end: 5 })).toBe(true);
+		expect(spansOverlap({ start: 3, end: 3 }, { start: 4, end: 5 })).toBe(false);
+	});
+});
+
+describe('nodesTouching — matching a layer against lines', () => {
+	const FINE: Layer = {
+		id: '1',
+		nodes: [
+			{ id: '1', title: 'knocking at the door', start: 3, end: 5 },
+			{ id: '2', title: 'checking', start: 5, end: 11 },
+			{ id: '3', title: 'preparing for a walk', start: 3, end: 3 },
+			{ id: '4', title: 'sarah curious', start: 9, end: 11 },
+		],
+		edges: [],
+	};
+
+	it('returns every node covering a single line', () => {
+		expect(nodesTouching(FINE, [{ start: 3, end: 3 }])).toEqual(['1', '3']);
+	});
+
+	it('returns every node a dragged span touches', () => {
+		expect(nodesTouching(FINE, [{ start: 9, end: 11 }])).toEqual(['2', '4']);
+	});
+
+	it('unions several spans without repeating a node', () => {
+		expect(
+			nodesTouching(FINE, [
+				{ start: 3, end: 3 },
+				{ start: 4, end: 4 },
+			])
+		).toEqual(['1', '3']);
+	});
+
+	it('returns nothing for lines outside every node, or for no spans at all', () => {
+		expect(nodesTouching(FINE, [{ start: 20, end: 25 }])).toEqual([]);
+		expect(nodesTouching(FINE, [])).toEqual([]);
+	});
+
+	it('keeps the layer’s own node order', () => {
+		expect(nodesTouching(FINE, [{ start: 1, end: 99 }])).toEqual(['1', '2', '3', '4']);
 	});
 });
 

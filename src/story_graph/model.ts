@@ -36,6 +36,28 @@ export interface LineSpan {
 	end: number;
 }
 
+/** Node ids the manuscript selection touches, keyed by layer id. */
+export type ActiveByLayer = Record<string, string[]>;
+
+/**
+ * Do two inclusive line spans share at least one line?
+ *
+ * This is the whole relationship between the graph and the manuscript, and it is
+ * used in both directions: the host matches the editor selection against every
+ * layer, and the view matches the anchor against the layer being switched to.
+ * A shared boundary line counts — nodes routinely end where the next begins.
+ */
+export function spansOverlap(a: LineSpan, b: LineSpan): boolean {
+	return a.start <= b.end && a.end >= b.start;
+}
+
+/** Ids of the nodes in `layer` whose lines overlap any of `spans`. */
+export function nodesTouching(layer: Layer, spans: readonly LineSpan[]): string[] {
+	return layer.nodes
+		.filter((node) => spans.some((span) => spansOverlap(node, span)))
+		.map((node) => node.id);
+}
+
 /** `story_1.md` sits next to `story_1.graph.yaml`. */
 export function graphPathFor(docPath: string): string {
 	return docPath.replace(/\.md$/i, '') + '.graph.yaml';

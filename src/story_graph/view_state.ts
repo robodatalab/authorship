@@ -10,10 +10,7 @@
 // deriving from the previous result made the selection creep outward on every
 // switch.
 
-import type { Layer, LineSpan } from './model';
-
-/** Node ids the manuscript selection touches, keyed by layer id. */
-export type ActiveByLayer = Record<string, string[]>;
+import { nodesTouching, type ActiveByLayer, type Layer, type LineSpan } from './model';
 
 export class GraphViewState {
 	private layers: Layer[] = [];
@@ -133,17 +130,10 @@ export class GraphViewState {
 	 * fine, that broad node's lines cover several narrow ones and all are picked up.
 	 */
 	private deriveFromAnchor(): void {
-		this.selected = new Set();
-
 		const layer = this.getCurrentLayer();
-		if (!layer || this.anchor.length === 0) {
-			return;
-		}
-		for (const node of layer.nodes) {
-			const hit = this.anchor.some((span) => node.start <= span.end && node.end >= span.start);
-			if (hit) {
-				this.selected.add(node.id);
-			}
-		}
+		this.selected =
+			layer && this.anchor.length > 0
+				? new Set(nodesTouching(layer, this.anchor))
+				: new Set();
 	}
 }
