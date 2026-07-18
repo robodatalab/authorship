@@ -23,6 +23,8 @@
 	/** Current pan/zoom, applied as a transform on the viewport group. */
 	let view = { k: 1, x: 0, y: 0 };
 	let selectedId = null;
+	/** Nodes the manuscript selection currently touches — there can be several. */
+	let activeIds = new Set();
 	let graph = { nodes: [], edges: [] };
 	let placed = new Map();
 
@@ -30,6 +32,14 @@
 		const message = event.data;
 		if (message.type === 'graph') {
 			render(message.graph);
+		} else if (message.type === 'active') {
+			// ...and moving in the manuscript drops the clicked node. A graph reload
+			// sets keepSelection, since that isn't the user picking a side.
+			activeIds = new Set(message.ids || []);
+			if (!message.keepSelection) {
+				selectedId = null;
+			}
+			applySelection();
 		} else if (message.type === 'error') {
 			showStatus(message.message);
 		}
@@ -206,7 +216,8 @@
 		title.textContent = `${item.title} — lines ${item.start}–${item.end}`;
 		group.appendChild(title);
 
-		group.addEventListener('click', () => select(item.id));
+		// Selection is driven from the pointer handlers below rather than a click
+		// listener here — see the note there about pointer capture.
 		return group;
 	}
 
@@ -225,7 +236,10 @@
 	// -----------------------------------------------------------------------
 
 	function select(id) {
+		// The two directions are mutually exclusive: picking a node drops whatever
+		// the manuscript selection had lit up.
 		selectedId = id;
+		activeIds = new Set();
 		applySelection();
 
 		const item = placed.get(id);
@@ -237,6 +251,7 @@
 	function applySelection() {
 		for (const group of viewport.querySelectorAll('.node')) {
 			group.classList.toggle('selected', group.dataset.id === selectedId);
+			group.classList.toggle('active', activeIds.has(group.dataset.id));
 		}
 		for (const path of viewport.querySelectorAll('.edge')) {
 			const incident = path.dataset.from === selectedId || path.dataset.to === selectedId;
@@ -296,37 +311,78 @@
 		applyView();
 	}, { passive: false });
 
-	let panning = null;
+	/** How far the pointer may drift before a press counts as a pan, not a click. */
+	const DRAG_THRESHOLD = 4;
+
+	/**
+	 * Panning and node selection share one gesture, so both live here.
+	 *
+	 * They can't be split into "pan on the background, click on a node": calling
+	 * setPointerCapture retargets the following `click` to the capture element, so
+	 * a click listener on the node never hears about it. Instead we track the press
+	 * ourselves and only capture the pointer once it has moved far enough to be a
+	 * drag — a press that never moves is a selection.
+	 */
+	let press = null;
 
 	svg.addEventListener('pointerdown', (event) => {
 		if (event.button !== 0) {
 			return;
 		}
-		panning = { px: event.clientX, py: event.clientY, x: view.x, y: view.y };
-		svg.setPointerCapture(event.pointerId);
-		svg.classList.add('panning');
+		const group = event.target.closest ? event.target.closest('.node') : null;
+		press = {
+			pointerId: event.pointerId,
+			px: event.clientX,
+			py: event.clientY,
+			x: view.x,
+			y: view.y,
+			nodeId: group ? group.dataset.id : null,
+			panning: false,
+		};
 	});
 
 	svg.addEventListener('pointermove', (event) => {
-		if (!panning) {
+		if (!press) {
 			return;
 		}
-		view.x = panning.x + (event.clientX - panning.px);
-		view.y = panning.y + (event.clientY - panning.py);
+		const dx = event.clientX - press.px;
+		const dy = event.clientY - press.py;
+
+		if (!press.panning) {
+			if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+				return;
+			}
+			// Now it's definitely a drag; capture so it survives leaving the panel.
+			press.panning = true;
+			svg.setPointerCapture(press.pointerId);
+			svg.classList.add('panning');
+		}
+
+		view.x = press.x + dx;
+		view.y = press.y + dy;
 		applyView();
 	});
 
-	function endPan(event) {
-		if (!panning) {
+	svg.addEventListener('pointerup', () => {
+		if (!press) {
 			return;
 		}
-		panning = null;
-		svg.releasePointerCapture(event.pointerId);
-		svg.classList.remove('panning');
-	}
+		if (press.panning) {
+			svg.releasePointerCapture(press.pointerId);
+			svg.classList.remove('panning');
+		} else if (press.nodeId !== null) {
+			select(press.nodeId);
+		}
+		press = null;
+	});
 
-	svg.addEventListener('pointerup', endPan);
-	svg.addEventListener('pointercancel', endPan);
+	svg.addEventListener('pointercancel', () => {
+		if (press && press.panning) {
+			svg.releasePointerCapture(press.pointerId);
+			svg.classList.remove('panning');
+		}
+		press = null;
+	});
 
 	window.addEventListener('resize', () => fit());
 

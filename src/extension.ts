@@ -82,6 +82,9 @@ class StoryGraphPanel {
 	private readonly graphUri: vscode.Uri;
 	private readonly disposables: vscode.Disposable[] = [];
 
+	/** Last graph read from disk, kept so selections can be matched against it. */
+	private graph: Graph = { nodes: [], edges: [] };
+
 	/** Marks the lines belonging to the node that was last clicked. */
 	private readonly highlight = vscode.window.createTextEditorDecorationType({
 		backgroundColor: new vscode.ThemeColor('editor.rangeHighlightBackground'),
@@ -134,6 +137,19 @@ class StoryGraphPanel {
 			})
 		);
 
+		// The other direction: moving or extending the selection in the manuscript
+		// lights up every node covering it.
+		this.disposables.push(
+			vscode.window.onDidChangeTextEditorSelection((event) => {
+				if (event.textEditor.document.uri.toString() === this.docUri.toString()) {
+					// Moving in the manuscript supersedes the last node click, so its
+					// highlight goes with it.
+					event.textEditor.setDecorations(this.highlight, []);
+					this.sendActive(event.selections);
+				}
+			})
+		);
+
 		// The graph file is expected to be rewritten by a background process, so
 		// watch it and push updates rather than reading it once at open time.
 		const watcher = vscode.workspace.createFileSystemWatcher(
@@ -158,8 +174,18 @@ class StoryGraphPanel {
 	private async load(): Promise<void> {
 		try {
 			const bytes = await vscode.workspace.fs.readFile(this.graphUri);
-			const graph = normalize(parseYaml(new TextDecoder().decode(bytes)));
-			void this.panel.webview.postMessage({ type: 'graph', graph });
+			this.graph = normalize(parseYaml(new TextDecoder().decode(bytes)));
+			void this.panel.webview.postMessage({ type: 'graph', graph: this.graph });
+
+			// Reflect wherever the cursor already is, rather than waiting for it to move.
+			const editor = vscode.window.visibleTextEditors.find(
+				(candidate) => candidate.document.uri.toString() === this.docUri.toString()
+			);
+			if (editor) {
+				// A background rewrite of the graph file isn't the user picking a
+				// side, so it must not clear a node they clicked.
+				this.sendActive(editor.selections, true);
+			}
 		} catch (err) {
 			void this.panel.webview.postMessage({
 				type: 'error',
@@ -190,6 +216,27 @@ class StoryGraphPanel {
 
 		editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 		editor.setDecorations(this.highlight, [range]);
+	}
+
+	/**
+	 * Tell the webview which nodes the selection touches. A node counts when its
+	 * line range overlaps the selection at all, so a bare cursor (an empty
+	 * selection) and a dragged range go through the same test — and a line sitting
+	 * inside several nodes lights up all of them.
+	 */
+	private sendActive(selections: readonly vscode.Selection[], keepSelection = false): void {
+		const ids = new Set<string>();
+		for (const selection of selections) {
+			const first = selection.start.line + 1;
+			const last = selection.end.line + 1;
+			for (const node of this.graph.nodes) {
+				// Inclusive 1-based ranges overlap unless one ends before the other starts.
+				if (node.start <= last && node.end >= first) {
+					ids.add(node.id);
+				}
+			}
+		}
+		void this.panel.webview.postMessage({ type: 'active', ids: [...ids], keepSelection });
 	}
 
 	private dispose(): void {
