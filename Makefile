@@ -5,5 +5,5 @@ node_modules: package.json
 	@touch node_modules
 
 build: node_modules
-	node esbuild.js
+	npm run package
 	npx @vscode/vsce package --no-dependencies --skip-license --allow-missing-repository --out dist/
