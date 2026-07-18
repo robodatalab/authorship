@@ -45,4 +45,40 @@ const extensionConfig = {
     level: "log", // enables logging required for problem matchers
   },
 };
-module.exports = [ extensionConfig ];
+/**
+ * The graph view runs inside the webview, which is a browser context rather than
+ * Node, so it needs its own bundle. The panel loads it from dist/ by URI.
+ *
+ * @type WebpackConfig
+ */
+const webviewConfig = {
+  target: 'web',
+  mode: 'none',
+  entry: './src/story_graph/view.ts',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'story_graph_view.js'
+  },
+  resolve: {
+    extensions: ['.ts', '.js']
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: 'ts-loader'
+          }
+        ]
+      }
+    ]
+  },
+  devtool: 'nosources-source-map',
+  infrastructureLogging: {
+    level: "log",
+  },
+};
+
+module.exports = [ extensionConfig, webviewConfig ];

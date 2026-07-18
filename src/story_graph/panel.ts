@@ -9,7 +9,7 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml } from 'yaml';
 
-import { graphPathFor, mergeSpans, normalize, type Layer, type LineSpan } from './story_graph_model';
+import { graphPathFor, mergeSpans, normalize, type Layer, type LineSpan } from './model';
 
 /**
  * A webview showing one manuscript's story graph, opened beside the document it
@@ -65,7 +65,10 @@ export class StoryGraphPanel {
 			{
 				enableScripts: true,
 				retainContextWhenHidden: true,
-				localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
+				localResourceRoots: [
+					vscode.Uri.joinPath(context.extensionUri, 'media'),
+					vscode.Uri.joinPath(context.extensionUri, 'dist'),
+				],
 			}
 		);
 		this.panel.webview.html = this.html(this.panel.webview);
@@ -224,7 +227,8 @@ export class StoryGraphPanel {
 
 	private html(webview: vscode.Webview): string {
 		const media = vscode.Uri.joinPath(this.context.extensionUri, 'media');
-		const script = webview.asWebviewUri(vscode.Uri.joinPath(media, 'graph.js'));
+		const dist = vscode.Uri.joinPath(this.context.extensionUri, 'dist');
+		const script = webview.asWebviewUri(vscode.Uri.joinPath(dist, 'story_graph_view.js'));
 		const style = webview.asWebviewUri(vscode.Uri.joinPath(media, 'graph.css'));
 		const nonce = nonceString();
 

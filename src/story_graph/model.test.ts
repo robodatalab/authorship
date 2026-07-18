@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
-import { graphPathFor, mergeSpans, normalize } from './story_graph_model';
+import { graphPathFor, mergeSpans, normalize } from './model';
 
 /** The shape currently in data/story_1.graph.yaml — two layers with repeating node ids. */
 const TWO_LAYERS = `
