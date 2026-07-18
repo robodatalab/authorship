@@ -9,30 +9,7 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml } from 'yaml';
 
-/**
- * One layer of the story, as the webview wants it — ids normalized to strings,
- * edges as from/to. Node ids are only unique within a layer, so nothing keyed by
- * node id may be shared between them.
- */
-interface Layer {
-	id: string;
-	nodes: GraphNode[];
-	edges: GraphEdge[];
-}
-
-interface GraphNode {
-	id: string;
-	title: string;
-	/** 1-based line numbers into the manuscript. */
-	start: number;
-	end: number;
-}
-
-interface GraphEdge {
-	id: string;
-	from: string;
-	to: string;
-}
+import { graphPathFor, mergeSpans, normalize, type Layer, type LineSpan } from './story_graph_model';
 
 /**
  * A webview showing one manuscript's story graph, opened beside the document it
@@ -170,32 +147,22 @@ export class StoryGraphPanel {
 		const doc = await vscode.workspace.openTextDocument(this.docUri);
 		const lastLine = doc.lineCount - 1;
 
-		const ranges: vscode.Range[] = [];
+		const spans: LineSpan[] = [];
 		for (const entry of input) {
 			const start = Number((entry as { start?: unknown })?.start);
 			const end = Number((entry as { end?: unknown })?.end);
 			if (!Number.isFinite(start) || !Number.isFinite(end)) {
 				continue;
 			}
-			const first = clamp(Math.min(start, end) - 1, 0, lastLine);
-			const final = clamp(Math.max(start, end) - 1, 0, lastLine);
-			ranges.push(new vscode.Range(first, 0, final, doc.lineAt(final).text.length));
+			spans.push({ start: Math.min(start, end), end: Math.max(start, end) });
 		}
 
-		// Node ranges can share lines. Left alone, two overlapping ranges stack their
-		// translucent backgrounds and the shared lines read as a second selection.
-		ranges.sort((a, b) => a.start.line - b.start.line);
-		const merged: vscode.Range[] = [];
-		for (const range of ranges) {
-			const previous = merged[merged.length - 1];
-			if (previous && range.start.line <= previous.end.line) {
-				if (range.end.line > previous.end.line) {
-					merged[merged.length - 1] = new vscode.Range(previous.start, range.end);
-				}
-			} else {
-				merged.push(range);
-			}
-		}
+		const merged = mergeSpans(spans).map((span) => {
+			const first = clamp(span.start - 1, 0, lastLine);
+			const final = clamp(span.end - 1, 0, lastLine);
+			return new vscode.Range(first, 0, final, doc.lineAt(final).text.length);
+		});
+
 		// An empty selection still has to be applied — switching to a layer that
 		// matches nothing must clear the old highlight, not leave it behind.
 		if (merged.length === 0) {
@@ -289,66 +256,8 @@ export class StoryGraphPanel {
 	}
 }
 
-/** `story_1.md` sits next to `story_1.graph.yaml`. */
 function graphUriFor(docUri: vscode.Uri): vscode.Uri {
-	return docUri.with({ path: docUri.path.replace(/\.md$/i, '') + '.graph.yaml' });
-}
-
-/**
- * Flatten the on-disk shape into the layers the webview draws.
- *
- * `layer:` may be a list of layers or, as it was written originally, a single
- * mapping; both are accepted so an older file still opens.
- */
-function normalize(raw: unknown): Layer[] {
-	const root = (raw ?? {}) as Record<string, unknown>;
-	const declared = root.layer ?? root.layers ?? root;
-	const list = Array.isArray(declared) ? declared : [declared];
-
-	return list
-		.map((entry, index) => normalizeLayer(entry, index))
-		.filter((layer) => layer.nodes.length > 0);
-}
-
-/**
- * Note that `start`/`end` mean different things in the two sections: line numbers
- * on a node, but node ids on an edge. Renaming them here keeps that ambiguity out
- * of the rest of the code.
- */
-function normalizeLayer(entry: unknown, index: number): Layer {
-	const layer = (entry ?? {}) as Record<string, unknown>;
-
-	const nodes: GraphNode[] = asArray(layer.nodes)
-		.map((entry) => {
-			const item = entry as Record<string, unknown>;
-			return {
-				id: String(item.node ?? item.id ?? ''),
-				title: String(item.title ?? item.node ?? item.id ?? ''),
-				start: Number(item.start),
-				end: Number(item.end),
-			};
-		})
-		.filter((node) => node.id !== '' && Number.isFinite(node.start) && Number.isFinite(node.end));
-
-	// Drop edges pointing at nodes that don't exist — the file is machine-written
-	// and may be mid-update when we read it.
-	const known = new Set(nodes.map((node) => node.id));
-	const edges: GraphEdge[] = asArray(layer.edges)
-		.map((entry, index) => {
-			const item = entry as Record<string, unknown>;
-			return {
-				id: String(item.edge ?? item.id ?? index),
-				from: String(item.start ?? item.from ?? ''),
-				to: String(item.end ?? item.to ?? ''),
-			};
-		})
-		.filter((edge) => known.has(edge.from) && known.has(edge.to));
-
-	return { id: String(layer.id ?? index + 1), nodes, edges };
-}
-
-function asArray(value: unknown): unknown[] {
-	return Array.isArray(value) ? value : [];
+	return docUri.with({ path: graphPathFor(docUri.path) });
 }
 
 function basename(uri: vscode.Uri): string {
