@@ -1,50 +1,51 @@
-"""HTTP surface. Loopback only — the manuscript does not leave the machine."""
-
-from fastapi import FastAPI, HTTPException
+import torch
+from fastapi import FastAPI
 from pydantic import BaseModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from .engine import DEFAULT_MODEL, Engine, parse_json
-from .tasks import TASKS, numbered
+MODEL = "Qwen/Qwen3.5-4B"
 
-app = FastAPI()
-engine = Engine(DEFAULT_MODEL)
+
+class Engine:
+    def __init__(self, model_id: str = MODEL) -> None:
+        self.model_id = model_id
+        self.status = "downloading"
+        self.tokenizer = None
+        self.model = None
+
+    def load(self) -> None:
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_id, dtype=torch.bfloat16, device_map="mps"
+        )
+        self.model.eval()
+        self.status = "ready"
+
+    def infer(self, prompt: str, max_new_tokens: int = 1024) -> str:
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            output = self.model.generate(
+                **inputs, max_new_tokens=max_new_tokens, do_sample=False
+            )
+        return self.tokenizer.decode(
+            output[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True
+        )
 
 
 class RunRequest(BaseModel):
-    task: str
-    text: str
+    prompt: str
     max_new_tokens: int = 1024
+
+
+app = FastAPI()
+engine = Engine()
 
 
 @app.get("/health")
 def health() -> dict:
-    return {
-        "status": "ready" if engine.ready else "loading",
-        "model": engine.model_id,
-        "tasks": sorted(TASKS),
-    }
+    return {"status": engine.status, "model": engine.model_id}
 
 
 @app.post("/run")
 def run(request: RunRequest) -> dict:
-    if not engine.ready:
-        raise HTTPException(status_code=503, detail="Model is still loading.")
-
-    task = TASKS.get(request.task)
-    if task is None:
-        raise HTTPException(status_code=400, detail=f"Unknown task '{request.task}'.")
-
-    result = engine.generate(
-        system=task.system,
-        prompt=task.prompt(numbered(request.text)),
-        max_new_tokens=request.max_new_tokens,
-    )
-
-    # `raw` is returned alongside the parse so a failure can be read rather than
-    # guessed at — with an untuned model that is most of the debugging.
-    return {
-        "task": request.task,
-        "output": parse_json(result["raw"]),
-        "raw": result["raw"],
-        "usage": result["usage"],
-    }
+    return {"output": engine.infer(request.prompt, request.max_new_tokens)}
