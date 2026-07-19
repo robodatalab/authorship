@@ -35,6 +35,16 @@
 				"npm: watch-tests"
 			],
 			"problemMatcher": []
+		},
+		{
+			"label": "uv sync",
+			"type": "shell",
+			"command": "uv sync",
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared"
+			},
+			"problemMatcher": []
 		}
 	]
 }
