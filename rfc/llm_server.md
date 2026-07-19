@@ -2,84 +2,103 @@
 
 ## 1. Framework
 
-MLX, using `mlx_lm` as a library.
+`transformers` + `torch` on Metal (MPS). Weights come from HuggingFace, run locally, and the
+manuscript never leaves the machine.
 
-The plan is one base model with a small LoRA adapter per task — scene detection, plot
-detection, character tracking — rather than one general model prompted three ways. Small
-tuned adapters beat a small model's zero-shot output at narrow extraction, and each is
-20–100 MB against a 2.5 GB base, so all of them stay in memory and are selected per request.
-
-MLX because the same stack trains the adapters (`mlx_lm.lora`) and serves them, and because
-`mlx_lm.tuner.utils` exposes `load_adapters(model, path)` and `remove_lora_layers(model)`,
-which is what per-request selection needs.
-
-We do not use `mlx_lm.server`: it binds one adapter from the command line, and it ignores
-`response_format`, so schema-constrained output is not available through it.
+Not MLX: it has no FlashAttention and its prefill degrades quadratically at long context,
+which is the binding cost here — not generation speed.
 
 ## 2. Model
 
-`mlx-community/Qwen3.5-4B-4bit` — ~2.5 GB resident, 262k context. Fits 36 GB alongside an
-IDE, and a 50k-word manuscript (~65k tokens) fits in one prompt, so no chunking.
+`Qwen/Qwen3.5-4B` in bf16, ~8 GB resident on a 36 GB machine.
 
-Fallback if 4B extracts poorly: `mlx-community/Qwen3.5-9B-4bit`, ~5 GB, same architecture
-and context, so it is a config change and an adapter retrain.
+Downloaded to the standard HuggingFace cache (`~/.cache/huggingface/hub`, or `$HF_HOME/hub`).
+`huggingface_hub.snapshot_download(model_id, local_files_only=True)` decides whether a
+download is needed; a partially fetched model raises `IncompleteSnapshotError`, which derives
+from `LocalEntryNotFoundError`, so an interrupted download is correctly treated as missing.
 
-Weights are pulled from HuggingFace on first start, after confirmation, into the standard
-HuggingFace cache (`~/.cache/huggingface/hub`, or `$HF_HOME/hub`). Adapters we train live
-in the repo under `server/adapters/<task>/`.
+The checkpoint declares `Qwen3_5ForConditionalGeneration` (multimodal), while
+`AutoModelForCausalLM` maps `qwen3_5` to `Qwen3_5ForCausalLM`. The loader and the checkpoint
+therefore disagree, and the vision weights are unused.
 
 ## 3. Server
 
-Python, FastAPI, in `server/`.
+Two processes.
 
-Holds the base model resident and every adapter alongside it, applying the requested task's
-adapter per request. One request at a time — generation saturates the GPU — with a queue of
-depth one, where a new request replaces a waiting one.
+**Parent** — FastAPI, in `server/api.py`. Holds no weights and never loads a model, so its
+event loop always answers `/health` immediately. This is the whole reason for the split: a
+load on the parent's threads starves the loop and the status bar reports a live server as
+offline.
 
-Output is constrained with [Outlines](https://dottxt-ai.github.io/outlines/latest/features/models/mlxlm/),
-which compiles the task's JSON schema into a logit processor, so responses parse by
-construction.
+**Worker** — `server/worker.py`, a `spawn` child. Checks the cache, downloads if needed,
+loads the model onto MPS, then serves inference from a queue for the life of the server.
+`spawn` rather than `fork` because forking a process that has imported torch is unsafe.
 
-**Environment.** `uv` creates and owns the virtualenv from `server/pyproject.toml`. The
-extension runs `uv sync` on first start, behind a progress notification.
+Three queues connect them: `status` (child → parent), `requests` and `responses`. The parent
+runs one small thread draining `status`; inference is serialised behind a lock, since there
+is one model on one GPU.
 
-**Start.** On user toggle only, never on extension activation. The extension spawns
-`uv run --project server authorship-model`, which runs the FastAPI app inside that venv. The
-service binds `127.0.0.1:0` and prints `AUTHORSHIP_PORT=<n>` as its first stdout line; the
-extension reads the port from there, then polls `/health` until it reports ready.
+**Start.** `python -m server --port 8765`, or the `Extension + Server` compound in
+`.vscode/launch.json`, which also attaches the debugger. Dependencies come from the root
+`pyproject.toml` via `uv sync` (`package = false` — it is an app, nothing to build).
 
-**Stop.** On toggle off and on `deactivate`: SIGTERM, then SIGKILL after 2s. An unexpected
-exit gets one restart, then stays down and reports.
+**Stop.** FastAPI's lifespan shutdown sends a sentinel, `join(30s)`, then `terminate()`,
+`join(5s)`, then `kill()`. The child is `daemon=True`, so it cannot outlive the parent.
 
-Status bar: `stopped` / `starting` / `ready` / `working` / `error`.
+**Status** progresses `starting` → `downloading` → `loading` → `ready`, and `stopped` on
+shutdown.
 
 ## 4. API
 
-Loopback, JSON.
+Loopback, JSON, port 8765.
 
-**`GET /health`** → `{ status: "loading" | "ready", model, adapters, busy }`
+**`GET /health`** → `{ "status": "…", "model": "Qwen/Qwen3.5-4B" }`
 
-The port listens well before the weights finish loading, so this is what readiness means.
+Answers instantly in every state, including mid-download. This is what the frontend polls.
 
-**`POST /run`** — run a task against the manuscript.
+**`POST /run`**
 
 ```json
-{ "id": "b3f1", "task": "scene_detection", "text": "<manuscript>" }
+{ "prompt": "…", "max_new_tokens": 1024 }
 ```
 ```json
-{ "id": "b3f1", "output": { … }, "usage": { "prompt_tokens": 64210, "ms": 41300 } }
+{ "output": "…" }
 ```
 
-`task` selects the adapter and the schema from a table in `tasks.py`; until a task's adapter
-is trained it runs against the bare base with the same schema. `output` is parsed and
-conforms to that schema. `usage` is there to measure whether whole-manuscript rebuilds are
-affordable.
+Synchronous — the reply carries the complete generation. `503` with the current status when
+the model is not `ready`.
 
-Errors: `400` unknown task or text over context, `409` cancelled, `503` loading, `500`
-generation failed.
+## 5. Frontend
 
-**`DELETE /run/{id}`** — cancel a running or queued request. The extension calls this when a
-newer save supersedes a rebuild already in flight.
+`src/llm/health.ts` polls `/health` every 2s and mirrors it into the status bar via the pure
+mapping in `src/llm/state.ts`:
+
+| server | status bar |
+|---|---|
+| `ready` | `Authorship: ok` |
+| `downloading` | `Authorship: downloading` |
+| `starting`, `loading` | `Authorship: loading` |
+| no answer, `stopped` | `Authorship: offline` |
+
+A request timeout holds the previous state rather than reporting `offline` — during a load
+the server can be slow without being gone. Only a refused connection means offline.
+
+The extension observes and never starts, stops, or spawns the server.
+
+## 6. Extending it
+
+**A new endpoint that needs no model** — add a route to `server/api.py`.
+
+**A new endpoint that needs the model** — the request queue carries a `dict`, so add a field
+naming the operation, branch on it in `worker.run`'s loop, and add the matching route. The
+parent must stay free of transformers imports.
+
+**Tasks** — there is no task mechanism. The caller supplies the prompt string and gets raw
+text back; no prompt table, no output schema, no parsing. Adding tasks means deciding where
+prompts live and what the response shape is, and belongs to
+[story_graph_builder.md](story_graph_builder.md).
+
+**Adapters** — none. No LoRA is trained, loaded, or served.
 
 ---
 
