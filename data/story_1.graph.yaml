@@ -1,59 +1,29 @@
 layer:
-  - id: 1
-    nodes:
-      - node: 1
-        title: knocking at the door
-        start: 3
-        end: 5
-      - node: 2
-        title: checking
-        start: 5
-        end: 11
-      - node: 3
-        title: preparing for a walk
-        start: 3
-        end: 3
-      - node: 4
-        title: sarah curious
-        start: 9
-        end: 11
-      - node: 5
-        title: sarah calling michael
-        start: 16
-        end: 17
-      - node: 6
-        title: sarah looking for michael
-        start: 17
-        end: 21
-    edges:
-      - edge: 1
-        start: 1
-        end: 2
-      - edge: 2
-        start: 2
-        end: 4
-      - edge: 3
-        start: 3
-        end: 1
-      - edge: 4
-        start: 4
-        end: 5
-      - edge: 5
-        start: 5
-        end: 6
-
-  - id: 2
-    nodes:
-      - node: 1
-        title: introduction 
-        start: 1
-        end: 11
-      - node: 2
-        title: investigation
-        start: 14
-        end: 21
-  
-    edges:
-      - edge: 1
-        start: 1
-        end: 2
+- id: 1
+  nodes:
+  - node: 1
+    title: knocking at the door
+    start: 3
+    end: 5
+  - node: 2
+    title: michael goes down
+    start: 5
+    end: 11
+  - node: 3
+    title: sarah checks the door
+    start: 14
+    end: 17
+  - node: 4
+    title: the house is empty
+    start: 17
+    end: 21
+  edges:
+  - edge: 1
+    start: 1
+    end: 2
+  - edge: 2
+    start: 2
+    end: 3
+  - edge: 3
+    start: 3
+    end: 4

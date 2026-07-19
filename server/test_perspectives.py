@@ -9,7 +9,6 @@ import unittest
 from .perspectives import (
     SCENE_SYSTEM,
     ScenePerspective,
-    answer,
     as_edge,
     as_id,
     as_line,
@@ -46,27 +45,13 @@ class Chat(unittest.TestCase):
             chat("SYS", "USR"),
             "<|im_start|>system\nSYS<|im_end|>\n"
             "<|im_start|>user\nUSR<|im_end|>\n"
-            "<|im_start|>assistant\n<think>\n",
+            "<|im_start|>assistant\n<think>\n\n</think>\n\n",
         )
 
-    def test_ends_inside_the_thinking_block(self) -> None:
-        # The checkpoint reasons before it answers; the generation prompt opens
-        # that block so `answer` has a marker to split on.
-        self.assertTrue(chat("s", "u").endswith("<think>\n"))
-
-
-class Answer(unittest.TestCase):
-    def test_drops_the_reasoning(self) -> None:
-        self.assertEqual(answer("working it out</think>\n\nthe answer"), "\n\nthe answer")
-
-    def test_keeps_everything_when_there_was_no_reasoning(self) -> None:
-        self.assertEqual(answer("the answer"), "the answer")
-
-    def test_splits_on_the_first_marker(self) -> None:
-        self.assertEqual(answer("a</think>b</think>c"), "b</think>c")
-
-    def test_empty_answer_after_the_marker(self) -> None:
-        self.assertEqual(answer("thought</think>"), "")
+    def test_hands_the_model_a_closed_reasoning_block(self) -> None:
+        # Reasoning is this checkpoint's default: omitting the marker makes it
+        # write its own. A block already closed is what turns it off.
+        self.assertTrue(chat("s", "u").endswith("<think>\n\n</think>\n\n"))
 
 
 class JsonObject(unittest.TestCase):
@@ -88,11 +73,8 @@ class JsonObject(unittest.TestCase):
     def test_escaped_quote_inside_a_string(self) -> None:
         self.assertEqual(json_object('{"a": "say \\" }"}'), {"a": 'say " }'})
 
-    def test_reasoning_braces_are_not_mistaken_for_the_answer(self) -> None:
-        # The model's working contains candidate objects. Scanning the whole
-        # reply would find one of those before the real answer.
-        reply = 'maybe {"nodes": []} or\n</think>\n{"nodes": [1]}'
-        self.assertEqual(json_object(reply), {"nodes": [1]})
+    def test_takes_the_first_of_several_objects(self) -> None:
+        self.assertEqual(json_object('{"a": 1}\nor maybe {"a": 2}'), {"a": 1})
 
     def test_no_object_at_all(self) -> None:
         with self.assertRaises(ValueError):
@@ -305,7 +287,6 @@ class Process(unittest.TestCase):
 
     def test_reply_becomes_a_graph(self) -> None:
         reply = (
-            "let me work through it</think>\n"
             '```json\n{"nodes": [{"id": 1, "title": "knocking", "start": 2, "end": 4}],'
             ' "edges": []}\n```'
         )
@@ -317,7 +298,10 @@ class Process(unittest.TestCase):
         prompt = self.prompts[0]
         self.assertIn(SCENE_SYSTEM, prompt)
         self.assertIn("0 | one\n1 | two", prompt)
-        self.assertTrue(prompt.endswith("<think>\n"))
+
+    def test_prompt_turns_reasoning_off(self) -> None:
+        ScenePerspective(self.infer('{"nodes": []}')).process("one")
+        self.assertTrue(self.prompts[0].endswith("<think>\n\n</think>\n\n"))
 
     def test_token_budget_is_passed_through(self) -> None:
         perspective = ScenePerspective(self.infer('{"nodes": []}'), max_new_tokens=99)

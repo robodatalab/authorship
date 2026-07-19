@@ -7,7 +7,10 @@ manuscript, prising JSON out of a reply — lives at the top.
 import json
 from typing import Any, Protocol
 
+from . import log
 from .story_graph import Edge, Node, StoryGraph, StoryPerspective
+
+_log = log.logger(__name__)
 
 
 class Infer(Protocol):
@@ -36,32 +39,23 @@ def numbered(story_markdown: str) -> str:
 
 
 def chat(system: str, user: str) -> str:
-    """Render a turn the way Qwen's chat template does.
+    """Render a turn the way Qwen's chat template does, with reasoning off.
 
     The worker tokenizes whatever string it is handed, so the markers belong to
     the prompt rather than to the server — a perspective that wanted a different
     model would render a different prompt, and nothing else would move.
 
-    The generation prompt ends inside `<think>`: this checkpoint reasons before
-    it answers, and truncating that habit costs more accuracy on line numbers
-    than the reasoning costs in tokens.
+    The empty `<think></think>` is how this checkpoint is told not to reason. It
+    is a reasoning model: left to itself it opens the block and works through
+    the manuscript first, which on this task costs thousands of tokens to reach
+    the same JSON. Handing it a block already closed is the documented way out —
+    omitting the marker is not, since the model then writes its own.
     """
     return (
         f"<|im_start|>system\n{system}<|im_end|>\n"
         f"<|im_start|>user\n{user}<|im_end|>\n"
-        f"<|im_start|>assistant\n<think>\n"
+        f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
     )
-
-
-def answer(reply: str) -> str:
-    """Drop the reasoning, keep what the model actually said.
-
-    The model works through the manuscript before answering, and that working
-    contains braces — candidate groupings, half-written objects. Scanning the
-    whole reply for JSON would find one of those first.
-    """
-    _, marker, rest = reply.partition("</think>")
-    return rest if marker else reply
 
 
 def json_object(reply: str) -> dict[str, Any]:
@@ -72,7 +66,6 @@ def json_object(reply: str) -> dict[str, Any]:
     all three. Raises `ValueError` if there is nothing usable, which fails the
     request and leaves the existing graph file alone.
     """
-    reply = answer(reply)
     start = reply.find("{")
     if start < 0:
         raise ValueError("no JSON object in the model's reply")
@@ -152,10 +145,10 @@ class ScenePerspective(StoryPerspective):
     starting position, not a settled one.
     """
 
-    #: Room for the model to reason over the manuscript and still answer. It
-    #: thinks before it writes, and a budget that only fits the JSON truncates
-    #: mid-thought — which parses as nothing at all.
-    def __init__(self, infer: Infer, max_new_tokens: int = 8192) -> None:
+    #: Enough for the JSON and no more. With reasoning off the reply is a scene
+    #: list, which runs to hundreds of tokens — and at the rate this machine
+    #: generates, every token in the budget is a second the writer waits.
+    def __init__(self, infer: Infer, max_new_tokens: int = 1024) -> None:
         self._infer = infer
         self._max_new_tokens = max_new_tokens
 
@@ -179,7 +172,9 @@ def build(payload: dict[str, Any]) -> StoryGraph:
     nodes: list[Node] = []
     for entry in payload.get("nodes") or []:
         node = as_node(entry)
-        if node is not None:
+        if node is None:
+            _log.warning("dropped an unusable scene: %s", entry)
+        else:
             nodes.append(node)
 
     known = {node.id for node in nodes}
@@ -187,7 +182,9 @@ def build(payload: dict[str, Any]) -> StoryGraph:
     for entry in payload.get("edges") or []:
         edge = as_edge(entry)
         # An edge naming a scene that did not survive has nothing to connect.
-        if edge is not None and edge.source in known and edge.target in known:
+        if edge is None or edge.source not in known or edge.target not in known:
+            _log.warning("dropped an unusable link: %s", entry)
+        else:
             edges.append(edge)
 
     return StoryGraph(nodes=tuple(nodes), edges=tuple(edges))

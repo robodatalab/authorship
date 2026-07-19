@@ -2,6 +2,7 @@ import argparse
 
 import uvicorn
 
+from . import log
 from .api import app
 
 
@@ -10,6 +11,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
+    log.setup()
     uvicorn.run(app, host="127.0.0.1", port=args.port)
 
 

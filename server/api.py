@@ -4,6 +4,7 @@ event loop is never starved and /health always answers immediately."""
 import multiprocessing as mp
 import re
 import threading
+import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from multiprocessing.process import BaseProcess
@@ -14,11 +15,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import story_graph, worker
+from . import log, story_graph, worker
 from .perspectives import Infer, ScenePerspective
 from .story_graph import StoryPerspective
 
 MODEL = "Qwen/Qwen3.5-4B"
+
+_log = log.logger(__name__)
 
 STARTING = "starting"
 STOPPED = "stopped"
@@ -149,19 +152,41 @@ def build(request: BuildRequest) -> dict[str, Any]:
     try:
         story_markdown = document.read_text(encoding="utf-8")
     except OSError as error:
+        _log.warning("cannot read %s: %s", document, error)
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    try:
-        graphs = [
-            perspective.process(story_markdown)
-            for perspective in perspectives(instance.infer)
-        ]
-    except ValueError as error:
-        # An unusable reply leaves the existing graph file alone.
-        raise HTTPException(status_code=502, detail=str(error)) from error
+    _log.info(
+        "build %s (%d lines)", document.name, len(story_markdown.splitlines())
+    )
+    started = time.monotonic()
+
+    graphs = []
+    for perspective in perspectives(instance.infer):
+        name = type(perspective).__name__
+        at = time.monotonic()
+        try:
+            graph = perspective.process(story_markdown)
+        except ValueError as error:
+            # An unusable reply leaves the existing graph file alone.
+            _log.warning("%s failed after %.1fs: %s", name, time.monotonic() - at, error)
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        _log.info(
+            "%s produced %d nodes, %d edges in %.1fs",
+            name,
+            len(graph.nodes),
+            len(graph.edges),
+            time.monotonic() - at,
+        )
+        graphs.append(graph)
 
     target = graph_path_for(document)
     target.write_text(story_graph.to_yaml(graphs), encoding="utf-8")
+    _log.info(
+        "wrote %s, %d layers, build took %.1fs",
+        target.name,
+        len(graphs),
+        time.monotonic() - started,
+    )
 
     return {
         "path": str(target),

@@ -2,8 +2,15 @@
 //
 // Free of the `vscode` module so the wording can be asserted directly.
 
-/** What `GET /health` reports, plus the case where nothing answers. */
-export type Phase = 'offline' | 'downloading' | 'loading' | 'ready';
+/**
+ * What `GET /health` reports, plus the case where nothing answers, plus what we
+ * are doing to the server ourselves.
+ *
+ * `building` is the odd one out: it is not a state the server publishes, it is
+ * a request of ours that is still in flight. `/health` stays a statement about
+ * the model alone.
+ */
+export type Phase = 'offline' | 'downloading' | 'loading' | 'ready' | 'building';
 
 export interface StatusDisplay {
 	text: string;
@@ -57,6 +64,11 @@ export function renderStatus(phase: Phase, model: string): StatusDisplay {
 			return {
 				text: '$(book) Authorship: ok',
 				tooltip: `${model} is loaded and serving.`,
+			};
+		case 'building':
+			return {
+				text: '$(sync~spin) Authorship: building',
+				tooltip: `Reading the manuscript with ${model}.`,
 			};
 	}
 }

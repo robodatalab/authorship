@@ -18,6 +18,7 @@ export class ModelHealth implements vscode.Disposable {
 	private readonly timer: NodeJS.Timeout;
 	private phase: Phase = 'offline';
 	private model = 'the model';
+	private building = false;
 
 	constructor(private readonly port: number) {
 		this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -48,8 +49,21 @@ export class ModelHealth implements vscode.Disposable {
 		this.render();
 	}
 
+	/**
+	 * Say whether a graph build is in flight.
+	 *
+	 * Polling carries on underneath and keeps `phase` current, so whatever the
+	 * server has become is already showing the moment the build ends.
+	 */
+	setBuilding(building: boolean): void {
+		this.building = building;
+		this.render();
+	}
+
 	private render(): void {
-		const display = renderStatus(this.phase, this.model);
+		// A build outranks the health phases: it can only have started from
+		// `ready`, and it is the more specific thing to say.
+		const display = renderStatus(this.building ? 'building' : this.phase, this.model);
 		this.status.text = display.text;
 		this.status.tooltip = display.tooltip;
 	}
