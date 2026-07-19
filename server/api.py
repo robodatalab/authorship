@@ -2,17 +2,21 @@
 event loop is never starved and /health always answers immediately."""
 
 import multiprocessing as mp
+import re
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from multiprocessing.process import BaseProcess
 from multiprocessing.queues import Queue
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import worker
+from . import story_graph, worker
+from .perspectives import Infer, ScenePerspective
+from .story_graph import StoryPerspective
 
 MODEL = "Qwen/Qwen3.5-4B"
 
@@ -91,9 +95,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         instance.stop()
 
 
+def perspectives(infer: Infer) -> Sequence[StoryPerspective]:
+    """The readings of a story we build, in the order they become layers.
+
+    Hardcoded: there is one, and choosing between them is not yet a question
+    anyone is asking.
+    """
+    return [ScenePerspective(infer)]
+
+
+def graph_path_for(document: Path) -> Path:
+    """`story.md` sits next to `story.graph.yaml` — by convention, not
+    configuration. Mirrors `graphPathFor` in src/story_graph/model.ts."""
+    stem = re.sub(r"\.md$", "", document.name, flags=re.I)
+    return document.with_name(stem + ".graph.yaml")
+
+
 class RunRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 1024
+
+
+class BuildRequest(BaseModel):
+    #: The manuscript. The server reads it, so there is one answer to what "the
+    #: file" means and the prose stays out of the request.
+    path: str
 
 
 app = FastAPI(lifespan=lifespan)
@@ -110,3 +136,36 @@ def run(request: RunRequest) -> dict[str, str]:
     if instance.status != worker.READY:
         raise HTTPException(status_code=503, detail=f"Model is {instance.status}.")
     return {"output": instance.infer(request.prompt, request.max_new_tokens)}
+
+
+@app.post("/build")
+def build(request: BuildRequest) -> dict[str, Any]:
+    """Run every perspective over the manuscript and write the layered file."""
+    instance: Worker = app.state.worker
+    if instance.status != worker.READY:
+        raise HTTPException(status_code=503, detail=f"Model is {instance.status}.")
+
+    document = Path(request.path)
+    try:
+        story_markdown = document.read_text(encoding="utf-8")
+    except OSError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    try:
+        graphs = [
+            perspective.process(story_markdown)
+            for perspective in perspectives(instance.infer)
+        ]
+    except ValueError as error:
+        # An unusable reply leaves the existing graph file alone.
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    target = graph_path_for(document)
+    target.write_text(story_graph.to_yaml(graphs), encoding="utf-8")
+
+    return {
+        "path": str(target),
+        "layers": [
+            {"nodes": len(graph.nodes), "edges": len(graph.edges)} for graph in graphs
+        ],
+    }
