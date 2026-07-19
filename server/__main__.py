@@ -3,7 +3,7 @@ import threading
 
 import uvicorn
 
-from .api import app, engine
+from .api import Engine, app
 
 
 def main() -> None:
@@ -11,7 +11,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
-    threading.Thread(target=engine.load, daemon=True).start()
+    def start_engine() -> None:
+        app.state.engine = Engine.start()
+
+    threading.Thread(target=start_engine, daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=args.port)
 
 

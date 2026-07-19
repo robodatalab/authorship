@@ -1,35 +1,47 @@
+from typing import Any, Protocol
+
 import torch
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedTokenizerBase,
+)
 
 MODEL = "Qwen/Qwen3.5-4B"
 
 
-class Engine:
-    def __init__(self, model_id: str = MODEL) -> None:
-        self.model_id = model_id
-        self.status = "downloading"
-        self.tokenizer = None
-        self.model = None
+class GenerativeModel(Protocol):
+    @property
+    def device(self) -> torch.device: ...
 
-    def load(self) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, dtype=torch.bfloat16, device_map="mps"
+    def generate(self, **kwargs: Any) -> Any: ...
+
+
+class Engine:
+    def __init__(self, model, tokenizer: PreTrainedTokenizerBase) -> None:
+        self.model = model
+        self.tokenizer = tokenizer
+
+    @classmethod
+    def start(cls, model_id: str = MODEL) -> "Engine":
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, dtype=torch.bfloat16, device_map="mps"
         )
-        self.model.eval()
-        self.status = "ready"
+        model.eval()
+        return cls(model, tokenizer)
 
     def infer(self, prompt: str, max_new_tokens: int = 1024) -> str:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        with torch.no_grad():
-            output = self.model.generate(
-                **inputs, max_new_tokens=max_new_tokens, do_sample=False
-            )
-        return self.tokenizer.decode(
+        output = self.model.generate(
+            **inputs, max_new_tokens=max_new_tokens, do_sample=False
+        )
+        text = self.tokenizer.decode(
             output[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True
         )
+        return text if isinstance(text, str) else "".join(text)
 
 
 class RunRequest(BaseModel):
@@ -38,14 +50,19 @@ class RunRequest(BaseModel):
 
 
 app = FastAPI()
-engine = Engine()
+app.state.engine = None
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": engine.status, "model": engine.model_id}
+    return {
+        "status": "ready" if app.state.engine else "downloading",
+        "model": MODEL,
+    }
 
 
 @app.post("/run")
 def run(request: RunRequest) -> dict:
-    return {"output": engine.infer(request.prompt, request.max_new_tokens)}
+    if app.state.engine is None:
+        raise HTTPException(status_code=503, detail="Model is still downloading.")
+    return {"output": app.state.engine.infer(request.prompt, request.max_new_tokens)}
