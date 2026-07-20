@@ -2,6 +2,8 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { StoryGraphPanel } from './story_graph/panel';
+import { ModelHealth } from './llm/health';
+import { GraphBuilder } from './llm/build';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -21,6 +23,15 @@ export function activate(context: vscode.ExtensionContext) {
 			new ManuscriptProvider()
 		)
 	);
+
+	// Reflects the model server's own state in the status bar. The server is
+	// started by the launch configuration, not from here.
+	const health = new ModelHealth(8765);
+	context.subscriptions.push(health);
+
+	// Saving a manuscript rebuilds its story graph. The builder shares the status
+	// bar, so the same item reads `building` while a rebuild is in flight.
+	context.subscriptions.push(new GraphBuilder(8765, health));
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('authorship.showStoryGraph', () => {

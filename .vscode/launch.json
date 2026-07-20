@@ -16,6 +16,34 @@
 				"${workspaceFolder}/dist/**/*.js"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			// Breakpoints in server/*.py work here. The port is fixed rather than
+			// ephemeral so the extension knows where to find a server it did not
+			// start itself.
+			"name": "Story Model Server",
+			"type": "debugpy",
+			"request": "launch",
+			"module": "server",
+			"args": [
+				"--port",
+				"8765"
+			],
+			"python": "${workspaceFolder}/.venv/bin/python",
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"preLaunchTask": "uv sync"
+		}
+	],
+	"compounds": [
+		{
+			"name": "Extension + Server",
+			"configurations": [
+				"Run Extension",
+				"Story Model Server"
+			],
+			"stopAll": true
 		}
 	]
 }

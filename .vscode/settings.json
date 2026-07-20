@@ -9,5 +9,18 @@
 		"dist": true // set this to false to include "dist" folder in search results
 	},
 	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-	"js/ts.tsc.autoDetect": "off"
+	"js/ts.tsc.autoDetect": "off",
+	// Python tests are unittest, discovered from the repo root so `server` stays
+	// an importable package — the test module uses relative imports.
+	"python.testing.unittestEnabled": true,
+	"python.testing.pytestEnabled": false,
+	"python.testing.cwd": "${workspaceFolder}",
+	"python.testing.unittestArgs": [
+		"-v",
+		"-s",
+		".",
+		"-p",
+		"test_*.py"
+	],
+	"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
 }

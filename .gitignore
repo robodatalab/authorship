@@ -4,3 +4,8 @@ out/
 *.vsix
 .DS_Store
 .vscode-test/
+
+__pycache__/
+.venv/
+*.pyc
+uv.lock
