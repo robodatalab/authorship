@@ -34,6 +34,11 @@ The endpoint hardcodes a list of perspectives that produce different graphs.
 
 That list is then condensed into a single yaml, each graph becoming a single layer.
 
+A build is an answer about the manuscript as it stood when the build began. Saving again makes
+that draft historical, so the build in flight is abandoned rather than left to finish — it
+stops generating wherever it had got to and writes nothing. Otherwise the writer's last save
+races the one before it for the same file, and the slower reading of an older draft can win.
+
 ## Implementations
 
 ```python

@@ -19,7 +19,7 @@ navigation workhorse, so that is disqualifying.
 ## 2. Format
 
 `story_1.md` is accompanied by `story_1.graph.yaml` beside it. By convention, not
-configuration: [`graphPathFor`](../src/story_graph/model.ts) replaces the trailing `.md`.
+configuration: [`graphPathFor`](../extension/story_graph/model.ts) replaces the trailing `.md`.
 
 ```yaml
 layer:
@@ -61,6 +61,12 @@ not exist, layers left with no nodes. The file is machine-written by
 [story_graph_builder.md](story_graph_builder.md) and may be read mid-rewrite, so a partial
 file renders whatever part of itself is valid.
 
+**A graph file that is not there is an absence, not a failure.** A manuscript that has never
+been built has none, and a first build has none for the whole time it runs — which is exactly
+when the panel is open to watch. It reads as an empty graph, and what the panel then says is
+decided in one place from three facts at once: whether a build is running, whether there is a
+graph, and whether the last read failed.
+
 `layer:` is a list ordered by convention — the lower the id, the finer the grain. Nothing in
 the code reads that ordering (see §4). A widget top-left switches between layers, hidden below
 two. The current layer survives graph-file reloads, so a background rewrite does not yank the
@@ -68,16 +74,16 @@ view back to layer one.
 
 ## 3. Architecture
 
-**Host** — [`panel.ts`](../src/story_graph/panel.ts). One `StoryGraphPanel` per document,
+**Host** — [`panel.ts`](../extension/story_graph/panel.ts). One `StoryGraphPanel` per document,
 keyed by URI, so re-running the command brings the existing panel forward. Owns the file
 watcher, the YAML read and the editor decoration. Opens in `ViewColumn.Beside`.
 
-**View** — [`view.ts`](../src/story_graph/view.ts), bundled by a second webpack entry to
+**View** — [`view.ts`](../extension/story_graph/view.ts), bundled by a second webpack entry to
 `dist/story_graph_view.js`. DOM only: SVG construction, pan/zoom, messaging.
 
 The decisions live in two modules free of both `vscode` and the DOM, imported by either side:
-[`model.ts`](../src/story_graph/model.ts) — parsing, the overlap rule, span merging — and
-[`view_state.ts`](../src/story_graph/view_state.ts) — layers and selection. That split is what
+[`model.ts`](../extension/story_graph/model.ts) — parsing, the overlap rule, span merging — and
+[`view_state.ts`](../extension/story_graph/view_state.ts) — layers and selection. That split is what
 makes the behaviour testable without launching an editor (§5).
 
 `media/graph.css` stays a static asset loaded by URI; bundling it would force
@@ -87,15 +93,34 @@ makes the behaviour testable without launching an editor (§5).
 |---|---|---|
 | host → view | `{type: 'graph', layers}` | freshly read file |
 | host → view | `{type: 'active', active, keepSelection}` | editor selection moved |
+| host → view | `{type: 'build', building, startedAt}` | a rebuild started or ended |
 | host → view | `{type: 'error', message}` | file unreadable |
 | view → host | `{type: 'select', ranges}` | highlight these lines |
+| view → host | `{type: 'ready'}` | the view is listening |
 
 `active` carries every layer's matches at once, so switching layers needs no round trip.
+
+The host answers `ready` rather than pushing state at construction, because a message posted
+before the view's script ran is simply gone — and a panel opened during a rebuild would then
+show no sign of one.
+
+## 3a. While it is being rebuilt
+
+A build reads the whole manuscript through the model, so on a long one the graph on screen is
+the previous answer for minutes at a stretch. The view dims it and counts up beside the layer
+switcher. Both halves matter: the dimming says the picture is stale, which a rebuild that
+changes little would not otherwise reveal, and the climbing count distinguishes a slow build
+from a wedged one. There is nothing finer to report — a generation has no interior progress to
+publish, and a bar pretending otherwise would be invented.
+
+Which manuscripts are building is held in [`activity.ts`](../extension/llm/activity.ts), apart
+from the builder that puts them there, because the status bar and every open panel ask the same
+question and none of them should have to ask each other.
 
 ## 4. Selection
 
 The only relationship between graph and manuscript is line-span overlap, with exactly one
-implementation — [`spansOverlap`](../src/story_graph/model.ts) — called by both directions. A
+implementation — [`spansOverlap`](../extension/story_graph/model.ts) — called by both directions. A
 shared boundary line counts, since nodes routinely end where the next begins.
 
 **Graph → manuscript.** Clicking a node posts its lines; the host reveals them and paints a
@@ -133,7 +158,7 @@ Two consequences worth knowing:
 
 ## 5. Layout, gestures, tests
 
-**Layout** ([`view_layout.ts`](../src/story_graph/view_layout.ts)) is layered top-to-bottom.
+**Layout** ([`view_layout.ts`](../extension/story_graph/view_layout.ts)) is layered top-to-bottom.
 Depth is the longest path to a node, relaxed until stable and capped at the node count, which
 both terminates and stops a cycle spinning. Within a row, nodes are ordered by manuscript
 position, so the picture is stable across reloads. No layout library — a vertical

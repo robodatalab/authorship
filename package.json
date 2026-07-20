@@ -51,11 +51,13 @@
     "scripts": {
         "vscode:prepublish": "npm run package",
         "compile": "webpack",
+        "clean": "rm -rf dist out",
+        "rebuild": "npm run clean && npm run compile",
         "watch": "webpack --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
         "compile-tests": "tsc -p . --outDir out",
         "watch-tests": "tsc -p . -w --outDir out",
-        "lint": "eslint src",
+        "lint": "eslint extension tests/extension",
         "test": "vitest run"
     },
     "devDependencies": {

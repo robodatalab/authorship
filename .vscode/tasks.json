@@ -4,17 +4,47 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			// What every launch configuration builds with.
+			//
+			// One shot, from an empty dist/, and blocking: the debug host does not
+			// start until this has finished, and it does not start at all if this
+			// fails. The arrangement it replaces was a background watcher, which
+			// has two properties that combine badly — VS Code reuses one that is
+			// already running rather than starting a fresh one, and a webpack
+			// watcher emits nothing when compilation fails. A watcher left over
+			// from two days earlier therefore went on serving a stale bundle
+			// through relaunch after relaunch, with nothing anywhere saying so.
+			//
+			// Deleting dist/ first is the part that makes it honest: a build that
+			// fails now leaves no bundle to run instead of the one it failed to
+			// produce.
+			"label": "rebuild",
+			"type": "npm",
+			"script": "rebuild",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": ["$ts-webpack"],
+			"presentation": {
+				"reveal": "silent",
+				"revealProblems": "onProblem",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			// Not used by any launch configuration, and deliberately so — see
+			// above. Start it by hand for a fast edit loop, knowing that what it
+			// leaves in dist/ is only as current as its own uptime.
 			"type": "npm",
 			"script": "watch",
 			"problemMatcher": "$ts-webpack-watch",
 			"isBackground": true,
 			"presentation": {
-				"reveal": "never",
+				"reveal": "silent",
+				"revealProblems": "onProblem",
 				"group": "watchers"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
 			}
 		},
 		{
@@ -23,10 +53,10 @@
 			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
 			"presentation": {
-				"reveal": "never",
+				"reveal": "silent",
+				"revealProblems": "onProblem",
 				"group": "watchers"
-			},
-			"group": "build"
+			}
 		},
 		{
 			"label": "tasks: watch-tests",
@@ -42,6 +72,7 @@
 			"command": "uv sync",
 			"presentation": {
 				"reveal": "silent",
+				"revealProblems": "onProblem",
 				"panel": "shared"
 			},
 			"problemMatcher": []

@@ -1,6 +1,7 @@
 {
 	"include": [
-		"src"
+		"extension",
+		"tests/extension"
 	],
 	"compilerOptions": {
 		"module": "Node16",
@@ -14,7 +15,9 @@
             "mocha"
         ],
 		"sourceMap": true,
-		"rootDir": "src",
+		// The tests live outside the sources they import, so the root of the
+		// program is the repo root rather than either directory.
+		"rootDir": ".",
 		"strict": true,   /* enable all strict type-checking options */
 		/* Additional Checks */
 		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */

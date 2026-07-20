@@ -4,6 +4,6 @@ export default defineConfig({
 	test: {
 		// Only the TypeScript sources — `out/` holds compiled copies of the same
 		// files and would otherwise be collected a second time.
-		include: ['src/**/*.test.ts'],
+		include: ['tests/extension/**/*.test.ts'],
 	},
 });

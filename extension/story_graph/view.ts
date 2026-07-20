@@ -5,6 +5,7 @@
 // live next door — geometry in view_layout.ts, layers and selection in
 // view_state.ts — so this file stays thin enough to judge by eye.
 
+import { elapsedSince } from '../llm/activity';
 import type { LineSpan } from './model';
 import { GraphViewState } from './view_state';
 import { boundsOf, edgePath, layout, LINE_H, PAD_X, PAD_Y, type PlacedNode } from './view_layout';
@@ -21,6 +22,8 @@ const svg = document.getElementById('canvas') as unknown as SVGSVGElement;
 const viewport = document.getElementById('viewport') as unknown as SVGGElement;
 const status = document.getElementById('status') as HTMLElement;
 const layerBar = document.getElementById('layers') as HTMLElement;
+const buildBar = document.getElementById('build') as HTMLElement;
+const buildLabel = document.getElementById('build-label') as HTMLElement;
 
 /** Current pan/zoom, applied as a transform on the viewport group. */
 const view = { k: 1, x: 0, y: 0 };
@@ -28,19 +31,107 @@ const view = { k: 1, x: 0, y: 0 };
 /** Laid-out nodes of the layer on screen right now. */
 let placed = new Map<string, PlacedNode>();
 
+/** The last read that failed. Cleared by a graph arriving, or by a build starting. */
+let failure: string | null = null;
+
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	if (message.type === 'graph') {
+		failure = null;
 		state.setLayers(message.layers ?? []);
 		renderLayerBar();
 		renderLayer();
 	} else if (message.type === 'active') {
 		state.applyActive(message.active ?? {}, Boolean(message.keepSelection));
 		applySelection();
+	} else if (message.type === 'build') {
+		setBuilding(message.building ? startOf(message.startedAt) : null);
 	} else if (message.type === 'error') {
-		showStatus(message.message);
+		failure = message.message;
+		updateStatus();
 	}
 });
+
+// ---------------------------------------------------------------------------
+// Rebuilds
+// ---------------------------------------------------------------------------
+
+/**
+ * Show that the graph is being rebuilt.
+ *
+ * Two things say it, because they say different halves. The graph dims: what is
+ * drawn is the previous answer, and a rebuild that ends up changing little would
+ * otherwise be indistinguishable from one that never ran. And the count climbs:
+ * the model can take minutes on a long manuscript, so the only honest report is
+ * how long it has been going — there is no progress to report from inside a
+ * single generation, and inventing a bar for it would be a lie.
+ */
+let buildStartedAt: number | null = null;
+let buildTimer: number | undefined;
+
+function setBuilding(startedAt: number | null): void {
+	buildStartedAt = startedAt;
+	window.clearInterval(buildTimer);
+	buildTimer = undefined;
+
+	if (startedAt === null) {
+		buildBar.hidden = true;
+		document.body.classList.remove('building');
+		updateStatus();
+		return;
+	}
+
+	// Whatever the last read of the file had to say, this build is about to
+	// answer it.
+	failure = null;
+	buildBar.hidden = false;
+	document.body.classList.add('building');
+	showElapsed();
+	buildTimer = window.setInterval(showElapsed, 1000);
+	updateStatus();
+}
+
+function showElapsed(): void {
+	if (buildStartedAt === null) {
+		return;
+	}
+	// The first build is a different wait from the rest — there is nothing on
+	// screen it is going to replace.
+	const verb = state.getLayers().length > 0 ? 'Rebuilding' : 'Building';
+	buildLabel.textContent = `${verb}… ${elapsedSince(buildStartedAt, Date.now())}`;
+}
+
+/**
+ * What the panel says when there is no picture — or something is wrong with the
+ * one there is.
+ *
+ * Three things can be true at once: a build is running, there is no graph on
+ * disk, and the last read failed. Reporting whichever message arrived last is
+ * what made a first build show as a missing-file error for the whole time it ran.
+ */
+function updateStatus(): void {
+	const empty = placed.size === 0;
+	if (failure !== null) {
+		showStatus(failure, empty);
+	} else if (!empty) {
+		hideStatus();
+	} else if (state.getLayers().length > 0) {
+		showStatus('No nodes in this graph file.', true);
+	} else if (buildStartedAt !== null) {
+		showStatus(
+			'Building the story graph. The model reads the whole manuscript, so this takes a few minutes.',
+			true
+		);
+	} else {
+		showStatus('No story graph yet. Save the manuscript to build one.', true);
+	}
+}
+
+/** A build we were told about without a start time is one that started now. */
+function startOf(value: unknown): number {
+	const startedAt = Number(value);
+	return Number.isFinite(startedAt) ? startedAt : Date.now();
+}
 
 // ---------------------------------------------------------------------------
 // Layers
@@ -98,10 +189,10 @@ function renderLayer(): void {
 	}
 
 	if (!layer || placed.size === 0) {
-		showStatus('No nodes in this graph file.');
+		updateStatus();
 		return;
 	}
-	hideStatus();
+	updateStatus();
 
 	// Edges first so nodes paint over their endpoints.
 	const edgeLayer = svgEl('g');
@@ -333,11 +424,22 @@ function svgEl<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTagName
 	return document.createElementNS('http://www.w3.org/2000/svg', name);
 }
 
-function showStatus(text: string): void {
+/**
+ * `empty` means there is no graph underneath. A line pinned to the top edge is
+ * right when it is annotating a picture, and wrong when it is all there is —
+ * over an empty canvas it also collides with the rebuild badge.
+ */
+function showStatus(text: string, empty = false): void {
 	status.textContent = text;
+	status.classList.toggle('empty', empty);
 	status.hidden = false;
 }
 
 function hideStatus(): void {
 	status.hidden = true;
 }
+
+// Everything worth drawing is held by the host, and anything it posted before
+// this script ran is gone. Asking on load is what lets a panel opened during a
+// rebuild show one.
+vscode.postMessage({ type: 'ready' });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { phaseFor, renderStatus } from './state';
+import { phaseFor, renderStatus } from '../../../extension/llm/state';
 
 describe('phaseFor', () => {
 	it('maps what the server reports', () => {

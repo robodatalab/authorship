@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { StoryGraphPanel } from './story_graph/panel';
 import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
+import { BuildActivity } from './llm/activity';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -29,9 +30,11 @@ export function activate(context: vscode.ExtensionContext) {
 	const health = new ModelHealth(8765);
 	context.subscriptions.push(health);
 
-	// Saving a manuscript rebuilds its story graph. The builder shares the status
-	// bar, so the same item reads `building` while a rebuild is in flight.
-	context.subscriptions.push(new GraphBuilder(8765, health));
+	// Saving a manuscript rebuilds its story graph. Who is building what is held
+	// apart from the builder, because the status bar and the graph panel both
+	// report it and neither should have to ask the other.
+	const activity = new BuildActivity();
+	context.subscriptions.push(new GraphBuilder(8765, health, activity));
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('authorship.showStoryGraph', () => {
@@ -42,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
 				);
 				return;
 			}
-			StoryGraphPanel.reveal(context, editor.document.uri, editor.viewColumn);
+			StoryGraphPanel.reveal(context, activity, editor.document.uri, editor.viewColumn);
 		})
 	);
 }

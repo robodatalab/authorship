@@ -8,7 +8,7 @@ import {
 	normalize,
 	spansOverlap,
 	type Layer,
-} from './model';
+} from '../../../extension/story_graph/model';
 
 /** The shape currently in data/story_1.graph.yaml — two layers with repeating node ids. */
 const TWO_LAYERS = `

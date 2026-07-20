@@ -11,6 +11,7 @@ import threading
 import time
 import traceback
 from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 from typing import Any, Protocol
 
 import torch
@@ -20,6 +21,8 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     PreTrainedTokenizerBase,
+    StoppingCriteria,
+    StoppingCriteriaList,
     TextStreamer,
 )
 
@@ -125,6 +128,27 @@ class Progress(TextStreamer):
             )
 
 
+class Interrupt(StoppingCriteria):
+    """Ends a generation nobody is waiting for any more.
+
+    Once `generate` is entered the request queue is not read again until it
+    returns, so a stopping criterion is the only place the outside world can
+    reach a running generation. Without it, a build superseded by the next save
+    kept the model to itself until it hit the token budget, and the save that
+    replaced it queued behind an answer about a draft that no longer existed.
+
+    One event serves every generation because only one runs at a time. The
+    parent clears it before each request, so a flag set for the call that just
+    ended cannot carry into the next one.
+    """
+
+    def __init__(self, flag: Event) -> None:
+        self._flag = flag
+
+    def __call__(self, input_ids: Any, scores: Any, **kwargs: Any) -> bool:
+        return self._flag.is_set()
+
+
 class Engine:
     def __init__(
         self, model: GenerativeModel, tokenizer: PreTrainedTokenizerBase
@@ -155,7 +179,9 @@ class Engine:
         )
         return cls(model, tokenizer)
 
-    def infer(self, prompt: str, max_new_tokens: int) -> str:
+    def infer(
+        self, prompt: str, max_new_tokens: int, interrupt: Event | None = None
+    ) -> str:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         prompt_tokens = int(inputs["input_ids"].shape[-1])
 
@@ -168,17 +194,28 @@ class Engine:
 
         streamer = Progress(self.tokenizer, max_new_tokens)
         output = self.model.generate(
-            **inputs, max_new_tokens=max_new_tokens, do_sample=False, streamer=streamer
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            streamer=streamer,
+            stopping_criteria=(
+                None if interrupt is None else StoppingCriteriaList([Interrupt(interrupt)])
+            ),
         )
 
         generated = int(output[0].shape[-1]) - prompt_tokens
         elapsed = time.monotonic() - started
+        stopped = interrupt is not None and interrupt.is_set()
         _log.info(
             "generated %d tokens in %.1fs (%.1f tok/s)%s",
             generated,
             elapsed,
             generated / elapsed if elapsed else 0.0,
-            " — hit the budget" if generated >= max_new_tokens else "",
+            " — interrupted"
+            if stopped
+            else " — hit the budget"
+            if generated >= max_new_tokens
+            else "",
         )
 
         text = self.tokenizer.decode(
@@ -206,6 +243,7 @@ def run(
     status: "Queue[str]",
     requests: "Queue[dict[str, Any] | None]",
     responses: "Queue[str]",
+    interrupt: Event,
 ) -> None:
     log.setup()
     log.dump_stacks_on_signal()
@@ -248,7 +286,11 @@ def run(
             _log.info("stopping")
             return
         try:
-            responses.put(engine.infer(request["prompt"], request["max_new_tokens"]))
+            responses.put(
+                engine.infer(
+                    request["prompt"], request["max_new_tokens"], interrupt=interrupt
+                )
+            )
         except Exception:
             # The caller is blocked on `responses`. Saying nothing here hangs it
             # for as long as the server lives.

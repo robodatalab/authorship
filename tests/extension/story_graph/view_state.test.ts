@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { Layer } from './model';
-import { GraphViewState } from './view_state';
+import type { Layer } from '../../../extension/story_graph/model';
+import { GraphViewState } from '../../../extension/story_graph/view_state';
 
 const node = (id: string, start: number, end: number, title = `node ${id}`) => ({
 	id,
