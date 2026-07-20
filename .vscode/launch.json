@@ -15,7 +15,10 @@
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}"
+			// Named outright rather than reached through ${defaultBuildTask}. The
+			// indirection is how this came to depend on a watcher nobody had
+			// looked at: what the launch builds with should be readable here.
+			"preLaunchTask": "rebuild"
 		},
 		{
 			// Breakpoints in server/*.py work here. The port is fixed rather than

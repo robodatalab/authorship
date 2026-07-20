@@ -9,6 +9,7 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml } from 'yaml';
 
+import type { BuildActivity } from '../llm/activity';
 import {
 	graphPathFor,
 	mergeSpans,
@@ -42,6 +43,7 @@ export class StoryGraphPanel {
 
 	static reveal(
 		context: vscode.ExtensionContext,
+		activity: BuildActivity,
 		docUri: vscode.Uri,
 		sourceColumn: vscode.ViewColumn | undefined
 	): void {
@@ -55,12 +57,18 @@ export class StoryGraphPanel {
 		}
 		StoryGraphPanel.panels.set(
 			key,
-			new StoryGraphPanel(context, docUri, sourceColumn ?? vscode.ViewColumn.One)
+			new StoryGraphPanel(
+				context,
+				activity,
+				docUri,
+				sourceColumn ?? vscode.ViewColumn.One
+			)
 		);
 	}
 
 	private constructor(
 		private readonly context: vscode.ExtensionContext,
+		private readonly activity: BuildActivity,
 		private readonly docUri: vscode.Uri,
 		private readonly sourceColumn: vscode.ViewColumn
 	) {
@@ -85,9 +93,26 @@ export class StoryGraphPanel {
 			this.panel.webview.onDidReceiveMessage((message) => {
 				if (message?.type === 'select') {
 					void this.focusRanges(message.ranges);
+				} else if (message?.type === 'ready') {
+					// The view asks rather than being told on construction: a message
+					// posted before its script ran is simply gone, and a panel opened
+					// during a rebuild would then show no sign of one.
+					this.sendBuild();
+					void this.load();
 				}
 			})
 		);
+
+		// A rebuild is worth showing in the graph itself. It reads the whole
+		// manuscript through the model, so the picture on screen is the previous
+		// answer for minutes at a stretch, and nothing about it says so.
+		this.disposables.push({
+			dispose: this.activity.onChange((path) => {
+				if (path === this.docUri.fsPath) {
+					this.sendBuild();
+				}
+			}),
+		});
 
 		// The other direction: moving or extending the selection in the manuscript
 		// lights up every node covering it.
@@ -119,7 +144,22 @@ export class StoryGraphPanel {
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
+		// Read now as well as on `ready`. Both are needed and neither is enough:
+		// the graph read is async, so it has always landed after the view began
+		// listening, while the build state is posted synchronously and would be
+		// dropped. Making the graph wait for `ready` too would leave the panel
+		// blank against a stale view bundle, which is a bad way to fail.
 		void this.load();
+	}
+
+	/** Say whether this manuscript is being read by the model right now. */
+	private sendBuild(): void {
+		const build = this.activity.get(this.docUri.fsPath);
+		void this.panel.webview.postMessage({
+			type: 'build',
+			building: build !== undefined,
+			startedAt: build?.startedAt,
+		});
 	}
 
 	/** Read the graph file and hand it to the webview. */
@@ -139,6 +179,15 @@ export class StoryGraphPanel {
 				this.sendActive(editor.selections, true);
 			}
 		} catch (err) {
+			// A manuscript that has never been built has no graph file, and a first
+			// build has none for the whole time it runs — which is precisely when
+			// this panel is open to watch. That is an absence, not a fault, and
+			// reporting it as one made every first build read as broken.
+			if (isMissing(err)) {
+				this.layers = [];
+				void this.panel.webview.postMessage({ type: 'graph', layers: [] });
+				return;
+			}
 			void this.panel.webview.postMessage({
 				type: 'error',
 				message: `Can't read ${basename(this.graphUri)} — ${describe(err)}`,
@@ -247,6 +296,10 @@ export class StoryGraphPanel {
 <body>
 	<div id="status" class="status" hidden></div>
 	<div id="layers" class="layers" role="group" aria-label="Story layers" hidden></div>
+	<div id="build" class="build" role="status" hidden>
+		<span class="spinner"></span>
+		<span id="build-label"></span>
+	</div>
 	<svg id="canvas" role="img" aria-label="Story graph">
 		<defs>
 			<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
@@ -275,7 +328,25 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function describe(err: unknown): string {
-	return err instanceof Error ? err.message : String(err);
+	const message = (err as { message?: unknown } | null)?.message;
+	return typeof message === 'string' ? message : String(err);
+}
+
+/**
+ * Is this "there is no such file" rather than "that file would not read"?
+ *
+ * Nothing here asks `instanceof Error`, and that is the point: what
+ * `workspace.fs` rejects with does not pass that test. The first attempt at this
+ * gated on it and so never ran — the giveaway was `describe` falling through to
+ * `String(err)` and prefixing the message with `Error:`. The code and the text
+ * are read off the value directly instead.
+ */
+function isMissing(err: unknown): boolean {
+	const code = (err as { code?: unknown } | null)?.code;
+	if (code === 'FileNotFound' || code === 'ENOENT') {
+		return true;
+	}
+	return describe(err).includes('ENOENT');
 }
 
 function nonceString(): string {

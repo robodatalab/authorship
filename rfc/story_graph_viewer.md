@@ -61,6 +61,12 @@ not exist, layers left with no nodes. The file is machine-written by
 [story_graph_builder.md](story_graph_builder.md) and may be read mid-rewrite, so a partial
 file renders whatever part of itself is valid.
 
+**A graph file that is not there is an absence, not a failure.** A manuscript that has never
+been built has none, and a first build has none for the whole time it runs — which is exactly
+when the panel is open to watch. It reads as an empty graph, and what the panel then says is
+decided in one place from three facts at once: whether a build is running, whether there is a
+graph, and whether the last read failed.
+
 `layer:` is a list ordered by convention — the lower the id, the finer the grain. Nothing in
 the code reads that ordering (see §4). A widget top-left switches between layers, hidden below
 two. The current layer survives graph-file reloads, so a background rewrite does not yank the
@@ -87,10 +93,29 @@ makes the behaviour testable without launching an editor (§5).
 |---|---|---|
 | host → view | `{type: 'graph', layers}` | freshly read file |
 | host → view | `{type: 'active', active, keepSelection}` | editor selection moved |
+| host → view | `{type: 'build', building, startedAt}` | a rebuild started or ended |
 | host → view | `{type: 'error', message}` | file unreadable |
 | view → host | `{type: 'select', ranges}` | highlight these lines |
+| view → host | `{type: 'ready'}` | the view is listening |
 
 `active` carries every layer's matches at once, so switching layers needs no round trip.
+
+The host answers `ready` rather than pushing state at construction, because a message posted
+before the view's script ran is simply gone — and a panel opened during a rebuild would then
+show no sign of one.
+
+## 3a. While it is being rebuilt
+
+A build reads the whole manuscript through the model, so on a long one the graph on screen is
+the previous answer for minutes at a stretch. The view dims it and counts up beside the layer
+switcher. Both halves matter: the dimming says the picture is stale, which a rebuild that
+changes little would not otherwise reveal, and the climbing count distinguishes a slow build
+from a wedged one. There is nothing finer to report — a generation has no interior progress to
+publish, and a bar pretending otherwise would be invented.
+
+Which manuscripts are building is held in [`activity.ts`](../extension/llm/activity.ts), apart
+from the builder that puts them there, because the status bar and every open panel ask the same
+question and none of them should have to ask each other.
 
 ## 4. Selection
 

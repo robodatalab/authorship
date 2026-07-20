@@ -37,6 +37,10 @@ TERMINATE_TIMEOUT_S = 5.0
 WATCH_INTERVAL_S = 5.0
 
 
+class Superseded(Exception):
+    """Raised inside a build that a newer save has taken the manuscript from."""
+
+
 class Worker:
     """Handle on the child process that owns the model."""
 
@@ -52,11 +56,28 @@ class Worker:
         self._responses: Queue[str] = context.Queue()
         self._lock = threading.Lock()
 
+        # Synchronization primitives cross a spawn boundary by inheritance only,
+        # so the interrupt is created here and handed over at construction.
+        self._interrupt = context.Event()
+
+        #: Who the generation in flight belongs to, and a mutex of its own so
+        #: `interrupt` can read it without waiting for the generation to end —
+        #: `_lock` is held for the whole call, which is precisely the span an
+        #: interrupt has to reach into.
+        self._owner: "Build | None" = None
+        self._guard = threading.Lock()
+
         # `daemon` so the child cannot outlive the server: Python terminates
         # daemonic children when the parent exits.
         self._process: BaseProcess = context.Process(
             target=worker.run,
-            args=(model_id, self._status, self._requests, self._responses),
+            args=(
+                model_id,
+                self._status,
+                self._requests,
+                self._responses,
+                self._interrupt,
+            ),
             daemon=True,
         )
         self._process.start()
@@ -126,7 +147,11 @@ class Worker:
                 self.seconds_in_status,
             )
 
-    def infer(self, prompt: str, max_new_tokens: int) -> str:
+    def infer(
+        self, prompt: str, max_new_tokens: int, owner: "Build | None" = None
+    ) -> str:
+        """`owner` is who the answer is for, so `interrupt` can end this
+        generation and not whichever one has started by the time it is called."""
         # One at a time: there is one model on one GPU, and interleaving requests
         # on a single pipe would mismatch replies with callers.
         waiting = time.monotonic()
@@ -135,8 +160,21 @@ class Worker:
             if queued > 1.0:
                 _log.info("waited %.1fs for the model to be free", queued)
 
+            with self._guard:
+                # Clearing here, with the queue to ourselves, is what keeps an
+                # interrupt meant for the previous call off this one.
+                self._interrupt.clear()
+                self._owner = owner
+                # Abandoned while it waited for the model: the flag goes up
+                # before the request does, and the first token ends it.
+                if owner is not None and owner.abandoned:
+                    self._interrupt.set()
+
             self._requests.put({"prompt": prompt, "max_new_tokens": max_new_tokens})
             reply = self._responses.get()
+
+            with self._guard:
+                self._owner = None
 
         _log.info(
             "inference returned %d chars after %.1fs",
@@ -144,6 +182,12 @@ class Worker:
             time.monotonic() - waiting,
         )
         return reply
+
+    def interrupt(self, owner: "Build") -> None:
+        """Stop the generation running for `owner` — if it is still that one."""
+        with self._guard:
+            if self._owner is owner:
+                self._interrupt.set()
 
     def stop(self) -> None:
         """Shut the child down, escalating until it is actually gone."""
@@ -172,10 +216,85 @@ class Worker:
         _log.info("worker stopped")
 
 
+class Build:
+    """One reading of one manuscript, and the one thing done to it from outside:
+    giving up on it.
+
+    A build is an answer about the file as it was when the build started. The
+    next save makes that file historical, so the build in flight stops being
+    anybody's answer — it is abandoned rather than left to finish, because
+    finishing means overwriting the graph with a reading of a draft that no
+    longer exists.
+
+    It is also the `Infer` the perspectives are handed, which is why they never
+    hear about any of this: abandonment surfaces as an exception out of the
+    inference they were already making.
+    """
+
+    def __init__(self, path: Path, model: Worker) -> None:
+        self.path = path
+        self._model = model
+        self._abandoned = threading.Event()
+
+    @property
+    def abandoned(self) -> bool:
+        return self._abandoned.is_set()
+
+    def abandon(self) -> None:
+        self._abandoned.set()
+        self._model.interrupt(self)
+
+    def check(self) -> None:
+        if self.abandoned:
+            raise Superseded(f"a newer save took over {self.path.name}")
+
+    def infer(self, prompt: str, max_new_tokens: int) -> str:
+        self.check()
+        reply = self._model.infer(prompt, max_new_tokens, owner=self)
+        # An interrupted generation stops mid-sentence, so the check comes before
+        # anything tries to read the reply as an answer.
+        self.check()
+        return reply
+
+
+class Builds:
+    """Which build owns each manuscript.
+
+    Starting one abandons whatever was reading the same file, so the newest save
+    is the one that gets written. Builds of different manuscripts are left alone:
+    they write different files, and the model serializes them regardless.
+    """
+
+    def __init__(self, model: Worker) -> None:
+        self._model = model
+        self._lock = threading.Lock()
+        self._current: dict[Path, Build] = {}
+
+    def start(self, path: Path) -> Build:
+        current = Build(path, self._model)
+        with self._lock:
+            previous = self._current.get(path)
+            self._current[path] = current
+
+        # Outside the lock: abandoning reaches into the child process, and this
+        # lock is only here to decide who is current.
+        if previous is not None:
+            _log.info("abandoning the build of %s, a newer save arrived", path.name)
+            previous.abandon()
+        return current
+
+    def finish(self, build: Build) -> None:
+        """Retire a build, unless a newer one has already taken the file over."""
+        with self._lock:
+            if self._current.get(build.path) is build:
+                del self._current[build.path]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     instance = Worker(MODEL)
     app.state.worker = instance
+    app.state.builds = Builds(instance)
     try:
         yield
     finally:
@@ -240,7 +359,12 @@ def run(request: RunRequest) -> dict[str, str]:
 
 @app.post("/build")
 def build(request: BuildRequest) -> dict[str, Any]:
-    """Run every perspective over the manuscript and write the layered file."""
+    """Run every perspective over the manuscript and write the layered file.
+
+    Saving again while this is running hands the manuscript to the newer build:
+    this one stops generating wherever it had got to, writes nothing, and says
+    so. The writer's last save is the one that reaches the graph.
+    """
     instance: Worker = app.state.worker
     if instance.status != worker.READY:
         # Saving during a load takes this path, so it says which save was
@@ -265,33 +389,52 @@ def build(request: BuildRequest) -> dict[str, Any]:
     )
     started = time.monotonic()
 
-    graphs = []
-    for perspective in perspectives(instance.infer):
-        name = type(perspective).__name__
-        at = time.monotonic()
-        try:
-            graph = perspective.process(story_markdown)
-        except ValueError as error:
-            # An unusable reply leaves the existing graph file alone.
-            _log.warning("%s failed after %.1fs: %s", name, time.monotonic() - at, error)
-            raise HTTPException(status_code=502, detail=str(error)) from error
-        _log.info(
-            "%s produced %d nodes, %d edges in %.1fs",
-            name,
-            len(graph.nodes),
-            len(graph.edges),
-            time.monotonic() - at,
-        )
-        graphs.append(graph)
+    registry: Builds = app.state.builds
+    current = registry.start(document)
+    try:
+        graphs = []
+        for perspective in perspectives(current.infer):
+            name = type(perspective).__name__
+            at = time.monotonic()
+            try:
+                graph = perspective.process(story_markdown)
+            except ValueError as error:
+                # An unusable reply leaves the existing graph file alone.
+                _log.warning(
+                    "%s failed after %.1fs: %s", name, time.monotonic() - at, error
+                )
+                raise HTTPException(status_code=502, detail=str(error)) from error
+            _log.info(
+                "%s produced %d nodes, %d edges in %.1fs",
+                name,
+                len(graph.nodes),
+                len(graph.edges),
+                time.monotonic() - at,
+            )
+            graphs.append(graph)
 
-    target = graph_path_for(document)
-    target.write_text(story_graph.to_yaml(graphs), encoding="utf-8")
-    _log.info(
-        "wrote %s, %d layers, build took %.1fs",
-        target.name,
-        len(graphs),
-        time.monotonic() - started,
-    )
+        # Between perspectives as well as inside them: a build abandoned after
+        # its last reply arrived is still not the one that gets to write.
+        current.check()
+
+        target = graph_path_for(document)
+        target.write_text(story_graph.to_yaml(graphs), encoding="utf-8")
+        _log.info(
+            "wrote %s, %d layers, build took %.1fs",
+            target.name,
+            len(graphs),
+            time.monotonic() - started,
+        )
+    except Superseded as error:
+        _log.info(
+            "gave up on %s after %.1fs: %s",
+            document.name,
+            time.monotonic() - started,
+            error,
+        )
+        raise HTTPException(status_code=409, detail=str(error)) from None
+    finally:
+        registry.finish(current)
 
     return {
         "path": str(target),

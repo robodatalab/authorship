@@ -138,3 +138,72 @@ body {
 	color: var(--vscode-descriptionForeground);
 	background: var(--vscode-editor-background);
 }
+
+/* Nothing drawn underneath: the line is not annotating a picture, it is the
+   whole contents of the panel. Centred, it also stops running under the rebuild
+   badge in the corner. */
+.status.empty {
+	top: 50%;
+	transform: translateY(-50%);
+	padding: 0 12%;
+	background: none;
+	text-align: center;
+	line-height: 1.6;
+}
+
+/* Rebuild indicator, opposite the layer switcher so the two never collide. */
+.build {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 11px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background);
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	font-variant-numeric: tabular-nums;
+}
+
+.build[hidden] {
+	display: none;
+}
+
+.spinner {
+	width: 11px;
+	height: 11px;
+	border: 2px solid var(--vscode-panel-border);
+	border-top-color: var(--vscode-progressBar-background);
+	border-radius: 50%;
+	animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* The count beside it is still climbing, so movement is not the only thing
+   saying the build is alive. */
+@media (prefers-reduced-motion: reduce) {
+	.spinner {
+		animation: none;
+	}
+}
+
+/* What is drawn during a rebuild is the answer from before the last save. Dimming
+   is the whole point of showing the build here rather than only in the status
+   bar: an unchanged picture and a stale one look the same. */
+#canvas {
+	transition: opacity 150ms ease;
+}
+
+body.building #canvas {
+	opacity: 0.4;
+}
