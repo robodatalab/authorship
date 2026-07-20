@@ -2,6 +2,7 @@
 event loop is never starved and /health always answers immediately."""
 
 import multiprocessing as mp
+import queue
 import re
 import threading
 import time
@@ -30,12 +31,18 @@ STOPPED = "stopped"
 DRAIN_TIMEOUT_S = 30.0
 TERMINATE_TIMEOUT_S = 5.0
 
+#: How long the status thread waits on the queue before looking at the child
+#: itself. Long enough to be free, short enough that a death is noticed while
+#: you are still watching the terminal.
+WATCH_INTERVAL_S = 5.0
+
 
 class Worker:
     """Handle on the child process that owns the model."""
 
     def __init__(self, model_id: str) -> None:
         self.status = STARTING
+        self._since = time.monotonic()
 
         # `spawn` rather than `fork`: forking a process that has already imported
         # torch is unsafe, and it is the default on macOS anyway.
@@ -53,39 +60,116 @@ class Worker:
             daemon=True,
         )
         self._process.start()
+        _log.info("spawned worker pid %s for %s", self._process.pid, model_id)
 
         threading.Thread(target=self._track_status, daemon=True).start()
 
+    @property
+    def pid(self) -> int | None:
+        return self._process.pid
+
+    @property
+    def alive(self) -> bool:
+        return self._process.is_alive()
+
+    @property
+    def seconds_in_status(self) -> float:
+        return time.monotonic() - self._since
+
     def _track_status(self) -> None:
-        """Mirror the child's progress. Reads tiny strings, so it never competes
-        for the GIL with anything that matters."""
+        """Mirror the child's progress, and notice when it stops reporting.
+
+        The read is on a timeout rather than blocking outright. Blocking was
+        correct as far as it went — the status only ever moves forward, so
+        silence means unchanged — but it made silence and death identical, and
+        a child that died mid-load left the parent saying `loading` forever.
+        """
         while True:
-            self.status = self._status.get()
+            try:
+                published = self._status.get(timeout=WATCH_INTERVAL_S)
+            except queue.Empty:
+                self._check_alive()
+                continue
+
+            _log.info(
+                "worker: %s -> %s after %.1fs",
+                self.status,
+                published,
+                self.seconds_in_status,
+            )
+            self.status = published
+            self._since = time.monotonic()
+
+    def _check_alive(self) -> None:
+        """Called whenever the child has been quiet for a while."""
+        if self.status in (STOPPED, worker.FAILED):
+            return
+
+        if not self.alive:
+            _log.error(
+                "worker pid %s is gone, last said %s %.0fs ago",
+                self._process.pid,
+                self.status,
+                self.seconds_in_status,
+            )
+            self.status = worker.FAILED
+            self._since = time.monotonic()
+            return
+
+        # Alive and quiet is normal once ready — it is only worth remarking on
+        # while something is supposed to be happening.
+        if self.status != worker.READY:
+            _log.info(
+                "worker pid %s still %s after %.0fs",
+                self._process.pid,
+                self.status,
+                self.seconds_in_status,
+            )
 
     def infer(self, prompt: str, max_new_tokens: int) -> str:
         # One at a time: there is one model on one GPU, and interleaving requests
         # on a single pipe would mismatch replies with callers.
+        waiting = time.monotonic()
         with self._lock:
+            queued = time.monotonic() - waiting
+            if queued > 1.0:
+                _log.info("waited %.1fs for the model to be free", queued)
+
             self._requests.put({"prompt": prompt, "max_new_tokens": max_new_tokens})
-            return self._responses.get()
+            reply = self._responses.get()
+
+        _log.info(
+            "inference returned %d chars after %.1fs",
+            len(reply),
+            time.monotonic() - waiting,
+        )
+        return reply
 
     def stop(self) -> None:
         """Shut the child down, escalating until it is actually gone."""
         self.status = STOPPED
 
         if not self._process.is_alive():
+            _log.info("worker pid %s was already gone", self._process.pid)
             return
 
+        _log.info("asking worker pid %s to stop", self._process.pid)
         self._requests.put(None)
         self._process.join(DRAIN_TIMEOUT_S)
 
         if self._process.is_alive():
+            _log.warning(
+                "worker ignored the sentinel for %.0fs, terminating", DRAIN_TIMEOUT_S
+            )
             self._process.terminate()
             self._process.join(TERMINATE_TIMEOUT_S)
 
         if self._process.is_alive():
+            _log.warning("worker survived terminate, killing")
             self._process.kill()
             self._process.join()
+
+        _log.info("worker stopped")
 
 
 @asynccontextmanager
@@ -129,8 +213,21 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": app.state.worker.status, "model": MODEL}
+def health() -> dict[str, Any]:
+    """Answers in every state, including mid-download. This is what the frontend
+    polls, so it must never touch the model or the queues.
+
+    It carries more than the status word because that word alone could not
+    distinguish a worker still loading from one that died saying `loading`.
+    """
+    instance: Worker = app.state.worker
+    return {
+        "status": instance.status,
+        "model": MODEL,
+        "pid": instance.pid,
+        "alive": instance.alive,
+        "seconds": round(instance.seconds_in_status, 1),
+    }
 
 
 @app.post("/run")
@@ -146,6 +243,14 @@ def build(request: BuildRequest) -> dict[str, Any]:
     """Run every perspective over the manuscript and write the layered file."""
     instance: Worker = app.state.worker
     if instance.status != worker.READY:
+        # Saving during a load takes this path, so it says which save was
+        # refused and why rather than only appearing as a 503 in the access log.
+        _log.info(
+            "refused build of %s: worker is %s (%.0fs)",
+            Path(request.path).name,
+            instance.status,
+            instance.seconds_in_status,
+        )
         raise HTTPException(status_code=503, detail=f"Model is {instance.status}.")
 
     document = Path(request.path)

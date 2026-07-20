@@ -4,7 +4,12 @@ Nothing here is imported by the parent at request time — the parent never load
 a model, so its event loop is always free to answer /health.
 """
 
+import os
+import resource
+import sys
+import threading
 import time
+import traceback
 from multiprocessing.queues import Queue
 from typing import Any, Protocol
 
@@ -24,11 +29,65 @@ DOWNLOADING = "downloading"
 LOADING = "loading"
 READY = "ready"
 
+#: Published when the child cannot go on. Without it a crash during load left
+#: the parent reporting `loading` for as long as it stayed up.
+FAILED = "failed"
+
 #: How often generation reports in. Often enough to see it moving, rare enough
 #: not to bury the rest of the log.
 PROGRESS_EVERY = 64
 
+#: How often a long silent call says it is still going.
+HEARTBEAT_S = 5.0
+
 _log = log.logger(__name__)
+
+
+def rss_bytes() -> int:
+    """Resident size of this process.
+
+    `ru_maxrss` is bytes on macOS and kilobytes on Linux — one of the older
+    inconsistencies in the interface.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
+
+
+class Heartbeat:
+    """Says a long call is still running, and shows it moving.
+
+    Loading is a single opaque call into transformers, so the log has nothing to
+    say between entering it and leaving. That makes a slow load and a wedged one
+    identical from outside, which is exactly the confusion this is here to end.
+
+    The resident size is what makes it more than a pulse: climbing means weights
+    are still arriving. Flat for a minute means stuck. And if the heartbeat
+    itself stops while the process is alive, whatever it is stuck in is holding
+    the GIL — which is a third diagnosis again.
+    """
+
+    def __init__(self, what: str, every: float = HEARTBEAT_S) -> None:
+        self.what = what
+        self.every = every
+        self.started = time.monotonic()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._beat, daemon=True)
+
+    def __enter__(self) -> "Heartbeat":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._stop.set()
+
+    def _beat(self) -> None:
+        while not self._stop.wait(self.every):
+            _log.info(
+                "still %s, %.0fs elapsed, rss %.1f GB",
+                self.what,
+                time.monotonic() - self.started,
+                rss_bytes() / 1024**3,
+            )
 
 
 class GenerativeModel(Protocol):
@@ -76,14 +135,24 @@ class Engine:
     @classmethod
     def start(cls, model_id: str) -> "Engine":
         started = time.monotonic()
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        _log.info("tokenizer ready, loading weights onto mps")
 
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, dtype=torch.bfloat16, device_map="mps"
+        with Heartbeat("loading the tokenizer"):
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+        _log.info("tokenizer ready after %.1fs", time.monotonic() - started)
+
+        at = time.monotonic()
+        with Heartbeat("loading weights onto mps"):
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, dtype=torch.bfloat16, device_map="mps"
+            )
+            model.eval()
+
+        _log.info(
+            "weights loaded in %.1fs, rss %.1f GB (%.1fs since start)",
+            time.monotonic() - at,
+            rss_bytes() / 1024**3,
+            time.monotonic() - started,
         )
-        model.eval()
-        _log.info("weights loaded in %.1fs", time.monotonic() - started)
         return cls(model, tokenizer)
 
     def infer(self, prompt: str, max_new_tokens: int) -> str:
@@ -139,22 +208,49 @@ def run(
     responses: "Queue[str]",
 ) -> None:
     log.setup()
+    log.dump_stacks_on_signal()
+    _log.info(
+        "worker started, pid %d, model %s — `kill -USR1 %d` to dump its stacks",
+        os.getpid(),
+        model_id,
+        os.getpid(),
+    )
 
-    if not is_downloaded(model_id):
-        _log.info("%s is not in the cache, downloading", model_id)
-        status.put(DOWNLOADING)
-        started = time.monotonic()
-        snapshot_download(model_id)
-        _log.info("downloaded in %.0fs", time.monotonic() - started)
+    # Nothing above this caught anything, so a failure during load killed the
+    # child silently and the parent went on reporting `loading` indefinitely.
+    # Whatever goes wrong, it gets said and it gets published.
+    try:
+        with Heartbeat("checking the cache"):
+            cached = is_downloaded(model_id)
 
-    status.put(LOADING)
-    engine = Engine.start(model_id)
-    status.put(READY)
-    _log.info("ready")
+        if not cached:
+            _log.info("%s is not in the cache, downloading", model_id)
+            status.put(DOWNLOADING)
+            started = time.monotonic()
+            with Heartbeat("downloading"):
+                snapshot_download(model_id)
+            _log.info("downloaded in %.0fs", time.monotonic() - started)
+        else:
+            _log.info("%s is already in the cache", model_id)
+
+        status.put(LOADING)
+        engine = Engine.start(model_id)
+        status.put(READY)
+        _log.info("ready, pid %d", os.getpid())
+    except BaseException:
+        _log.error("worker died during startup:\n%s", traceback.format_exc())
+        status.put(FAILED)
+        raise
 
     while True:
         request = requests.get()
         if request is None:
             _log.info("stopping")
             return
-        responses.put(engine.infer(request["prompt"], request["max_new_tokens"]))
+        try:
+            responses.put(engine.infer(request["prompt"], request["max_new_tokens"]))
+        except Exception:
+            # The caller is blocked on `responses`. Saying nothing here hangs it
+            # for as long as the server lives.
+            _log.error("inference failed:\n%s", traceback.format_exc())
+            responses.put("")
