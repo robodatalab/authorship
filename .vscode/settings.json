@@ -10,14 +10,16 @@
 	},
 	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
 	"js/ts.tsc.autoDetect": "off",
-	// Python tests are unittest, discovered from the repo root so `server` stays
-	// an importable package — the test module uses relative imports.
+	// Python tests are unittest. Discovery starts in `tests`, with the top-level
+	// directory left at the repo root so `server` stays an importable package.
 	"python.testing.unittestEnabled": true,
 	"python.testing.pytestEnabled": false,
 	"python.testing.cwd": "${workspaceFolder}",
 	"python.testing.unittestArgs": [
 		"-v",
 		"-s",
+		"tests",
+		"-t",
 		".",
 		"-p",
 		"test_*.py"

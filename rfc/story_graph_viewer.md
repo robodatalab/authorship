@@ -19,7 +19,7 @@ navigation workhorse, so that is disqualifying.
 ## 2. Format
 
 `story_1.md` is accompanied by `story_1.graph.yaml` beside it. By convention, not
-configuration: [`graphPathFor`](../src/story_graph/model.ts) replaces the trailing `.md`.
+configuration: [`graphPathFor`](../extension/story_graph/model.ts) replaces the trailing `.md`.
 
 ```yaml
 layer:
@@ -68,16 +68,16 @@ view back to layer one.
 
 ## 3. Architecture
 
-**Host** — [`panel.ts`](../src/story_graph/panel.ts). One `StoryGraphPanel` per document,
+**Host** — [`panel.ts`](../extension/story_graph/panel.ts). One `StoryGraphPanel` per document,
 keyed by URI, so re-running the command brings the existing panel forward. Owns the file
 watcher, the YAML read and the editor decoration. Opens in `ViewColumn.Beside`.
 
-**View** — [`view.ts`](../src/story_graph/view.ts), bundled by a second webpack entry to
+**View** — [`view.ts`](../extension/story_graph/view.ts), bundled by a second webpack entry to
 `dist/story_graph_view.js`. DOM only: SVG construction, pan/zoom, messaging.
 
 The decisions live in two modules free of both `vscode` and the DOM, imported by either side:
-[`model.ts`](../src/story_graph/model.ts) — parsing, the overlap rule, span merging — and
-[`view_state.ts`](../src/story_graph/view_state.ts) — layers and selection. That split is what
+[`model.ts`](../extension/story_graph/model.ts) — parsing, the overlap rule, span merging — and
+[`view_state.ts`](../extension/story_graph/view_state.ts) — layers and selection. That split is what
 makes the behaviour testable without launching an editor (§5).
 
 `media/graph.css` stays a static asset loaded by URI; bundling it would force
@@ -95,7 +95,7 @@ makes the behaviour testable without launching an editor (§5).
 ## 4. Selection
 
 The only relationship between graph and manuscript is line-span overlap, with exactly one
-implementation — [`spansOverlap`](../src/story_graph/model.ts) — called by both directions. A
+implementation — [`spansOverlap`](../extension/story_graph/model.ts) — called by both directions. A
 shared boundary line counts, since nodes routinely end where the next begins.
 
 **Graph → manuscript.** Clicking a node posts its lines; the host reveals them and paints a
@@ -133,7 +133,7 @@ Two consequences worth knowing:
 
 ## 5. Layout, gestures, tests
 
-**Layout** ([`view_layout.ts`](../src/story_graph/view_layout.ts)) is layered top-to-bottom.
+**Layout** ([`view_layout.ts`](../extension/story_graph/view_layout.ts)) is layered top-to-bottom.
 Depth is the longest path to a node, relaxed until stable and capped at the node count, which
 both terminates and stops a cycle spinning. Within a row, nodes are ordered by manuscript
 position, so the picture is stable across reloads. No layout library — a vertical

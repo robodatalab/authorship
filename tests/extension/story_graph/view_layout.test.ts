@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Layer } from './model';
+import type { Layer } from '../../../extension/story_graph/model';
 import {
 	boundsOf,
 	edgePath,
@@ -12,7 +12,7 @@ import {
 	PAD_Y,
 	wrap,
 	type PlacedNode,
-} from './view_layout';
+} from '../../../extension/story_graph/view_layout';
 
 const node = (id: string, start: number, end: number, title = `node ${id}`) => ({
 	id,

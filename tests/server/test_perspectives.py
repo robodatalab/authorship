@@ -6,7 +6,7 @@ canned reply exercises the whole path from completion to graph.
 
 import unittest
 
-from .perspectives import (
+from server.perspectives import (
     SCENE_SYSTEM,
     ScenePerspective,
     as_edge,
@@ -18,7 +18,7 @@ from .perspectives import (
     json_object,
     numbered,
 )
-from .story_graph import Edge, Node
+from server.story_graph import Edge, Node
 
 
 class Numbered(unittest.TestCase):

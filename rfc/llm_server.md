@@ -70,8 +70,8 @@ the model is not `ready`.
 
 ## 5. Frontend
 
-`src/llm/health.ts` polls `/health` every 2s and mirrors it into the status bar via the pure
-mapping in `src/llm/state.ts`:
+`extension/llm/health.ts` polls `/health` every 2s and mirrors it into the status bar via the pure
+mapping in `extension/llm/state.ts`:
 
 | server | status bar |
 |---|---|

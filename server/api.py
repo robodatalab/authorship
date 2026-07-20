@@ -193,7 +193,7 @@ def perspectives(infer: Infer) -> Sequence[StoryPerspective]:
 
 def graph_path_for(document: Path) -> Path:
     """`story.md` sits next to `story.graph.yaml` — by convention, not
-    configuration. Mirrors `graphPathFor` in src/story_graph/model.ts."""
+    configuration. Mirrors `graphPathFor` in extension/story_graph/model.ts."""
     stem = re.sub(r"\.md$", "", document.name, flags=re.I)
     return document.with_name(stem + ".graph.yaml")
 
