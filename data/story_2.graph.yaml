@@ -1,0 +1,64 @@
+layer:
+- id: 1
+  nodes:
+  - node: 1
+    title: Anabelle's morning routine
+    start: 3
+    end: 50
+  - node: 2
+    title: The carriage ride to Sophia's
+    start: 51
+    end: 122
+  - node: 3
+    title: Shopping for a new wardrobe
+    start: 123
+    end: 152
+  - node: 4
+    title: Entering the pleasure department
+    start: 153
+    end: 258
+  - node: 5
+    title: Anabelle's first encounter
+    start: 259
+    end: 390
+  - node: 6
+    title: The drive home and Sophia's breakdown
+    start: 391
+    end: 434
+  - node: 7
+    title: Installing the pleasure frame
+    start: 435
+    end: 597
+  - node: 8
+    title: Sophia confesses her love for Mathew
+    start: 601
+    end: 691
+  - node: 9
+    title: Anabelle's work day and confrontation
+    start: 693
+    end: 804
+  edges:
+  - edge: 1
+    start: 1
+    end: 2
+  - edge: 2
+    start: 2
+    end: 3
+  - edge: 3
+    start: 3
+    end: 4
+  - edge: 4
+    start: 4
+    end: 5
+  - edge: 5
+    start: 5
+    end: 6
+  - edge: 6
+    start: 6
+    end: 7
+  - edge: 7
+    start: 7
+    end: 8
+  - edge: 8
+    start: 8
+    end: 9
