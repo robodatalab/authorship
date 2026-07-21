@@ -33,8 +33,8 @@ export class ModelHealth implements vscode.Disposable {
 			const response = await fetch(`http://127.0.0.1:${this.port}/health`, {
 				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 			});
-			const body = (await response.json()) as { status?: string };
-			this.phase = phaseFor(body.status);
+			const body = (await response.json()) as { inference_server_status?: string };
+			this.phase = phaseFor(body.inference_server_status);
 		} catch (err) {
 			// A timeout means the server is there but too busy to answer — loading
 			// weights starves the event loop. Only a refused connection means it is

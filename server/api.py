@@ -37,7 +37,6 @@ app = FastAPI(lifespan=lifespan)
 def health() -> dict[str, Any]:
     """Is the application healthy and ready to serve traffic"""
     inference_server_status = app.state.completion_model.status()
-    # TODO: update the frontend to show the status correctly
     return {
         "inference_server_status": inference_server_status,
     }

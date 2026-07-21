@@ -113,18 +113,23 @@ class CompletionModelStateMachine(unittest.TestCase):
         self.model = FakeModel(self.TOTAL_TOKENS)
         self._models: list[CompletionModel] = []
 
-        patchers = (
-            mock.patch.object(completion.multiprocessing, "Process", FakeProcess),
-            mock.patch.object(completion, "AutoTokenizer"),
-            mock.patch.object(completion, "AutoModelForCausalLM"),
+        process_patcher = mock.patch.object(
+            completion.multiprocessing, "Process", FakeProcess
         )
-        for patcher in patchers:
-            patcher.start()
+        tokenizer_patcher = mock.patch.object(completion, "AutoTokenizer")
+        model_patcher = mock.patch.object(completion, "AutoModelForCausalLM")
+
+        process_patcher.start()
+        auto_tokenizer = tokenizer_patcher.start()
+        auto_model = model_patcher.start()
+        for patcher in (process_patcher, tokenizer_patcher, model_patcher):
             self.addCleanup(patcher.stop)
 
-        # TODO: error - these types are not MagicMocks, and don't have return_value
-        completion.AutoTokenizer.from_pretrained.return_value = self.tokenizer
-        completion.AutoModelForCausalLM.from_pretrained.return_value = self.model
+        # `start()` hands back the MagicMock standing in for each class, so
+        # stubbing `from_pretrained` reads as MagicMock attribute access rather
+        # than as calls on the real `transformers` classes.
+        auto_tokenizer.from_pretrained.return_value = self.tokenizer
+        auto_model.from_pretrained.return_value = self.model
 
     def tearDown(self) -> None:
         # Release any monitor thread still parked on an empty queue so it exits

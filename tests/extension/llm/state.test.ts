@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { phaseFor, renderStatus } from '../../../extension/llm/state';
 
 describe('phaseFor', () => {
-	it('maps what the server reports', () => {
-		expect(phaseFor('ready')).toBe('ready');
-		expect(phaseFor('downloading')).toBe('downloading');
+	it('reads a serving model as ready', () => {
+		expect(phaseFor('serving')).toBe('ready');
 	});
 
-	it('collapses the two not-usable-yet states', () => {
-		expect(phaseFor('starting')).toBe('loading');
-		expect(phaseFor('loading')).toBe('loading');
+	it('reads a download-progress report as downloading', () => {
+		expect(phaseFor('0% downloaded')).toBe('downloading');
+		expect(phaseFor('37% downloaded')).toBe('downloading');
+		expect(phaseFor('100% downloaded')).toBe('downloading');
 	});
 
 	it('treats no answer as offline', () => {
@@ -30,7 +30,7 @@ describe('renderStatus', () => {
 	});
 
 	it('names the extension, not the model, in every state', () => {
-		for (const phase of ['offline', 'downloading', 'loading', 'ready'] as const) {
+		for (const phase of ['offline', 'downloading', 'ready'] as const) {
 			expect(renderStatus(phase).text).toMatch(/^\$\(book\) Authorship: /);
 		}
 	});
@@ -40,12 +40,8 @@ describe('renderStatus', () => {
 	});
 
 	it('never offers to start a server the extension does not start', () => {
-		for (const phase of ['offline', 'downloading', 'loading', 'ready'] as const) {
+		for (const phase of ['offline', 'downloading', 'ready'] as const) {
 			expect(renderStatus(phase).tooltip).not.toMatch(/click/i);
 		}
-	});
-
-	it('distinguishes downloading from loading', () => {
-		expect(renderStatus('downloading').text).not.toEqual(renderStatus('loading').text);
 	});
 });
