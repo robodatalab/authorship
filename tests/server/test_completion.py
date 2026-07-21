@@ -122,6 +122,7 @@ class CompletionModelStateMachine(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
+        # TODO: error - these types are not MagicMocks, and don't have return_value
         completion.AutoTokenizer.from_pretrained.return_value = self.tokenizer
         completion.AutoModelForCausalLM.from_pretrained.return_value = self.model
 
