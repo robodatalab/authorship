@@ -8,7 +8,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 import httpx
 
-from server.api import app
+from server.api import app, ParallelBuildJobsManager
 from server.inference.completion import ModelNotAvailable
 
 
@@ -55,15 +55,14 @@ class Build(unittest.TestCase):
             path.write_text("# scene\n\nprose\n")
             self.manuscript_paths.append(str(path))
 
-        self.original_model = getattr(app.state, "completion_model", None)
-
         def _restore_model():
-            app.state.completion_model = self.original_model
+            app.state.completion_model = None
 
         self.addCleanup(_restore_model)
 
         self.model = build_fake_completion_model()
         app.state.completion_model = self.model
+        app.state.jobs = ParallelBuildJobsManager()
 
     def test_backs_off_while_the_model_is_loading(self) -> None:
         self.model.complete.side_effect = [
@@ -105,7 +104,7 @@ class Build(unittest.TestCase):
             self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
 
     def test_a_second_build_for_the_same_file_supersedes_the_first(self) -> None:
-        barrier = threading.Barrier(2)
+        barrier = threading.Barrier(5)
 
         def rendezvous(*_args, **_kwargs) -> str:
             barrier.wait(timeout=5)
@@ -120,13 +119,17 @@ class Build(unittest.TestCase):
                 return await asyncio.gather(
                     *(
                         client.post("/build", json={"path": self.manuscript_paths[0]})
-                        for _ in range(2)
+                        for _ in range(5)
                     )
                 )
 
         responses = asyncio.run(build_both())
-        self.assertEqual(responses[0].status_code, 403)
-        self.assertEqual(responses[1].status_code, 200)
+
+        n_successful = sum([1 for r in responses if r.status_code == 200])
+        n_cancelled = sum([1 for r in responses if r.status_code == 403])
+
+        self.assertEqual(n_successful, 1)
+        self.assertEqual(n_cancelled, 4)
 
 
 if __name__ == "__main__":
