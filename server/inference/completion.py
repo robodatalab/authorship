@@ -4,16 +4,16 @@ import threading
 import time
 from multiprocessing.queues import Queue
 
+from huggingface_hub import snapshot_download
+from server import log
 from server.inference.monitoring import TextStreamerProgressMonitor
 import torch
-from huggingface_hub import snapshot_download
+from tqdm.auto import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     PreTrainedTokenizerBase,
 )
-
-from server import log
 
 _log = log.logger(__name__)
 
@@ -140,7 +140,6 @@ def _reporting_tqdm(signal: "Queue[float | str]") -> type:
     the hub ever stops drawing that bar the fraction just stays at zero until
     DOWNLOADED — the transition to serving still fires.
     """
-    from tqdm.auto import tqdm
 
     class ReportingTqdm(tqdm):  # type: ignore[type-arg]
         def update(self, n: float | None = 1) -> bool | None:
