@@ -104,32 +104,34 @@ class Build(unittest.TestCase):
             self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
 
     def test_a_second_build_for_the_same_file_supersedes_the_first(self) -> None:
-        barrier = threading.Barrier(5)
+        entered = threading.Semaphore(0)
+        release = threading.Event()
 
-        def rendezvous(*_args, **_kwargs) -> str:
-            barrier.wait(timeout=5)
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
             return DEFAULT_REPLY
 
-        self.model.complete.side_effect = rendezvous
+        self.model.complete.side_effect = complete
+        path = self.manuscript_paths[0]
 
         async def build_both():
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), base_url="http://test"
             ) as client:
-                return await asyncio.gather(
-                    *(
-                        client.post("/build", json={"path": self.manuscript_paths[0]})
-                        for _ in range(5)
-                    )
-                )
+                first = asyncio.create_task(client.post("/build", json={"path": path}))
+                await asyncio.to_thread(entered.acquire, True, 5)  # first is in flight
 
-        responses = asyncio.run(build_both())
+                second = asyncio.create_task(client.post("/build", json={"path": path}))
+                await asyncio.to_thread(entered.acquire, True, 5)
 
-        n_successful = sum([1 for r in responses if r.status_code == 200])
-        n_cancelled = sum([1 for r in responses if r.status_code == 403])
+                release.set()
+                return await asyncio.gather(first, second)
 
-        self.assertEqual(n_successful, 1)
-        self.assertEqual(n_cancelled, 4)
+        first_response, second_response = asyncio.run(build_both())
+
+        self.assertEqual(first_response.status_code, 403)
+        self.assertEqual(second_response.status_code, 200)
 
 
 if __name__ == "__main__":
