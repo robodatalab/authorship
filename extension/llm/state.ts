@@ -43,7 +43,7 @@ export function phaseFor(status: string | undefined): Phase {
  * implementation detail, so a working extension reads simply as `ok`. Only the
  * states where Authorship cannot do its job name what is holding it up.
  */
-export function renderStatus(phase: Phase, model: string): StatusDisplay {
+export function renderStatus(phase: Phase): StatusDisplay {
 	switch (phase) {
 		case 'offline':
 			return {
@@ -53,22 +53,22 @@ export function renderStatus(phase: Phase, model: string): StatusDisplay {
 		case 'downloading':
 			return {
 				text: '$(book) Authorship: downloading',
-				tooltip: `Fetching ${model}. This takes a while on first run.`,
+				tooltip: 'Fetching the model. This takes a while on first run.',
 			};
 		case 'loading':
 			return {
 				text: '$(book) Authorship: loading',
-				tooltip: `Loading ${model} onto the GPU.`,
+				tooltip: 'Loading the model onto the GPU.',
 			};
 		case 'ready':
 			return {
 				text: '$(book) Authorship: ok',
-				tooltip: `${model} is loaded and serving.`,
+				tooltip: 'The model is loaded and serving.',
 			};
 		case 'building':
 			return {
 				text: '$(sync~spin) Authorship: building',
-				tooltip: `Reading the manuscript with ${model}.`,
+				tooltip: 'Reading the manuscript.',
 			};
 	}
 }

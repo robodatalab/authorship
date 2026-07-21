@@ -6,9 +6,9 @@ canned reply exercises the whole path from completion to graph.
 
 import unittest
 
-from server.perspectives import (
+from server.representations.scenes_representation import (
     SCENE_SYSTEM,
-    ScenePerspective,
+    SceneRepresentation,
     as_edge,
     as_id,
     as_line,
