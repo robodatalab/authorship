@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from server import log
 from server.representations.scene_representation import build_scene_representation
 from server.representations.utils import graph_path_for
-from server.inference.completion import CompletionModel
+from server.inference.completion import CompletionModel, ModelNotAvailable
 import tenacity
 
 _log = log.logger(__name__)
@@ -47,7 +47,7 @@ class RepresentationBuildRequest(BaseModel):
 
 
 @tenacity.retry(
-    retry=tenacity.retry_if_exception_type(ValueError),
+    retry=tenacity.retry_if_exception_type((ValueError, ModelNotAvailable)),
     wait=tenacity.wait_exponential_jitter(initial=1, max=30),
     stop=tenacity.stop_after_attempt(5),
     reraise=True,
