@@ -1,33 +1,26 @@
 // Rebuilds a manuscript's story graph when the manuscript is saved.
 //
-// The server does the reading and the writing: it is handed a path, and the
-// `.graph.yaml` it writes reaches the viewer through the file watcher that was
-// already there. Nothing here parses a graph or touches the panel.
+// The server does the reading and the writing: it is handed a path and writes
+// the `.graph.yaml`, which reaches the viewer through the file watcher that was
+// already there. A build runs the model for minutes, so the POST only starts it
+// and returns; a status poll follows it to the end. Nothing here parses a graph
+// or touches the panel.
 
 import * as vscode from 'vscode';
 
 import type { BuildActivity } from './activity';
 import type { ModelHealth } from './health';
 
-/** A build runs the model over the whole manuscript, so minutes, not seconds. */
-const REQUEST_TIMEOUT_MS = 600_000;
-
-/**
- * The server saying a newer save took the manuscript over. Not a failure: it is
- * the answer to having saved again, and the newer build is already running.
- */
-const SUPERSEDED = 409;
+/** How often to ask the server how a build is getting on. */
+const POLL_INTERVAL_MS = 2000;
 
 export class GraphBuilder implements vscode.Disposable {
 	private readonly subscriptions: vscode.Disposable[] = [];
 
 	/**
-	 * The request in flight per path, so a save can end the one before it.
-	 *
-	 * Two writers on one file is the thing being avoided, and waiting is the
-	 * lesser half of it: the older build was reading a draft that no longer
-	 * exists, so its answer would overwrite the newer one if it happened to
-	 * finish second.
+	 * The request in flight per path, so a save can end the one before it. The
+	 * abort stops our polling here; the server supersedes the older build on its
+	 * own side.
 	 */
 	private readonly requests = new Map<string, AbortController>();
 
@@ -59,21 +52,19 @@ export class GraphBuilder implements vscode.Disposable {
 		const current = this.activity.started(path, Date.now());
 
 		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/build`, {
+			const started = await fetch(`http://127.0.0.1:${this.port}/build`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ path }),
-				signal: AbortSignal.any([
-					request.signal,
-					AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-				]),
+				signal: request.signal,
 			});
-			if (!response.ok && response.status !== SUPERSEDED) {
-				const body = (await response.json()) as { detail?: string };
-				vscode.window.showWarningMessage(
-					`Authorship could not rebuild the story graph: ${body.detail ?? response.statusText}`
-				);
+			if (!started.ok) {
+				await this.warn(started);
+				return;
 			}
+
+			const { id } = (await started.json()) as { id: string };
+			await this.followToEnd(id, request.signal);
 		} catch (err) {
 			// Saving is not an act of asking for this, so a server that is simply
 			// not running must not interrupt. The status bar already says offline.
@@ -89,8 +80,43 @@ export class GraphBuilder implements vscode.Disposable {
 		}
 	}
 
+	/** Poll the build's status until it is no longer running. */
+	private async followToEnd(id: string, signal: AbortSignal): Promise<void> {
+		for (;;) {
+			await delay(POLL_INTERVAL_MS, signal);
+
+			const response = await fetch(
+				`http://127.0.0.1:${this.port}/build/status?id=${encodeURIComponent(id)}`,
+				{ signal }
+			);
+			// A 404 means the server has no record of this build — it restarted,
+			// say — so there is nothing left to wait for.
+			if (!response.ok) {
+				return;
+			}
+
+			const body = (await response.json()) as { running?: boolean };
+			if (!body.running) {
+				return; // done, or superseded by a newer save
+			}
+		}
+	}
+
+	private async warn(response: Response): Promise<void> {
+		let detail = response.statusText;
+		try {
+			const body = (await response.json()) as { detail?: string };
+			detail = body.detail ?? detail;
+		} catch {
+			// A non-JSON body; the status text will have to do.
+		}
+		vscode.window.showWarningMessage(
+			`Authorship could not rebuild the story graph: ${detail}`
+		);
+	}
+
 	dispose(): void {
-		// Unsubscribing first: aborting sends the builds unwinding, and their
+		// Unsubscribing first: aborting sends the polls unwinding, and their
 		// announcements would otherwise reach a status bar that is already gone.
 		for (const item of this.subscriptions) {
 			item.dispose();
@@ -101,7 +127,32 @@ export class GraphBuilder implements vscode.Disposable {
 	}
 }
 
-/** A timeout aborts too, but that one is worth saying out loud. */
+/** A promise that settles after `ms`, or rejects the moment `signal` aborts. */
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (signal.aborted) {
+			reject(abortError());
+			return;
+		}
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener(
+			'abort',
+			() => {
+				clearTimeout(timer);
+				reject(abortError());
+			},
+			{ once: true }
+		);
+	});
+}
+
+function abortError(): Error {
+	const err = new Error('Aborted');
+	err.name = 'AbortError';
+	return err;
+}
+
+/** Our own aborts — a newer save taking over — read as AbortError. */
 function isAbort(err: unknown): boolean {
 	return err instanceof Error && err.name === 'AbortError';
 }

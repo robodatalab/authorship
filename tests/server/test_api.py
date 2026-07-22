@@ -1,12 +1,11 @@
-import asyncio
 from pathlib import Path
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
 from fastapi.testclient import TestClient
-import httpx
 import yaml
 
 from server.api import app, ParallelBuildJobsManager
@@ -16,8 +15,6 @@ from server.inference.completion import ModelNotAvailable
 DEFAULT_REPLY = (
     '{"nodes": [{"id": 1, "title": "scene", "start": 0, "end": 1}], "edges": []}'
 )
-
-EXPECTED_LAYERS = [{"nodes": 1, "edges": 0}, {"nodes": 1, "edges": 0}]
 
 
 def build_fake_completion_model(
@@ -45,6 +42,16 @@ class Health(unittest.TestCase):
         self.assertEqual(response.json(), {"inference_server_status": "serving"})
 
 
+def wait_for_build(client: TestClient, build_id: str, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get("/build/status", params={"id": build_id})
+        if response.status_code == 200 and not response.json()["running"]:
+            return
+        time.sleep(0.005)
+    raise AssertionError(f"build {build_id} did not finish within {timeout}s")
+
+
 class Build(unittest.TestCase):
     def setUp(self):
         super().setUp()
@@ -67,15 +74,15 @@ class Build(unittest.TestCase):
         app.state.completion_model = self.model
         app.state.jobs = ParallelBuildJobsManager()
 
-    def test_writes_the_graph_file_the_response_names(self) -> None:
-        response = TestClient(app).post(
-            "/build", json={"path": self.manuscript_paths[0]}
-        )
-        self.assertEqual(response.status_code, 200)
+    def test_build_returns_at_once_then_writes_the_graph_file(self) -> None:
+        client = TestClient(app)
+        response = client.post("/build", json={"path": self.manuscript_paths[0]})
+        self.assertEqual(response.status_code, 202)
+
+        wait_for_build(client, response.json()["id"])
 
         written = Path(response.json()["path"])
         self.assertTrue(written.exists())
-        # Both perspectives land on disk as layers, scenes first.
         document = yaml.safe_load(written.read_text())
         self.assertEqual(len(document["layer"]), 2)
 
@@ -86,12 +93,13 @@ class Build(unittest.TestCase):
             DEFAULT_REPLY,
             DEFAULT_REPLY,
         ]
-        client = TestClient(app, raise_server_exceptions=False)
+        client = TestClient(app)
         with mock.patch("time.sleep"):
             response = client.post("/build", json={"path": self.manuscript_paths[0]})
+            self.assertEqual(response.status_code, 202)
+            wait_for_build(client, response.json()["id"])
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["layers"], EXPECTED_LAYERS)
+        self.assertTrue(Path(response.json()["path"]).exists())
 
     def test_multiple_builds_for_different_files_can_run_in_parallel(self) -> None:
         barrier = threading.Barrier(2)
@@ -102,22 +110,16 @@ class Build(unittest.TestCase):
 
         self.model.complete.side_effect = rendezvous
 
-        async def build_both():
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                return await asyncio.gather(
-                    *(
-                        client.post("/build", json={"path": p})
-                        for p in self.manuscript_paths
-                    )
-                )
-
-        responses = asyncio.run(build_both())
-
+        client = TestClient(app)
+        responses = [
+            client.post("/build", json={"path": path})
+            for path in self.manuscript_paths
+        ]
         for response in responses:
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["layers"], EXPECTED_LAYERS)
+            self.assertEqual(response.status_code, 202)
+        for response in responses:
+            wait_for_build(client, response.json()["id"])
+            self.assertTrue(Path(response.json()["path"]).exists())
 
     def test_a_second_build_for_the_same_file_supersedes_the_first(self) -> None:
         entered = threading.Semaphore(0)
@@ -130,24 +132,20 @@ class Build(unittest.TestCase):
 
         self.model.complete.side_effect = complete
         path = self.manuscript_paths[0]
+        client = TestClient(app)
 
-        async def build_both():
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                first = asyncio.create_task(client.post("/build", json={"path": path}))
-                await asyncio.to_thread(entered.acquire, True, 5)  # first is in flight
+        first = client.post("/build", json={"path": path})
+        self.assertEqual(first.status_code, 202)
+        self.assertTrue(entered.acquire(timeout=5))  # first build is in flight
+        first_job = app.state.jobs._by_path[path]
 
-                second = asyncio.create_task(client.post("/build", json={"path": path}))
-                await asyncio.to_thread(entered.acquire, True, 5)
+        second = client.post("/build", json={"path": path})
+        self.assertEqual(second.status_code, 202)
+        self.assertTrue(entered.acquire(timeout=5))  # second build is in flight
 
-                release.set()
-                return await asyncio.gather(first, second)
-
-        first_response, second_response = asyncio.run(build_both())
-
-        self.assertEqual(first_response.status_code, 403)
-        self.assertEqual(second_response.status_code, 200)
+        release.set()
+        wait_for_build(client, second.json()["id"])
+        self.assertTrue(first_job.cancelled)
 
 
 if __name__ == "__main__":
