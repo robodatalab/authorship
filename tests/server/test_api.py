@@ -16,6 +16,8 @@ DEFAULT_REPLY = (
     '{"nodes": [{"id": 1, "title": "scene", "start": 0, "end": 1}], "edges": []}'
 )
 
+EXPECTED_LAYERS = [{"nodes": 1, "edges": 0}, {"nodes": 1, "edges": 0}]
+
 
 def build_fake_completion_model(
     reply: str = DEFAULT_REPLY, status: str = "serving"
@@ -69,13 +71,14 @@ class Build(unittest.TestCase):
             ModelNotAvailable("loading"),
             ModelNotAvailable("loading"),
             DEFAULT_REPLY,
+            DEFAULT_REPLY,
         ]
         client = TestClient(app, raise_server_exceptions=False)
         with mock.patch("time.sleep"):
             response = client.post("/build", json={"path": self.manuscript_paths[0]})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
+        self.assertEqual(response.json()["layers"], EXPECTED_LAYERS)
 
     def test_multiple_builds_for_different_files_can_run_in_parallel(self) -> None:
         barrier = threading.Barrier(2)
@@ -101,7 +104,7 @@ class Build(unittest.TestCase):
 
         for response in responses:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
+            self.assertEqual(response.json()["layers"], EXPECTED_LAYERS)
 
     def test_a_second_build_for_the_same_file_supersedes_the_first(self) -> None:
         entered = threading.Semaphore(0)

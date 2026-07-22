@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
+from server.representations.plot_representation import build_plot_representation
 from server.representations.scene_representation import build_scene_representation
 from server.representations.utils import graph_path_for
 from server.inference.completion import CompletionModel, ModelNotAvailable
@@ -54,7 +55,10 @@ class RepresentationBuildRequest(BaseModel):
     reraise=True,
 )
 def _build_representations(model, markdown):
-    return [build_scene_representation(model, markdown)]
+    return [
+        build_scene_representation(model, markdown),
+        build_plot_representation(model, markdown),
+    ]
 
 
 class BuildJob:
@@ -106,8 +110,6 @@ class ParallelBuildJobsManager:
 
     def remove(self, job: BuildJob) -> None:
         with self._lock:
-            # Only if it is still the registered job — a cancelled job must not
-            # evict the one that replaced it.
             if self._by_path.get(job.path) is job:
                 del self._by_path[job.path]
 
