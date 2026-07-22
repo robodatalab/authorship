@@ -20,6 +20,7 @@ export interface PlacedNode {
 	title: string;
 	start: number;
 	end: number;
+	group?: number;
 	lines: string[];
 	depth: number;
 	x: number;
@@ -51,6 +52,7 @@ export function layout(layer: Layer): Map<string, PlacedNode> {
 			title: node.title,
 			start: node.start,
 			end: node.end,
+			group: node.group,
 			lines,
 			depth: 0,
 			x: 0,

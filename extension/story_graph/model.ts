@@ -22,12 +22,15 @@ export interface GraphNode {
 	/** 1-based line numbers into the manuscript. */
 	start: number;
 	end: number;
+	/** The plot this node belongs to, for layers that have several. */
+	group?: number;
 }
 
 export interface GraphEdge {
 	id: string;
 	from: string;
 	to: string;
+	group?: number;
 }
 
 /** An inclusive span of 1-based manuscript lines. */
@@ -95,6 +98,7 @@ function normalizeLayer(entry: unknown, index: number): Layer {
 				title: String(item.title ?? item.node ?? item.id ?? ''),
 				start: Number(item.start),
 				end: Number(item.end),
+				group: asGroup(item.group),
 			};
 		})
 		.filter((node) => node.id !== '' && Number.isFinite(node.start) && Number.isFinite(node.end));
@@ -109,6 +113,7 @@ function normalizeLayer(entry: unknown, index: number): Layer {
 				id: String(item.edge ?? item.id ?? index),
 				from: String(item.start ?? item.from ?? ''),
 				to: String(item.end ?? item.to ?? ''),
+				group: asGroup(item.group),
 			};
 		})
 		.filter((edge) => known.has(edge.from) && known.has(edge.to));
@@ -144,4 +149,9 @@ export function mergeSpans(spans: readonly LineSpan[]): LineSpan[] {
 
 function asArray(value: unknown): unknown[] {
 	return Array.isArray(value) ? value : [];
+}
+
+function asGroup(value: unknown): number | undefined {
+	const group = Number(value);
+	return Number.isFinite(group) ? group : undefined;
 }
