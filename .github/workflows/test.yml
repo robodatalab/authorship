@@ -28,14 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.11'
+          enable-cache: true
 
-      # Not `uv sync`: that pulls torch and transformers for a suite that never
-      # loads a model. The modules under test reach no further than PyYAML.
-      - run: pip install 'pyyaml>=6.0'
+      # Installs the full dependency set from the lockfile. uv provisions a
+      # Python matching `requires-python`, so no separate setup-python step.
+      - run: uv sync
 
       # Discovery starts in `tests`, but the top-level directory stays the repo
       # root so `server` resolves as a package from the test modules.
-      - run: python -m unittest discover -v -s tests -t . -p 'test_*.py'
+      - run: uv run python -m unittest discover -v -s tests -t . -p 'test_*.py'
