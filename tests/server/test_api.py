@@ -7,6 +7,7 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 import httpx
+import yaml
 
 from server.api import app, ParallelBuildJobsManager
 from server.inference.completion import ModelNotAvailable
@@ -65,6 +66,18 @@ class Build(unittest.TestCase):
         self.model = build_fake_completion_model()
         app.state.completion_model = self.model
         app.state.jobs = ParallelBuildJobsManager()
+
+    def test_writes_the_graph_file_the_response_names(self) -> None:
+        response = TestClient(app).post(
+            "/build", json={"path": self.manuscript_paths[0]}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        written = Path(response.json()["path"])
+        self.assertTrue(written.exists())
+        # Both perspectives land on disk as layers, scenes first.
+        document = yaml.safe_load(written.read_text())
+        self.assertEqual(len(document["layer"]), 2)
 
     def test_backs_off_while_the_model_is_loading(self) -> None:
         self.model.complete.side_effect = [

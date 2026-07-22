@@ -13,6 +13,7 @@ from server import log
 from server.representations.plot_representation import build_plot_representation
 from server.representations.scene_representation import build_scene_representation
 from server.representations.utils import graph_path_for
+from server.story_graph import to_yaml
 from server.inference.completion import CompletionModel, ModelNotAvailable
 import tenacity
 
@@ -128,6 +129,8 @@ def build(request: RepresentationBuildRequest) -> dict[str, Any]:
 
     if job.cancelled:
         raise HTTPException(status_code=403, detail="superseded by a newer build")
+
+    target_graph_file.write_text(to_yaml(graphs))
 
     return {
         "path": str(target_graph_file),
