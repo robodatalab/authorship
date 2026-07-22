@@ -1,11 +1,7 @@
-from huggingface_hub import snapshot_download
-from huggingface_hub.errors import LocalEntryNotFoundError
-
-
-def is_huggingface_model_downloaded(model_id: str) -> bool:
-    """Ask the hub whether every file is already local."""
-    try:
-        snapshot_download(model_id, local_files_only=True)
-        return True
-    except LocalEntryNotFoundError:
-        return False
+def qwen_chat_prompt(system: str, user: str) -> str:
+    """Render a turn the way Qwen's chat template does, with reasoning off."""
+    return (
+        f"<|im_start|>system\n{system}<|im_end|>\n"
+        f"<|im_start|>user\n{user}<|im_end|>\n"
+        f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
