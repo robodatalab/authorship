@@ -17,7 +17,6 @@ export class ModelHealth implements vscode.Disposable {
 	private readonly status: vscode.StatusBarItem;
 	private readonly timer: NodeJS.Timeout;
 	private phase: Phase = 'offline';
-	private model = 'the model';
 	private building = false;
 
 	constructor(private readonly port: number) {
@@ -34,9 +33,8 @@ export class ModelHealth implements vscode.Disposable {
 			const response = await fetch(`http://127.0.0.1:${this.port}/health`, {
 				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 			});
-			const body = (await response.json()) as { status?: string; model?: string };
-			this.phase = phaseFor(body.status);
-			this.model = body.model ?? this.model;
+			const body = (await response.json()) as { inference_server_status?: string };
+			this.phase = phaseFor(body.inference_server_status);
 		} catch (err) {
 			// A timeout means the server is there but too busy to answer — loading
 			// weights starves the event loop. Only a refused connection means it is
@@ -63,7 +61,7 @@ export class ModelHealth implements vscode.Disposable {
 	private render(): void {
 		// A build outranks the health phases: it can only have started from
 		// `ready`, and it is the more specific thing to say.
-		const display = renderStatus(this.building ? 'building' : this.phase, this.model);
+		const display = renderStatus(this.building ? 'building' : this.phase);
 		this.status.text = display.text;
 		this.status.tooltip = display.tooltip;
 	}

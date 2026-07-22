@@ -1,138 +1,138 @@
-"""Tests for what happens when the writer saves again mid-build.
-
-No model and no server: `Builds` is handed whatever answers `infer`, so a stub
-that records what it was asked exercises the whole supersession path.
-"""
-
-import unittest
+import asyncio
 from pathlib import Path
-from typing import Any
+import tempfile
+import threading
+import unittest
+from unittest import mock
 
-from server.api import Build, Builds, Superseded, graph_path_for
+from fastapi.testclient import TestClient
+import httpx
 
-
-class StubWorker:
-    """Stands in for the child process holding the weights."""
-
-    def __init__(self, reply: str = "{}") -> None:
-        self.reply = reply
-        self.calls: list[str] = []
-        self.interrupted: list[Build] = []
-        #: Called with the build the model is generating for, so a test can
-        #: abandon it from inside the generation it is abandoning.
-        self.during: Any = None
-
-    def infer(self, prompt: str, max_new_tokens: int, owner: Build | None = None) -> str:
-        self.calls.append(prompt)
-        if self.during is not None and owner is not None:
-            self.during(owner)
-        return self.reply
-
-    def interrupt(self, owner: Build) -> None:
-        self.interrupted.append(owner)
+from server.api import app, ParallelBuildJobsManager
+from server.inference.completion import ModelNotAvailable
 
 
-STORY = Path("/manuscripts/story.md")
-OTHER = Path("/manuscripts/other.md")
+DEFAULT_REPLY = (
+    '{"nodes": [{"id": 1, "title": "scene", "start": 0, "end": 1}], "edges": []}'
+)
 
 
-class Supersession(unittest.TestCase):
-    def test_a_second_save_abandons_the_first_build(self) -> None:
-        model = StubWorker()
-        builds = Builds(model)  # type: ignore[arg-type]
-
-        first = builds.start(STORY)
-        second = builds.start(STORY)
-
-        self.assertTrue(first.abandoned)
-        self.assertFalse(second.abandoned)
-
-    def test_abandoning_reaches_the_generation_in_flight(self) -> None:
-        # Setting the flag alone would leave the old build holding the model
-        # until it hit its token budget, with the new one queued behind it.
-        model = StubWorker()
-        builds = Builds(model)  # type: ignore[arg-type]
-
-        first = builds.start(STORY)
-        builds.start(STORY)
-
-        self.assertEqual(model.interrupted, [first])
-
-    def test_manuscripts_do_not_abandon_each_other(self) -> None:
-        model = StubWorker()
-        builds = Builds(model)  # type: ignore[arg-type]
-
-        story = builds.start(STORY)
-        builds.start(OTHER)
-
-        self.assertFalse(story.abandoned)
-        self.assertEqual(model.interrupted, [])
-
-    def test_a_superseded_build_does_not_retire_its_replacement(self) -> None:
-        # The abandoned request unwinds after the one that replaced it started.
-        model = StubWorker()
-        builds = Builds(model)  # type: ignore[arg-type]
-
-        first = builds.start(STORY)
-        second = builds.start(STORY)
-        builds.finish(first)
-
-        third = builds.start(STORY)
-        self.assertTrue(second.abandoned)
-        self.assertIsNot(third, second)
-
-    def test_finishing_clears_the_way_for_the_next_save(self) -> None:
-        model = StubWorker()
-        builds = Builds(model)  # type: ignore[arg-type]
-
-        first = builds.start(STORY)
-        builds.finish(first)
-        builds.start(STORY)
-
-        # Nothing to abandon: the first build was already done.
-        self.assertEqual(model.interrupted, [])
+def build_fake_completion_model(
+    reply: str = DEFAULT_REPLY, status: str = "serving"
+) -> mock.MagicMock:
+    model = mock.MagicMock()
+    model.complete.return_value = reply
+    model.status.return_value = status
+    return model
 
 
-class Inference(unittest.TestCase):
-    def test_a_live_build_infers(self) -> None:
-        model = StubWorker(reply="an answer")
-        build = Build(STORY, model)  # type: ignore[arg-type]
-
-        self.assertEqual(build.infer("a prompt", 16), "an answer")
-        self.assertEqual(model.calls, ["a prompt"])
-
-    def test_an_abandoned_build_does_not_reach_the_model(self) -> None:
-        model = StubWorker()
-        build = Build(STORY, model)  # type: ignore[arg-type]
-        build.abandon()
-
-        with self.assertRaises(Superseded):
-            build.infer("a prompt", 16)
-        self.assertEqual(model.calls, [])
-
-    def test_a_reply_interrupted_mid_generation_is_not_an_answer(self) -> None:
-        # An interrupted generation stops mid-sentence, so the reply must never
-        # reach the parser — a half-written object is not a failed build, it is
-        # a build nobody is waiting for.
-        model = StubWorker(reply='{"nodes": [{"id": 1, "ti')
-        model.during = lambda owner: owner.abandon()
-        build = Build(STORY, model)  # type: ignore[arg-type]
-
-        with self.assertRaises(Superseded):
-            build.infer("a prompt", 16)
-
-    def test_naming_the_manuscript_that_was_taken_over(self) -> None:
-        build = Build(STORY, StubWorker())  # type: ignore[arg-type]
-        build.abandon()
-
-        with self.assertRaises(Superseded) as caught:
-            build.check()
-        self.assertIn("story.md", str(caught.exception))
-
-
-class GraphPath(unittest.TestCase):
-    def test_sits_beside_the_manuscript(self) -> None:
-        self.assertEqual(
-            graph_path_for(Path("/manuscripts/story_1.md")),
-            Path("/manuscripts/story_1.graph.yaml"),
+class Health(unittest.TestCase):
+    def test_reports_download_progress_while_the_model_loads(self) -> None:
+        app.state.completion_model = build_fake_completion_model(
+            status="37% downloaded"
         )
+        response = TestClient(app).get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"inference_server_status": "37% downloaded"})
+
+    def test_reports_serving_once_the_model_is_ready(self) -> None:
+        app.state.completion_model = build_fake_completion_model(status="serving")
+        response = TestClient(app).get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"inference_server_status": "serving"})
+
+
+class Build(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+
+        self.manuscript_paths = []
+        for name in ["first", "second"]:
+            path = Path(self._dir.name) / f"{name}.md"
+            path.write_text("# scene\n\nprose\n")
+            self.manuscript_paths.append(str(path))
+
+        def _restore_model():
+            app.state.completion_model = None
+
+        self.addCleanup(_restore_model)
+
+        self.model = build_fake_completion_model()
+        app.state.completion_model = self.model
+        app.state.jobs = ParallelBuildJobsManager()
+
+    def test_backs_off_while_the_model_is_loading(self) -> None:
+        self.model.complete.side_effect = [
+            ModelNotAvailable("loading"),
+            ModelNotAvailable("loading"),
+            DEFAULT_REPLY,
+        ]
+        client = TestClient(app, raise_server_exceptions=False)
+        with mock.patch("time.sleep"):
+            response = client.post("/build", json={"path": self.manuscript_paths[0]})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
+
+    def test_multiple_builds_for_different_files_can_run_in_parallel(self) -> None:
+        barrier = threading.Barrier(2)
+
+        def rendezvous(*_args, **_kwargs) -> str:
+            barrier.wait(timeout=5)
+            return DEFAULT_REPLY
+
+        self.model.complete.side_effect = rendezvous
+
+        async def build_both():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                return await asyncio.gather(
+                    *(
+                        client.post("/build", json={"path": p})
+                        for p in self.manuscript_paths
+                    )
+                )
+
+        responses = asyncio.run(build_both())
+
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["layers"], [{"nodes": 1, "edges": 0}])
+
+    def test_a_second_build_for_the_same_file_supersedes_the_first(self) -> None:
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return DEFAULT_REPLY
+
+        self.model.complete.side_effect = complete
+        path = self.manuscript_paths[0]
+
+        async def build_both():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                first = asyncio.create_task(client.post("/build", json={"path": path}))
+                await asyncio.to_thread(entered.acquire, True, 5)  # first is in flight
+
+                second = asyncio.create_task(client.post("/build", json={"path": path}))
+                await asyncio.to_thread(entered.acquire, True, 5)
+
+                release.set()
+                return await asyncio.gather(first, second)
+
+        first_response, second_response = asyncio.run(build_both())
+
+        self.assertEqual(first_response.status_code, 403)
+        self.assertEqual(second_response.status_code, 200)
+
+
+if __name__ == "__main__":
+    unittest.main()
