@@ -230,6 +230,34 @@ export function denormalize(layers: readonly Layer[]): { layer: unknown[] } {
 	};
 }
 
+/**
+ * Do two graphs carry the same nodes and edges? Key order, an absent field vs an
+ * explicit `undefined`, and edge ids (which are only positional) are all
+ * disregarded, so a graph compares equal to itself after a save→reload round
+ * trip. Used to tell our own write landing back from a change made underneath us.
+ */
+export function sameGraph(a: readonly Layer[], b: readonly Layer[]): boolean {
+	return canonicalize(a) === canonicalize(b);
+}
+
+function canonicalize(layers: readonly Layer[]): string {
+	return JSON.stringify(
+		layers.map((layer) => ({
+			id: layer.id,
+			nodes: layer.nodes.map((node) => [
+				node.id,
+				node.title,
+				node.start,
+				node.end,
+				node.group ?? null,
+				node.x ?? null,
+				node.y ?? null,
+			]),
+			edges: layer.edges.map((edge) => [edge.from, edge.to, edge.group ?? null]),
+		}))
+	);
+}
+
 /** Add a node to a layer, giving it the next free id. The id comes back too. */
 export function addNode(layer: Layer, fields: NodeFields): { layer: Layer; id: string } {
 	const id = nextId(layer.nodes.map((node) => node.id));

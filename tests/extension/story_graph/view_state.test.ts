@@ -462,4 +462,18 @@ describe('editing the graph', () => {
 		expect(coarse?.nodes.some((n) => n.title === 'coarse only')).toBe(true);
 		expect(fine?.nodes.some((n) => n.title === 'coarse only')).toBe(false);
 	});
+
+	it('pins a batch of nodes at once, leaving the rest free', () => {
+		state.pinPositions(
+			new Map([
+				['1', { x: 10, y: 20 }],
+				['3', { x: 30, y: 40 }],
+			])
+		);
+
+		const layer = currentLayer(state)!;
+		expect(layer.nodes.find((n) => n.id === '1')).toMatchObject({ x: 10, y: 20 });
+		expect(layer.nodes.find((n) => n.id === '3')).toMatchObject({ x: 30, y: 40 });
+		expect(layer.nodes.find((n) => n.id === '2')?.x).toBeUndefined();
+	});
 });

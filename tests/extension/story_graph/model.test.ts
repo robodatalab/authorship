@@ -12,6 +12,7 @@ import {
 	moveNode,
 	nodesTouching,
 	normalize,
+	sameGraph,
 	spansOverlap,
 	updateNode,
 	type Layer,
@@ -477,5 +478,51 @@ describe('graph edits', () => {
 		expect(base.nodes).toHaveLength(2);
 		expect(base.edges).toHaveLength(1);
 		expect(base.nodes[0].x).toBeUndefined();
+	});
+});
+
+describe('sameGraph — telling our own save from a change underneath us', () => {
+	const withNode = (title: string): Layer[] => [
+		{ id: '1', nodes: [{ id: '1', title, start: 1, end: 2 }], edges: [] },
+	];
+
+	it('holds after a save→reload round trip, undefined vs missing fields aside', () => {
+		const edited: Layer[] = [
+			{ id: '1', nodes: [{ id: '1', title: 'x', start: 1, end: 2, group: undefined, x: undefined, y: undefined }], edges: [] },
+		];
+		const reloaded = normalize(parseYaml(stringifyYaml(denormalize(edited))));
+
+		expect(sameGraph(edited, reloaded)).toBe(true);
+	});
+
+	it('ignores edge ids, which are only positional', () => {
+		const nodes = [
+			{ id: '1', title: 'x', start: 1, end: 2 },
+			{ id: '2', title: 'y', start: 3, end: 4 },
+		];
+		const a: Layer[] = [{ id: '1', nodes, edges: [{ id: '7', from: '1', to: '2' }] }];
+		const b: Layer[] = [{ id: '1', nodes, edges: [{ id: '1', from: '1', to: '2' }] }];
+
+		expect(sameGraph(a, b)).toBe(true);
+	});
+
+	it('is false when a title, a position, or an edge changes', () => {
+		expect(sameGraph(withNode('a'), withNode('b'))).toBe(false);
+
+		const moved: Layer[] = [{ id: '1', nodes: [{ id: '1', title: 'a', start: 1, end: 2, x: 5, y: 5 }], edges: [] }];
+		expect(sameGraph(withNode('a'), moved)).toBe(false);
+
+		const linked: Layer[] = [
+			{
+				id: '1',
+				nodes: [
+					{ id: '1', title: 'a', start: 1, end: 2 },
+					{ id: '2', title: 'b', start: 3, end: 4 },
+				],
+				edges: [{ id: '1', from: '1', to: '2' }],
+			},
+		];
+		const unlinked: Layer[] = [{ ...linked[0], edges: [] }];
+		expect(sameGraph(linked, unlinked)).toBe(false);
 	});
 });

@@ -23,8 +23,8 @@ layer:
         title: Anabelle's first encounter
         start: 259
         end: 390
-        x: -69.9871051516825
-        y: 463.6963117403901
+        x: 6
+        y: 383
       - node: 6
         title: The drive home and Sophia's breakdown
         start: 391

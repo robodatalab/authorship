@@ -173,6 +173,25 @@ export class GraphViewState {
 		}
 	}
 
+	/**
+	 * Pin a batch of nodes at given positions in one step. Used to freeze the
+	 * current arrangement before a structural edit, so removing or adding an edge
+	 * doesn't re-flow the nodes it left untouched.
+	 */
+	pinPositions(positions: ReadonlyMap<string, { x: number; y: number }>): void {
+		const layer = this.getCurrentLayer();
+		if (!layer) {
+			return;
+		}
+		this.replaceCurrentLayer({
+			...layer,
+			nodes: layer.nodes.map((node) => {
+				const at = positions.get(node.id);
+				return at ? { ...node, x: at.x, y: at.y } : node;
+			}),
+		});
+	}
+
 	deleteNode(id: string): void {
 		const layer = this.getCurrentLayer();
 		if (layer) {

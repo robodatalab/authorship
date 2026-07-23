@@ -6,7 +6,8 @@
 // view_state.ts — so this file stays thin enough to judge by eye.
 
 import { elapsedSince } from '../llm/activity';
-import type { LineSpan, NodeFields } from './model';
+import { EditHistory } from './edit_history';
+import type { Layer, LineSpan, NodeFields } from './model';
 import { GraphViewState } from './view_state';
 import { boundsOf, edgePath, layout, LINE_H, PAD_X, PAD_Y, type PlacedNode } from './view_layout';
 
@@ -17,6 +18,7 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 const vscode = acquireVsCodeApi();
 const state = new GraphViewState();
+const history = new EditHistory();
 
 const svg = document.getElementById('canvas') as unknown as SVGSVGElement;
 const viewport = document.getElementById('viewport') as unknown as SVGGElement;
@@ -84,6 +86,9 @@ window.addEventListener('message', (event: MessageEvent) => {
 	if (message.type === 'graph') {
 		failure = null;
 		state.setLayers(message.layers ?? []);
+		// Reconcile history with what actually landed: our own save is a no-op here,
+		// an external rewrite drops the stale undo/redo.
+		history.sync(state.getLayers());
 		renderLayerBar();
 		renderLayer();
 		reconcileEditing();
@@ -574,7 +579,9 @@ svg.addEventListener('pointerup', (event: PointerEvent) => {
 		svg.releasePointerCapture(press.pointerId);
 		const item = press.nodeId !== null ? placed.get(press.nodeId) : undefined;
 		if (press.nodeId !== null && item) {
-			state.moveNode(press.nodeId, item.x, item.y);
+			// Whole pixels: a snapshot then round-trips through YAML exactly, so it
+			// compares equal to itself and history stays honest.
+			state.moveNode(press.nodeId, Math.round(item.x), Math.round(item.y));
 			pushEdit();
 		}
 	} else if (press.panning) {
@@ -626,9 +633,10 @@ edStart.addEventListener('input', previewEditorLines);
 edEnd.addEventListener('input', previewEditorLines);
 
 /**
- * Delete removes the selected nodes and edges; Escape clears the selection or
- * closes the editor; Enter commits it. Keys typed inside the editor's own inputs
- * go to the editor branch, which returns before any delete can fire.
+ * Delete removes the selected nodes and edges; Cmd/Ctrl+Z undoes and Shift (or
+ * Ctrl+Y) redoes; Escape clears the selection or closes the editor; Enter commits
+ * it. Keys typed inside the editor's own inputs go to the editor branch, which
+ * returns first — so its native text undo is left intact.
  */
 window.addEventListener('keydown', (event: KeyboardEvent) => {
 	if (editingNodeId !== null) {
@@ -640,7 +648,18 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 		}
 		return;
 	}
-	if (event.key === 'Escape') {
+	const accel = event.metaKey || event.ctrlKey;
+	if (accel && (event.key === 'z' || event.key === 'Z')) {
+		event.preventDefault();
+		if (event.shiftKey) {
+			redo();
+		} else {
+			undo();
+		}
+	} else if (accel && (event.key === 'y' || event.key === 'Y')) {
+		event.preventDefault();
+		redo();
+	} else if (event.key === 'Escape') {
 		selectedNodes.clear();
 		selectedEdges.clear();
 		applySelection();
@@ -696,6 +715,7 @@ function deleteSelection(): void {
 	if (nodeIds.length === 0 && edgeIndices.length === 0) {
 		return;
 	}
+	freezePositions();
 	for (const index of edgeIndices) {
 		state.deleteEdgeAt(index);
 	}
@@ -706,6 +726,20 @@ function deleteSelection(): void {
 	selectedEdges.clear();
 	renderLayer();
 	pushEdit();
+}
+
+/**
+ * Pin every node where it currently sits. A structural edit — removing or adding
+ * an edge or a node — changes the depths the layout is built from, which would
+ * otherwise fling the auto-placed nodes into new rows. Freezing first keeps the
+ * picture still; the arrangement stays put by hand until the next rebuild.
+ */
+function freezePositions(): void {
+	const positions = new Map<string, { x: number; y: number }>();
+	for (const item of placed.values()) {
+		positions.set(item.id, { x: Math.round(item.x), y: Math.round(item.y) });
+	}
+	state.pinPositions(positions);
 }
 
 /** After a reload, drop anything selected that no longer exists, and close the
@@ -896,6 +930,9 @@ function finishLinking(event: PointerEvent): void {
 	cancelLinking();
 	const targetId = nodeAt(event.clientX, event.clientY);
 	if (targetId && targetId !== sourceId) {
+		// Freeze first, so connecting two nodes draws an edge between them where
+		// they sit rather than re-flowing the target under its new parent.
+		freezePositions();
 		state.addEdge(sourceId, targetId);
 		renderLayer();
 		pushEdit();
@@ -967,9 +1004,39 @@ function redrawNode(id: string): void {
 	}
 }
 
-/** Hand the whole edited model to the host to write beside the manuscript. */
+/** Record the edited model as an undo point and hand it to the host to write. */
 function pushEdit(): void {
-	vscode.postMessage({ type: 'edit', layers: state.getLayers() });
+	history.commit(state.getLayers());
+	persist(state.getLayers());
+}
+
+/** Write a layer set to disk without touching history — undo/redo persist their
+ *  restored state this way, having already moved the stacks themselves. */
+function persist(layers: readonly Layer[]): void {
+	vscode.postMessage({ type: 'edit', layers });
+}
+
+function undo(): void {
+	const restored = history.undo();
+	if (restored !== null) {
+		applyRestored(restored);
+	}
+}
+
+function redo(): void {
+	const restored = history.redo();
+	if (restored !== null) {
+		applyRestored(restored);
+	}
+}
+
+/** Swap the whole graph to a snapshot from the history and write it out. */
+function applyRestored(layers: Layer[]): void {
+	state.setLayers(layers);
+	renderLayerBar();
+	renderLayer();
+	reconcileEditing();
+	persist(layers);
 }
 
 // ---------------------------------------------------------------------------
