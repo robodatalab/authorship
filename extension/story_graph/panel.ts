@@ -288,7 +288,9 @@ export class StoryGraphPanel {
 			active[layer.id] = nodesTouching(layer, spans);
 		}
 
-		void this.panel.webview.postMessage({ type: 'active', active, keepSelection });
+		// `spans` rides along so a new node can be seeded from the lines the user
+		// has selected in the manuscript, which are otherwise invisible to the view.
+		void this.panel.webview.postMessage({ type: 'active', active, keepSelection, spans });
 	}
 
 	private dispose(): void {
@@ -324,8 +326,8 @@ export class StoryGraphPanel {
 		<span id="build-label"></span>
 	</div>
 	<div id="tools" class="tools" role="group" aria-label="Edit graph">
-		<button id="edit-toggle" type="button" aria-pressed="false" title="Edit the graph">Edit</button>
-		<button id="add-node" type="button" hidden>Add node</button>
+		<button id="add-node" type="button">Add node</button>
+		<button id="delete-selection" type="button" hidden title="Delete selected (Del)">Delete</button>
 	</div>
 	<div id="node-editor" class="editor" hidden>
 		<label>Title
@@ -343,7 +345,6 @@ export class StoryGraphPanel {
 			</label>
 		</div>
 		<div class="editor-actions">
-			<button id="ed-delete" type="button" class="danger">Delete</button>
 			<span class="spacer"></span>
 			<button id="ed-cancel" type="button">Cancel</button>
 			<button id="ed-save" type="button" class="primary">Save</button>

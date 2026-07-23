@@ -24,6 +24,10 @@ export interface GraphNode {
 	end: number;
 	/** The plot this node belongs to, for layers that have several. */
 	group?: number;
+	/** A pinned canvas position. Absent means the layout is free to place it;
+	 *  set once the user drags it, and honored by the layout from then on. */
+	x?: number;
+	y?: number;
 }
 
 export interface GraphEdge {
@@ -99,6 +103,8 @@ function normalizeLayer(entry: unknown, index: number): Layer {
 				start: Number(item.start),
 				end: Number(item.end),
 				group: asGroup(item.group),
+				x: asCoord(item.x),
+				y: asCoord(item.y),
 			};
 		})
 		.filter((node) => node.id !== '' && Number.isFinite(node.start) && Number.isFinite(node.end));
@@ -156,6 +162,11 @@ function asGroup(value: unknown): number | undefined {
 	return Number.isFinite(group) ? group : undefined;
 }
 
+function asCoord(value: unknown): number | undefined {
+	const coord = Number(value);
+	return value === undefined || value === null || !Number.isFinite(coord) ? undefined : coord;
+}
+
 // ---------------------------------------------------------------------------
 // Editing
 // ---------------------------------------------------------------------------
@@ -198,6 +209,10 @@ export function denormalize(layers: readonly Layer[]): { layer: unknown[] } {
 				if (node.group !== undefined) {
 					fields.group = node.group;
 				}
+				if (node.x !== undefined && node.y !== undefined) {
+					fields.x = node.x;
+					fields.y = node.y;
+				}
 				return fields;
 			}),
 			edges: layer.edges.map((edge, index) => {
@@ -226,18 +241,27 @@ export function addNode(layer: Layer, fields: NodeFields): { layer: Layer; id: s
 }
 
 /**
- * Overwrite a node's editable fields, the group included — it is written whole
- * rather than merged, so clearing the group in the editor actually clears it. A
- * no-op if the id isn't in the layer.
+ * Overwrite a node's editable fields. The group is written even when cleared
+ * (set to undefined), so blanking it in the editor really clears it; the pinned
+ * position is left as-is, since the form doesn't touch it. A no-op if the id
+ * isn't in the layer.
  */
 export function updateNode(layer: Layer, id: string, fields: NodeFields): Layer {
 	return {
 		...layer,
 		nodes: layer.nodes.map((node) =>
 			node.id === id
-				? { id: node.id, title: fields.title, start: fields.start, end: fields.end, group: fields.group }
+				? { ...node, title: fields.title, start: fields.start, end: fields.end, group: fields.group }
 				: node
 		),
+	};
+}
+
+/** Pin a node to a canvas position. */
+export function moveNode(layer: Layer, id: string, x: number, y: number): Layer {
+	return {
+		...layer,
+		nodes: layer.nodes.map((node) => (node.id === id ? { ...node, x, y } : node)),
 	};
 }
 

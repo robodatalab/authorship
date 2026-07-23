@@ -106,6 +106,18 @@ export function layout(layer: Layer): Map<string, PlacedNode> {
 		y += tallest + GAP_Y;
 	}
 
+	// A node the user has dragged carries its own coordinates; they win over the
+	// computed row position. Edges just follow wherever the endpoints land.
+	for (const node of layer.nodes) {
+		if (node.x !== undefined && node.y !== undefined) {
+			const item = byId.get(node.id);
+			if (item) {
+				item.x = node.x;
+				item.y = node.y;
+			}
+		}
+	}
+
 	return byId;
 }
 

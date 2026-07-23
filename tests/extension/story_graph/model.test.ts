@@ -9,6 +9,7 @@ import {
 	denormalize,
 	graphPathFor,
 	mergeSpans,
+	moveNode,
 	nodesTouching,
 	normalize,
 	spansOverlap,
@@ -378,6 +379,24 @@ describe('denormalize — writing the graph back', () => {
 		expect(doc.layer[0].nodes[0]).toHaveProperty('group', 3);
 		expect(doc.layer[0].nodes[1]).not.toHaveProperty('group');
 	});
+
+	it('writes a pinned position, and round-trips it through the reader', () => {
+		const layer: Layer = {
+			id: '1',
+			nodes: [
+				{ id: '1', title: 'pinned', start: 1, end: 2, x: 10, y: 20 },
+				{ id: '2', title: 'free', start: 3, end: 4 },
+			],
+			edges: [],
+		};
+		const doc = denormalize([layer]) as { layer: { nodes: Record<string, unknown>[] }[] };
+		expect(doc.layer[0].nodes[0]).toMatchObject({ x: 10, y: 20 });
+		expect(doc.layer[0].nodes[1]).not.toHaveProperty('x');
+
+		const back = normalize(parseYaml(stringifyYaml(doc)))[0].nodes;
+		expect([back[0].x, back[0].y]).toEqual([10, 20]);
+		expect(back[1].x).toBeUndefined();
+	});
 });
 
 describe('graph edits', () => {
@@ -438,14 +457,25 @@ describe('graph edits', () => {
 		expect(deleteEdgeAt(base, 5)).toBe(base);
 	});
 
+	it('pins a node to a position, and an edit keeps it', () => {
+		const moved = moveNode(base, '1', 120, -40);
+		expect(moved.nodes.find((n) => n.id === '1')).toMatchObject({ x: 120, y: -40 });
+
+		// Editing the fields must not wipe a position the form never showed.
+		const edited = updateNode(moved, '1', { title: 'A', start: 1, end: 2 });
+		expect(edited.nodes.find((n) => n.id === '1')).toMatchObject({ x: 120, y: -40 });
+	});
+
 	it('does not mutate the layer it is handed', () => {
 		addNode(base, { title: 'c', start: 5, end: 6 });
 		updateNode(base, '1', { title: 'A', start: 1, end: 1 });
 		deleteNode(base, '1');
 		addEdge(base, '2', '1');
 		deleteEdgeAt(base, 0);
+		moveNode(base, '1', 9, 9);
 
 		expect(base.nodes).toHaveLength(2);
 		expect(base.edges).toHaveLength(1);
+		expect(base.nodes[0].x).toBeUndefined();
 	});
 });

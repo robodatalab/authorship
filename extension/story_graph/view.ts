@@ -24,8 +24,8 @@ const status = document.getElementById('status') as HTMLElement;
 const layerBar = document.getElementById('layers') as HTMLElement;
 const buildBar = document.getElementById('build') as HTMLElement;
 const buildLabel = document.getElementById('build-label') as HTMLElement;
-const editToggle = document.getElementById('edit-toggle') as HTMLButtonElement;
 const addNodeButton = document.getElementById('add-node') as HTMLButtonElement;
+const deleteButton = document.getElementById('delete-selection') as HTMLButtonElement;
 const nodeEditor = document.getElementById('node-editor') as HTMLElement;
 const edTitle = document.getElementById('ed-title') as HTMLInputElement;
 const edGroup = document.getElementById('ed-group') as HTMLInputElement;
@@ -33,7 +33,6 @@ const edStart = document.getElementById('ed-start') as HTMLInputElement;
 const edEnd = document.getElementById('ed-end') as HTMLInputElement;
 const edSave = document.getElementById('ed-save') as HTMLButtonElement;
 const edCancel = document.getElementById('ed-cancel') as HTMLButtonElement;
-const edDelete = document.getElementById('ed-delete') as HTMLButtonElement;
 
 /** Current pan/zoom, applied as a transform on the viewport group. */
 const view = { k: 1, x: 0, y: 0 };
@@ -48,27 +47,37 @@ let failure: string | null = null;
 // Editing
 // ---------------------------------------------------------------------------
 //
-// Off by default: with it off the panel is exactly the navigation viewer it was,
-// so a graph can't be changed by accident. On, three affordances appear — a
-// connect handle on each node, a fat hit-target over each edge, and the Add-node
-// button — and double-click opens the node editor. Every change mutates the local
-// model for instant feedback and is posted to the host, which writes it; the
-// file watcher then reloads the same bytes back, so the save confirms itself.
-
-/** Whether edits are live. Toggled by the Edit button. */
-let editing = false;
+// The panel is always editable: every node carries a connect handle, every edge
+// a fat hit-target, and double-click opens the node editor. A change mutates the
+// local model for instant feedback and is posted to the host, which writes it;
+// the file watcher then reloads the same bytes back, so the save confirms itself.
+//
+// Two selections coexist. The graph's own is view-local — the nodes and edges
+// picked out for moving or deleting, and it may hold several at once (shift- or
+// cmd-click adds). Separately, a plain single click also drives the manuscript
+// highlight through the shared state, the way it always has.
 
 /** The node the floating editor is open for, or null when it is closed. */
 let editingNodeId: string | null = null;
 
-/** Index of the edge picked for deletion, or null. View-local: it never leaves
- *  this panel, so it lives here rather than in the shared state. */
-let selectedEdge: number | null = null;
+/** Whether the open editor is for a node just added and not yet saved — so
+ *  Cancel (or any close short of Save) removes it rather than keeping it. */
+let editingIsNew = false;
+
+/** The graph's own selection, view-local: it never leaves this panel. Nodes by
+ *  id, edges by their position in the layer's edge list. Either may hold several,
+ *  and both feed the delete action. */
+const selectedNodes = new Set<string>();
+const selectedEdges = new Set<number>();
 
 /** The layer the viewport was last fitted to. A re-render of the same layer — an
  *  edit, or a background reload — keeps the user's pan and zoom; only a switch or
  *  the first paint recentres, so a run of edits doesn't keep yanking it back. */
 let fittedLayerId: string | null = null;
+
+/** The manuscript's current selection, in lines, as last reported by the host.
+ *  A new node is seeded from it, so it lands on the prose the writer is reading. */
+let manuscriptSpans: LineSpan[] = [];
 
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
@@ -79,7 +88,15 @@ window.addEventListener('message', (event: MessageEvent) => {
 		renderLayer();
 		reconcileEditing();
 	} else if (message.type === 'active') {
-		state.applyActive(message.active ?? {}, Boolean(message.keepSelection));
+		manuscriptSpans = Array.isArray(message.spans) ? message.spans : [];
+		const keep = Boolean(message.keepSelection);
+		state.applyActive(message.active ?? {}, keep);
+		// Moving the cursor in the manuscript supersedes a graph selection, the same
+		// way it clears the clicked node — but a background reload (keep) leaves it.
+		if (!keep) {
+			selectedNodes.clear();
+			selectedEdges.clear();
+		}
 		applySelection();
 	} else if (message.type === 'build') {
 		setBuilding(message.building ? startOf(message.startedAt) : null);
@@ -241,20 +258,18 @@ function renderLayer(): void {
 		}
 		const d = edgePath(from, to);
 
-		// The whole edge — a fat invisible hit-path (edit mode only) under the
-		// drawn curve — lives in one group so selection and deletion key off it.
+		// The whole edge — a fat invisible hit-path under the drawn curve — lives in
+		// one group so selection and deletion key off it.
 		const group = svgEl('g');
 		group.setAttribute('class', 'edge-group');
 		group.dataset.index = String(index);
 		group.dataset.from = edge.from;
 		group.dataset.to = edge.to;
 
-		if (editing) {
-			const hit = svgEl('path');
-			hit.setAttribute('class', 'edge-hit');
-			hit.setAttribute('d', d);
-			group.appendChild(hit);
-		}
+		const hit = svgEl('path');
+		hit.setAttribute('class', 'edge-hit');
+		hit.setAttribute('d', d);
+		group.appendChild(hit);
 
 		const path = svgEl('path');
 		path.setAttribute('class', 'edge');
@@ -320,14 +335,12 @@ function nodeEl(item: PlacedNode): SVGGElement {
 	group.appendChild(title);
 
 	// The dot an edge is dragged out of, at the foot of the box where edges leave.
-	if (editing) {
-		const handle = svgEl('circle');
-		handle.setAttribute('class', 'handle');
-		handle.setAttribute('cx', String(item.w / 2));
-		handle.setAttribute('cy', String(item.h));
-		handle.setAttribute('r', '6');
-		group.appendChild(handle);
-	}
+	const handle = svgEl('circle');
+	handle.setAttribute('class', 'handle');
+	handle.setAttribute('cx', String(item.w / 2));
+	handle.setAttribute('cy', String(item.h));
+	handle.setAttribute('r', '6');
+	group.appendChild(handle);
 
 	// Selection is driven from the pointer handlers below rather than a click
 	// listener here — see the note there about pointer capture.
@@ -347,30 +360,35 @@ function groupStyle(group: number): { fill: string; border: string } {
 // Selection
 // ---------------------------------------------------------------------------
 
+/** Navigation: light up the node's lines in the manuscript. The graph's own
+ *  selection is set by the caller; this only drives the shared/host side. */
 function select(id: string): void {
 	if (!state.selectNode(id)) {
 		return;
 	}
-	selectedEdge = null;
 	applySelection();
 	sendSelection();
 }
 
 function applySelection(): void {
-	const selected = state.getSelectedIds();
 	const active = state.getActiveIds();
 
 	for (const group of viewport.querySelectorAll<SVGGElement>('.node')) {
 		const id = group.dataset.id ?? '';
-		group.classList.toggle('selected', selected.has(id));
+		group.classList.toggle('selected', selectedNodes.has(id));
 		group.classList.toggle('active', active.has(id));
 	}
 	for (const group of viewport.querySelectorAll<SVGGElement>('.edge-group')) {
 		const incident =
-			selected.has(group.dataset.from ?? '') || selected.has(group.dataset.to ?? '');
-		group.classList.toggle('incident', selected.size > 0 && incident);
-		group.classList.toggle('selected', editing && selectedEdge === Number(group.dataset.index));
+			selectedNodes.has(group.dataset.from ?? '') || selectedNodes.has(group.dataset.to ?? '');
+		group.classList.toggle('incident', selectedNodes.size > 0 && incident);
+		group.classList.toggle('selected', selectedEdges.has(Number(group.dataset.index)));
 	}
+
+	// The trash shows when there is something it would delete — but not while the
+	// editor is open, where Cancel/Save are the way out.
+	deleteButton.hidden =
+		editingNodeId !== null || (selectedNodes.size === 0 && selectedEdges.size === 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +449,13 @@ interface Press {
 	y: number;
 	nodeId: string | null;
 	edgeIndex: number | null;
+	/** The node's position when the press began, for dragging it. */
+	nodeX: number;
+	nodeY: number;
+	/** Whether a modifier was held — a click then adds to the selection. */
+	additive: boolean;
 	panning: boolean;
+	movingNode: boolean;
 }
 
 /** An edge being dragged out from a node's handle, with the preview line drawn
@@ -465,18 +489,17 @@ svg.addEventListener('pointerdown', (event: PointerEvent) => {
 	const target = event.target as Element | null;
 
 	// A press starting on a connect handle drags out an edge rather than panning.
-	if (editing) {
-		const handle = target?.closest?.('.handle');
-		const sourceNode = handle?.closest?.('.node') as SVGGElement | null;
-		const sourceId = sourceNode?.dataset.id;
-		if (handle && sourceId) {
-			startLinking(event, sourceId);
-			return;
-		}
+	const handle = target?.closest?.('.handle');
+	const handleNode = handle?.closest?.('.node') as SVGGElement | null;
+	const handleId = handleNode?.dataset.id;
+	if (handle && handleId) {
+		startLinking(event, handleId);
+		return;
 	}
 
 	const group = target?.closest?.('.node') as SVGGElement | null;
 	const edgeGroup = group ? null : (target?.closest?.('.edge-group') as SVGGElement | null);
+	const item = group ? placed.get(group.dataset.id ?? '') : undefined;
 	press = {
 		pointerId: event.pointerId,
 		px: event.clientX,
@@ -484,8 +507,12 @@ svg.addEventListener('pointerdown', (event: PointerEvent) => {
 		x: view.x,
 		y: view.y,
 		nodeId: group?.dataset.id ?? null,
-		edgeIndex: editing && edgeGroup ? Number(edgeGroup.dataset.index) : null,
+		edgeIndex: edgeGroup ? Number(edgeGroup.dataset.index) : null,
+		nodeX: item?.x ?? 0,
+		nodeY: item?.y ?? 0,
+		additive: event.shiftKey || event.metaKey || event.ctrlKey,
 		panning: false,
+		movingNode: false,
 	};
 });
 
@@ -499,6 +526,26 @@ svg.addEventListener('pointermove', (event: PointerEvent) => {
 	}
 	const dx = event.clientX - press.px;
 	const dy = event.clientY - press.py;
+
+	// Dragging a node moves the node; dragging the background pans.
+	if (press.nodeId !== null) {
+		if (!press.movingNode) {
+			if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+				return;
+			}
+			press.movingNode = true;
+			svg.setPointerCapture(press.pointerId);
+		}
+		const item = placed.get(press.nodeId);
+		if (item) {
+			// Screen delta into canvas units, so the node keeps up with the pointer
+			// at any zoom.
+			item.x = press.nodeX + dx / view.k;
+			item.y = press.nodeY + dy / view.k;
+			redrawNode(press.nodeId);
+		}
+		return;
+	}
 
 	if (!press.panning) {
 		if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
@@ -523,16 +570,24 @@ svg.addEventListener('pointerup', (event: PointerEvent) => {
 	if (!press) {
 		return;
 	}
-	if (press.panning) {
+	if (press.movingNode) {
+		svg.releasePointerCapture(press.pointerId);
+		const item = press.nodeId !== null ? placed.get(press.nodeId) : undefined;
+		if (press.nodeId !== null && item) {
+			state.moveNode(press.nodeId, item.x, item.y);
+			pushEdit();
+		}
+	} else if (press.panning) {
 		svg.releasePointerCapture(press.pointerId);
 		svg.classList.remove('panning');
 	} else if (press.nodeId !== null) {
-		select(press.nodeId);
+		clickNode(press.nodeId, press.additive);
 	} else if (press.edgeIndex !== null) {
-		selectEdge(press.edgeIndex);
-	} else if (editing) {
-		// A press on empty canvas drops the edge selection.
-		selectedEdge = null;
+		clickEdge(press.edgeIndex, press.additive);
+	} else if (!press.additive) {
+		// A plain press on empty canvas clears the selection; a modified one keeps it.
+		selectedNodes.clear();
+		selectedEdges.clear();
 		applySelection();
 	}
 	press = null;
@@ -542,7 +597,7 @@ svg.addEventListener('pointercancel', () => {
 	if (linking) {
 		cancelLinking();
 	}
-	if (press && press.panning) {
+	if (press && (press.panning || press.movingNode)) {
 		svg.releasePointerCapture(press.pointerId);
 		svg.classList.remove('panning');
 	}
@@ -550,9 +605,6 @@ svg.addEventListener('pointercancel', () => {
 });
 
 svg.addEventListener('dblclick', (event: MouseEvent) => {
-	if (!editing) {
-		return;
-	}
 	const target = event.target as Element | null;
 	const id = (target?.closest?.('.node') as SVGGElement | null)?.dataset.id;
 	if (id) {
@@ -566,21 +618,19 @@ window.addEventListener('resize', () => fit());
 // Editing
 // ---------------------------------------------------------------------------
 
-editToggle.addEventListener('click', () => setEditing(!editing));
 addNodeButton.addEventListener('click', addNode);
+deleteButton.addEventListener('click', deleteSelection);
 edSave.addEventListener('click', commitEditor);
 edCancel.addEventListener('click', closeEditor);
-edDelete.addEventListener('click', deleteEditingNode);
+edStart.addEventListener('input', previewEditorLines);
+edEnd.addEventListener('input', previewEditorLines);
 
 /**
- * Delete removes the picked edge; Escape drops the picked edge or closes the
- * editor; Enter commits it. Only while editing, and edge deletion never fires
- * from inside the editor's own inputs (the editor branch returns first).
+ * Delete removes the selected nodes and edges; Escape clears the selection or
+ * closes the editor; Enter commits it. Keys typed inside the editor's own inputs
+ * go to the editor branch, which returns before any delete can fire.
  */
 window.addEventListener('keydown', (event: KeyboardEvent) => {
-	if (!editing) {
-		return;
-	}
 	if (editingNodeId !== null) {
 		if (event.key === 'Enter') {
 			event.preventDefault();
@@ -591,50 +641,114 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 		return;
 	}
 	if (event.key === 'Escape') {
-		selectedEdge = null;
+		selectedNodes.clear();
+		selectedEdges.clear();
 		applySelection();
 	} else if (event.key === 'Delete' || event.key === 'Backspace') {
-		deleteSelectedEdge();
+		deleteSelection();
 	}
 });
 
-function setEditing(on: boolean): void {
-	editing = on;
-	editToggle.setAttribute('aria-pressed', String(on));
-	editToggle.classList.toggle('current', on);
-	addNodeButton.hidden = !on;
-	document.body.classList.toggle('editing', on);
-	if (!on) {
-		closeEditor();
-		selectedEdge = null;
+/** A node click: on its own it replaces the selection and drives the manuscript
+ *  highlight; with a modifier it toggles the node into the selection. */
+function clickNode(id: string, additive: boolean): void {
+	if (additive) {
+		if (selectedNodes.has(id)) {
+			selectedNodes.delete(id);
+		} else {
+			selectedNodes.add(id);
+		}
+		selectedEdges.clear();
+		applySelection();
+		return;
 	}
-	renderLayer();
+	selectedNodes.clear();
+	selectedNodes.add(id);
+	selectedEdges.clear();
+	select(id);
 }
 
-/** After a reload, close the editor if its node is gone and drop an edge
- *  selection that now points past the end of the list. */
+/** An edge click: replace the selection, or with a modifier toggle it in. */
+function clickEdge(index: number, additive: boolean): void {
+	closeEditor();
+	if (additive) {
+		if (selectedEdges.has(index)) {
+			selectedEdges.delete(index);
+		} else {
+			selectedEdges.add(index);
+		}
+	} else {
+		selectedEdges.clear();
+		selectedEdges.add(index);
+		selectedNodes.clear();
+	}
+	applySelection();
+}
+
+/**
+ * Remove everything selected. Edges go first, by descending index so an earlier
+ * removal doesn't shift a later one; then nodes, which carry off any edge still
+ * touching them.
+ */
+function deleteSelection(): void {
+	const nodeIds = [...selectedNodes];
+	const edgeIndices = [...selectedEdges].sort((a, b) => b - a);
+	if (nodeIds.length === 0 && edgeIndices.length === 0) {
+		return;
+	}
+	for (const index of edgeIndices) {
+		state.deleteEdgeAt(index);
+	}
+	for (const id of nodeIds) {
+		state.deleteNode(id);
+	}
+	selectedNodes.clear();
+	selectedEdges.clear();
+	renderLayer();
+	pushEdit();
+}
+
+/** After a reload, drop anything selected that no longer exists, and close the
+ *  editor if its node is gone. */
 function reconcileEditing(): void {
-	if (selectedEdge !== null && selectedEdge >= (state.getCurrentLayer()?.edges.length ?? 0)) {
-		selectedEdge = null;
+	const layer = state.getCurrentLayer();
+	const ids = new Set(layer?.nodes.map((node) => node.id) ?? []);
+	for (const id of [...selectedNodes]) {
+		if (!ids.has(id)) {
+			selectedNodes.delete(id);
+		}
+	}
+	const edgeCount = layer?.edges.length ?? 0;
+	for (const index of [...selectedEdges]) {
+		if (index >= edgeCount) {
+			selectedEdges.delete(index);
+		}
 	}
 	if (editingNodeId !== null) {
-		if (state.getCurrentLayer()?.nodes.some((node) => node.id === editingNodeId)) {
+		if (ids.has(editingNodeId)) {
 			positionEditor();
 		} else {
+			// The node vanished from under the editor; drop it without treating the
+			// close as an abandoned add.
+			editingIsNew = false;
 			closeEditor();
 		}
 	}
 	applySelection();
 }
 
-/** Add a node, seeded from the picked lines if any, and open it for editing. */
+/**
+ * Add a node, seeded from the lines currently in play — a clicked graph node if
+ * there is one, otherwise the manuscript's text selection — and open it for
+ * editing so the title and any adjustment go in straight away.
+ */
 function addNode(): void {
-	const [span] = state.getAnchor();
-	const seed = span ?? { start: 1, end: 1 };
+	const seed = state.getAnchor()[0] ?? manuscriptSpans[0] ?? { start: 1, end: 1 };
 	const id = state.addNode({ title: 'New node', start: seed.start, end: seed.end });
 	renderLayer();
-	pushEdit();
 	openEditor(id);
+	// Not written yet: the node isn't saved until Save, so Cancel can take it back.
+	editingIsNew = true;
 }
 
 function openEditor(id: string): void {
@@ -643,7 +757,10 @@ function openEditor(id: string): void {
 		return;
 	}
 	editingNodeId = id;
-	selectedEdge = null;
+	editingIsNew = false;
+	selectedNodes.clear();
+	selectedNodes.add(id);
+	selectedEdges.clear();
 	edTitle.value = node.title;
 	edGroup.value = node.group !== undefined ? String(node.group) : '';
 	edStart.value = String(node.start);
@@ -664,24 +781,44 @@ function commitEditor(): void {
 		return;
 	}
 	state.updateNode(editingNodeId, fields);
-	closeEditor();
-	renderLayer();
-	pushEdit();
-}
-
-function deleteEditingNode(): void {
-	if (editingNodeId === null) {
-		return;
-	}
-	state.deleteNode(editingNodeId);
+	editingIsNew = false; // committed now, so closing won't take it back
 	closeEditor();
 	renderLayer();
 	pushEdit();
 }
 
 function closeEditor(): void {
+	// A new node abandoned before Save was never really added, so it leaves with
+	// the editor rather than being left stranded on the canvas. The write persists
+	// the removal in case an intervening edit had already saved the model with it.
+	if (editingIsNew && editingNodeId !== null) {
+		state.deleteNode(editingNodeId);
+		selectedNodes.delete(editingNodeId);
+		editingIsNew = false;
+		editingNodeId = null;
+		nodeEditor.hidden = true;
+		renderLayer();
+		pushEdit();
+		return;
+	}
 	editingNodeId = null;
 	nodeEditor.hidden = true;
+}
+
+/**
+ * As start/end are typed in the editor, light up those lines in the manuscript,
+ * so the numbers can be dialed in against the prose rather than guessed.
+ */
+function previewEditorLines(): void {
+	const start = Number(edStart.value);
+	const end = Number(edEnd.value);
+	if (!Number.isFinite(start) || !Number.isFinite(end)) {
+		return;
+	}
+	vscode.postMessage({
+		type: 'select',
+		ranges: [{ start: Math.min(start, end), end: Math.max(start, end) }],
+	});
 }
 
 /**
@@ -718,22 +855,6 @@ function positionEditor(): void {
 	const top = Math.max(8, Math.min(view.y + item.y * view.k, box.height - h - 8));
 	nodeEditor.style.left = `${left}px`;
 	nodeEditor.style.top = `${top}px`;
-}
-
-function selectEdge(index: number): void {
-	closeEditor();
-	selectedEdge = index;
-	applySelection();
-}
-
-function deleteSelectedEdge(): void {
-	if (selectedEdge === null) {
-		return;
-	}
-	state.deleteEdgeAt(selectedEdge);
-	selectedEdge = null;
-	renderLayer();
-	pushEdit();
 }
 
 // -- edge creation, dragged from a node's handle ----------------------------
@@ -773,7 +894,7 @@ function finishLinking(event: PointerEvent): void {
 	}
 	const { sourceId } = linking;
 	cancelLinking();
-	const targetId = nodeIdAt(event.clientX, event.clientY);
+	const targetId = nodeAt(event.clientX, event.clientY);
 	if (targetId && targetId !== sourceId) {
 		state.addEdge(sourceId, targetId);
 		renderLayer();
@@ -801,9 +922,49 @@ function toViewport(clientX: number, clientY: number): [number, number] {
 	return [(clientX - box.left - view.x) / view.k, (clientY - box.top - view.y) / view.k];
 }
 
-function nodeIdAt(clientX: number, clientY: number): string | null {
-	const el = document.elementFromPoint(clientX, clientY) as Element | null;
-	return (el?.closest?.('.node') as SVGGElement | null)?.dataset.id ?? null;
+/**
+ * Which node's box contains this screen point, if any. A geometric test over the
+ * laid-out boxes rather than `elementFromPoint`, which is unreliable while a
+ * pointer is captured — the reason a dragged edge would not land on its target.
+ */
+function nodeAt(clientX: number, clientY: number): string | null {
+	const [x, y] = toViewport(clientX, clientY);
+	for (const item of placed.values()) {
+		if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
+			return item.id;
+		}
+	}
+	return null;
+}
+
+/**
+ * Move one node's box and re-route its edges in place, without rebuilding the
+ * whole scene — light enough to run on every pointer move while dragging.
+ */
+function redrawNode(id: string): void {
+	const item = placed.get(id);
+	if (!item) {
+		return;
+	}
+	for (const group of viewport.querySelectorAll<SVGGElement>('.node')) {
+		if (group.dataset.id === id) {
+			group.setAttribute('transform', `translate(${item.x},${item.y})`);
+			break;
+		}
+	}
+	for (const group of viewport.querySelectorAll<SVGGElement>('.edge-group')) {
+		if (group.dataset.from !== id && group.dataset.to !== id) {
+			continue;
+		}
+		const from = placed.get(group.dataset.from ?? '');
+		const to = placed.get(group.dataset.to ?? '');
+		if (from && to) {
+			const d = edgePath(from, to);
+			for (const path of group.querySelectorAll<SVGPathElement>('path')) {
+				path.setAttribute('d', d);
+			}
+		}
+	}
 }
 
 /** Hand the whole edited model to the host to write beside the manuscript. */

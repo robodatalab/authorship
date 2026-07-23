@@ -230,3 +230,20 @@ describe('boundsOf', () => {
 		expect(boundsOf([])).toBeUndefined();
 	});
 });
+
+describe('layout — pinned positions', () => {
+	it('places a node at its stored coordinates instead of the computed row', () => {
+		const placed = layout({
+			id: '1',
+			nodes: [
+				{ id: '1', title: 'auto', start: 1, end: 1 },
+				{ id: '2', title: 'pinned', start: 2, end: 2, x: 500, y: -80 },
+			],
+			edges: [edge('1', '2')],
+		});
+
+		expect([placed.get('2')?.x, placed.get('2')?.y]).toEqual([500, -80]);
+		// The unpinned node still lands where the layout put it.
+		expect(placed.get('1')?.y).toBe(0);
+	});
+});

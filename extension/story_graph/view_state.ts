@@ -15,6 +15,7 @@ import {
 	addNode as addNodeToLayer,
 	deleteEdgeAt as deleteEdgeInLayer,
 	deleteNode as deleteNodeFromLayer,
+	moveNode as moveNodeInLayer,
 	nodesTouching,
 	updateNode as updateNodeInLayer,
 	type ActiveByLayer,
@@ -162,6 +163,13 @@ export class GraphViewState {
 		const layer = this.getCurrentLayer();
 		if (layer) {
 			this.replaceCurrentLayer(updateNodeInLayer(layer, id, fields));
+		}
+	}
+
+	moveNode(id: string, x: number, y: number): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(moveNodeInLayer(layer, id, x, y));
 		}
 	}
 
