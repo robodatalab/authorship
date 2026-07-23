@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import {
+	addEdge,
+	addNode,
+	deleteEdgeAt,
+	deleteNode,
+	denormalize,
 	graphPathFor,
 	mergeSpans,
 	nodesTouching,
 	normalize,
 	spansOverlap,
+	updateNode,
 	type Layer,
 } from '../../../extension/story_graph/model';
 
@@ -321,5 +327,125 @@ describe('mergeSpans — painting the manuscript highlight', () => {
 			{ start: 17, end: 21 },
 			{ start: 16, end: 17 },
 		]);
+	});
+});
+
+describe('denormalize — writing the graph back', () => {
+	const LAYERS = layersFrom(TWO_LAYERS);
+
+	it('is the inverse of normalize', () => {
+		expect(normalize(denormalize(LAYERS))).toEqual(LAYERS);
+	});
+
+	it('survives a round trip through YAML text', () => {
+		const text = stringifyYaml(denormalize(LAYERS));
+		expect(normalize(parseYaml(text))).toEqual(LAYERS);
+	});
+
+	it('keeps integer ids as integers, so node: 1 does not become node: "1"', () => {
+		const doc = denormalize(LAYERS) as { layer: { id: unknown; nodes: { node: unknown }[] }[] };
+		expect(doc.layer[0].id).toBe(1);
+		expect(doc.layer[0].nodes[0].node).toBe(1);
+	});
+
+	it('renumbers edges by position, as the builder does', () => {
+		const layer: Layer = {
+			id: '1',
+			nodes: [
+				{ id: '1', title: 'a', start: 1, end: 1 },
+				{ id: '2', title: 'b', start: 2, end: 2 },
+				{ id: '3', title: 'c', start: 3, end: 3 },
+			],
+			edges: [
+				{ id: 'x', from: '1', to: '2' },
+				{ id: 'y', from: '2', to: '3' },
+			],
+		};
+		const doc = denormalize([layer]) as { layer: { edges: { edge: number }[] }[] };
+		expect(doc.layer[0].edges.map((edge) => edge.edge)).toEqual([1, 2]);
+	});
+
+	it('writes a group only when the node has one', () => {
+		const layer: Layer = {
+			id: '1',
+			nodes: [
+				{ id: '1', title: 'grouped', start: 1, end: 2, group: 3 },
+				{ id: '2', title: 'ungrouped', start: 3, end: 4 },
+			],
+			edges: [],
+		};
+		const doc = denormalize([layer]) as { layer: { nodes: Record<string, unknown>[] }[] };
+		expect(doc.layer[0].nodes[0]).toHaveProperty('group', 3);
+		expect(doc.layer[0].nodes[1]).not.toHaveProperty('group');
+	});
+});
+
+describe('graph edits', () => {
+	const base: Layer = {
+		id: '1',
+		nodes: [
+			{ id: '1', title: 'a', start: 1, end: 2 },
+			{ id: '2', title: 'b', start: 3, end: 4 },
+		],
+		edges: [{ id: '1', from: '1', to: '2' }],
+	};
+
+	it('adds a node with the next free integer id', () => {
+		const { layer, id } = addNode(base, { title: 'c', start: 5, end: 6 });
+
+		expect(id).toBe('3');
+		expect(layer.nodes.map((n) => n.id)).toEqual(['1', '2', '3']);
+	});
+
+	it('overwrites a node’s fields whole, so the group can be cleared', () => {
+		const set = updateNode(base, '1', { title: 'A', start: 10, end: 12, group: 2 });
+		expect(set.nodes.find((n) => n.id === '1')).toEqual({
+			id: '1',
+			title: 'A',
+			start: 10,
+			end: 12,
+			group: 2,
+		});
+
+		const cleared = updateNode(set, '1', { title: 'A', start: 10, end: 12 });
+		expect(cleared.nodes.find((n) => n.id === '1')?.group).toBeUndefined();
+	});
+
+	it('deleting a node also drops every edge touching it', () => {
+		const layer = deleteNode(base, '1');
+
+		expect(layer.nodes.map((n) => n.id)).toEqual(['2']);
+		expect(layer.edges).toEqual([]);
+	});
+
+	it('adds an edge, keeping the one already there', () => {
+		const layer = addEdge(base, '2', '1');
+
+		expect(layer.edges.map((e) => [e.from, e.to])).toEqual([
+			['1', '2'],
+			['2', '1'],
+		]);
+	});
+
+	it('refuses a self-loop, an unknown endpoint, or a duplicate edge', () => {
+		expect(addEdge(base, '1', '1').edges).toHaveLength(1);
+		expect(addEdge(base, '1', '9').edges).toHaveLength(1);
+		expect(addEdge(base, '1', '2').edges).toHaveLength(1);
+	});
+
+	it('deletes an edge by position, and leaves an out-of-range index alone', () => {
+		expect(deleteEdgeAt(base, 0).edges).toEqual([]);
+		expect(deleteEdgeAt(base, 5)).toBe(base);
+	});
+
+	it('does not mutate the layer it is handed', () => {
+		addNode(base, { title: 'c', start: 5, end: 6 });
+		updateNode(base, '1', { title: 'A', start: 1, end: 1 });
+		deleteNode(base, '1');
+		addEdge(base, '2', '1');
+		deleteEdgeAt(base, 0);
+
+		expect(base.nodes).toHaveLength(2);
+		expect(base.edges).toHaveLength(1);
 	});
 });

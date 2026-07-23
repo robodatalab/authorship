@@ -77,10 +77,8 @@ body {
 	stroke-width: 1.5;
 }
 
-.edge.incident {
-	stroke: var(--vscode-focusBorder);
-	stroke-width: 2.5;
-}
+/* Edges incident to the selected node highlight; the class sits on the edge
+   group (see .edge-group.incident in the editing section). */
 
 #arrow path {
 	fill: var(--vscode-editorLineNumber-foreground);
@@ -206,4 +204,180 @@ body {
 
 body.building #canvas {
 	opacity: 0.4;
+}
+
+/* Editing ------------------------------------------------------------------
+   The panel is a navigation viewer until Edit is switched on; everything below
+   only shows or bites once the body carries `.editing`. */
+
+/* The Edit toggle and Add-node button, in the corner the layer switcher and the
+   rebuild badge both leave free. */
+.tools {
+	position: absolute;
+	bottom: 10px;
+	left: 10px;
+	z-index: 2;
+	display: flex;
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background);
+}
+
+.tools button {
+	padding: 3px 10px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+}
+
+.tools button:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.tools button.current {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.tools button[hidden] {
+	display: none;
+}
+
+.tools button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+
+/* The dot at the foot of each node that an edge is dragged out of. */
+.handle {
+	fill: var(--vscode-editorWidget-background);
+	stroke: var(--vscode-focusBorder);
+	stroke-width: 1.5;
+	cursor: crosshair;
+}
+
+.handle:hover {
+	fill: var(--vscode-focusBorder);
+}
+
+/* A fat invisible stroke tracing each edge, so a thin curve is still easy to
+   click to select it for deletion. Only rendered while editing. */
+.edge-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 14;
+	cursor: pointer;
+}
+
+.edge-group.incident .edge {
+	stroke: var(--vscode-focusBorder);
+	stroke-width: 2.5;
+}
+
+.edge-group.selected .edge {
+	stroke: var(--vscode-errorForeground);
+	stroke-width: 3;
+}
+
+/* The edge being dragged out from a handle, before it has a target. */
+.link-preview {
+	fill: none;
+	stroke: var(--vscode-focusBorder);
+	stroke-width: 2;
+	stroke-dasharray: 5 4;
+	pointer-events: none;
+}
+
+/* The node editor, floated over the node it edits. */
+.editor {
+	position: absolute;
+	z-index: 3;
+	width: 240px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background);
+	color: var(--vscode-foreground);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.editor[hidden] {
+	display: none;
+}
+
+.editor label {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-descriptionForeground);
+}
+
+.editor input {
+	padding: 3px 6px;
+	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border-radius: 3px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+.editor input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.editor-row {
+	display: flex;
+	gap: 6px;
+}
+
+.editor-row label {
+	flex: 1;
+	min-width: 0;
+}
+
+.editor-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.editor-actions .spacer {
+	flex: 1;
+}
+
+.editor-actions button {
+	padding: 4px 12px;
+	border: none;
+	border-radius: 3px;
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+}
+
+.editor-actions button.primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.editor-actions button.danger {
+	background: transparent;
+	color: var(--vscode-errorForeground);
+}
+
+.editor-actions button:hover {
+	filter: brightness(1.15);
 }

@@ -6,7 +6,7 @@
 // view_state.ts — so this file stays thin enough to judge by eye.
 
 import { elapsedSince } from '../llm/activity';
-import type { LineSpan } from './model';
+import type { LineSpan, NodeFields } from './model';
 import { GraphViewState } from './view_state';
 import { boundsOf, edgePath, layout, LINE_H, PAD_X, PAD_Y, type PlacedNode } from './view_layout';
 
@@ -24,6 +24,16 @@ const status = document.getElementById('status') as HTMLElement;
 const layerBar = document.getElementById('layers') as HTMLElement;
 const buildBar = document.getElementById('build') as HTMLElement;
 const buildLabel = document.getElementById('build-label') as HTMLElement;
+const editToggle = document.getElementById('edit-toggle') as HTMLButtonElement;
+const addNodeButton = document.getElementById('add-node') as HTMLButtonElement;
+const nodeEditor = document.getElementById('node-editor') as HTMLElement;
+const edTitle = document.getElementById('ed-title') as HTMLInputElement;
+const edGroup = document.getElementById('ed-group') as HTMLInputElement;
+const edStart = document.getElementById('ed-start') as HTMLInputElement;
+const edEnd = document.getElementById('ed-end') as HTMLInputElement;
+const edSave = document.getElementById('ed-save') as HTMLButtonElement;
+const edCancel = document.getElementById('ed-cancel') as HTMLButtonElement;
+const edDelete = document.getElementById('ed-delete') as HTMLButtonElement;
 
 /** Current pan/zoom, applied as a transform on the viewport group. */
 const view = { k: 1, x: 0, y: 0 };
@@ -34,6 +44,32 @@ let placed = new Map<string, PlacedNode>();
 /** The last read that failed. Cleared by a graph arriving, or by a build starting. */
 let failure: string | null = null;
 
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+//
+// Off by default: with it off the panel is exactly the navigation viewer it was,
+// so a graph can't be changed by accident. On, three affordances appear — a
+// connect handle on each node, a fat hit-target over each edge, and the Add-node
+// button — and double-click opens the node editor. Every change mutates the local
+// model for instant feedback and is posted to the host, which writes it; the
+// file watcher then reloads the same bytes back, so the save confirms itself.
+
+/** Whether edits are live. Toggled by the Edit button. */
+let editing = false;
+
+/** The node the floating editor is open for, or null when it is closed. */
+let editingNodeId: string | null = null;
+
+/** Index of the edge picked for deletion, or null. View-local: it never leaves
+ *  this panel, so it lives here rather than in the shared state. */
+let selectedEdge: number | null = null;
+
+/** The layer the viewport was last fitted to. A re-render of the same layer — an
+ *  edit, or a background reload — keeps the user's pan and zoom; only a switch or
+ *  the first paint recentres, so a run of edits doesn't keep yanking it back. */
+let fittedLayerId: string | null = null;
+
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	if (message.type === 'graph') {
@@ -41,6 +77,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 		state.setLayers(message.layers ?? []);
 		renderLayerBar();
 		renderLayer();
+		reconcileEditing();
 	} else if (message.type === 'active') {
 		state.applyActive(message.active ?? {}, Boolean(message.keepSelection));
 		applySelection();
@@ -196,23 +233,39 @@ function renderLayer(): void {
 
 	// Edges first so nodes paint over their endpoints.
 	const edgeLayer = svgEl('g');
-	for (const edge of layer.edges) {
+	layer.edges.forEach((edge, index) => {
 		const from = placed.get(edge.from);
 		const to = placed.get(edge.to);
 		if (!from || !to) {
-			continue;
+			return;
 		}
+		const d = edgePath(from, to);
+
+		// The whole edge — a fat invisible hit-path (edit mode only) under the
+		// drawn curve — lives in one group so selection and deletion key off it.
+		const group = svgEl('g');
+		group.setAttribute('class', 'edge-group');
+		group.dataset.index = String(index);
+		group.dataset.from = edge.from;
+		group.dataset.to = edge.to;
+
+		if (editing) {
+			const hit = svgEl('path');
+			hit.setAttribute('class', 'edge-hit');
+			hit.setAttribute('d', d);
+			group.appendChild(hit);
+		}
+
 		const path = svgEl('path');
 		path.setAttribute('class', 'edge');
-		path.setAttribute('d', edgePath(from, to));
+		path.setAttribute('d', d);
 		path.setAttribute('marker-end', 'url(#arrow)');
-		path.dataset.from = edge.from;
-		path.dataset.to = edge.to;
 		if (edge.group !== undefined) {
 			path.style.setProperty('--group-stroke', groupStyle(edge.group).border);
 		}
-		edgeLayer.appendChild(path);
-	}
+		group.appendChild(path);
+		edgeLayer.appendChild(group);
+	});
 	viewport.appendChild(edgeLayer);
 
 	for (const item of placed.values()) {
@@ -220,7 +273,15 @@ function renderLayer(): void {
 	}
 
 	applySelection();
-	fit();
+
+	// Recentre only when the layer on screen actually changes; otherwise leave
+	// the viewport where the user left it (see fittedLayerId).
+	if (fittedLayerId !== layer.id) {
+		fittedLayerId = layer.id;
+		fit();
+	} else {
+		applyView();
+	}
 }
 
 function nodeEl(item: PlacedNode): SVGGElement {
@@ -258,6 +319,16 @@ function nodeEl(item: PlacedNode): SVGGElement {
 	title.textContent = `${item.title} — lines ${item.start}–${item.end}`;
 	group.appendChild(title);
 
+	// The dot an edge is dragged out of, at the foot of the box where edges leave.
+	if (editing) {
+		const handle = svgEl('circle');
+		handle.setAttribute('class', 'handle');
+		handle.setAttribute('cx', String(item.w / 2));
+		handle.setAttribute('cy', String(item.h));
+		handle.setAttribute('r', '6');
+		group.appendChild(handle);
+	}
+
 	// Selection is driven from the pointer handlers below rather than a click
 	// listener here — see the note there about pointer capture.
 	return group as SVGGElement;
@@ -280,6 +351,7 @@ function select(id: string): void {
 	if (!state.selectNode(id)) {
 		return;
 	}
+	selectedEdge = null;
 	applySelection();
 	sendSelection();
 }
@@ -293,10 +365,11 @@ function applySelection(): void {
 		group.classList.toggle('selected', selected.has(id));
 		group.classList.toggle('active', active.has(id));
 	}
-	for (const path of viewport.querySelectorAll<SVGPathElement>('.edge')) {
+	for (const group of viewport.querySelectorAll<SVGGElement>('.edge-group')) {
 		const incident =
-			selected.has(path.dataset.from ?? '') || selected.has(path.dataset.to ?? '');
-		path.classList.toggle('incident', selected.size > 0 && incident);
+			selected.has(group.dataset.from ?? '') || selected.has(group.dataset.to ?? '');
+		group.classList.toggle('incident', selected.size > 0 && incident);
+		group.classList.toggle('selected', editing && selectedEdge === Number(group.dataset.index));
 	}
 }
 
@@ -357,7 +430,16 @@ interface Press {
 	x: number;
 	y: number;
 	nodeId: string | null;
+	edgeIndex: number | null;
 	panning: boolean;
+}
+
+/** An edge being dragged out from a node's handle, with the preview line drawn
+ *  while it looks for a target. */
+interface Linking {
+	pointerId: number;
+	sourceId: string;
+	line: SVGPathElement;
 }
 
 /**
@@ -368,15 +450,33 @@ interface Press {
  * click listener on the node never hears about it. Instead we track the press
  * ourselves and only capture the pointer once it has moved far enough to be a
  * drag — a press that never moves is a selection.
+ *
+ * Editing adds one more thing a press can be: a drag off a node's handle draws a
+ * new edge instead of panning. That is decided up front from where the press
+ * lands, and then runs on its own state, so the pan/select path is untouched.
  */
 let press: Press | null = null;
+let linking: Linking | null = null;
 
 svg.addEventListener('pointerdown', (event: PointerEvent) => {
 	if (event.button !== 0) {
 		return;
 	}
 	const target = event.target as Element | null;
+
+	// A press starting on a connect handle drags out an edge rather than panning.
+	if (editing) {
+		const handle = target?.closest?.('.handle');
+		const sourceNode = handle?.closest?.('.node') as SVGGElement | null;
+		const sourceId = sourceNode?.dataset.id;
+		if (handle && sourceId) {
+			startLinking(event, sourceId);
+			return;
+		}
+	}
+
 	const group = target?.closest?.('.node') as SVGGElement | null;
+	const edgeGroup = group ? null : (target?.closest?.('.edge-group') as SVGGElement | null);
 	press = {
 		pointerId: event.pointerId,
 		px: event.clientX,
@@ -384,11 +484,16 @@ svg.addEventListener('pointerdown', (event: PointerEvent) => {
 		x: view.x,
 		y: view.y,
 		nodeId: group?.dataset.id ?? null,
+		edgeIndex: editing && edgeGroup ? Number(edgeGroup.dataset.index) : null,
 		panning: false,
 	};
 });
 
 svg.addEventListener('pointermove', (event: PointerEvent) => {
+	if (linking) {
+		updateLinking(event);
+		return;
+	}
 	if (!press) {
 		return;
 	}
@@ -410,7 +515,11 @@ svg.addEventListener('pointermove', (event: PointerEvent) => {
 	applyView();
 });
 
-svg.addEventListener('pointerup', () => {
+svg.addEventListener('pointerup', (event: PointerEvent) => {
+	if (linking) {
+		finishLinking(event);
+		return;
+	}
 	if (!press) {
 		return;
 	}
@@ -419,11 +528,20 @@ svg.addEventListener('pointerup', () => {
 		svg.classList.remove('panning');
 	} else if (press.nodeId !== null) {
 		select(press.nodeId);
+	} else if (press.edgeIndex !== null) {
+		selectEdge(press.edgeIndex);
+	} else if (editing) {
+		// A press on empty canvas drops the edge selection.
+		selectedEdge = null;
+		applySelection();
 	}
 	press = null;
 });
 
 svg.addEventListener('pointercancel', () => {
+	if (linking) {
+		cancelLinking();
+	}
 	if (press && press.panning) {
 		svg.releasePointerCapture(press.pointerId);
 		svg.classList.remove('panning');
@@ -431,7 +549,267 @@ svg.addEventListener('pointercancel', () => {
 	press = null;
 });
 
+svg.addEventListener('dblclick', (event: MouseEvent) => {
+	if (!editing) {
+		return;
+	}
+	const target = event.target as Element | null;
+	const id = (target?.closest?.('.node') as SVGGElement | null)?.dataset.id;
+	if (id) {
+		openEditor(id);
+	}
+});
+
 window.addEventListener('resize', () => fit());
+
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+
+editToggle.addEventListener('click', () => setEditing(!editing));
+addNodeButton.addEventListener('click', addNode);
+edSave.addEventListener('click', commitEditor);
+edCancel.addEventListener('click', closeEditor);
+edDelete.addEventListener('click', deleteEditingNode);
+
+/**
+ * Delete removes the picked edge; Escape drops the picked edge or closes the
+ * editor; Enter commits it. Only while editing, and edge deletion never fires
+ * from inside the editor's own inputs (the editor branch returns first).
+ */
+window.addEventListener('keydown', (event: KeyboardEvent) => {
+	if (!editing) {
+		return;
+	}
+	if (editingNodeId !== null) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			commitEditor();
+		} else if (event.key === 'Escape') {
+			closeEditor();
+		}
+		return;
+	}
+	if (event.key === 'Escape') {
+		selectedEdge = null;
+		applySelection();
+	} else if (event.key === 'Delete' || event.key === 'Backspace') {
+		deleteSelectedEdge();
+	}
+});
+
+function setEditing(on: boolean): void {
+	editing = on;
+	editToggle.setAttribute('aria-pressed', String(on));
+	editToggle.classList.toggle('current', on);
+	addNodeButton.hidden = !on;
+	document.body.classList.toggle('editing', on);
+	if (!on) {
+		closeEditor();
+		selectedEdge = null;
+	}
+	renderLayer();
+}
+
+/** After a reload, close the editor if its node is gone and drop an edge
+ *  selection that now points past the end of the list. */
+function reconcileEditing(): void {
+	if (selectedEdge !== null && selectedEdge >= (state.getCurrentLayer()?.edges.length ?? 0)) {
+		selectedEdge = null;
+	}
+	if (editingNodeId !== null) {
+		if (state.getCurrentLayer()?.nodes.some((node) => node.id === editingNodeId)) {
+			positionEditor();
+		} else {
+			closeEditor();
+		}
+	}
+	applySelection();
+}
+
+/** Add a node, seeded from the picked lines if any, and open it for editing. */
+function addNode(): void {
+	const [span] = state.getAnchor();
+	const seed = span ?? { start: 1, end: 1 };
+	const id = state.addNode({ title: 'New node', start: seed.start, end: seed.end });
+	renderLayer();
+	pushEdit();
+	openEditor(id);
+}
+
+function openEditor(id: string): void {
+	const node = state.getCurrentLayer()?.nodes.find((candidate) => candidate.id === id);
+	if (!node) {
+		return;
+	}
+	editingNodeId = id;
+	selectedEdge = null;
+	edTitle.value = node.title;
+	edGroup.value = node.group !== undefined ? String(node.group) : '';
+	edStart.value = String(node.start);
+	edEnd.value = String(node.end);
+	nodeEditor.hidden = false;
+	positionEditor();
+	applySelection();
+	edTitle.focus();
+	edTitle.select();
+}
+
+function commitEditor(): void {
+	if (editingNodeId === null) {
+		return;
+	}
+	const fields = readEditorFields();
+	if (!fields) {
+		return;
+	}
+	state.updateNode(editingNodeId, fields);
+	closeEditor();
+	renderLayer();
+	pushEdit();
+}
+
+function deleteEditingNode(): void {
+	if (editingNodeId === null) {
+		return;
+	}
+	state.deleteNode(editingNodeId);
+	closeEditor();
+	renderLayer();
+	pushEdit();
+}
+
+function closeEditor(): void {
+	editingNodeId = null;
+	nodeEditor.hidden = true;
+}
+
+/**
+ * Read the form. Start and end are normalized to a valid span; a blank or
+ * unreadable group means no group, which is how the group is cleared.
+ */
+function readEditorFields(): NodeFields | null {
+	const start = Number(edStart.value);
+	const end = Number(edEnd.value);
+	if (!Number.isFinite(start) || !Number.isFinite(end)) {
+		return null;
+	}
+	const groupText = edGroup.value.trim();
+	const groupValue = Number(groupText);
+	const group = groupText !== '' && Number.isFinite(groupValue) ? groupValue : undefined;
+	const lo = Math.max(1, Math.min(start, end));
+	const hi = Math.max(lo, Math.max(start, end));
+	return { title: edTitle.value.trim(), start: lo, end: hi, group };
+}
+
+/** Float the editor over the node it edits, kept inside the panel. */
+function positionEditor(): void {
+	if (editingNodeId === null) {
+		return;
+	}
+	const item = placed.get(editingNodeId);
+	if (!item) {
+		return;
+	}
+	const box = svg.getBoundingClientRect();
+	const w = nodeEditor.offsetWidth || 240;
+	const h = nodeEditor.offsetHeight || 160;
+	const left = Math.max(8, Math.min(view.x + item.x * view.k, box.width - w - 8));
+	const top = Math.max(8, Math.min(view.y + item.y * view.k, box.height - h - 8));
+	nodeEditor.style.left = `${left}px`;
+	nodeEditor.style.top = `${top}px`;
+}
+
+function selectEdge(index: number): void {
+	closeEditor();
+	selectedEdge = index;
+	applySelection();
+}
+
+function deleteSelectedEdge(): void {
+	if (selectedEdge === null) {
+		return;
+	}
+	state.deleteEdgeAt(selectedEdge);
+	selectedEdge = null;
+	renderLayer();
+	pushEdit();
+}
+
+// -- edge creation, dragged from a node's handle ----------------------------
+
+function startLinking(event: PointerEvent, sourceId: string): void {
+	closeEditor();
+	const line = svgEl('path');
+	line.setAttribute('class', 'link-preview');
+	line.setAttribute('marker-end', 'url(#arrow)');
+	viewport.appendChild(line);
+	linking = { pointerId: event.pointerId, sourceId, line };
+	svg.setPointerCapture(event.pointerId);
+	updateLinking(event);
+}
+
+function updateLinking(event: PointerEvent): void {
+	if (!linking) {
+		return;
+	}
+	const source = placed.get(linking.sourceId);
+	if (!source) {
+		return;
+	}
+	const x1 = source.x + source.w / 2;
+	const y1 = source.y + source.h;
+	const [x2, y2] = toViewport(event.clientX, event.clientY);
+	const bend = Math.max(18, Math.abs(y2 - y1) / 2);
+	linking.line.setAttribute(
+		'd',
+		`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`
+	);
+}
+
+function finishLinking(event: PointerEvent): void {
+	if (!linking) {
+		return;
+	}
+	const { sourceId } = linking;
+	cancelLinking();
+	const targetId = nodeIdAt(event.clientX, event.clientY);
+	if (targetId && targetId !== sourceId) {
+		state.addEdge(sourceId, targetId);
+		renderLayer();
+		pushEdit();
+	}
+}
+
+function cancelLinking(): void {
+	if (!linking) {
+		return;
+	}
+	try {
+		svg.releasePointerCapture(linking.pointerId);
+	} catch {
+		// On a cancel the pointer may already be gone; there is nothing to release.
+	}
+	linking.line.remove();
+	linking = null;
+}
+
+/** Screen point to viewport-local coordinates — the inverse of the viewport
+ *  transform, so the preview line meets the pointer. */
+function toViewport(clientX: number, clientY: number): [number, number] {
+	const box = svg.getBoundingClientRect();
+	return [(clientX - box.left - view.x) / view.k, (clientY - box.top - view.y) / view.k];
+}
+
+function nodeIdAt(clientX: number, clientY: number): string | null {
+	const el = document.elementFromPoint(clientX, clientY) as Element | null;
+	return (el?.closest?.('.node') as SVGGElement | null)?.dataset.id ?? null;
+}
+
+/** Hand the whole edited model to the host to write beside the manuscript. */
+function pushEdit(): void {
+	vscode.postMessage({ type: 'edit', layers: state.getLayers() });
+}
 
 // ---------------------------------------------------------------------------
 // Bits and pieces

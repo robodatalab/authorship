@@ -7,10 +7,11 @@
 // and moving the cursor lights up the nodes covering it.
 
 import * as vscode from 'vscode';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import type { BuildActivity } from '../llm/activity';
 import {
+	denormalize,
 	graphPathFor,
 	mergeSpans,
 	nodesTouching,
@@ -93,7 +94,9 @@ export class StoryGraphPanel {
 			this.panel.webview.onDidReceiveMessage((message) => {
 				if (message?.type === 'select') {
 					void this.focusRanges(message.ranges);
-				} else if (message?.type === 'ready') {
+				} else if (message?.type === 'edit') {
+						void this.save(message.layers);
+					} else if (message?.type === 'ready') {
 					// The view asks rather than being told on construction: a message
 					// posted before its script ran is simply gone, and a panel opened
 					// during a rebuild would then show no sign of one.
@@ -191,6 +194,26 @@ export class StoryGraphPanel {
 			void this.panel.webview.postMessage({
 				type: 'error',
 				message: `Can't read ${basename(this.graphUri)} — ${describe(err)}`,
+			});
+		}
+	}
+
+	/**
+	 * Write the edited graph back beside the manuscript. The file watcher then
+	 * reloads it, so the view is confirmed along the same path a background rewrite
+	 * takes — there is no special case for our own writes. Saving canonicalizes the
+	 * file: it round-trips through the reader's rules, so dangling edges are pruned
+	 * and edges renumbered, the same shape the builder emits.
+	 */
+	private async save(raw: unknown): Promise<void> {
+		const layers = Array.isArray(raw) ? (raw as Layer[]) : [];
+		try {
+			const text = stringifyYaml(denormalize(layers), { lineWidth: 0 });
+			await vscode.workspace.fs.writeFile(this.graphUri, new TextEncoder().encode(text));
+		} catch (err) {
+			void this.panel.webview.postMessage({
+				type: 'error',
+				message: `Can't write ${basename(this.graphUri)} — ${describe(err)}`,
 			});
 		}
 	}
@@ -299,6 +322,32 @@ export class StoryGraphPanel {
 	<div id="build" class="build" role="status" hidden>
 		<span class="spinner"></span>
 		<span id="build-label"></span>
+	</div>
+	<div id="tools" class="tools" role="group" aria-label="Edit graph">
+		<button id="edit-toggle" type="button" aria-pressed="false" title="Edit the graph">Edit</button>
+		<button id="add-node" type="button" hidden>Add node</button>
+	</div>
+	<div id="node-editor" class="editor" hidden>
+		<label>Title
+			<input id="ed-title" type="text">
+		</label>
+		<div class="editor-row">
+			<label>Group
+				<input id="ed-group" type="number" min="1" placeholder="none">
+			</label>
+			<label>Start
+				<input id="ed-start" type="number" min="1">
+			</label>
+			<label>End
+				<input id="ed-end" type="number" min="1">
+			</label>
+		</div>
+		<div class="editor-actions">
+			<button id="ed-delete" type="button" class="danger">Delete</button>
+			<span class="spacer"></span>
+			<button id="ed-cancel" type="button">Cancel</button>
+			<button id="ed-save" type="button" class="primary">Save</button>
+		</div>
 	</div>
 	<svg id="canvas" role="img" aria-label="Story graph">
 		<defs>
