@@ -33,8 +33,8 @@ body {
 }
 
 .node rect {
-	fill: var(--vscode-editorWidget-background);
-	stroke: var(--vscode-panel-border);
+	fill: var(--group-fill, var(--vscode-editorWidget-background));
+	stroke: var(--group-border, var(--vscode-panel-border));
 	stroke-width: 1;
 }
 
@@ -73,7 +73,7 @@ body {
 
 .edge {
 	fill: none;
-	stroke: var(--vscode-editorLineNumber-foreground);
+	stroke: var(--group-stroke, var(--vscode-editorLineNumber-foreground));
 	stroke-width: 1.5;
 }
 

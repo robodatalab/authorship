@@ -1,17 +1,20 @@
 """Backend API."""
 
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 import threading
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 
 from server import log
+from server.representations.plot_representation import build_plot_representation
 from server.representations.scene_representation import build_scene_representation
 from server.representations.utils import graph_path_for
+from server.story_graph import to_yaml
 from server.inference.completion import CompletionModel, ModelNotAvailable
 import tenacity
 
@@ -54,7 +57,10 @@ class RepresentationBuildRequest(BaseModel):
     reraise=True,
 )
 def _build_representations(model, markdown):
-    return [build_scene_representation(model, markdown)]
+    return [
+        build_scene_representation(model, markdown),
+        build_plot_representation(model, markdown),
+    ]
 
 
 class BuildJob:
@@ -80,9 +86,11 @@ class BuildJob:
     def cancel(self) -> None:
         self._cancel.set()
 
-    def run(self) -> list:
+    def run(self) -> None:
         try:
-            return _build_representations(self._model, self._markdown)
+            graphs = _build_representations(self._model, self._markdown)
+            if not self.cancelled:
+                graph_path_for(Path(self.path)).write_text(to_yaml(graphs))
         finally:
             self._jobs_manager.remove(self)
 
@@ -92,6 +100,7 @@ class ParallelBuildJobsManager:
     job cancels that job first."""
 
     def __init__(self) -> None:
+        self._pool = ThreadPoolExecutor()
         self._by_path: dict[str, BuildJob] = {}
         self._lock = threading.Lock()
 
@@ -102,17 +111,20 @@ class ParallelBuildJobsManager:
             self._by_path[path] = job
         if superseded is not None:
             superseded.cancel()
+        self._pool.submit(job.run)
         return job
+
+    def is_running(self, path: str) -> bool:
+        with self._lock:
+            return path in self._by_path
 
     def remove(self, job: BuildJob) -> None:
         with self._lock:
-            # Only if it is still the registered job — a cancelled job must not
-            # evict the one that replaced it.
             if self._by_path.get(job.path) is job:
                 del self._by_path[job.path]
 
 
-@app.post("/build")
+@app.post("/build", status_code=202)
 def build(request: RepresentationBuildRequest) -> dict[str, Any]:
     """Generate representations of a manuscript."""
     document = Path(request.path)
@@ -122,14 +134,9 @@ def build(request: RepresentationBuildRequest) -> dict[str, Any]:
     job = app.state.jobs.start(
         str(document), app.state.completion_model, story_markdown
     )
-    graphs = job.run()
+    return {"id": job.path, "path": str(target_graph_file)}
 
-    if job.cancelled:
-        raise HTTPException(status_code=403, detail="superseded by a newer build")
 
-    return {
-        "path": str(target_graph_file),
-        "layers": [
-            {"nodes": len(graph.nodes), "edges": len(graph.edges)} for graph in graphs
-        ],
-    }
+@app.get("/build/status")
+def build_status(id: str) -> dict[str, Any]:
+    return {"running": app.state.jobs.is_running(id)}

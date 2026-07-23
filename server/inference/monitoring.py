@@ -1,6 +1,8 @@
+from multiprocessing.queues import Queue
 import time
 
 from server import log
+from tqdm.auto import tqdm
 from transformers import PreTrainedTokenizerBase, TextStreamer
 
 
@@ -30,3 +32,14 @@ class TextStreamerProgressMonitor(TextStreamer):
                 elapsed,
                 self.tokens / elapsed if elapsed else 0.0,
             )
+
+
+def reporting_tqdm(signal: Queue[float | str]) -> type:
+    class ReportingTqdm(tqdm):  # type: ignore[type-arg]
+        def update(self, n: float | None = 1) -> bool | None:
+            updated = super().update(n)
+            if self.unit != "B" and self.total:
+                signal.put(min(self.n / self.total, 1.0))
+            return updated
+
+    return ReportingTqdm

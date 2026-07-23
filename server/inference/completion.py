@@ -1,14 +1,15 @@
 import abc
 import multiprocessing
+import os
 import threading
 import time
 from multiprocessing.queues import Queue
 
 from huggingface_hub import snapshot_download
 from server import log
-from server.inference.monitoring import TextStreamerProgressMonitor
+from server.inference.monitoring import reporting_tqdm, TextStreamerProgressMonitor
+from server.inference.utils import qwen_chat_prompt
 import torch
-from tqdm.auto import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -16,11 +17,9 @@ from transformers import (
 )
 
 _log = log.logger(__name__)
+os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
 MODEL = "Qwen/Qwen3.5-4B"
-
-#: Published by the download process once every weight file is on disk. The
-#: monitor thread waits for exactly this and nothing else.
 DOWNLOADED = "downloaded"
 
 
@@ -60,16 +59,7 @@ class ModelNotAvailable(Exception):
 class CompletionModelLoading(CompletionModelState):
     def __init__(self, controller: CompletionModel) -> None:
         self.controller = controller
-
-        # Written by the monitor thread as the download reports in, read by
-        # status() from whatever thread asks. A lone float assignment is atomic
-        # under the GIL, so the two need no lock between them.
         self.progress = 0.0
-
-        # The download runs in its own process so a multi-gigabyte fetch never
-        # shares this process's memory or holds its GIL. Progress fractions and
-        # a final DOWNLOADED marker come back over the queue; the files land in
-        # the shared HuggingFace cache for the main process to load from.
         self.downloaded: Queue[float | str] = multiprocessing.Queue()
         self.download_process = multiprocessing.Process(
             target=download_process_main,
@@ -78,9 +68,6 @@ class CompletionModelLoading(CompletionModelState):
         )
         self.download_process.start()
 
-        # A thread rather than a callback so the blocking wait on the process
-        # stays off the event loop. When it hears the weights have arrived it
-        # loads them here and flips the controller over to serving.
         self.monitor_thread = threading.Thread(
             target=monitor_thread_main,
             kwargs=dict(loading=self),
@@ -89,10 +76,6 @@ class CompletionModelLoading(CompletionModelState):
         self.monitor_thread.start()
 
     def cleanup(self) -> None:
-        # The download process has already exited by the time serving takes
-        # over, so this returns at once; on any other transition it reaps it.
-        # The monitor thread is deliberately not joined: it is the very thread
-        # driving this transition, and a thread cannot join itself.
         self.download_process.join()
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
@@ -102,12 +85,12 @@ class CompletionModelLoading(CompletionModelState):
         return f"{self.progress:.0%} downloaded"
 
 
-def download_process_main(signal: "Queue[float | str]") -> None:
+def download_process_main(signal: Queue[float | str]) -> None:
     """Child process: pull every weight file into the cache, then report back."""
     log.setup()
     _log.info("downloading %s", MODEL)
     started = time.monotonic()
-    snapshot_download(MODEL, tqdm_class=_reporting_tqdm(signal))
+    snapshot_download(MODEL, tqdm_class=reporting_tqdm(signal))
     _log.info("downloaded %s in %.0fs", MODEL, time.monotonic() - started)
     signal.put(DOWNLOADED)
 
@@ -131,26 +114,6 @@ def monitor_thread_main(loading: CompletionModelLoading) -> None:
     controller.set_state(CompletionModelServing(controller, model, tokenizer))
 
 
-def _reporting_tqdm(signal: "Queue[float | str]") -> type:
-    """A tqdm subclass that reports the overall fetch fraction to the parent.
-
-    `snapshot_download` drives one bar over the file count and one per file over
-    bytes. The file-count bar measures the whole job, so its fraction is what
-    gets published; the per-file byte bars (unit "B") report only to the log. If
-    the hub ever stops drawing that bar the fraction just stays at zero until
-    DOWNLOADED — the transition to serving still fires.
-    """
-
-    class ReportingTqdm(tqdm):  # type: ignore[type-arg]
-        def update(self, n: float | None = 1) -> bool | None:
-            updated = super().update(n)
-            if self.unit != "B" and self.total:
-                signal.put(min(self.n / self.total, 1.0))
-            return updated
-
-    return ReportingTqdm
-
-
 class CompletionModelServing(CompletionModelState):
     def __init__(
         self, controller: CompletionModel, model, tokenizer: PreTrainedTokenizerBase
@@ -160,7 +123,7 @@ class CompletionModelServing(CompletionModelState):
         self.tokenizer = tokenizer
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        prompt = _qwen_chat_prompt(system, user)
+        prompt = qwen_chat_prompt(system, user)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         prompt_tokens = int(inputs["input_ids"].shape[-1])
 
@@ -197,12 +160,3 @@ class CompletionModelServing(CompletionModelState):
 
     def cleanup(self) -> None:
         pass
-
-
-def _qwen_chat_prompt(system: str, user: str) -> str:
-    """Render a turn the way Qwen's chat template does, with reasoning off."""
-    return (
-        f"<|im_start|>system\n{system}<|im_end|>\n"
-        f"<|im_start|>user\n{user}<|im_end|>\n"
-        f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
-    )

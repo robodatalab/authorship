@@ -12,7 +12,6 @@ def main() -> None:
     args = parser.parse_args()
 
     log.setup()
-    log.dump_stacks_on_signal()
     uvicorn.run(app, host="127.0.0.1", port=args.port)
 
 

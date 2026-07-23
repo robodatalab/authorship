@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from server.story_graph import Edge, Node
+
 
 def graph_path_for(document: Path) -> Path:
     """`story.md` sits next to `story.graph.yaml` — by convention, not
@@ -59,3 +61,53 @@ def json_object(reply: str) -> dict[str, Any]:
                 return parsed
 
     raise ValueError("the model's reply ended mid-object")
+
+
+def as_node(entry: Any) -> Node | None:
+    if not isinstance(entry, dict):
+        return None
+
+    identifier = as_id(entry.get("id", entry.get("node")))
+    start = as_line(entry.get("start"))
+    end = as_line(entry.get("end"))
+    title = str(entry.get("title") or "").strip()
+    group = as_id(entry.get("group", None))
+
+    if identifier is None or start is None or end is None or not title:
+        return None
+    # A span running backwards tells us nothing about which lines were meant.
+    if end < start:
+        return None
+
+    return Node(id=identifier, title=title, start=start + 1, end=end + 1, group=group)
+
+
+def as_edge(entry: Any) -> Edge | None:
+    if not isinstance(entry, dict):
+        return None
+
+    source = as_id(entry.get("from", entry.get("source")))
+    target = as_id(entry.get("to", entry.get("target")))
+    group = as_id(entry.get("group", None))
+
+    if source is None or target is None or source == target:
+        return None
+
+    return Edge(source=source, target=target, group=group)
+
+
+def as_id(value: Any) -> int | None:
+    """Ids are ints, but the model returns "3" often enough to be worth taking."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value)
+    return None
+
+
+def as_line(value: Any) -> int | None:
+    """A 0-based line index, or None if it is not one."""
+    index = as_id(value)
+    return index if index is not None and index >= 0 else None

@@ -18,9 +18,12 @@ class Node:
 
     id: int
     title: str
-    #: 1-based inclusive manuscript lines, as the viewer reads them.
+    # Line numbers that indicate the continuous area of manuscript a node refers to
     start: int
     end: int
+    # Groups aggregate nodes into aggregates with some similarity surface.
+    # The meaning depends on the type of graph
+    group: int | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,9 @@ class Edge:
 
     source: int
     target: int
+    # Groups aggregate edges into aggregates with some similarity surface.
+    # The meaning depends on the type of graph
+    group: int | None = None
 
 
 @dataclass(frozen=True)
@@ -64,18 +70,9 @@ def to_yaml(graphs: Sequence[StoryGraph]) -> str:
     layers = [
         {
             "id": index,
-            "nodes": [
-                {
-                    "node": node.id,
-                    "title": node.title,
-                    "start": node.start,
-                    "end": node.end,
-                }
-                for node in graph.nodes
-            ],
-            # `start`/`end` are node ids here, not lines. See `Edge`.
+            "nodes": [_node_fields(node) for node in graph.nodes],
             "edges": [
-                {"edge": position, "start": edge.source, "end": edge.target}
+                _edge_fields(position, edge)
                 for position, edge in enumerate(graph.edges, start=1)
             ],
         }
@@ -84,6 +81,29 @@ def to_yaml(graphs: Sequence[StoryGraph]) -> str:
     ]
 
     return dump({"layer": layers})
+
+
+def _node_fields(node: Node) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "node": node.id,
+        "title": node.title,
+        "start": node.start,
+        "end": node.end,
+    }
+    if node.group is not None:
+        fields["group"] = node.group
+    return fields
+
+
+def _edge_fields(position: int, edge: Edge) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "edge": position,
+        "start": edge.source,
+        "end": edge.target,
+    }
+    if edge.group is not None:
+        fields["group"] = edge.group
+    return fields
 
 
 def dump(document: Any) -> str:

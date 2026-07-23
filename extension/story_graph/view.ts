@@ -208,6 +208,9 @@ function renderLayer(): void {
 		path.setAttribute('marker-end', 'url(#arrow)');
 		path.dataset.from = edge.from;
 		path.dataset.to = edge.to;
+		if (edge.group !== undefined) {
+			path.style.setProperty('--group-stroke', groupStyle(edge.group).border);
+		}
 		edgeLayer.appendChild(path);
 	}
 	viewport.appendChild(edgeLayer);
@@ -225,6 +228,11 @@ function nodeEl(item: PlacedNode): SVGGElement {
 	group.setAttribute('class', 'node');
 	group.setAttribute('transform', `translate(${item.x},${item.y})`);
 	group.dataset.id = item.id;
+	if (item.group !== undefined) {
+		const { fill, border } = groupStyle(item.group);
+		group.style.setProperty('--group-fill', fill);
+		group.style.setProperty('--group-border', border);
+	}
 
 	const rect = svgEl('rect');
 	rect.setAttribute('width', String(item.w));
@@ -253,6 +261,15 @@ function nodeEl(item: PlacedNode): SVGGElement {
 	// Selection is driven from the pointer handlers below rather than a click
 	// listener here — see the note there about pointer capture.
 	return group as SVGGElement;
+}
+
+/** A distinct hue per plot group: a filled background and a solid accent border. */
+function groupStyle(group: number): { fill: string; border: string } {
+	const hue = Math.round((group * 137.5) % 360);
+	return {
+		fill: `hsla(${hue}, 70%, 50%, 0.28)`,
+		border: `hsl(${hue}, 65%, 45%)`,
+	};
 }
 
 // ---------------------------------------------------------------------------
