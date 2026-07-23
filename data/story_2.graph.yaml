@@ -166,3 +166,115 @@ layer:
     start: 12
     end: 13
     group: 4
+- id: 3
+  nodes:
+  - node: 1
+    title: 'Anabelle: joyful and confident'
+    start: 36
+    end: 50
+    group: 1
+  - node: 2
+    title: 'Anabelle: curious and eager'
+    start: 202
+    end: 207
+    group: 1
+  - node: 3
+    title: 'Anabelle: entranced and overwhelmed'
+    start: 296
+    end: 346
+    group: 1
+  - node: 4
+    title: 'Anabelle: distracted and preoccupied'
+    start: 460
+    end: 464
+    group: 1
+  - node: 5
+    title: 'Anabelle: angry and vengeful'
+    start: 658
+    end: 684
+    group: 1
+  - node: 6
+    title: 'Anabelle: conflicted and tormented'
+    start: 713
+    end: 732
+    group: 1
+  - node: 7
+    title: 'Anabelle: resolute and controlling'
+    start: 752
+    end: 803
+    group: 1
+  - node: 8
+    title: 'Sophia: carefree and joyful'
+    start: 136
+    end: 142
+    group: 2
+  - node: 9
+    title: 'Sophia: guarded and evasive'
+    start: 108
+    end: 118
+    group: 2
+  - node: 10
+    title: 'Sophia: hesitant and fearful'
+    start: 308
+    end: 322
+    group: 2
+  - node: 11
+    title: 'Sophia: broken and desperate'
+    start: 410
+    end: 431
+    group: 2
+  - node: 12
+    title: 'Sophia: terrified and defensive'
+    start: 609
+    end: 642
+    group: 2
+  - node: 13
+    title: 'Sophia: resigned and heartbroken'
+    start: 791
+    end: 803
+    group: 2
+  edges:
+  - edge: 1
+    start: 1
+    end: 2
+    group: 1
+  - edge: 2
+    start: 2
+    end: 3
+    group: 1
+  - edge: 3
+    start: 3
+    end: 4
+    group: 1
+  - edge: 4
+    start: 4
+    end: 5
+    group: 1
+  - edge: 5
+    start: 5
+    end: 6
+    group: 1
+  - edge: 6
+    start: 6
+    end: 7
+    group: 1
+  - edge: 7
+    start: 8
+    end: 9
+    group: 2
+  - edge: 8
+    start: 9
+    end: 10
+    group: 2
+  - edge: 9
+    start: 10
+    end: 11
+    group: 2
+  - edge: 10
+    start: 11
+    end: 12
+    group: 2
+  - edge: 11
+    start: 12
+    end: 13
+    group: 2
