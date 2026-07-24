@@ -219,9 +219,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				return;
 			}
 			const { path } = (await response.json()) as { path: string };
-			const epub = vscode.Uri.file(path);
-			await this.status(`Exported ${basename(epub)}`, false);
-			void vscode.commands.executeCommand('revealFileInOS', epub);
+			// The file lands beside the manuscript and shows up in the explorer on
+			// its own; opening a Finder window on top of that is just noise.
+			await this.status(`Exported ${basename(vscode.Uri.file(path))}`, false);
 		} catch (err) {
 			// The server is what builds the book; a refused connection is the likely
 			// cause, and it is the one thing the author can act on.
@@ -269,13 +269,13 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<title>Publish</title>
 </head>
 <body>
-	<div class="manuscript">
-		<span id="manuscript-name" class="name">No manuscript selected</span>
-		<button id="choose" type="button">Choose…</button>
-	</div>
-	<details id="publish" open>
-		<summary>Publish</summary>
+	<details class="drawer" id="publishing" open>
+		<summary>Publishing</summary>
 		<div class="body">
+			<div class="manuscript">
+				<span id="manuscript-name" class="name">No manuscript selected</span>
+				<button id="choose" type="button">Choose…</button>
+			</div>
 			<label>Title
 				<input id="f-title" type="text" placeholder="From the manuscript">
 			</label>

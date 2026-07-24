@@ -4,18 +4,46 @@
 
 body {
 	margin: 0;
-	padding: 10px;
+	padding: 0;
 	background: var(--vscode-sideBar-background);
 	color: var(--vscode-foreground);
 	font-family: var(--vscode-font-family);
 	font-size: var(--vscode-font-size);
 }
 
+/* A drawer: one titled, collapsible section. They stack, each delineated by its
+   own header and rule — Publishing is the first of several to come. */
+.drawer {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.drawer > summary {
+	cursor: pointer;
+	padding: 8px 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-size: calc(var(--vscode-font-size) - 1px);
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.drawer > summary:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.drawer > .body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 4px 10px 12px;
+}
+
 .manuscript {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	margin-bottom: 10px;
 }
 
 .manuscript .name {
@@ -63,24 +91,6 @@ button:disabled {
 
 button[hidden] {
 	display: none;
-}
-
-details > summary {
-	cursor: pointer;
-	padding: 4px 0;
-	font-weight: 600;
-	user-select: none;
-}
-
-details > summary:focus-visible {
-	outline: 1px solid var(--vscode-focusBorder);
-}
-
-.body {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	padding: 8px 0 0;
 }
 
 label {
