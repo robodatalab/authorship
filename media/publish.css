@@ -1,0 +1,155 @@
+/* The Publish view dresses in VS Code's own theme variables, like the graph
+   view, so it follows whatever theme the editor is wearing without a light/dark
+   branch of its own. */
+
+body {
+	margin: 0;
+	padding: 10px;
+	background: var(--vscode-sideBar-background);
+	color: var(--vscode-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+.manuscript {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.manuscript .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+button {
+	padding: 3px 10px;
+	border: none;
+	border-radius: 4px;
+	background: var(--vscode-button-secondaryBackground, transparent);
+	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+}
+
+button:hover {
+	background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+button.primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+button.primary:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+button[hidden] {
+	display: none;
+}
+
+details > summary {
+	cursor: pointer;
+	padding: 4px 0;
+	font-weight: 600;
+	user-select: none;
+}
+
+details > summary:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px 0 0;
+}
+
+label {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	color: var(--vscode-descriptionForeground);
+}
+
+input,
+textarea {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 3px 6px;
+	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border-radius: 3px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+textarea {
+	min-height: 80px;
+	resize: vertical;
+}
+
+input:focus,
+textarea:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.cover {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.cover .label {
+	color: var(--vscode-descriptionForeground);
+}
+
+.cover .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.actions {
+	display: flex;
+	margin-top: 4px;
+}
+
+.actions .primary {
+	flex: 1;
+}
+
+.status {
+	color: var(--vscode-descriptionForeground);
+}
+
+.status.error {
+	color: var(--vscode-errorForeground);
+}
+
+.status[hidden] {
+	display: none;
+}

@@ -81,4 +81,40 @@ const webviewConfig = {
   },
 };
 
-module.exports = [ extensionConfig, webviewConfig ];
+/**
+ * The Publish sidebar runs inside its own webview, so like the graph view it
+ * needs a browser-context bundle of its own, loaded from dist/ by URI.
+ *
+ * @type WebpackConfig
+ */
+const publishViewConfig = {
+  target: 'web',
+  mode: 'none',
+  entry: './extension/publish/view.ts',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'publish_view.js'
+  },
+  resolve: {
+    extensions: ['.ts', '.js']
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: 'ts-loader'
+          }
+        ]
+      }
+    ]
+  },
+  devtool: 'nosources-source-map',
+  infrastructureLogging: {
+    level: "log",
+  },
+};
+
+module.exports = [ extensionConfig, webviewConfig, publishViewConfig ];

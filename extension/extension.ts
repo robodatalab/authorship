@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { StoryGraphPanel } from './story_graph/panel';
+import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
 import { BuildActivity } from './llm/activity';
@@ -19,9 +20,12 @@ export function activate(context: vscode.ExtensionContext) {
 	// here is what makes the view render; VS Code activates the extension
 	// automatically the first time the view becomes visible.
 	context.subscriptions.push(
-		vscode.window.registerTreeDataProvider(
+		vscode.window.registerWebviewViewProvider(
 			'authorship.manuscript',
-			new ManuscriptProvider()
+			new PublishView(context, 8765),
+			// Keep the form's state while the view is hidden, so switching away and
+			// back doesn't reset an edit in progress.
+			{ webviewOptions: { retainContextWhenHidden: true } }
 		)
 	);
 
@@ -48,16 +52,6 @@ export function activate(context: vscode.ExtensionContext) {
 			StoryGraphPanel.reveal(context, activity, editor.document.uri, editor.viewColumn);
 		})
 	);
-}
-
-class ManuscriptProvider implements vscode.TreeDataProvider<string> {
-	getTreeItem(element: string): vscode.TreeItem {
-		return new vscode.TreeItem(element, vscode.TreeItemCollapsibleState.None);
-	}
-
-	getChildren(element?: string): string[] {
-		return element ? [] : ['Chapter One', 'Chapter Two'];
-	}
 }
 
 // This method is called when your extension is deactivated

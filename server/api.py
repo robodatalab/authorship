@@ -7,10 +7,11 @@ from pathlib import Path
 import threading
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
+from server.epub_exporter import build_epub
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -144,3 +145,34 @@ def build(request: RepresentationBuildRequest) -> dict[str, Any]:
 @app.get("/build/status")
 def build_status(id: str) -> dict[str, Any]:
     return {"running": app.state.jobs.is_running(id)}
+
+
+class EpubExportRequest(BaseModel):
+    # Path of the manuscript to publish.
+    path: str
+    # Falls back to the title detected in the manuscript when omitted.
+    title: str | None = None
+    author: str = ""
+    language: str = "en"
+    # Path of a cover image, or None for a coverless book.
+    cover: str | None = None
+
+
+@app.post("/export/epub")
+def export_epub(request: EpubExportRequest) -> dict[str, Any]:
+    """Export a manuscript to an EPUB written beside it, as `<name>.epub`."""
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(status_code=400, detail=f"No such manuscript: {request.path}")
+
+    out_path = document.with_suffix(".epub")
+    cover = Path(request.cover) if request.cover else None
+    build_epub(
+        document,
+        out_path,
+        cover,
+        request.title,
+        request.author,
+        request.language,
+    )
+    return {"path": str(out_path)}
