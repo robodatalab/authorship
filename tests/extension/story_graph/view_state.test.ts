@@ -402,3 +402,83 @@ describe('carrying upward onto several nodes', () => {
 		expect(selected(state)).toEqual(['before']);
 	});
 });
+
+describe('editing the graph', () => {
+	let state: GraphViewState;
+
+	const currentLayer = (s: GraphViewState) => s.getLayers().find((l) => l.id === s.getCurrentLayerId());
+
+	beforeEach(() => {
+		state = new GraphViewState();
+		state.setLayers(LAYERS);
+	});
+
+	it('adds a node to the layer on screen and returns its id', () => {
+		const id = state.addNode({ title: 'new', start: 8, end: 9 });
+
+		expect(currentLayer(state)?.nodes.find((n) => n.id === id)?.title).toBe('new');
+	});
+
+	it('starts a first layer when the graph is empty', () => {
+		state.setLayers([]);
+		const id = state.addNode({ title: 'first', start: 1, end: 1 });
+
+		expect(state.getCurrentLayerId()).not.toBeNull();
+		expect(currentLayer(state)?.nodes.find((n) => n.id === id)?.title).toBe('first');
+	});
+
+	it('edits a node in place, and the new lines drive the selection', () => {
+		state.selectNode('1'); // 3-5
+		state.updateNode('1', { title: 'renamed', start: 2, end: 8, group: 4 });
+
+		const n = currentLayer(state)?.nodes.find((x) => x.id === '1');
+		expect([n?.title, n?.start, n?.end, n?.group]).toEqual(['renamed', 2, 8, 4]);
+	});
+
+	it('deletes a node and its edges, re-deriving the selection', () => {
+		state.deleteNode('1');
+
+		const layer = currentLayer(state);
+		expect(layer?.nodes.some((n) => n.id === '1')).toBe(false);
+		expect(layer?.edges.every((e) => e.from !== '1' && e.to !== '1')).toBe(true);
+	});
+
+	it('adds and removes edges on the current layer', () => {
+		const before = currentLayer(state)?.edges.length ?? 0;
+
+		state.addEdge('1', '4');
+		expect(currentLayer(state)?.edges.length).toBe(before + 1);
+
+		state.deleteEdgeAt((currentLayer(state)?.edges.length ?? 1) - 1);
+		expect(currentLayer(state)?.edges.length).toBe(before);
+	});
+
+	it('pins a node to a position with moveNode', () => {
+		state.moveNode('1', 42, 7);
+		expect(currentLayer(state)?.nodes.find((n) => n.id === '1')).toMatchObject({ x: 42, y: 7 });
+	});
+
+	it('touches only the layer on screen, despite repeating node ids', () => {
+		state.switchTo('2');
+		state.addNode({ title: 'coarse only', start: 5, end: 6 });
+
+		const fine = state.getLayers().find((l) => l.id === '1');
+		const coarse = state.getLayers().find((l) => l.id === '2');
+		expect(coarse?.nodes.some((n) => n.title === 'coarse only')).toBe(true);
+		expect(fine?.nodes.some((n) => n.title === 'coarse only')).toBe(false);
+	});
+
+	it('pins a batch of nodes at once, leaving the rest free', () => {
+		state.pinPositions(
+			new Map([
+				['1', { x: 10, y: 20 }],
+				['3', { x: 30, y: 40 }],
+			])
+		);
+
+		const layer = currentLayer(state)!;
+		expect(layer.nodes.find((n) => n.id === '1')).toMatchObject({ x: 10, y: 20 });
+		expect(layer.nodes.find((n) => n.id === '3')).toMatchObject({ x: 30, y: 40 });
+		expect(layer.nodes.find((n) => n.id === '2')?.x).toBeUndefined();
+	});
+});

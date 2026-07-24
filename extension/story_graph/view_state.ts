@@ -10,7 +10,19 @@
 // deriving from the previous result made the selection creep outward on every
 // switch.
 
-import { nodesTouching, type ActiveByLayer, type Layer, type LineSpan } from './model';
+import {
+	addEdge as addEdgeToLayer,
+	addNode as addNodeToLayer,
+	deleteEdgeAt as deleteEdgeInLayer,
+	deleteNode as deleteNodeFromLayer,
+	moveNode as moveNodeInLayer,
+	nodesTouching,
+	updateNode as updateNodeInLayer,
+	type ActiveByLayer,
+	type Layer,
+	type LineSpan,
+	type NodeFields,
+} from './model';
 
 export class GraphViewState {
 	private layers: Layer[] = [];
@@ -122,6 +134,90 @@ export class GraphViewState {
 			this.selected = new Set();
 			this.anchor = [];
 		}
+	}
+
+	// -- editing -------------------------------------------------------------
+	//
+	// One edit changes the layer on screen; the whole layer set is what goes to
+	// disk, so the view reads it back with getLayers() and hands it to the host.
+	// The selection is re-derived after every edit, so moving a node's lines or
+	// deleting the one you had picked lands the highlight where it now belongs.
+
+	/**
+	 * Add a node to the layer on screen and return its id. Adding to an empty
+	 * graph starts a first layer to hold it, so a graph can be drawn from nothing.
+	 */
+	addNode(fields: NodeFields): string {
+		const layer = this.getCurrentLayer() ?? { id: '1', nodes: [], edges: [] };
+		const present = this.layers.some((candidate) => candidate.id === layer.id);
+		const { layer: next, id } = addNodeToLayer(layer, fields);
+		this.layers = present
+			? this.layers.map((candidate) => (candidate.id === layer.id ? next : candidate))
+			: [...this.layers, next];
+		this.currentLayerId = next.id;
+		this.deriveFromAnchor();
+		return id;
+	}
+
+	updateNode(id: string, fields: NodeFields): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(updateNodeInLayer(layer, id, fields));
+		}
+	}
+
+	moveNode(id: string, x: number, y: number): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(moveNodeInLayer(layer, id, x, y));
+		}
+	}
+
+	/**
+	 * Pin a batch of nodes at given positions in one step. Used to freeze the
+	 * current arrangement before a structural edit, so removing or adding an edge
+	 * doesn't re-flow the nodes it left untouched.
+	 */
+	pinPositions(positions: ReadonlyMap<string, { x: number; y: number }>): void {
+		const layer = this.getCurrentLayer();
+		if (!layer) {
+			return;
+		}
+		this.replaceCurrentLayer({
+			...layer,
+			nodes: layer.nodes.map((node) => {
+				const at = positions.get(node.id);
+				return at ? { ...node, x: at.x, y: at.y } : node;
+			}),
+		});
+	}
+
+	deleteNode(id: string): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(deleteNodeFromLayer(layer, id));
+		}
+	}
+
+	addEdge(from: string, to: string): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(addEdgeToLayer(layer, from, to));
+		}
+	}
+
+	deleteEdgeAt(index: number): void {
+		const layer = this.getCurrentLayer();
+		if (layer) {
+			this.replaceCurrentLayer(deleteEdgeInLayer(layer, index));
+		}
+	}
+
+	private replaceCurrentLayer(next: Layer): void {
+		this.layers = this.layers.map((layer) =>
+			layer.id === this.currentLayerId ? next : layer
+		);
+		this.deriveFromAnchor();
 	}
 
 	/**

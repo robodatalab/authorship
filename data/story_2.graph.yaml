@@ -1,280 +1,286 @@
 layer:
-- id: 1
-  nodes:
-  - node: 1
-    title: Anabelle's morning routine
-    start: 3
-    end: 50
-  - node: 2
-    title: The carriage ride to Sophia's
-    start: 51
-    end: 122
-  - node: 3
-    title: Shopping for a new wardrobe
-    start: 123
-    end: 152
-  - node: 4
-    title: Entering the pleasure department
-    start: 153
-    end: 258
-  - node: 5
-    title: Anabelle's first encounter
-    start: 259
-    end: 390
-  - node: 6
-    title: The drive home and Sophia's breakdown
-    start: 391
-    end: 434
-  - node: 7
-    title: Installing the pleasure frame
-    start: 435
-    end: 597
-  - node: 8
-    title: Sophia confesses her love for Mathew
-    start: 601
-    end: 691
-  - node: 9
-    title: Anabelle's work day and confrontation
-    start: 693
-    end: 804
-  edges:
-  - edge: 1
-    start: 1
-    end: 2
-  - edge: 2
-    start: 2
-    end: 3
-  - edge: 3
-    start: 3
-    end: 4
-  - edge: 4
-    start: 4
-    end: 5
-  - edge: 5
-    start: 5
-    end: 6
-  - edge: 6
-    start: 6
-    end: 7
-  - edge: 7
-    start: 7
-    end: 8
-  - edge: 8
-    start: 8
-    end: 9
-- id: 2
-  nodes:
-  - node: 1
-    title: anabelle's new career
-    start: 36
-    end: 41
-    group: 1
-  - node: 2
-    title: anabelle's new career
-    start: 116
-    end: 119
-    group: 1
-  - node: 3
-    title: a shopping spree
-    start: 38
-    end: 41
-    group: 2
-  - node: 4
-    title: a shopping spree
-    start: 88
-    end: 120
-    group: 2
-  - node: 5
-    title: a new pleasure companion
-    start: 148
-    end: 150
-    group: 3
-  - node: 6
-    title: a new pleasure companion
-    start: 172
-    end: 174
-    group: 3
-  - node: 7
-    title: a new pleasure companion
-    start: 370
-    end: 386
-    group: 3
-  - node: 8
-    title: a new pleasure companion
-    start: 515
-    end: 538
-    group: 3
-  - node: 9
-    title: a new pleasure companion
-    start: 559
-    end: 596
-    group: 3
-  - node: 10
-    title: sophia's secret love
-    start: 602
-    end: 609
-    group: 4
-  - node: 11
-    title: sophia's secret love
-    start: 632
-    end: 642
-    group: 4
-  - node: 12
-    title: sophia's secret love
-    start: 715
-    end: 723
-    group: 4
-  - node: 13
-    title: sophia's secret love
-    start: 752
-    end: 757
-    group: 4
-  edges:
-  - edge: 1
-    start: 1
-    end: 2
-    group: 1
-  - edge: 2
-    start: 3
-    end: 4
-    group: 2
-  - edge: 3
-    start: 5
-    end: 6
-    group: 3
-  - edge: 4
-    start: 6
-    end: 7
-    group: 3
-  - edge: 5
-    start: 7
-    end: 8
-    group: 3
-  - edge: 6
-    start: 8
-    end: 9
-    group: 3
-  - edge: 7
-    start: 10
-    end: 11
-    group: 4
-  - edge: 8
-    start: 11
-    end: 12
-    group: 4
-  - edge: 9
-    start: 12
-    end: 13
-    group: 4
-- id: 3
-  nodes:
-  - node: 1
-    title: 'Anabelle: joyful and confident'
-    start: 36
-    end: 50
-    group: 1
-  - node: 2
-    title: 'Anabelle: curious and eager'
-    start: 202
-    end: 207
-    group: 1
-  - node: 3
-    title: 'Anabelle: entranced and overwhelmed'
-    start: 296
-    end: 346
-    group: 1
-  - node: 4
-    title: 'Anabelle: distracted and preoccupied'
-    start: 460
-    end: 464
-    group: 1
-  - node: 5
-    title: 'Anabelle: angry and vengeful'
-    start: 658
-    end: 684
-    group: 1
-  - node: 6
-    title: 'Anabelle: conflicted and tormented'
-    start: 713
-    end: 732
-    group: 1
-  - node: 7
-    title: 'Anabelle: resolute and controlling'
-    start: 752
-    end: 803
-    group: 1
-  - node: 8
-    title: 'Sophia: carefree and joyful'
-    start: 136
-    end: 142
-    group: 2
-  - node: 9
-    title: 'Sophia: guarded and evasive'
-    start: 108
-    end: 118
-    group: 2
-  - node: 10
-    title: 'Sophia: hesitant and fearful'
-    start: 308
-    end: 322
-    group: 2
-  - node: 11
-    title: 'Sophia: broken and desperate'
-    start: 410
-    end: 431
-    group: 2
-  - node: 12
-    title: 'Sophia: terrified and defensive'
-    start: 609
-    end: 642
-    group: 2
-  - node: 13
-    title: 'Sophia: resigned and heartbroken'
-    start: 791
-    end: 803
-    group: 2
-  edges:
-  - edge: 1
-    start: 1
-    end: 2
-    group: 1
-  - edge: 2
-    start: 2
-    end: 3
-    group: 1
-  - edge: 3
-    start: 3
-    end: 4
-    group: 1
-  - edge: 4
-    start: 4
-    end: 5
-    group: 1
-  - edge: 5
-    start: 5
-    end: 6
-    group: 1
-  - edge: 6
-    start: 6
-    end: 7
-    group: 1
-  - edge: 7
-    start: 8
-    end: 9
-    group: 2
-  - edge: 8
-    start: 9
-    end: 10
-    group: 2
-  - edge: 9
-    start: 10
-    end: 11
-    group: 2
-  - edge: 10
-    start: 11
-    end: 12
-    group: 2
-  - edge: 11
-    start: 12
-    end: 13
-    group: 2
+  - id: 1
+    nodes:
+      - node: 1
+        title: Anabelle's morning routine
+        start: 3
+        end: 50
+        x: -124.79422045015343
+        y: 31.47908256681108
+      - node: 2
+        title: The carriage ride to Sophia's
+        start: 51
+        end: 122
+        x: -94.78903950459942
+        y: 139.5315403116136
+      - node: 3
+        title: Shopping for a new wardrobe
+        start: 123
+        end: 152
+        x: -61.60071420081317
+        y: 274.10242017456096
+      - node: 5
+        title: Anabelle's first encounter
+        start: 259
+        end: 390
+        x: 6
+        y: 383
+      - node: 6
+        title: The drive home and Sophia's breakdown
+        start: 391
+        end: 434
+        x: -62.53278206703559
+        y: 562.1852679178288
+      - node: 7
+        title: Installing the pleasure frame
+        start: 435
+        end: 597
+        x: -64.03713026422815
+        y: 636.4869871383559
+      - node: 8
+        title: Sophia confesses her love for Mathew
+        start: 601
+        end: 691
+        x: -65.51196794714907
+        y: 719.4392982029094
+      - node: 9
+        title: Anabelle's work day and confrontation
+        start: 693
+        end: 804
+        x: -68.92502292586084
+        y: 806.5924982222565
+    edges:
+      - edge: 1
+        start: 1
+        end: 2
+      - edge: 2
+        start: 5
+        end: 6
+      - edge: 3
+        start: 6
+        end: 7
+      - edge: 4
+        start: 7
+        end: 8
+      - edge: 5
+        start: 8
+        end: 9
+      - edge: 6
+        start: 2
+        end: 3
+  - id: 2
+    nodes:
+      - node: 1
+        title: anabelle's new career
+        start: 36
+        end: 41
+        group: 1
+      - node: 2
+        title: anabelle's new career
+        start: 116
+        end: 119
+        group: 1
+      - node: 3
+        title: a shopping spree
+        start: 38
+        end: 41
+        group: 2
+      - node: 4
+        title: a shopping spree
+        start: 88
+        end: 120
+        group: 2
+      - node: 5
+        title: a new pleasure companion
+        start: 148
+        end: 150
+        group: 3
+      - node: 6
+        title: a new pleasure companion
+        start: 172
+        end: 174
+        group: 3
+      - node: 7
+        title: a new pleasure companion
+        start: 370
+        end: 386
+        group: 3
+      - node: 8
+        title: a new pleasure companion
+        start: 515
+        end: 538
+        group: 3
+      - node: 9
+        title: a new pleasure companion
+        start: 559
+        end: 596
+        group: 3
+      - node: 10
+        title: sophia's secret love
+        start: 602
+        end: 609
+        group: 4
+      - node: 11
+        title: sophia's secret love
+        start: 632
+        end: 642
+        group: 4
+      - node: 12
+        title: sophia's secret love
+        start: 715
+        end: 723
+        group: 4
+      - node: 13
+        title: sophia's secret love
+        start: 752
+        end: 757
+        group: 4
+    edges:
+      - edge: 1
+        start: 1
+        end: 2
+        group: 1
+      - edge: 2
+        start: 3
+        end: 4
+        group: 2
+      - edge: 3
+        start: 5
+        end: 6
+        group: 3
+      - edge: 4
+        start: 6
+        end: 7
+        group: 3
+      - edge: 5
+        start: 7
+        end: 8
+        group: 3
+      - edge: 6
+        start: 8
+        end: 9
+        group: 3
+      - edge: 7
+        start: 10
+        end: 11
+        group: 4
+      - edge: 8
+        start: 11
+        end: 12
+        group: 4
+      - edge: 9
+        start: 12
+        end: 13
+        group: 4
+  - id: 3
+    nodes:
+      - node: 1
+        title: "Anabelle: joyful and confident"
+        start: 36
+        end: 50
+        group: 1
+      - node: 2
+        title: "Anabelle: curious and eager"
+        start: 202
+        end: 207
+        group: 1
+      - node: 3
+        title: "Anabelle: entranced and overwhelmed"
+        start: 296
+        end: 346
+        group: 1
+      - node: 4
+        title: "Anabelle: distracted and preoccupied"
+        start: 460
+        end: 464
+        group: 1
+      - node: 5
+        title: "Anabelle: angry and vengeful"
+        start: 658
+        end: 684
+        group: 1
+      - node: 6
+        title: "Anabelle: conflicted and tormented"
+        start: 713
+        end: 732
+        group: 1
+      - node: 7
+        title: "Anabelle: resolute and controlling"
+        start: 752
+        end: 803
+        group: 1
+      - node: 8
+        title: "Sophia: carefree and joyful"
+        start: 136
+        end: 142
+        group: 2
+      - node: 9
+        title: "Sophia: guarded and evasive"
+        start: 108
+        end: 118
+        group: 2
+      - node: 10
+        title: "Sophia: hesitant and fearful"
+        start: 308
+        end: 322
+        group: 2
+      - node: 11
+        title: "Sophia: broken and desperate"
+        start: 410
+        end: 431
+        group: 2
+      - node: 12
+        title: "Sophia: terrified and defensive"
+        start: 609
+        end: 642
+        group: 2
+      - node: 13
+        title: "Sophia: resigned and heartbroken"
+        start: 791
+        end: 803
+        group: 2
+    edges:
+      - edge: 1
+        start: 1
+        end: 2
+        group: 1
+      - edge: 2
+        start: 2
+        end: 3
+        group: 1
+      - edge: 3
+        start: 3
+        end: 4
+        group: 1
+      - edge: 4
+        start: 4
+        end: 5
+        group: 1
+      - edge: 5
+        start: 5
+        end: 6
+        group: 1
+      - edge: 6
+        start: 6
+        end: 7
+        group: 1
+      - edge: 7
+        start: 8
+        end: 9
+        group: 2
+      - edge: 8
+        start: 9
+        end: 10
+        group: 2
+      - edge: 9
+        start: 10
+        end: 11
+        group: 2
+      - edge: 10
+        start: 11
+        end: 12
+        group: 2
+      - edge: 11
+        start: 12
+        end: 13
+        group: 2

@@ -84,15 +84,24 @@ class Build(unittest.TestCase):
         written = Path(response.json()["path"])
         self.assertTrue(written.exists())
         document = yaml.safe_load(written.read_text())
-        self.assertEqual(len(document["layer"]), 2)
+        # One layer per perspective: scene, plot and character.
+        self.assertEqual(len(document["layer"]), 3)
 
     def test_backs_off_while_the_model_is_loading(self) -> None:
-        self.model.complete.side_effect = [
-            ModelNotAvailable("loading"),
-            ModelNotAvailable("loading"),
-            DEFAULT_REPLY,
-            DEFAULT_REPLY,
-        ]
+        # Unavailable for the first couple of calls, then serving. A function
+        # rather than a fixed list of replies, so the test doesn't depend on how
+        # many completions a full build makes (one per perspective, and the whole
+        # set is retried together).
+        attempts = 0
+
+        def complete(*_args, **_kwargs) -> str:
+            nonlocal attempts
+            attempts += 1
+            if attempts <= 2:
+                raise ModelNotAvailable("loading")
+            return DEFAULT_REPLY
+
+        self.model.complete.side_effect = complete
         client = TestClient(app)
         with mock.patch("time.sleep"):
             response = client.post("/build", json={"path": self.manuscript_paths[0]})
