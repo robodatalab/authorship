@@ -41,6 +41,7 @@ class CompletionModelState(abc.ABC):
 
 class CompletionModel:
     def __init__(self, model_id: str, prompt_formatter: PromptFormatter) -> None:
+        self.model_id = model_id
         self.prompt_formatter = prompt_formatter
         self.state: CompletionModelState = CompletionModelLoading(self, model_id)
 
@@ -54,9 +55,27 @@ class CompletionModel:
     def status(self) -> str:
         return self.state.status()
 
+    def unload(self) -> None:
+        self.set_state(CompletionModelUnloaded(self.model_id))
+
 
 class ModelNotAvailable(Exception):
     pass
+
+
+class CompletionModelUnloaded(CompletionModelState):
+
+    def __init__(self, model_id: str) -> None:
+        self.model_id = model_id
+
+    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
+        raise ModelNotAvailable(f"Model {self.model_id} has been unloaded")
+
+    def status(self) -> str:
+        return f"Model {self.model_id} unloaded"
+
+    def cleanup(self) -> None:
+        pass
 
 
 class CompletionModelLoading(CompletionModelState):
@@ -166,4 +185,6 @@ class CompletionModelServing(CompletionModelState):
         return "serving"
 
     def cleanup(self) -> None:
-        pass
+        del self.model
+        del self.tokenizer
+        torch.mps.empty_cache()
