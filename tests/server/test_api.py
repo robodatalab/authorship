@@ -3,6 +3,7 @@ import tempfile
 import threading
 import time
 import unittest
+import zipfile
 from unittest import mock
 
 from fastapi.testclient import TestClient
@@ -155,6 +156,36 @@ class Build(unittest.TestCase):
         release.set()
         wait_for_build(client, second.json()["id"])
         self.assertTrue(first_job.cancelled)
+
+
+class ExportEpub(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.manuscript = Path(self._dir.name) / "story.md"
+        self.manuscript.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
+
+    def test_writes_the_epub_beside_the_manuscript(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/export/epub",
+            json={"path": str(self.manuscript), "author": "A. Writer"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        written = Path(response.json()["path"])
+        self.assertEqual(written, self.manuscript.with_suffix(".epub"))
+        self.assertTrue(written.exists())
+        self.assertTrue(zipfile.is_zipfile(written))
+
+    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/export/epub",
+            json={"path": str(self.manuscript.with_name("nope.md"))},
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 if __name__ == "__main__":

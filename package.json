@@ -43,6 +43,7 @@
                 {
                     "id": "authorship.manuscript",
                     "name": "Manuscript",
+                    "type": "webview",
                     "icon": "./media/icon.svg"
                 }
             ]
