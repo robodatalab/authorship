@@ -453,6 +453,11 @@ describe('editing the graph', () => {
 		expect(currentLayer(state)?.edges.length).toBe(before);
 	});
 
+	it('pins a node to a position with moveNode', () => {
+		state.moveNode('1', 42, 7);
+		expect(currentLayer(state)?.nodes.find((n) => n.id === '1')).toMatchObject({ x: 42, y: 7 });
+	});
+
 	it('touches only the layer on screen, despite repeating node ids', () => {
 		state.switchTo('2');
 		state.addNode({ title: 'coarse only', start: 5, end: 6 });

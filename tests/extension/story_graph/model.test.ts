@@ -381,6 +381,23 @@ describe('denormalize — writing the graph back', () => {
 		expect(doc.layer[0].nodes[1]).not.toHaveProperty('group');
 	});
 
+	it('writes an edge group only when the edge has one', () => {
+		const layer: Layer = {
+			id: '1',
+			nodes: [
+				{ id: '1', title: 'a', start: 1, end: 2 },
+				{ id: '2', title: 'b', start: 3, end: 4 },
+			],
+			edges: [
+				{ id: '1', from: '1', to: '2', group: 5 },
+				{ id: '2', from: '2', to: '1' },
+			],
+		};
+		const doc = denormalize([layer]) as { layer: { edges: Record<string, unknown>[] }[] };
+		expect(doc.layer[0].edges[0]).toHaveProperty('group', 5);
+		expect(doc.layer[0].edges[1]).not.toHaveProperty('group');
+	});
+
 	it('writes a pinned position, and round-trips it through the reader', () => {
 		const layer: Layer = {
 			id: '1',
@@ -415,6 +432,17 @@ describe('graph edits', () => {
 
 		expect(id).toBe('3');
 		expect(layer.nodes.map((n) => n.id)).toEqual(['1', '2', '3']);
+	});
+
+	it('carries a group onto a new node when one is given', () => {
+		const { layer, id } = addNode(base, { title: 'c', start: 5, end: 6, group: 4 });
+		expect(layer.nodes.find((n) => n.id === id)?.group).toBe(4);
+	});
+
+	it('leaves the layer alone for an id that is not there', () => {
+		expect(updateNode(base, 'nope', { title: 'x', start: 1, end: 2 })).toEqual(base);
+		expect(deleteNode(base, 'nope')).toEqual(base);
+		expect(moveNode(base, 'nope', 5, 5)).toEqual(base);
 	});
 
 	it('overwrites a node’s fields whole, so the group can be cleared', () => {

@@ -7,6 +7,7 @@
 
 import { elapsedSince } from '../llm/activity';
 import { EditHistory } from './edit_history';
+import { GraphSelection } from './graph_selection';
 import type { Layer, LineSpan, NodeFields } from './model';
 import { GraphViewState } from './view_state';
 import { boundsOf, edgePath, layout, LINE_H, PAD_X, PAD_Y, type PlacedNode } from './view_layout';
@@ -66,11 +67,9 @@ let editingNodeId: string | null = null;
  *  Cancel (or any close short of Save) removes it rather than keeping it. */
 let editingIsNew = false;
 
-/** The graph's own selection, view-local: it never leaves this panel. Nodes by
- *  id, edges by their position in the layer's edge list. Either may hold several,
- *  and both feed the delete action. */
-const selectedNodes = new Set<string>();
-const selectedEdges = new Set<number>();
+/** The graph's own selection, view-local: it never leaves this panel. Nodes and
+ *  edges picked out for moving or deleting — the rules live in graph_selection.ts. */
+const selection = new GraphSelection();
 
 /** The layer the viewport was last fitted to. A re-render of the same layer — an
  *  edit, or a background reload — keeps the user's pan and zoom; only a switch or
@@ -99,8 +98,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 		// Moving the cursor in the manuscript supersedes a graph selection, the same
 		// way it clears the clicked node — but a background reload (keep) leaves it.
 		if (!keep) {
-			selectedNodes.clear();
-			selectedEdges.clear();
+			selection.clear();
 		}
 		applySelection();
 	} else if (message.type === 'build') {
@@ -380,20 +378,19 @@ function applySelection(): void {
 
 	for (const group of viewport.querySelectorAll<SVGGElement>('.node')) {
 		const id = group.dataset.id ?? '';
-		group.classList.toggle('selected', selectedNodes.has(id));
+		group.classList.toggle('selected', selection.hasNode(id));
 		group.classList.toggle('active', active.has(id));
 	}
 	for (const group of viewport.querySelectorAll<SVGGElement>('.edge-group')) {
 		const incident =
-			selectedNodes.has(group.dataset.from ?? '') || selectedNodes.has(group.dataset.to ?? '');
-		group.classList.toggle('incident', selectedNodes.size > 0 && incident);
-		group.classList.toggle('selected', selectedEdges.has(Number(group.dataset.index)));
+			selection.hasNode(group.dataset.from ?? '') || selection.hasNode(group.dataset.to ?? '');
+		group.classList.toggle('incident', selection.hasNodes() && incident);
+		group.classList.toggle('selected', selection.hasEdge(Number(group.dataset.index)));
 	}
 
 	// The trash shows when there is something it would delete — but not while the
 	// editor is open, where Cancel/Save are the way out.
-	deleteButton.hidden =
-		editingNodeId !== null || (selectedNodes.size === 0 && selectedEdges.size === 0);
+	deleteButton.hidden = editingNodeId !== null || selection.isEmpty();
 }
 
 // ---------------------------------------------------------------------------
@@ -593,8 +590,7 @@ svg.addEventListener('pointerup', (event: PointerEvent) => {
 		clickEdge(press.edgeIndex, press.additive);
 	} else if (!press.additive) {
 		// A plain press on empty canvas clears the selection; a modified one keeps it.
-		selectedNodes.clear();
-		selectedEdges.clear();
+		selection.clear();
 		applySelection();
 	}
 	press = null;
@@ -660,8 +656,7 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 		event.preventDefault();
 		redo();
 	} else if (event.key === 'Escape') {
-		selectedNodes.clear();
-		selectedEdges.clear();
+		selection.clear();
 		applySelection();
 	} else if (event.key === 'Delete' || event.key === 'Backspace') {
 		deleteSelection();
@@ -671,36 +666,19 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 /** A node click: on its own it replaces the selection and drives the manuscript
  *  highlight; with a modifier it toggles the node into the selection. */
 function clickNode(id: string, additive: boolean): void {
+	selection.clickNode(id, additive);
 	if (additive) {
-		if (selectedNodes.has(id)) {
-			selectedNodes.delete(id);
-		} else {
-			selectedNodes.add(id);
-		}
-		selectedEdges.clear();
 		applySelection();
-		return;
+	} else {
+		// A plain click also drives the manuscript highlight through the state.
+		select(id);
 	}
-	selectedNodes.clear();
-	selectedNodes.add(id);
-	selectedEdges.clear();
-	select(id);
 }
 
 /** An edge click: replace the selection, or with a modifier toggle it in. */
 function clickEdge(index: number, additive: boolean): void {
 	closeEditor();
-	if (additive) {
-		if (selectedEdges.has(index)) {
-			selectedEdges.delete(index);
-		} else {
-			selectedEdges.add(index);
-		}
-	} else {
-		selectedEdges.clear();
-		selectedEdges.add(index);
-		selectedNodes.clear();
-	}
+	selection.clickEdge(index, additive);
 	applySelection();
 }
 
@@ -710,8 +688,8 @@ function clickEdge(index: number, additive: boolean): void {
  * touching them.
  */
 function deleteSelection(): void {
-	const nodeIds = [...selectedNodes];
-	const edgeIndices = [...selectedEdges].sort((a, b) => b - a);
+	const nodeIds = selection.nodeIds();
+	const edgeIndices = selection.edgeIndices();
 	if (nodeIds.length === 0 && edgeIndices.length === 0) {
 		return;
 	}
@@ -722,8 +700,7 @@ function deleteSelection(): void {
 	for (const id of nodeIds) {
 		state.deleteNode(id);
 	}
-	selectedNodes.clear();
-	selectedEdges.clear();
+	selection.clear();
 	renderLayer();
 	pushEdit();
 }
@@ -747,17 +724,7 @@ function freezePositions(): void {
 function reconcileEditing(): void {
 	const layer = state.getCurrentLayer();
 	const ids = new Set(layer?.nodes.map((node) => node.id) ?? []);
-	for (const id of [...selectedNodes]) {
-		if (!ids.has(id)) {
-			selectedNodes.delete(id);
-		}
-	}
-	const edgeCount = layer?.edges.length ?? 0;
-	for (const index of [...selectedEdges]) {
-		if (index >= edgeCount) {
-			selectedEdges.delete(index);
-		}
-	}
+	selection.prune(ids, layer?.edges.length ?? 0);
 	if (editingNodeId !== null) {
 		if (ids.has(editingNodeId)) {
 			positionEditor();
@@ -792,9 +759,7 @@ function openEditor(id: string): void {
 	}
 	editingNodeId = id;
 	editingIsNew = false;
-	selectedNodes.clear();
-	selectedNodes.add(id);
-	selectedEdges.clear();
+	selection.only(id);
 	edTitle.value = node.title;
 	edGroup.value = node.group !== undefined ? String(node.group) : '';
 	edStart.value = String(node.start);
@@ -827,7 +792,7 @@ function closeEditor(): void {
 	// the removal in case an intervening edit had already saved the model with it.
 	if (editingIsNew && editingNodeId !== null) {
 		state.deleteNode(editingNodeId);
-		selectedNodes.delete(editingNodeId);
+		selection.removeNode(editingNodeId);
 		editingIsNew = false;
 		editingNodeId = null;
 		nodeEditor.hidden = true;
