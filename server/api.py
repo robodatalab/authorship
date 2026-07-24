@@ -1,17 +1,20 @@
 """Backend API."""
 
+import threading
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-import threading
 from typing import Any
 
+import tenacity
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
 from server.epub_exporter import build_epub
+from server.grammar import fix_grammar
+from server.inference.completion import CompletionModel, ModelNotAvailable
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -19,8 +22,6 @@ from server.representations.plot_representation import build_plot_representation
 from server.representations.scene_representation import build_scene_representation
 from server.representations.utils import graph_path_for
 from server.story_graph import to_yaml
-from server.inference.completion import CompletionModel, ModelNotAvailable
-import tenacity
 
 _log = log.logger(__name__)
 
@@ -163,7 +164,9 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     """Export a manuscript to an EPUB written beside it, as `<name>.epub`."""
     document = Path(request.path)
     if not document.is_file():
-        raise HTTPException(status_code=400, detail=f"No such manuscript: {request.path}")
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
 
     out_path = document.with_suffix(".epub")
     cover = Path(request.cover) if request.cover else None
@@ -176,3 +179,29 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         request.language,
     )
     return {"path": str(out_path)}
+
+
+class GrammarFixRequest(BaseModel):
+    # Path of the manuscript to correct.
+    path: str
+
+
+@app.post("/fix/grammar")
+def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
+    """Correct a manuscript's spelling and grammar, returning the new text.
+
+    The corrected text is handed back rather than written: it is the author's own
+    document, so the editor applies the change, where it can be reviewed and
+    undone. A 503 says the model is not ready yet, the one thing worth retrying.
+    """
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
+
+    try:
+        corrected = fix_grammar(app.state.completion_model, document.read_text())
+    except ModelNotAvailable as err:
+        raise HTTPException(status_code=503, detail=str(err))
+    return {"text": corrected}

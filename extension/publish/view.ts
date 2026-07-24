@@ -37,6 +37,8 @@ const clearCover = document.getElementById('clear-cover') as HTMLButtonElement;
 const blurb = document.getElementById('f-blurb') as HTMLTextAreaElement;
 const exportButton = document.getElementById('export') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLElement;
+const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
+const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 
 /** How long after the last keystroke the blurb is written. */
 const BLURB_DEBOUNCE_MS = 400;
@@ -75,21 +77,26 @@ chooseButton.addEventListener('click', () => vscode.postMessage({ type: 'choose'
 chooseCover.addEventListener('click', () => vscode.postMessage({ type: 'chooseCover' }));
 clearCover.addEventListener('click', () => vscode.postMessage({ type: 'clearCover' }));
 exportButton.addEventListener('click', () => {
-	setStatus('Exporting…', false);
+	setStatus(status, 'Exporting…', false);
 	vscode.postMessage({ type: 'export' });
 });
+fixGrammar.addEventListener('click', () => {
+	setStatus(utilsStatus, 'Fixing grammar…', false);
+	vscode.postMessage({ type: 'fixGrammar' });
+});
 
-/** With no manuscript there is nothing to configure, so the form is inert. */
+/** With no story chosen there is nothing to act on, so the panel is inert. */
 function setEnabled(enabled: boolean): void {
-	for (const el of [title, author, language, chooseCover, clearCover, blurb, exportButton]) {
+	const controls = [title, author, language, chooseCover, clearCover, blurb, exportButton, fixGrammar];
+	for (const el of controls) {
 		el.disabled = !enabled;
 	}
 }
 
-function setStatus(message: string, error: boolean): void {
-	status.textContent = message;
-	status.classList.toggle('error', error);
-	status.hidden = message === '';
+function setStatus(el: HTMLElement, message: string, error: boolean): void {
+	el.textContent = message;
+	el.classList.toggle('error', error);
+	el.hidden = message === '';
 }
 
 function showCover(cover: string): void {
@@ -98,15 +105,18 @@ function showCover(cover: string): void {
 }
 
 function renderState(state: StateMessage): void {
-	const hasManuscript = state.manuscript !== null;
-	manuscriptName.textContent = state.manuscript ?? 'No manuscript selected';
+	const hasStory = state.manuscript !== null;
+	manuscriptName.textContent = state.manuscript ?? 'No story selected';
+	// The name is ellipsized when the path is long; the tooltip keeps it legible.
+	manuscriptName.title = state.manuscript ?? '';
 	title.value = state.settings.title;
 	author.value = state.settings.author;
 	language.value = state.settings.language;
 	showCover(state.settings.cover);
 	blurb.value = state.blurb;
-	setEnabled(hasManuscript);
-	setStatus('', false);
+	setEnabled(hasStory);
+	setStatus(status, '', false);
+	setStatus(utilsStatus, '', false);
 }
 
 function baseName(p: string): string {
@@ -120,7 +130,8 @@ window.addEventListener('message', (event) => {
 	} else if (message?.type === 'cover') {
 		showCover(String(message.cover ?? ''));
 	} else if (message?.type === 'status') {
-		setStatus(String(message.message ?? ''), Boolean(message.error));
+		const target = message.scope === 'utils' ? utilsStatus : status;
+		setStatus(target, String(message.message ?? ''), Boolean(message.error));
 	}
 });
 

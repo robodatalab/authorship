@@ -1,12 +1,15 @@
-// The Publish sidebar: a webview view in the Authorship container where a
-// manuscript is picked and its publication set, then exported to an EPUB beside
-// it.
+// The Authorship sidebar: a single webview view in the Authorship container,
+// laid out as drawers. Story picks the manuscript every other drawer works on;
+// Publishing sets its publication and exports an EPUB beside it; Utils runs
+// one-shot fixes over it, starting with a grammar pass.
 //
-// The settings live in `<name>.pub.yaml` and the blurb in `<name>.blurb.md`,
-// both sitting next to the manuscript exactly as `<name>.graph.yaml` does. This
-// module owns those files; the webview is only the form. Exporting hands the
-// manuscript and its settings to the server, which writes `<name>.epub` and is
-// the one place that knows how to build the book.
+// The publication settings live in `<name>.pub.yaml` and the blurb in
+// `<name>.blurb.md`, both sitting next to the manuscript exactly as
+// `<name>.graph.yaml` does. This module owns those files; the webview is only
+// the form. Exporting hands the manuscript and its settings to the server, which
+// writes `<name>.epub` and is the one place that knows how to build the book.
+// The grammar pass likewise runs on the server, which holds the model, and comes
+// back as text the editor applies — so a correction can be reviewed and undone.
 
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -82,6 +85,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'export':
 					void this.export();
 					break;
+				case 'fixGrammar':
+					void this.fixGrammar();
+					break;
 			}
 		});
 
@@ -95,7 +101,7 @@ export class PublishView implements vscode.WebviewViewProvider {
 	private async choose(): Promise<void> {
 		const picked = await vscode.window.showOpenDialog({
 			canSelectMany: false,
-			openLabel: 'Publish',
+			openLabel: 'Select story',
 			filters: { Markdown: ['md'] },
 		});
 		if (!picked || picked.length === 0) {
@@ -232,6 +238,54 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 	}
 
+	// --- utils: grammar ---
+
+	/**
+	 * Correct the manuscript's grammar. The server holds the model and returns
+	 * the corrected text; the editor applies it, so the author sees the change as
+	 * an ordinary edit they can read over and undo, rather than a silent rewrite
+	 * of the file on disk.
+	 */
+	private async fixGrammar(): Promise<void> {
+		if (!this.manuscript) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: this.manuscript.fsPath }),
+			});
+			if (!response.ok) {
+				await this.status(`Grammar fix failed: ${await detailOf(response)}`, true, 'utils');
+				return;
+			}
+			const { text } = (await response.json()) as { text: string };
+			await this.applyText(this.manuscript, text);
+			await this.status('Grammar fixed — review and save.', false, 'utils');
+		} catch (err) {
+			// The server is what holds the model; a refused connection is the likely
+			// cause, and it is the one thing the author can act on.
+			await this.status(
+				`Grammar fix failed — is the model server running? (${describe(err)})`,
+				true,
+				'utils'
+			);
+		}
+	}
+
+	/** Replace a document's whole text as one undoable edit, left unsaved. */
+	private async applyText(uri: vscode.Uri, text: string): Promise<void> {
+		const document = await vscode.workspace.openTextDocument(uri);
+		const whole = new vscode.Range(
+			document.positionAt(0),
+			document.positionAt(document.getText().length)
+		);
+		const edit = new vscode.WorkspaceEdit();
+		edit.replace(uri, whole, text);
+		await vscode.workspace.applyEdit(edit);
+	}
+
 	// --- view plumbing ---
 
 	/** Read the files and hand the whole state to the view. */
@@ -241,14 +295,23 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 		await this.view.webview.postMessage({
 			type: 'state',
-			manuscript: this.manuscript ? basename(this.manuscript) : null,
+			// Shown root-relative, so a story nested in the workspace reads as its
+			// path rather than a bare filename shared with every other story.md.
+			manuscript: this.manuscript
+				? vscode.workspace.asRelativePath(this.manuscript)
+				: null,
 			settings: await this.readSettings(),
 			blurb: await this.readBlurb(),
 		});
 	}
 
-	private async status(message: string, error: boolean): Promise<void> {
-		await this.view?.webview.postMessage({ type: 'status', message, error });
+	/** A status line, sent to whichever drawer raised it. */
+	private async status(
+		message: string,
+		error: boolean,
+		scope: 'publish' | 'utils' = 'publish'
+	): Promise<void> {
+		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
 	}
 
 	private html(webview: vscode.Webview): string {
@@ -269,13 +332,18 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<title>Publish</title>
 </head>
 <body>
+	<details class="drawer" id="story" open>
+		<summary>Story</summary>
+		<div class="body">
+			<div class="manuscript">
+				<span id="manuscript-name" class="name">No story selected</span>
+				<button id="choose" type="button">Choose…</button>
+			</div>
+		</div>
+	</details>
 	<details class="drawer" id="publishing" open>
 		<summary>Publishing</summary>
 		<div class="body">
-			<div class="manuscript">
-				<span id="manuscript-name" class="name">No manuscript selected</span>
-				<button id="choose" type="button">Choose…</button>
-			</div>
 			<label>Title
 				<input id="f-title" type="text" placeholder="From the manuscript">
 			</label>
@@ -299,6 +367,15 @@ export class PublishView implements vscode.WebviewViewProvider {
 				<button id="export" type="button" class="primary">Export as EPUB</button>
 			</div>
 			<div id="status" class="status" hidden></div>
+		</div>
+	</details>
+	<details class="drawer" id="utils" open>
+		<summary>Utils</summary>
+		<div class="body">
+			<div class="actions">
+				<button id="fix-grammar" type="button" class="primary">Fix grammar</button>
+			</div>
+			<div id="utils-status" class="status" hidden></div>
 		</div>
 	</details>
 	<script nonce="${nonce}" src="${script}"></script>
