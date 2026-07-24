@@ -14,7 +14,8 @@ from pydantic import BaseModel
 from server import log
 from server.epub_exporter import build_epub
 from server.grammar import fix_grammar
-from server.inference.completion import CompletionModel, ModelNotAvailable
+from server.inference.completion import MODEL, CompletionModel, ModelNotAvailable
+from server.inference.utils import qwen_chat_prompt
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -29,7 +30,7 @@ _log = log.logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _log.info("Starting a CompletionModel")
-    app.state.completion_model = CompletionModel()
+    app.state.completion_model = CompletionModel(MODEL, qwen_chat_prompt)
     app.state.jobs = ParallelBuildJobsManager()
     _log.info("CompletionModel created")
 

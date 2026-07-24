@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import threading
 import time
+from typing import Callable
 from multiprocessing.queues import Queue
 
 from huggingface_hub import snapshot_download
@@ -21,6 +22,7 @@ os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
 MODEL = "Qwen/Qwen3.5-4B"
 DOWNLOADED = "downloaded"
+PromptFormatter = Callable[[str, str], str]
 
 
 class CompletionModelState(abc.ABC):
@@ -38,8 +40,9 @@ class CompletionModelState(abc.ABC):
 
 
 class CompletionModel:
-    def __init__(self) -> None:
-        self.state: CompletionModelState = CompletionModelLoading(self)
+    def __init__(self, model_id: str, prompt_formatter: PromptFormatter) -> None:
+        self.prompt_formatter = prompt_formatter
+        self.state: CompletionModelState = CompletionModelLoading(self, model_id)
 
     def set_state(self, state: CompletionModelState) -> None:
         self.state.cleanup()
@@ -57,20 +60,21 @@ class ModelNotAvailable(Exception):
 
 
 class CompletionModelLoading(CompletionModelState):
-    def __init__(self, controller: CompletionModel) -> None:
+    def __init__(self, controller: CompletionModel, model_id: str) -> None:
         self.controller = controller
+        self.model_id = model_id
         self.progress = 0.0
         self.downloaded: Queue[float | str] = multiprocessing.Queue()
         self.download_process = multiprocessing.Process(
             target=download_process_main,
-            kwargs=dict(signal=self.downloaded),
+            kwargs=dict(signal=self.downloaded, model_id=model_id),
             daemon=True,
         )
         self.download_process.start()
 
         self.monitor_thread = threading.Thread(
             target=monitor_thread_main,
-            kwargs=dict(loading=self),
+            kwargs=dict(loading=self, model_id=model_id),
             daemon=True,
         )
         self.monitor_thread.start()
@@ -79,23 +83,23 @@ class CompletionModelLoading(CompletionModelState):
         self.download_process.join()
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        raise ModelNotAvailable("Completion model is loading")
+        raise ModelNotAvailable(f"Completion model '{self.model_id}' is loading")
 
     def status(self) -> str:
-        return f"{self.progress:.0%} downloaded"
+        return f"{self.model_id}: {self.progress:.0%} downloaded"
 
 
-def download_process_main(signal: Queue[float | str]) -> None:
+def download_process_main(signal: Queue[float | str], model_id: str) -> None:
     """Child process: pull every weight file into the cache, then report back."""
     log.setup()
-    _log.info("downloading %s", MODEL)
+    _log.info("downloading %s", model_id)
     started = time.monotonic()
-    snapshot_download(MODEL, tqdm_class=reporting_tqdm(signal))
-    _log.info("downloaded %s in %.0fs", MODEL, time.monotonic() - started)
+    snapshot_download(model_id, tqdm_class=reporting_tqdm(signal))
+    _log.info("downloaded %s in %.0fs", model_id, time.monotonic() - started)
     signal.put(DOWNLOADED)
 
 
-def monitor_thread_main(loading: CompletionModelLoading) -> None:
+def monitor_thread_main(loading: CompletionModelLoading, model_id: str) -> None:
     """Track the download's progress, then load the model in this process."""
     while True:
         message = loading.downloaded.get()
@@ -103,10 +107,10 @@ def monitor_thread_main(loading: CompletionModelLoading) -> None:
             break
         loading.progress = float(message)
 
-    _log.info("download complete, loading %s in-process", MODEL)
-    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    _log.info("download complete, loading %s in-process", model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL, dtype=torch.bfloat16, device_map="mps"
+        model_id, dtype=torch.bfloat16, device_map="mps"
     )
     model.eval()
 
@@ -116,14 +120,17 @@ def monitor_thread_main(loading: CompletionModelLoading) -> None:
 
 class CompletionModelServing(CompletionModelState):
     def __init__(
-        self, controller: CompletionModel, model, tokenizer: PreTrainedTokenizerBase
+        self, 
+        controller: CompletionModel, 
+        model, 
+        tokenizer: PreTrainedTokenizerBase,
     ) -> None:
         self.controller = controller
         self.model = model
         self.tokenizer = tokenizer
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        prompt = qwen_chat_prompt(system, user)
+        prompt = self.controller.prompt_formatter(system, user)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         prompt_tokens = int(inputs["input_ids"].shape[-1])
 

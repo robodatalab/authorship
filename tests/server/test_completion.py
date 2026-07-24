@@ -20,6 +20,11 @@ from server.inference.completion import (
 )
 
 
+def format_prompt(system: str, user: str) -> str:
+    """A stand-in prompt formatter; the state machine never inspects its result."""
+    return f"{system}\n{user}"
+
+
 def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool:
     """Give the monitor thread a moment to catch up, or give up after `timeout`.
 
@@ -104,6 +109,7 @@ class FakeModel:
 
 
 class CompletionModelStateMachine(unittest.TestCase):
+    MODEL_ID = "test-org/test-model"
     PROMPT_TOKENS = 5
     TOTAL_TOKENS = 8
     REPLY = "a bright, clean sentence"
@@ -141,7 +147,7 @@ class CompletionModelStateMachine(unittest.TestCase):
                 state.monitor_thread.join(timeout=2.0)
 
     def make_model(self) -> CompletionModel:
-        model = CompletionModel()
+        model = CompletionModel(self.MODEL_ID, format_prompt)
         self._models.append(model)
         return model
 
@@ -154,16 +160,20 @@ class CompletionModelStateMachine(unittest.TestCase):
         model = self.make_model()
 
         # Before the first byte lands the monitor is parked and progress is zero.
-        self.assertEqual(model.status(), "0% downloaded")
+        self.assertEqual(model.status(), f"{self.MODEL_ID}: 0% downloaded")
 
         loading = model.state
         assert isinstance(loading, CompletionModelLoading)
 
         loading.downloaded.put(0.5)
-        self.assertTrue(wait_until(lambda: model.status() == "50% downloaded"))
+        self.assertTrue(
+            wait_until(lambda: model.status() == f"{self.MODEL_ID}: 50% downloaded")
+        )
 
         loading.downloaded.put(0.99)
-        self.assertTrue(wait_until(lambda: model.status() == "99% downloaded"))
+        self.assertTrue(
+            wait_until(lambda: model.status() == f"{self.MODEL_ID}: 99% downloaded")
+        )
 
     def test_completes_once_the_model_is_downloaded(self) -> None:
         model = self.make_model()
