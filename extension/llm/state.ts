@@ -10,7 +10,7 @@
  * a request of ours that is still in flight. `/health` stays a statement about
  * the model alone.
  */
-export type Phase = 'offline' | 'downloading' | 'ready' | 'building';
+export type Phase = 'offline' | 'unloaded' | 'downloading' | 'ready' | 'building';
 
 export interface StatusDisplay {
 	text: string;
@@ -20,17 +20,20 @@ export interface StatusDisplay {
 /**
  * Map the server's `inference_server_status` field onto a phase.
  *
- * The server says one of two things: `"<n>% downloaded"` while it is fetching
- * the weights, and `"serving"` once the model is loaded and answering. The load
- * onto the GPU is not a phase of its own — the server stays on the last
- * `"<n>% downloaded"` reading until it flips to `"serving"`. Anything else, or
- * no answer at all, reads as offline.
+ * The server reports `"unloaded"` before anything has asked for the model,
+ * `"<model>: <n>% downloaded"` while it is fetching the weights, and `"serving"`
+ * once the model is loaded and answering. The load onto the GPU is not a phase of
+ * its own — the server stays on the last `"<n>% downloaded"` reading until it
+ * flips to `"serving"`. Only a server that does not answer at all is offline.
  */
 export function phaseFor(status: string | undefined): Phase {
 	if (status === 'serving') {
 		return 'ready';
 	}
-	if (status !== undefined && /^\d+% downloaded$/.test(status)) {
+	if (status === 'unloaded') {
+		return 'unloaded';
+	}
+	if (status !== undefined && /\d+% downloaded$/.test(status)) {
 		return 'downloading';
 	}
 	return 'offline';
@@ -47,6 +50,11 @@ export function renderStatus(phase: Phase): StatusDisplay {
 			return {
 				text: '$(book) Authorship: offline',
 				tooltip: 'No model server is answering. Start it from the debugger.',
+			};
+		case 'unloaded':
+			return {
+				text: '$(book) Authorship: idle',
+				tooltip: 'The model server is up; the model loads on first use.',
 			};
 		case 'downloading':
 			return {
