@@ -1,8 +1,5 @@
 """Backend API."""
 
-import abc
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -14,19 +11,20 @@ from pydantic import BaseModel
 from server import log
 from server.epub_exporter import build_epub
 from server.grammar import fix_grammar
-from server.inference.inference import (
+from server.inference import (
     InferenceModel,
     InferenceModelResourceManager,
     ModelNotAvailable,
+    CausalModel, Seq2SeqModel,
+    coedit_prompt, qwen_chat_prompt
 )
-from server.inference.kinds import CausalModel, Seq2SeqModel
-from server.inference.utils import coedit_prompt, qwen_chat_prompt
-from server.representations.character_representation import (
+from server.jobs import Job, ParallelJobsManager
+from server.representations import (
     build_character_representation,
+    build_plot_representation,
+    build_scene_representation,
+    graph_path_for
 )
-from server.representations.plot_representation import build_plot_representation
-from server.representations.scene_representation import build_scene_representation
-from server.representations.utils import graph_path_for
 from server.story_graph import to_yaml
 
 _log = log.logger(__name__)
@@ -101,46 +99,6 @@ def _build_representations(model, markdown):
     ]
 
 
-class Job(abc.ABC):
-    """A cancellable unit of work of a named kind, keyed by the file it produces."""
-
-    kind: str
-
-    def __init__(self, target: str) -> None:
-        self.target = target
-        self.error: str | None = None
-        self._cancel = threading.Event()
-        self._begun = threading.Event()
-        self._done = threading.Event()
-
-    @property
-    def cancelled(self) -> bool:
-        return self._cancel.is_set()
-
-    @property
-    def done(self) -> bool:
-        return self._done.is_set()
-
-    @property
-    def status(self) -> str:
-        """Waiting for a worker, holding one, or finished with."""
-        if self.done:
-            return "done"
-        return "running" if self._begun.is_set() else "pending"
-
-    def cancel(self) -> None:
-        self._cancel.set()
-
-    def begin(self) -> None:
-        self._begun.set()
-
-    def finish(self) -> None:
-        self._done.set()
-
-    @abc.abstractmethod
-    def execute(self) -> None:
-        pass
-
 
 class RepresentationBuildJob(Job):
     kind = "representation build"
@@ -169,47 +127,6 @@ class GrammarFixJob(Job):
     def execute(self) -> None:
         self.result = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
 
-
-class ParallelJobsManager:
-    """The job in flight, or the last one finished, per target file. Starting a
-    job for a target that already has one supersedes it — the newer write wins.
-    A finished job lingers so its result can be polled, until it is replaced."""
-
-    def __init__(self) -> None:
-        self._pool = ThreadPoolExecutor()
-        self._by_target: dict[str, Job] = {}
-        self._lock = threading.Lock()
-
-    def start(self, job: Job) -> Job:
-        with self._lock:
-            superseded = self._by_target.get(job.target)
-            self._by_target[job.target] = job
-        if superseded is not None:
-            superseded.cancel()
-        self._pool.submit(self._run, job)
-        return job
-
-    def get(self, target: str) -> Job | None:
-        with self._lock:
-            return self._by_target.get(target)
-
-    def is_running(self, target: str) -> bool:
-        job = self.get(target)
-        return job is not None and not job.done
-
-    def queued(self) -> list[Job]:
-        """Every job still waiting for a worker or running on one."""
-        with self._lock:
-            return [job for job in self._by_target.values() if not job.done]
-
-    def _run(self, job: Job) -> None:
-        job.begin()
-        try:
-            job.execute()
-        except Exception as err:
-            job.error = str(err)
-        finally:
-            job.finish()
 
 
 @app.get("/jobs")
