@@ -393,9 +393,10 @@ export class PublishView implements vscode.WebviewViewProvider {
 				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
 			});
 			const body = (await response.json()) as {
-				jobs: { path: string; status: string }[];
+				jobs: { kind: string; path: string; status: string }[];
 			};
 			const jobs = body.jobs.map((job) => ({
+				kind: job.kind,
 				// Shown root-relative, like the manuscript name: the panel is narrow,
 				// and the end of the path is the part that names the file.
 				path: vscode.workspace.asRelativePath(vscode.Uri.file(job.path)),

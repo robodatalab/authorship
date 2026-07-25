@@ -276,7 +276,15 @@ class Jobs(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
-            {"jobs": [{"path": str(self.manuscript), "status": "running"}]},
+            {
+                "jobs": [
+                    {
+                        "kind": "grammar fix",
+                        "path": str(self.manuscript),
+                        "status": "running",
+                    }
+                ]
+            },
         )
 
         release.set()

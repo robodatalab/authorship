@@ -102,7 +102,9 @@ def _build_representations(model, markdown):
 
 
 class Job(abc.ABC):
-    """A cancellable unit of work, keyed by the file it produces."""
+    """A cancellable unit of work of a named kind, keyed by the file it produces."""
+
+    kind: str
 
     def __init__(self, target: str) -> None:
         self.target = target
@@ -141,6 +143,8 @@ class Job(abc.ABC):
 
 
 class RepresentationBuildJob(Job):
+    kind = "representation build"
+
     def __init__(self, model: InferenceModel, source: Path) -> None:
         super().__init__(str(graph_path_for(source)))
         self._model = model
@@ -154,6 +158,8 @@ class RepresentationBuildJob(Job):
 
 
 class GrammarFixJob(Job):
+    kind = "grammar fix"
+
     def __init__(self, model: InferenceModel, source: Path) -> None:
         super().__init__(str(source))
         self._model = model
@@ -211,7 +217,7 @@ def jobs() -> dict[str, Any]:
     """The work in hand: every unfinished job and the file it is queued on."""
     return {
         "jobs": [
-            {"path": job.target, "status": job.status}
+            {"kind": job.kind, "path": job.target, "status": job.status}
             for job in app.state.jobs.queued()
         ]
     }

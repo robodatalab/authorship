@@ -31,6 +31,7 @@ interface ModelStatus {
 }
 
 interface JobStatus {
+	kind: string;
 	path: string;
 	status: string;
 }
@@ -201,16 +202,27 @@ function renderJobs(jobs: JobStatus[] | null): void {
 		const row = document.createElement('div');
 		row.className = 'job';
 
-		const name = document.createElement('span');
-		name.className = 'name';
-		name.textContent = job.path;
-		name.title = job.path;
+		// What the job does, and where it is, on one line; the file it works on
+		// beneath, where a long path has the width to read.
+		const head = document.createElement('div');
+		head.className = 'head';
+
+		const kind = document.createElement('span');
+		kind.className = 'kind';
+		kind.textContent = job.kind;
 
 		const phase = document.createElement('span');
 		phase.className = `phase ${job.status}`;
 		phase.textContent = job.status;
 
-		row.append(name, phase);
+		head.append(kind, phase);
+
+		const name = document.createElement('div');
+		name.className = 'name';
+		name.textContent = job.path;
+		name.title = job.path;
+
+		row.append(head, name);
 		jobsStatus.append(row);
 	}
 }

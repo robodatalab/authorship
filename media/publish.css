@@ -217,21 +217,29 @@ textarea:focus {
 .jobs {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 8px;
 }
 
-.job {
+.job .head {
 	display: flex;
 	align-items: baseline;
 	gap: 8px;
 }
 
-.job .name {
+.job .kind {
 	flex: 1;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.job .name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: calc(var(--vscode-font-size) - 1px);
+	color: var(--vscode-descriptionForeground);
 }
 
 .job .phase {
