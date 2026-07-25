@@ -30,6 +30,7 @@ class RecordingModel:
         self.name = name
         self.unloads = 0
         self._log = log if log is not None else []
+        self.state = mock.Mock(spec=CompletionModelServing)
 
     def unload(self) -> None:
         self.unloads += 1

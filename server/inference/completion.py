@@ -3,7 +3,8 @@ import multiprocessing
 import os
 import threading
 import time
-from typing import Callable
+from contextlib import contextmanager
+from typing import Callable, Generator
 from multiprocessing.queues import Queue
 
 from huggingface_hub import snapshot_download
@@ -39,24 +40,67 @@ class CompletionModelState(abc.ABC):
         pass
 
 
+class CompletionModelResourceManager:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._ready = threading.Condition()
+        self._resident: "CompletionModel | None" = None
+
+    @property
+    def resident(self) -> "CompletionModel | None":
+        return self._resident
+
+    def wake(self) -> None:
+        with self._ready:
+            self._ready.notify_all()
+
+    @contextmanager
+    def residency(self, model: "CompletionModel") -> Generator[None, None, None]:
+        with self._lock:
+            if self._resident is not model:
+                if self._resident is not None:
+                    self._resident.unload()
+                self._resident = model
+            if not isinstance(model.state, CompletionModelServing):
+                model.load()
+                with self._ready:
+                    self._ready.wait_for(
+                        lambda: isinstance(model.state, CompletionModelServing)
+                    )
+            yield
+
+
 class CompletionModel:
-    def __init__(self, model_id: str, prompt_formatter: PromptFormatter) -> None:
+    def __init__(
+        self,
+        model_id: str,
+        prompt_formatter: PromptFormatter,
+        manager: CompletionModelResourceManager,
+    ) -> None:
         self.model_id = model_id
         self.prompt_formatter = prompt_formatter
-        self.state: CompletionModelState = CompletionModelLoading(self, model_id)
+        self.manager = manager
+        self.state: CompletionModelState = CompletionModelUnloaded(model_id)
 
     def set_state(self, state: CompletionModelState) -> None:
+        if type(self.state) is type(state):
+            return
         self.state.cleanup()
         self.state = state
+        self.manager.wake()
 
-    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        return self.state.complete(system, user, max_new_tokens)
-
-    def status(self) -> str:
-        return self.state.status()
+    def load(self) -> None:
+        self.set_state(CompletionModelLoading(self, self.model_id))
 
     def unload(self) -> None:
         self.set_state(CompletionModelUnloaded(self.model_id))
+
+    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
+        with self.manager.residency(self):
+            return self.state.complete(system, user, max_new_tokens)
+
+    def status(self) -> str:
+        return self.state.status()
 
 
 class ModelNotAvailable(Exception):
@@ -72,7 +116,7 @@ class CompletionModelUnloaded(CompletionModelState):
         raise ModelNotAvailable(f"Model {self.model_id} has been unloaded")
 
     def status(self) -> str:
-        return f"Model {self.model_id} unloaded"
+        return "unloaded"
 
     def cleanup(self) -> None:
         pass
