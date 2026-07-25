@@ -108,6 +108,7 @@ class Job(abc.ABC):
         self.target = target
         self.error: str | None = None
         self._cancel = threading.Event()
+        self._begun = threading.Event()
         self._done = threading.Event()
 
     @property
@@ -118,8 +119,18 @@ class Job(abc.ABC):
     def done(self) -> bool:
         return self._done.is_set()
 
+    @property
+    def status(self) -> str:
+        """Waiting for a worker, holding one, or finished with."""
+        if self.done:
+            return "done"
+        return "running" if self._begun.is_set() else "pending"
+
     def cancel(self) -> None:
         self._cancel.set()
+
+    def begin(self) -> None:
+        self._begun.set()
 
     def finish(self) -> None:
         self._done.set()
@@ -180,13 +191,30 @@ class ParallelJobsManager:
         job = self.get(target)
         return job is not None and not job.done
 
+    def queued(self) -> list[Job]:
+        """Every job still waiting for a worker or running on one."""
+        with self._lock:
+            return [job for job in self._by_target.values() if not job.done]
+
     def _run(self, job: Job) -> None:
+        job.begin()
         try:
             job.execute()
         except Exception as err:
             job.error = str(err)
         finally:
             job.finish()
+
+
+@app.get("/jobs")
+def jobs() -> dict[str, Any]:
+    """The work in hand: every unfinished job and the file it is queued on."""
+    return {
+        "jobs": [
+            {"path": job.target, "status": job.status}
+            for job in app.state.jobs.queued()
+        ]
+    }
 
 
 @app.post("/build", status_code=202)

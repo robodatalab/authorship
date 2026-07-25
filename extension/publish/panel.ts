@@ -25,11 +25,11 @@ import {
 /** Where the chosen manuscript is remembered between sessions. */
 const MANUSCRIPT_KEY = 'authorship.publish.manuscript';
 
-/** How often the Status drawer refreshes the model list. */
-const MODEL_POLL_MS = 1500;
+/** How often the status drawers refresh. */
+const STATUS_POLL_MS = 1500;
 
 /** Generous, because loading weights starves the event loop for seconds. */
-const MODEL_REQUEST_TIMEOUT_MS = 10_000;
+const STATUS_REQUEST_TIMEOUT_MS = 10_000;
 
 /** How often a running grammar job is polled for its result. */
 const GRAMMAR_POLL_MS = 1000;
@@ -40,7 +40,7 @@ export class PublishView implements vscode.WebviewViewProvider {
 	/** The manuscript being published, if one has been chosen. */
 	private manuscript?: vscode.Uri;
 
-	/** Refreshes the Status drawer while the view is alive. */
+	/** Refreshes the status drawers while the view is alive. */
 	private pollTimer?: ReturnType<typeof setInterval>;
 
 	constructor(
@@ -103,8 +103,8 @@ export class PublishView implements vscode.WebviewViewProvider {
 			}
 		});
 
-		void this.pollModels();
-		this.pollTimer = setInterval(() => void this.pollModels(), MODEL_POLL_MS);
+		void this.poll();
+		this.pollTimer = setInterval(() => void this.poll(), STATUS_POLL_MS);
 
 		view.onDidDispose(() => {
 			if (this.pollTimer !== undefined) {
@@ -358,14 +358,19 @@ export class PublishView implements vscode.WebviewViewProvider {
 		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
 	}
 
-	/** Poll the server for what is loaded, and paint the Status drawer. */
+	/** Repaint both status drawers from the server. */
+	private async poll(): Promise<void> {
+		await Promise.all([this.pollModels(), this.pollJobs()]);
+	}
+
+	/** Poll the server for what is loaded, and paint the Serving Status drawer. */
 	private async pollModels(): Promise<void> {
 		if (!this.view) {
 			return;
 		}
 		try {
 			const response = await fetch(`http://127.0.0.1:${this.port}/models`, {
-				signal: AbortSignal.timeout(MODEL_REQUEST_TIMEOUT_MS),
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
 			});
 			const body = (await response.json()) as { models: unknown };
 			void this.view.webview.postMessage({ type: 'models', models: body.models });
@@ -374,6 +379,32 @@ export class PublishView implements vscode.WebviewViewProvider {
 			// reading up. Only a refused connection reads as offline.
 			if (!isTimeout(err)) {
 				void this.view.webview.postMessage({ type: 'models', models: null });
+			}
+		}
+	}
+
+	/** Poll the server for the work it has in hand, and paint the Jobs Status drawer. */
+	private async pollJobs(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/jobs`, {
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+			});
+			const body = (await response.json()) as {
+				jobs: { path: string; status: string }[];
+			};
+			const jobs = body.jobs.map((job) => ({
+				// Shown root-relative, like the manuscript name: the panel is narrow,
+				// and the end of the path is the part that names the file.
+				path: vscode.workspace.asRelativePath(vscode.Uri.file(job.path)),
+				status: job.status,
+			}));
+			void this.view.webview.postMessage({ type: 'jobs', jobs });
+		} catch (err) {
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'jobs', jobs: null });
 			}
 		}
 	}
@@ -442,10 +473,16 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div id="utils-status" class="status" hidden></div>
 		</div>
 	</details>
-	<details class="drawer" id="model-status-drawer" open>
-		<summary>Status</summary>
+	<details class="drawer" id="serving-status-drawer" open>
+		<summary>Serving Status</summary>
 		<div class="body">
 			<div id="model-status" class="models"></div>
+		</div>
+	</details>
+	<details class="drawer" id="jobs-status-drawer" open>
+		<summary>Jobs Status</summary>
+		<div class="body">
+			<div id="jobs-status" class="jobs"></div>
 		</div>
 	</details>
 	<script nonce="${nonce}" src="${script}"></script>

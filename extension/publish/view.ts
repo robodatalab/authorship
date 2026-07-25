@@ -30,6 +30,11 @@ interface ModelStatus {
 	resident: boolean;
 }
 
+interface JobStatus {
+	path: string;
+	status: string;
+}
+
 const vscode = acquireVsCodeApi();
 
 const manuscriptName = document.getElementById('manuscript-name') as HTMLElement;
@@ -46,6 +51,7 @@ const status = document.getElementById('status') as HTMLElement;
 const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
+const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
 
 /** How long after the last keystroke the blurb is written. */
 const BLURB_DEBOUNCE_MS = 400;
@@ -174,6 +180,41 @@ function phaseClass(status: string): string {
 	return 'unloaded';
 }
 
+/** null means the server did not answer; a list is the work it has in hand. */
+function renderJobs(jobs: JobStatus[] | null): void {
+	jobsStatus.textContent = '';
+	if (jobs === null) {
+		const offline = document.createElement('div');
+		offline.className = 'offline';
+		offline.textContent = 'Model server offline';
+		jobsStatus.append(offline);
+		return;
+	}
+	if (jobs.length === 0) {
+		const idle = document.createElement('div');
+		idle.className = 'idle';
+		idle.textContent = 'Nothing queued';
+		jobsStatus.append(idle);
+		return;
+	}
+	for (const job of jobs) {
+		const row = document.createElement('div');
+		row.className = 'job';
+
+		const name = document.createElement('span');
+		name.className = 'name';
+		name.textContent = job.path;
+		name.title = job.path;
+
+		const phase = document.createElement('span');
+		phase.className = `phase ${job.status}`;
+		phase.textContent = job.status;
+
+		row.append(name, phase);
+		jobsStatus.append(row);
+	}
+}
+
 window.addEventListener('message', (event) => {
 	const message = event.data;
 	if (message?.type === 'state') {
@@ -185,6 +226,8 @@ window.addEventListener('message', (event) => {
 		setStatus(target, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
+	} else if (message?.type === 'jobs') {
+		renderJobs(message.jobs as JobStatus[] | null);
 	}
 });
 

@@ -241,6 +241,49 @@ class GrammarFix(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class Jobs(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.manuscript = Path(self._dir.name) / "story.md"
+        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+
+        def _restore_model():
+            app.state.grammar_model = None
+
+        self.addCleanup(_restore_model)
+        app.state.jobs = ParallelJobsManager()
+
+    def test_lists_the_work_in_flight_and_drops_it_once_finished(self) -> None:
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "the cat."
+
+        model = build_fake_completion_model()
+        model.complete.side_effect = complete
+        app.state.grammar_model = model
+        client = TestClient(app)
+
+        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        self.assertTrue(entered.acquire(timeout=5))
+
+        response = client.get("/jobs")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"jobs": [{"path": str(self.manuscript), "status": "running"}]},
+        )
+
+        release.set()
+        wait_for_grammar(client, started.json()["id"])
+        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+
+
 class ExportEpub(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()

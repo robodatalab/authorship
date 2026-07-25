@@ -164,7 +164,7 @@ textarea:focus {
 	display: none;
 }
 
-/* The Status drawer: one row per model, the resident marked with a dot. */
+/* The Serving Status drawer: one row per model, the resident marked with a dot. */
 .models {
 	display: flex;
 	flex-direction: column;
@@ -209,5 +209,44 @@ textarea:focus {
 }
 
 .models .offline {
+	color: var(--vscode-errorForeground);
+}
+
+/* The Jobs Status drawer: one row per unfinished job, keyed by the file it
+   works on. */
+.jobs {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.job {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.job .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.job .phase {
+	font-size: calc(var(--vscode-font-size) - 1px);
+	color: var(--vscode-descriptionForeground);
+}
+
+.job .phase.running {
+	color: var(--vscode-charts-green, #89d185);
+}
+
+.jobs .idle {
+	color: var(--vscode-descriptionForeground);
+}
+
+.jobs .offline {
 	color: var(--vscode-errorForeground);
 }
