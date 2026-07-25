@@ -212,6 +212,54 @@ textarea:focus {
 	color: var(--vscode-errorForeground);
 }
 
+/* The Inference Resources drawer: the call holding the GPU, then the calls
+   queued behind it, each with how long it has been in that state. */
+.requests {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.request {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.request .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.request .phase {
+	font-size: calc(var(--vscode-font-size) - 1px);
+}
+
+.request .phase.holding {
+	color: var(--vscode-charts-green, #89d185);
+}
+
+.request .phase.waiting {
+	color: var(--vscode-charts-yellow, #cca700);
+}
+
+.request .elapsed {
+	font-size: calc(var(--vscode-font-size) - 1px);
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+}
+
+.requests .idle {
+	color: var(--vscode-descriptionForeground);
+}
+
+.requests .offline {
+	color: var(--vscode-errorForeground);
+}
+
 /* The Jobs Status drawer: one row per unfinished job, keyed by the file it
    works on. */
 .jobs {

@@ -36,6 +36,16 @@ interface JobStatus {
 	status: string;
 }
 
+interface ResidencyRequest {
+	model: string;
+	seconds: number;
+}
+
+interface Residency {
+	holding: ResidencyRequest | null;
+	waiting: ResidencyRequest[];
+}
+
 const vscode = acquireVsCodeApi();
 
 const manuscriptName = document.getElementById('manuscript-name') as HTMLElement;
@@ -52,6 +62,7 @@ const status = document.getElementById('status') as HTMLElement;
 const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
+const residency = document.getElementById('residency') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
 
 /** How long after the last keystroke the blurb is written. */
@@ -181,6 +192,61 @@ function phaseClass(status: string): string {
 	return 'unloaded';
 }
 
+/** null means the server did not answer; otherwise the GPU's holder and its queue. */
+function renderResidency(state: Residency | null): void {
+	residency.textContent = '';
+	if (state === null) {
+		const offline = document.createElement('div');
+		offline.className = 'offline';
+		offline.textContent = 'Model server offline';
+		residency.append(offline);
+		return;
+	}
+	if (state.holding === null && state.waiting.length === 0) {
+		const idle = document.createElement('div');
+		idle.className = 'idle';
+		idle.textContent = 'Nobody is using the GPU';
+		residency.append(idle);
+		return;
+	}
+	if (state.holding !== null) {
+		residency.append(requestRow(state.holding, 'holding'));
+	}
+	for (const queued of state.waiting) {
+		residency.append(requestRow(queued, 'waiting'));
+	}
+}
+
+function requestRow(request: ResidencyRequest, state: string): HTMLElement {
+	const row = document.createElement('div');
+	row.className = 'request';
+
+	const name = document.createElement('span');
+	name.className = 'name';
+	name.textContent = request.model;
+	name.title = request.model;
+
+	const phase = document.createElement('span');
+	phase.className = `phase ${state}`;
+	phase.textContent = state;
+
+	const elapsed = document.createElement('span');
+	elapsed.className = 'elapsed';
+	elapsed.textContent = duration(request.seconds);
+
+	row.append(name, phase, elapsed);
+	return row;
+}
+
+/** Whole seconds under a minute, then minutes and seconds. */
+function duration(seconds: number): string {
+	const whole = Math.floor(seconds);
+	if (whole < 60) {
+		return `${whole}s`;
+	}
+	return `${Math.floor(whole / 60)}m ${whole % 60}s`;
+}
+
 /** null means the server did not answer; a list is the work it has in hand. */
 function renderJobs(jobs: JobStatus[] | null): void {
 	jobsStatus.textContent = '';
@@ -238,6 +304,8 @@ window.addEventListener('message', (event) => {
 		setStatus(target, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
+	} else if (message?.type === 'residency') {
+		renderResidency(message.residency as Residency | null);
 	} else if (message?.type === 'jobs') {
 		renderJobs(message.jobs as JobStatus[] | null);
 	}

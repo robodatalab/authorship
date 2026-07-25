@@ -28,6 +28,7 @@ def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool
 class RecordingModel:
     def __init__(self, name: str, log: list | None = None) -> None:
         self.name = name
+        self.model_id = name
         self.unloads = 0
         self._log = log if log is not None else []
         self.state = mock.Mock(spec=InferenceModelServing)
@@ -137,11 +138,19 @@ class WaitingForCompletion(unittest.TestCase):
         complete_patcher = mock.patch.object(
             InferenceModelServing, "complete", return_value=REPLY
         )
+        # Freeing the weights reaches for the GPU, which the tests run without.
+        cleanup_patcher = mock.patch.object(InferenceModelServing, "cleanup")
 
         self.process = process_patcher.start()
         tokenizer_patcher.start()
         complete_patcher.start()
-        for patcher in (process_patcher, tokenizer_patcher, complete_patcher):
+        cleanup_patcher.start()
+        for patcher in (
+            process_patcher,
+            tokenizer_patcher,
+            complete_patcher,
+            cleanup_patcher,
+        ):
             self.addCleanup(patcher.stop)
 
     def test_complete_blocks_until_the_model_finishes_loading(self) -> None:
@@ -168,6 +177,58 @@ class WaitingForCompletion(unittest.TestCase):
         caller.join(timeout=2.0)
         self.assertEqual(reply["value"], REPLY)
         self.assertIsInstance(model.state, InferenceModelServing)
+
+    def test_a_call_for_another_model_queues_and_takes_the_slot_when_it_frees(
+        self,
+    ) -> None:
+        manager = InferenceModelResourceManager()
+        first = InferenceModel("first-model", mock.Mock(), manager)
+        second = InferenceModel("second-model", mock.Mock(), manager)
+
+        replies: dict[str, str] = {}
+
+        def call_first() -> None:
+            replies["first"] = first.complete("system", "user", 8)
+
+        def call_second() -> None:
+            replies["second"] = second.complete("system", "user", 8)
+
+        first_caller = threading.Thread(target=call_first)
+        first_caller.start()
+        self.assertTrue(
+            wait_until(lambda: isinstance(first.state, InferenceModelLoading))
+        )
+
+        second_caller = threading.Thread(target=call_second)
+        second_caller.start()
+        self.assertTrue(wait_until(lambda: len(manager.waiting) == 1))
+
+        # The first call holds the slot while its model loads, so the second has
+        # not started loading anything of its own.
+        holding = manager.holding
+        assert holding is not None
+        self.assertEqual(holding.model_id, "first-model")
+        self.assertEqual(
+            [request.model_id for request in manager.waiting], ["second-model"]
+        )
+        self.assertIs(manager.resident, first)
+        self.assertEqual(second.status(), "unloaded")
+
+        first.state.downloaded.put(DOWNLOADED)
+        first_caller.join(timeout=2.0)
+        self.assertEqual(replies["first"], REPLY)
+
+        # With the slot free the queued call takes it, and loads its own model.
+        self.assertTrue(
+            wait_until(lambda: isinstance(second.state, InferenceModelLoading))
+        )
+        self.assertIs(manager.resident, second)
+        self.assertEqual(manager.waiting, [])
+
+        second.state.downloaded.put(DOWNLOADED)
+        second_caller.join(timeout=2.0)
+        self.assertEqual(replies["second"], REPLY)
+        self.assertIsNone(manager.holding)
 
     def test_a_second_completion_reuses_the_loaded_model(self) -> None:
         manager = InferenceModelResourceManager()

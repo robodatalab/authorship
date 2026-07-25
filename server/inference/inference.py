@@ -38,15 +38,46 @@ class InferenceModelState(abc.ABC):
         pass
 
 
+class ResidencyRequest:
+    """One call's claim on the GPU: queued for it, or holding it and working."""
+
+    def __init__(self, model_id: str) -> None:
+        self.model_id = model_id
+        self._since = time.monotonic()
+
+    @property
+    def elapsed(self) -> float:
+        """How long it has been in its current state — waiting, or holding."""
+        return time.monotonic() - self._since
+
+    def restamp(self) -> None:
+        self._since = time.monotonic()
+
+
 class InferenceModelResourceManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._ready = threading.Condition()
         self._resident: "InferenceModel | None" = None
+        # The queue is a record of who is asking, not the thing that decides
+        # who goes next — `_lock` still does that.
+        self._queue = threading.Lock()
+        self._waiting: list[ResidencyRequest] = []
+        self._holding: ResidencyRequest | None = None
 
     @property
     def resident(self) -> "InferenceModel | None":
         return self._resident
+
+    @property
+    def holding(self) -> ResidencyRequest | None:
+        with self._queue:
+            return self._holding
+
+    @property
+    def waiting(self) -> list[ResidencyRequest]:
+        with self._queue:
+            return list(self._waiting)
 
     def wake(self) -> None:
         with self._ready:
@@ -54,18 +85,29 @@ class InferenceModelResourceManager:
 
     @contextmanager
     def residency(self, model: "InferenceModel") -> Generator[None, None, None]:
+        request = ResidencyRequest(model.model_id)
+        with self._queue:
+            self._waiting.append(request)
         with self._lock:
-            if self._resident is not model:
-                if self._resident is not None:
-                    self._resident.unload()
-                self._resident = model
-            if not isinstance(model.state, InferenceModelServing):
-                model.load()
-                with self._ready:
-                    self._ready.wait_for(
-                        lambda: isinstance(model.state, InferenceModelServing)
-                    )
-            yield
+            with self._queue:
+                self._waiting.remove(request)
+                request.restamp()
+                self._holding = request
+            try:
+                if self._resident is not model:
+                    if self._resident is not None:
+                        self._resident.unload()
+                    self._resident = model
+                if not isinstance(model.state, InferenceModelServing):
+                    model.load()
+                    with self._ready:
+                        self._ready.wait_for(
+                            lambda: isinstance(model.state, InferenceModelServing)
+                        )
+                yield
+            finally:
+                with self._queue:
+                    self._holding = None
 
 
 class InferenceModel:

@@ -358,9 +358,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
 	}
 
-	/** Repaint both status drawers from the server. */
+	/** Repaint the status drawers from the server. */
 	private async poll(): Promise<void> {
-		await Promise.all([this.pollModels(), this.pollJobs()]);
+		await Promise.all([this.pollModels(), this.pollResidency(), this.pollJobs()]);
 	}
 
 	/** Poll the server for what is loaded, and paint the Serving Status drawer. */
@@ -379,6 +379,24 @@ export class PublishView implements vscode.WebviewViewProvider {
 			// reading up. Only a refused connection reads as offline.
 			if (!isTimeout(err)) {
 				void this.view.webview.postMessage({ type: 'models', models: null });
+			}
+		}
+	}
+
+	/** Poll the GPU's queue, and paint the Inference Resources drawer. */
+	private async pollResidency(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/residency`, {
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+			});
+			const residency = await response.json();
+			void this.view.webview.postMessage({ type: 'residency', residency });
+		} catch (err) {
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'residency', residency: null });
 			}
 		}
 	}
@@ -478,6 +496,12 @@ export class PublishView implements vscode.WebviewViewProvider {
 		<summary>Serving Status</summary>
 		<div class="body">
 			<div id="model-status" class="models"></div>
+		</div>
+	</details>
+	<details class="drawer" id="inference-resources-drawer" open>
+		<summary>Inference Resources</summary>
+		<div class="body">
+			<div id="residency" class="requests"></div>
 		</div>
 	</details>
 	<details class="drawer" id="jobs-status-drawer" open>

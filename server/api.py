@@ -80,6 +80,24 @@ def models() -> dict[str, Any]:
     }
 
 
+@app.get("/residency")
+def residency() -> dict[str, Any]:
+    """Who holds the GPU, and the calls queued behind them."""
+    manager = app.state.models
+    holding = manager.holding
+    return {
+        "holding": (
+            None
+            if holding is None
+            else {"model": holding.model_id, "seconds": holding.elapsed}
+        ),
+        "waiting": [
+            {"model": request.model_id, "seconds": request.elapsed}
+            for request in manager.waiting
+        ],
+    }
+
+
 class RepresentationBuildRequest(BaseModel):
     # Path of the document
     path: str
