@@ -5,3 +5,8 @@ def qwen_chat_prompt(system: str, user: str) -> str:
         f"<|im_start|>user\n{user}<|im_end|>\n"
         f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
     )
+
+
+def coedit_prompt(instruction: str, text: str) -> str:
+    """CoEdIT reads a task instruction followed by the text to edit."""
+    return f"{instruction}: {text}"

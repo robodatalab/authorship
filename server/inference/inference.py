@@ -4,29 +4,27 @@ import os
 import threading
 import time
 from contextlib import contextmanager
-from typing import Callable, Generator
+from typing import Generator
 from multiprocessing.queues import Queue
 
 from huggingface_hub import snapshot_download
 from server import log
-from server.inference.monitoring import reporting_tqdm, TextStreamerProgressMonitor
-from server.inference.utils import qwen_chat_prompt
+from server.inference.kinds import ModelKind
+from server.inference.monitoring import reporting_tqdm
 import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    PreTrainedTokenizerBase,
-)
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 _log = log.logger(__name__)
 os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
-MODEL = "Qwen/Qwen3.5-4B"
 DOWNLOADED = "downloaded"
-PromptFormatter = Callable[[str, str], str]
 
 
-class CompletionModelState(abc.ABC):
+class ModelNotAvailable(Exception):
+    pass
+
+
+class InferenceModelState(abc.ABC):
     @abc.abstractmethod
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
         pass
@@ -40,14 +38,14 @@ class CompletionModelState(abc.ABC):
         pass
 
 
-class CompletionModelResourceManager:
+class InferenceModelResourceManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._ready = threading.Condition()
-        self._resident: "CompletionModel | None" = None
+        self._resident: "InferenceModel | None" = None
 
     @property
-    def resident(self) -> "CompletionModel | None":
+    def resident(self) -> "InferenceModel | None":
         return self._resident
 
     def wake(self) -> None:
@@ -55,34 +53,34 @@ class CompletionModelResourceManager:
             self._ready.notify_all()
 
     @contextmanager
-    def residency(self, model: "CompletionModel") -> Generator[None, None, None]:
+    def residency(self, model: "InferenceModel") -> Generator[None, None, None]:
         with self._lock:
             if self._resident is not model:
                 if self._resident is not None:
                     self._resident.unload()
                 self._resident = model
-            if not isinstance(model.state, CompletionModelServing):
+            if not isinstance(model.state, InferenceModelServing):
                 model.load()
                 with self._ready:
                     self._ready.wait_for(
-                        lambda: isinstance(model.state, CompletionModelServing)
+                        lambda: isinstance(model.state, InferenceModelServing)
                     )
             yield
 
 
-class CompletionModel:
+class InferenceModel:
     def __init__(
         self,
         model_id: str,
-        prompt_formatter: PromptFormatter,
-        manager: CompletionModelResourceManager,
+        kind: ModelKind,
+        manager: InferenceModelResourceManager,
     ) -> None:
         self.model_id = model_id
-        self.prompt_formatter = prompt_formatter
+        self.kind = kind
         self.manager = manager
-        self.state: CompletionModelState = CompletionModelUnloaded(model_id)
+        self.state: InferenceModelState = InferenceModelUnloaded(model_id)
 
-    def set_state(self, state: CompletionModelState) -> None:
+    def set_state(self, state: InferenceModelState) -> None:
         if type(self.state) is type(state):
             return
         self.state.cleanup()
@@ -90,10 +88,10 @@ class CompletionModel:
         self.manager.wake()
 
     def load(self) -> None:
-        self.set_state(CompletionModelLoading(self, self.model_id))
+        self.set_state(InferenceModelLoading(self, self.model_id))
 
     def unload(self) -> None:
-        self.set_state(CompletionModelUnloaded(self.model_id))
+        self.set_state(InferenceModelUnloaded(self.model_id))
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
         with self.manager.residency(self):
@@ -103,12 +101,7 @@ class CompletionModel:
         return self.state.status()
 
 
-class ModelNotAvailable(Exception):
-    pass
-
-
-class CompletionModelUnloaded(CompletionModelState):
-
+class InferenceModelUnloaded(InferenceModelState):
     def __init__(self, model_id: str) -> None:
         self.model_id = model_id
 
@@ -122,8 +115,8 @@ class CompletionModelUnloaded(CompletionModelState):
         pass
 
 
-class CompletionModelLoading(CompletionModelState):
-    def __init__(self, controller: CompletionModel, model_id: str) -> None:
+class InferenceModelLoading(InferenceModelState):
+    def __init__(self, controller: InferenceModel, model_id: str) -> None:
         self.controller = controller
         self.model_id = model_id
         self.progress = 0.0
@@ -146,7 +139,7 @@ class CompletionModelLoading(CompletionModelState):
         self.download_process.join()
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        raise ModelNotAvailable(f"Completion model '{self.model_id}' is loading")
+        raise ModelNotAvailable(f"Inference model '{self.model_id}' is loading")
 
     def status(self) -> str:
         return f"{self.model_id}: {self.progress:.0%} downloaded"
@@ -162,7 +155,7 @@ def download_process_main(signal: Queue[float | str], model_id: str) -> None:
     signal.put(DOWNLOADED)
 
 
-def monitor_thread_main(loading: CompletionModelLoading, model_id: str) -> None:
+def monitor_thread_main(loading: InferenceModelLoading, model_id: str) -> None:
     """Track the download's progress, then load the model in this process."""
     while True:
         message = loading.downloaded.get()
@@ -171,21 +164,17 @@ def monitor_thread_main(loading: CompletionModelLoading, model_id: str) -> None:
         loading.progress = float(message)
 
     _log.info("download complete, loading %s in-process", model_id)
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id, dtype=torch.bfloat16, device_map="mps"
-    )
-    model.eval()
-
     controller = loading.controller
-    controller.set_state(CompletionModelServing(controller, model, tokenizer))
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = controller.kind.load(model_id)
+    controller.set_state(InferenceModelServing(controller, model, tokenizer))
 
 
-class CompletionModelServing(CompletionModelState):
+class InferenceModelServing(InferenceModelState):
     def __init__(
-        self, 
-        controller: CompletionModel, 
-        model, 
+        self,
+        controller: InferenceModel,
+        model,
         tokenizer: PreTrainedTokenizerBase,
     ) -> None:
         self.controller = controller
@@ -193,37 +182,9 @@ class CompletionModelServing(CompletionModelState):
         self.tokenizer = tokenizer
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        prompt = self.controller.prompt_formatter(system, user)
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        prompt_tokens = int(inputs["input_ids"].shape[-1])
-
-        _log.info(
-            "generating: %d prompt tokens, up to %d new", prompt_tokens, max_new_tokens
+        return self.controller.kind.complete(
+            self.model, self.tokenizer, system, user, max_new_tokens
         )
-        started = time.monotonic()
-
-        streamer = TextStreamerProgressMonitor(self.tokenizer, max_new_tokens)
-        output = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            streamer=streamer,
-        )
-
-        generated = int(output[0].shape[-1]) - prompt_tokens
-        elapsed = time.monotonic() - started
-        _log.info(
-            "generated %d tokens in %.1fs (%.1f tok/s)%s",
-            generated,
-            elapsed,
-            generated / elapsed if elapsed else 0.0,
-            " — hit the budget" if generated >= max_new_tokens else "",
-        )
-
-        text = self.tokenizer.decode(
-            output[0][prompt_tokens:], skip_special_tokens=True
-        )
-        return text if isinstance(text, str) else "".join(text)
 
     def status(self) -> str:
         return "serving"

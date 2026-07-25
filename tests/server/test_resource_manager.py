@@ -3,13 +3,13 @@ import time
 import unittest
 from unittest import mock
 
-from server.inference import completion
-from server.inference.completion import (
+from server.inference import inference
+from server.inference.inference import (
     DOWNLOADED,
-    CompletionModel,
-    CompletionModelLoading,
-    CompletionModelResourceManager,
-    CompletionModelServing,
+    InferenceModel,
+    InferenceModelLoading,
+    InferenceModelResourceManager,
+    InferenceModelServing,
 )
 
 MODEL_ID = "test-org/test-model"
@@ -30,7 +30,7 @@ class RecordingModel:
         self.name = name
         self.unloads = 0
         self._log = log if log is not None else []
-        self.state = mock.Mock(spec=CompletionModelServing)
+        self.state = mock.Mock(spec=InferenceModelServing)
 
     def unload(self) -> None:
         self.unloads += 1
@@ -42,7 +42,7 @@ class RecordingModel:
 
 class ResourceManagerResidency(unittest.TestCase):
     def test_taking_residency_makes_the_model_resident(self) -> None:
-        manager = CompletionModelResourceManager()
+        manager = InferenceModelResourceManager()
         model = RecordingModel("only")
 
         self.assertIsNone(manager.resident)
@@ -52,7 +52,7 @@ class ResourceManagerResidency(unittest.TestCase):
         self.assertEqual(model.unloads, 0)
 
     def test_reusing_the_resident_does_not_evict_it(self) -> None:
-        manager = CompletionModelResourceManager()
+        manager = InferenceModelResourceManager()
         model = RecordingModel("only")
 
         with manager.residency(model):
@@ -64,7 +64,7 @@ class ResourceManagerResidency(unittest.TestCase):
         self.assertIs(manager.resident, model)
 
     def test_switching_models_evicts_the_previous_one(self) -> None:
-        manager = CompletionModelResourceManager()
+        manager = InferenceModelResourceManager()
         first, second = RecordingModel("first"), RecordingModel("second")
 
         with manager.residency(first):
@@ -77,7 +77,7 @@ class ResourceManagerResidency(unittest.TestCase):
         self.assertIs(manager.resident, second)
 
     def test_the_previous_model_is_unloaded_before_the_new_takes_the_slot(self) -> None:
-        manager = CompletionModelResourceManager()
+        manager = InferenceModelResourceManager()
         log: list = []
         first, second = RecordingModel("first", log), RecordingModel("second", log)
 
@@ -94,7 +94,7 @@ class ResourceManagerResidency(unittest.TestCase):
 
 class ResourceManagerMutualExclusion(unittest.TestCase):
     def test_a_second_caller_waits_until_the_first_releases_the_slot(self) -> None:
-        manager = CompletionModelResourceManager()
+        manager = InferenceModelResourceManager()
         first, second = RecordingModel("first"), RecordingModel("second")
 
         holding = threading.Event()
@@ -132,28 +132,21 @@ class ResourceManagerMutualExclusion(unittest.TestCase):
 
 class WaitingForCompletion(unittest.TestCase):
     def setUp(self) -> None:
-        process_patcher = mock.patch.object(completion.multiprocessing, "Process")
-        tokenizer_patcher = mock.patch.object(completion, "AutoTokenizer")
-        model_patcher = mock.patch.object(completion, "AutoModelForCausalLM")
+        process_patcher = mock.patch.object(inference.multiprocessing, "Process")
+        tokenizer_patcher = mock.patch.object(inference, "AutoTokenizer")
         complete_patcher = mock.patch.object(
-            CompletionModelServing, "complete", return_value=REPLY
+            InferenceModelServing, "complete", return_value=REPLY
         )
 
         self.process = process_patcher.start()
         tokenizer_patcher.start()
-        model_patcher.start()
         complete_patcher.start()
-        for patcher in (
-            process_patcher,
-            tokenizer_patcher,
-            model_patcher,
-            complete_patcher,
-        ):
+        for patcher in (process_patcher, tokenizer_patcher, complete_patcher):
             self.addCleanup(patcher.stop)
 
     def test_complete_blocks_until_the_model_finishes_loading(self) -> None:
-        manager = CompletionModelResourceManager()
-        model = CompletionModel(MODEL_ID, mock.Mock(), manager)
+        manager = InferenceModelResourceManager()
+        model = InferenceModel(MODEL_ID, mock.Mock(), manager)
 
         reply: dict[str, str] = {}
 
@@ -164,7 +157,7 @@ class WaitingForCompletion(unittest.TestCase):
         caller.start()
 
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelLoading))
+            wait_until(lambda: isinstance(model.state, InferenceModelLoading))
         )
         self.assertIs(manager.resident, model)
         self.assertFalse(wait_until(lambda: not caller.is_alive(), timeout=0.2))
@@ -174,22 +167,22 @@ class WaitingForCompletion(unittest.TestCase):
 
         caller.join(timeout=2.0)
         self.assertEqual(reply["value"], REPLY)
-        self.assertIsInstance(model.state, CompletionModelServing)
+        self.assertIsInstance(model.state, InferenceModelServing)
 
     def test_a_second_completion_reuses_the_loaded_model(self) -> None:
-        manager = CompletionModelResourceManager()
-        model = CompletionModel(MODEL_ID, mock.Mock(), manager)
+        manager = InferenceModelResourceManager()
+        model = InferenceModel(MODEL_ID, mock.Mock(), manager)
 
         model.load()
         model.state.downloaded.put(DOWNLOADED)
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+            wait_until(lambda: isinstance(model.state, InferenceModelServing))
         )
         loads = self.process.call_count
 
         self.assertEqual(model.complete("system", "user", 8), REPLY)
         self.assertEqual(model.complete("system", "user", 8), REPLY)
-        self.assertIsInstance(model.state, CompletionModelServing)
+        self.assertIsInstance(model.state, InferenceModelServing)
         self.assertEqual(self.process.call_count, loads)
 
 

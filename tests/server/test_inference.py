@@ -2,14 +2,15 @@ import time
 import unittest
 from unittest import mock
 
-from server.inference import completion
-from server.inference.completion import (
+from server.inference import inference, kinds
+from server.inference.inference import (
     DOWNLOADED,
-    CompletionModel,
-    CompletionModelLoading,
-    CompletionModelServing,
-    CompletionModelUnloaded,
+    InferenceModel,
+    InferenceModelLoading,
+    InferenceModelServing,
+    InferenceModelUnloaded,
 )
+from server.inference.kinds import CausalModel
 
 MODEL_ID = "test-org/test-model"
 PROMPT_TOKENS = 5
@@ -87,13 +88,13 @@ class FakeModel:
         return [FakeTensor(self._total_tokens)]
 
 
-class CompletionModelStateMachine(unittest.TestCase):
+class InferenceModelStateMachine(unittest.TestCase):
     def setUp(self) -> None:
         process_patcher = mock.patch.object(
-            completion.multiprocessing, "Process", FakeProcess
+            inference.multiprocessing, "Process", FakeProcess
         )
-        tokenizer_patcher = mock.patch.object(completion, "AutoTokenizer")
-        model_patcher = mock.patch.object(completion, "AutoModelForCausalLM")
+        tokenizer_patcher = mock.patch.object(inference, "AutoTokenizer")
+        model_patcher = mock.patch.object(kinds, "AutoModelForCausalLM")
         empty_cache_patcher = mock.patch("torch.mps.empty_cache")
 
         process_patcher.start()
@@ -112,15 +113,15 @@ class CompletionModelStateMachine(unittest.TestCase):
         auto_model.from_pretrained.return_value = FakeModel(TOTAL_TOKENS)
 
     def test_a_new_model_starts_unloaded(self) -> None:
-        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
-        self.assertIsInstance(model.state, CompletionModelUnloaded)
+        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
+        self.assertIsInstance(model.state, InferenceModelUnloaded)
         self.assertEqual(model.status(), "unloaded")
 
     def test_loading_reports_download_progress(self) -> None:
-        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
         model.load()
         loading = model.state
-        assert isinstance(loading, CompletionModelLoading)
+        assert isinstance(loading, InferenceModelLoading)
 
         self.assertEqual(model.status(), f"{MODEL_ID}: 0% downloaded")
 
@@ -135,46 +136,46 @@ class CompletionModelStateMachine(unittest.TestCase):
         )
 
     def test_loading_reaches_serving_when_the_download_finishes(self) -> None:
-        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
         model.load()
         model.state.downloaded.put(DOWNLOADED)
 
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+            wait_until(lambda: isinstance(model.state, InferenceModelServing))
         )
         self.assertEqual(model.status(), "serving")
 
     def test_a_serving_model_generates_the_reply(self) -> None:
-        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
         model.load()
         model.state.downloaded.put(DOWNLOADED)
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+            wait_until(lambda: isinstance(model.state, InferenceModelServing))
         )
 
         serving = model.state
-        assert isinstance(serving, CompletionModelServing)
+        assert isinstance(serving, InferenceModelServing)
         self.assertEqual(serving.complete("system", "user", 16), REPLY)
 
     def test_an_unloaded_model_can_be_loaded_again(self) -> None:
-        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
         model.load()
         model.state.downloaded.put(DOWNLOADED)
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+            wait_until(lambda: isinstance(model.state, InferenceModelServing))
         )
 
         model.unload()
-        self.assertIsInstance(model.state, CompletionModelUnloaded)
+        self.assertIsInstance(model.state, InferenceModelUnloaded)
 
         model.load()
         model.state.downloaded.put(DOWNLOADED)
         self.assertTrue(
-            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+            wait_until(lambda: isinstance(model.state, InferenceModelServing))
         )
 
         serving = model.state
-        assert isinstance(serving, CompletionModelServing)
+        assert isinstance(serving, InferenceModelServing)
         self.assertEqual(serving.complete("system", "user", 16), REPLY)
 
 

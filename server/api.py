@@ -1,11 +1,10 @@
 """Backend API."""
 
 import threading
-from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import tenacity
 from fastapi import FastAPI, HTTPException
@@ -14,13 +13,13 @@ from pydantic import BaseModel
 from server import log
 from server.epub_exporter import build_epub
 from server.grammar import fix_grammar
-from server.inference.completion import (
-    MODEL,
-    CompletionModel,
-    CompletionModelResourceManager,
+from server.inference.inference import (
+    InferenceModel,
+    InferenceModelResourceManager,
     ModelNotAvailable,
 )
-from server.inference.utils import qwen_chat_prompt
+from server.inference.kinds import CausalModel, Seq2SeqModel
+from server.inference.utils import coedit_prompt, qwen_chat_prompt
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -32,15 +31,21 @@ from server.story_graph import to_yaml
 _log = log.logger(__name__)
 
 
+CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
+GRAMMAR_MODEL = "grammarly/coedit-xl"
+
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    _log.info("Starting a CompletionModel")
-    app.state.models = CompletionModelResourceManager()
-    app.state.completion_model = CompletionModel(
-        MODEL, qwen_chat_prompt, app.state.models
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    _log.info("Starting the completion models")
+    app.state.models = InferenceModelResourceManager()
+    app.state.completion_model = InferenceModel(
+        CLASSIFIER_MODEL, CausalModel(qwen_chat_prompt), app.state.models
+    )
+    app.state.grammar_model = InferenceModel(
+        GRAMMAR_MODEL, Seq2SeqModel(coedit_prompt), app.state.models
     )
     app.state.jobs = ParallelBuildJobsManager()
-    _log.info("CompletionModel created")
+    _log.info("Completion models created")
 
     _log.info("Yielding control to FastAPI server")
     yield
@@ -84,7 +89,7 @@ class BuildJob:
     def __init__(
         self,
         path: str,
-        model: CompletionModel,
+        model: InferenceModel,
         markdown: str,
         jobs_manager: "ParallelBuildJobsManager",
     ) -> None:
@@ -119,7 +124,7 @@ class ParallelBuildJobsManager:
         self._by_path: dict[str, BuildJob] = {}
         self._lock = threading.Lock()
 
-    def start(self, path: str, model: CompletionModel, markdown: str) -> BuildJob:
+    def start(self, path: str, model: InferenceModel, markdown: str) -> BuildJob:
         job = BuildJob(path, model, markdown, self)
         with self._lock:
             superseded = self._by_path.get(path)
@@ -210,7 +215,7 @@ def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
         )
 
     try:
-        corrected = fix_grammar(app.state.completion_model, document.read_text())
+        corrected = fix_grammar(app.state.grammar_model, document.read_text())
     except ModelNotAvailable as err:
         raise HTTPException(status_code=503, detail=str(err))
     return {"text": corrected}

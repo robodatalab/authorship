@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelBuildJobsManager
-from server.inference.completion import ModelNotAvailable
+from server.inference.inference import ModelNotAvailable
 
 
 DEFAULT_REPLY = (
