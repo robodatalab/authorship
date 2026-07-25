@@ -24,6 +24,12 @@ interface StateMessage {
 	blurb: string;
 }
 
+interface ModelStatus {
+	model: string;
+	status: string;
+	resident: boolean;
+}
+
 const vscode = acquireVsCodeApi();
 
 const manuscriptName = document.getElementById('manuscript-name') as HTMLElement;
@@ -39,6 +45,7 @@ const exportButton = document.getElementById('export') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLElement;
 const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
+const modelStatus = document.getElementById('model-status') as HTMLElement;
 
 /** How long after the last keystroke the blurb is written. */
 const BLURB_DEBOUNCE_MS = 400;
@@ -123,6 +130,50 @@ function baseName(p: string): string {
 	return p.split(/[\\/]/).pop() ?? p;
 }
 
+/** null means the server did not answer; a list is its models and which is resident. */
+function renderModels(models: ModelStatus[] | null): void {
+	modelStatus.textContent = '';
+	if (models === null) {
+		const offline = document.createElement('div');
+		offline.className = 'offline';
+		offline.textContent = 'Model server offline';
+		modelStatus.append(offline);
+		return;
+	}
+	for (const m of models) {
+		const row = document.createElement('div');
+		row.className = m.resident ? 'model resident' : 'model';
+
+		const name = document.createElement('span');
+		name.className = 'name';
+		name.textContent = m.model;
+		name.title = m.model;
+
+		const phase = document.createElement('span');
+		phase.className = `phase ${phaseClass(m.status)}`;
+		phase.textContent = phaseText(m.status);
+
+		row.append(name, phase);
+		modelStatus.append(row);
+	}
+}
+
+/** The server prefixes the model id onto its download progress; drop it here. */
+function phaseText(status: string): string {
+	const progress = status.match(/\d+% downloaded/);
+	return progress ? progress[0] : status;
+}
+
+function phaseClass(status: string): string {
+	if (status === 'serving') {
+		return 'serving';
+	}
+	if (status.includes('downloaded')) {
+		return 'downloading';
+	}
+	return 'unloaded';
+}
+
 window.addEventListener('message', (event) => {
 	const message = event.data;
 	if (message?.type === 'state') {
@@ -132,6 +183,8 @@ window.addEventListener('message', (event) => {
 	} else if (message?.type === 'status') {
 		const target = message.scope === 'utils' ? utilsStatus : status;
 		setStatus(target, String(message.message ?? ''), Boolean(message.error));
+	} else if (message?.type === 'models') {
+		renderModels(message.models as ModelStatus[] | null);
 	}
 });
 

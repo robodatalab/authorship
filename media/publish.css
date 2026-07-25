@@ -163,3 +163,51 @@ textarea:focus {
 .status[hidden] {
 	display: none;
 }
+
+/* The Status drawer: one row per model, the resident marked with a dot. */
+.models {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.model {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.model .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.model.resident .name {
+	color: var(--vscode-foreground);
+}
+
+.model.resident .name::before {
+	content: "\25CF\00A0";
+	color: var(--vscode-foreground);
+}
+
+.model .phase {
+	font-size: calc(var(--vscode-font-size) - 1px);
+	color: var(--vscode-descriptionForeground);
+}
+
+.model .phase.serving {
+	color: var(--vscode-charts-green, #89d185);
+}
+
+.model .phase.downloading {
+	color: var(--vscode-charts-yellow, #cca700);
+}
+
+.models .offline {
+	color: var(--vscode-errorForeground);
+}

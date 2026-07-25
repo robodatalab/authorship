@@ -35,7 +35,7 @@ CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
 GRAMMAR_MODEL = "grammarly/coedit-xl"
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager()
     app.state.completion_model = InferenceModel(
@@ -44,6 +44,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.grammar_model = InferenceModel(
         GRAMMAR_MODEL, Seq2SeqModel(coedit_prompt), app.state.models
     )
+    app.state.inference_models = [
+        app.state.completion_model,
+        app.state.grammar_model,
+    ]
     app.state.jobs = ParallelBuildJobsManager()
     _log.info("Completion models created")
 
@@ -58,9 +62,22 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Is the application healthy and ready to serve traffic"""
-    inference_server_status = app.state.completion_model.status()
+    resident = app.state.models.resident
+    status = resident.status() if resident is not None else "unloaded"
     return {
-        "inference_server_status": inference_server_status,
+        "inference_server_status": status,
+    }
+
+
+@app.get("/models")
+def models() -> dict[str, Any]:
+    """Every inference model and which one currently holds the GPU."""
+    resident = app.state.models.resident
+    return {
+        "models": [
+            {"model": m.model_id, "status": m.status(), "resident": m is resident}
+            for m in app.state.inference_models
+        ]
     }
 
 

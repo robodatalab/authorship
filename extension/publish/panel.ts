@@ -25,11 +25,20 @@ import {
 /** Where the chosen manuscript is remembered between sessions. */
 const MANUSCRIPT_KEY = 'authorship.publish.manuscript';
 
+/** How often the Status drawer refreshes the model list. */
+const MODEL_POLL_MS = 1500;
+
+/** Generous, because loading weights starves the event loop for seconds. */
+const MODEL_REQUEST_TIMEOUT_MS = 10_000;
+
 export class PublishView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
 
 	/** The manuscript being published, if one has been chosen. */
 	private manuscript?: vscode.Uri;
+
+	/** Refreshes the Status drawer while the view is alive. */
+	private pollTimer?: ReturnType<typeof setInterval>;
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
@@ -91,7 +100,14 @@ export class PublishView implements vscode.WebviewViewProvider {
 			}
 		});
 
+		void this.pollModels();
+		this.pollTimer = setInterval(() => void this.pollModels(), MODEL_POLL_MS);
+
 		view.onDidDispose(() => {
+			if (this.pollTimer !== undefined) {
+				clearInterval(this.pollTimer);
+				this.pollTimer = undefined;
+			}
 			this.view = undefined;
 		});
 	}
@@ -314,6 +330,26 @@ export class PublishView implements vscode.WebviewViewProvider {
 		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
 	}
 
+	/** Poll the server for what is loaded, and paint the Status drawer. */
+	private async pollModels(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/models`, {
+				signal: AbortSignal.timeout(MODEL_REQUEST_TIMEOUT_MS),
+			});
+			const body = (await response.json()) as { models: unknown };
+			void this.view.webview.postMessage({ type: 'models', models: body.models });
+		} catch (err) {
+			// A timeout means the server is busy loading, not gone — leave the last
+			// reading up. Only a refused connection reads as offline.
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'models', models: null });
+			}
+		}
+	}
+
 	private html(webview: vscode.Webview): string {
 		const media = vscode.Uri.joinPath(this.context.extensionUri, 'media');
 		const dist = vscode.Uri.joinPath(this.context.extensionUri, 'dist');
@@ -378,6 +414,12 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div id="utils-status" class="status" hidden></div>
 		</div>
 	</details>
+	<details class="drawer" id="model-status-drawer" open>
+		<summary>Status</summary>
+		<div class="body">
+			<div id="model-status" class="models"></div>
+		</div>
+	</details>
 	<script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
@@ -409,6 +451,11 @@ function basename(uri: vscode.Uri): string {
 function describe(err: unknown): string {
 	const message = (err as { message?: unknown } | null)?.message;
 	return typeof message === 'string' ? message : String(err);
+}
+
+/** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
+function isTimeout(err: unknown): boolean {
+	return err instanceof Error && err.name === 'TimeoutError';
 }
 
 function nonceString(): string {

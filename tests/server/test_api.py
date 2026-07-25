@@ -28,19 +28,58 @@ def build_fake_completion_model(
 
 
 class Health(unittest.TestCase):
-    def test_reports_download_progress_while_the_model_loads(self) -> None:
-        app.state.completion_model = build_fake_completion_model(
-            status="37% downloaded"
+    def test_reports_the_resident_models_download_progress(self) -> None:
+        app.state.models = mock.Mock(
+            resident=build_fake_completion_model(status="37% downloaded")
         )
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "37% downloaded"})
 
-    def test_reports_serving_once_the_model_is_ready(self) -> None:
-        app.state.completion_model = build_fake_completion_model(status="serving")
+    def test_reports_serving_once_the_resident_model_is_ready(self) -> None:
+        app.state.models = mock.Mock(
+            resident=build_fake_completion_model(status="serving")
+        )
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "serving"})
+
+    def test_reports_unloaded_when_no_model_is_resident(self) -> None:
+        app.state.models = mock.Mock(resident=None)
+        response = TestClient(app).get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"inference_server_status": "unloaded"})
+
+
+class Models(unittest.TestCase):
+    def test_lists_each_model_and_marks_the_resident(self) -> None:
+        classifier = build_fake_completion_model(status="unloaded")
+        classifier.model_id = "Qwen/Qwen3.5-4B"
+        grammar = build_fake_completion_model(status="serving")
+        grammar.model_id = "grammarly/coedit-xl"
+        app.state.inference_models = [classifier, grammar]
+        app.state.models = mock.Mock(resident=grammar)
+
+        response = TestClient(app).get("/models")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "models": [
+                    {
+                        "model": "Qwen/Qwen3.5-4B",
+                        "status": "unloaded",
+                        "resident": False,
+                    },
+                    {
+                        "model": "grammarly/coedit-xl",
+                        "status": "serving",
+                        "resident": True,
+                    },
+                ]
+            },
+        )
 
 
 def wait_for_build(client: TestClient, build_id: str, timeout: float = 5.0) -> None:
