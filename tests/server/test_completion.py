@@ -1,12 +1,3 @@
-"""Tests for the completion model's state machine.
-
-No real subprocess and no real weights. `multiprocessing.Process` is replaced by
-a fake that spawns nothing, and the tokenizer/model loads are stubbed, so the
-test plays the download child itself — putting progress fractions and the final
-DOWNLOADED marker on the queue the loading state hands out, and watching the
-controller walk from loading to serving.
-"""
-
 import time
 import unittest
 from unittest import mock
@@ -16,21 +7,21 @@ from server.inference.completion import (
     DOWNLOADED,
     CompletionModel,
     CompletionModelLoading,
-    ModelNotAvailable,
+    CompletionModelServing,
+    CompletionModelUnloaded,
 )
+
+MODEL_ID = "test-org/test-model"
+PROMPT_TOKENS = 5
+TOTAL_TOKENS = 8
+REPLY = "a bright, clean sentence"
 
 
 def format_prompt(system: str, user: str) -> str:
-    """A stand-in prompt formatter; the state machine never inspects its result."""
     return f"{system}\n{user}"
 
 
 def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool:
-    """Give the monitor thread a moment to catch up, or give up after `timeout`.
-
-    The monitor consumes the queue on its own thread, so an assertion about what
-    it did has to wait for it rather than read the moment after a `put`.
-    """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
@@ -40,21 +31,13 @@ def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool
 
 
 class FakeProcess:
-    """Stands in for `multiprocessing.Process`: records its target, spawns nothing.
-
-    The real child runs `download_process_main`, which pulls gigabytes of
-    weights over the network. Here the test is the child: it puts progress and
-    the DOWNLOADED marker on the queue the loading state created.
-    """
-
     def __init__(self, target=None, kwargs=None, daemon=None, **_) -> None:
         self.target = target
         self.kwargs = kwargs or {}
         self.daemon = daemon
-        self.started = False
 
     def start(self) -> None:
-        self.started = True
+        pass
 
     def join(self, timeout=None) -> None:
         pass
@@ -64,8 +47,6 @@ class FakeProcess:
 
 
 class FakeTensor:
-    """Enough of a tensor for `complete`: a shape, and a slice that returns itself."""
-
     def __init__(self, length: int) -> None:
         self.shape = (1, length)
 
@@ -75,8 +56,6 @@ class FakeTensor:
 
 class FakeEncoding:
     def __init__(self, prompt_tokens: int) -> None:
-        # A plain dict so `**inputs` unpacks into `generate`, the way a real
-        # BatchEncoding does.
         self._tensors = {"input_ids": FakeTensor(prompt_tokens)}
 
     def to(self, device):
@@ -109,81 +88,94 @@ class FakeModel:
 
 
 class CompletionModelStateMachine(unittest.TestCase):
-    MODEL_ID = "test-org/test-model"
-    PROMPT_TOKENS = 5
-    TOTAL_TOKENS = 8
-    REPLY = "a bright, clean sentence"
-
     def setUp(self) -> None:
-        self.tokenizer = FakeTokenizer(self.PROMPT_TOKENS, self.REPLY)
-        self.model = FakeModel(self.TOTAL_TOKENS)
-        self._models: list[CompletionModel] = []
-
         process_patcher = mock.patch.object(
             completion.multiprocessing, "Process", FakeProcess
         )
         tokenizer_patcher = mock.patch.object(completion, "AutoTokenizer")
         model_patcher = mock.patch.object(completion, "AutoModelForCausalLM")
+        empty_cache_patcher = mock.patch("torch.mps.empty_cache")
 
         process_patcher.start()
         auto_tokenizer = tokenizer_patcher.start()
         auto_model = model_patcher.start()
-        for patcher in (process_patcher, tokenizer_patcher, model_patcher):
+        empty_cache_patcher.start()
+        for patcher in (
+            process_patcher,
+            tokenizer_patcher,
+            model_patcher,
+            empty_cache_patcher,
+        ):
             self.addCleanup(patcher.stop)
 
-        # `start()` hands back the MagicMock standing in for each class, so
-        # stubbing `from_pretrained` reads as MagicMock attribute access rather
-        # than as calls on the real `transformers` classes.
-        auto_tokenizer.from_pretrained.return_value = self.tokenizer
-        auto_model.from_pretrained.return_value = self.model
+        auto_tokenizer.from_pretrained.return_value = FakeTokenizer(PROMPT_TOKENS, REPLY)
+        auto_model.from_pretrained.return_value = FakeModel(TOTAL_TOKENS)
 
-    def tearDown(self) -> None:
-        # Release any monitor thread still parked on an empty queue so it exits
-        # with the test instead of lingering; the stubbed load makes it cheap.
-        for model in self._models:
-            state = model.state
-            if isinstance(state, CompletionModelLoading):
-                state.downloaded.put(DOWNLOADED)
-                state.monitor_thread.join(timeout=2.0)
+    def test_a_new_model_starts_unloaded(self) -> None:
+        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        self.assertIsInstance(model.state, CompletionModelUnloaded)
+        self.assertEqual(model.status(), "unloaded")
 
-    def make_model(self) -> CompletionModel:
-        model = CompletionModel(self.MODEL_ID, format_prompt)
-        self._models.append(model)
-        return model
-
-    def test_completion_is_unavailable_while_loading(self) -> None:
-        model = self.make_model()
-        with self.assertRaises(ModelNotAvailable):
-            model.complete("system", "user", 16)
-
-    def test_status_reports_download_progress(self) -> None:
-        model = self.make_model()
-
-        # Before the first byte lands the monitor is parked and progress is zero.
-        self.assertEqual(model.status(), f"{self.MODEL_ID}: 0% downloaded")
-
+    def test_loading_reports_download_progress(self) -> None:
+        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model.load()
         loading = model.state
         assert isinstance(loading, CompletionModelLoading)
 
+        self.assertEqual(model.status(), f"{MODEL_ID}: 0% downloaded")
+
         loading.downloaded.put(0.5)
         self.assertTrue(
-            wait_until(lambda: model.status() == f"{self.MODEL_ID}: 50% downloaded")
+            wait_until(lambda: model.status() == f"{MODEL_ID}: 50% downloaded")
         )
 
         loading.downloaded.put(0.99)
         self.assertTrue(
-            wait_until(lambda: model.status() == f"{self.MODEL_ID}: 99% downloaded")
+            wait_until(lambda: model.status() == f"{MODEL_ID}: 99% downloaded")
         )
 
-    def test_completes_once_the_model_is_downloaded(self) -> None:
-        model = self.make_model()
-        loading = model.state
-        assert isinstance(loading, CompletionModelLoading)
+    def test_loading_reaches_serving_when_the_download_finishes(self) -> None:
+        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model.load()
+        model.state.downloaded.put(DOWNLOADED)
 
-        loading.downloaded.put(DOWNLOADED)
-        self.assertTrue(wait_until(lambda: model.status() == "serving"))
+        self.assertTrue(
+            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+        )
+        self.assertEqual(model.status(), "serving")
 
-        self.assertEqual(model.complete("system", "user", 16), self.REPLY)
+    def test_a_serving_model_generates_the_reply(self) -> None:
+        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model.load()
+        model.state.downloaded.put(DOWNLOADED)
+        self.assertTrue(
+            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+        )
+
+        serving = model.state
+        assert isinstance(serving, CompletionModelServing)
+        self.assertEqual(serving.complete("system", "user", 16), REPLY)
+
+    def test_an_unloaded_model_can_be_loaded_again(self) -> None:
+        model = CompletionModel(MODEL_ID, format_prompt, mock.Mock())
+        model.load()
+        model.state.downloaded.put(DOWNLOADED)
+        self.assertTrue(
+            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+        )
+
+        model.unload()
+        self.assertIsInstance(model.state, CompletionModelUnloaded)
+
+        model.load()
+        model.state.downloaded.put(DOWNLOADED)
+        self.assertTrue(
+            wait_until(lambda: isinstance(model.state, CompletionModelServing))
+        )
+
+        serving = model.state
+        assert isinstance(serving, CompletionModelServing)
+        self.assertEqual(serving.complete("system", "user", 16), REPLY)
 
 
 if __name__ == "__main__":
