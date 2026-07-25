@@ -9,7 +9,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 import yaml
 
-from server.api import app, ParallelBuildJobsManager
+from server.api import app, ParallelJobsManager
 from server.inference.inference import ModelNotAvailable
 
 
@@ -112,7 +112,7 @@ class Build(unittest.TestCase):
 
         self.model = build_fake_completion_model()
         app.state.completion_model = self.model
-        app.state.jobs = ParallelBuildJobsManager()
+        app.state.jobs = ParallelJobsManager()
 
     def test_build_returns_at_once_then_writes_the_graph_file(self) -> None:
         client = TestClient(app)
@@ -186,7 +186,7 @@ class Build(unittest.TestCase):
         first = client.post("/build", json={"path": path})
         self.assertEqual(first.status_code, 202)
         self.assertTrue(entered.acquire(timeout=5))  # first build is in flight
-        first_job = app.state.jobs._by_path[path]
+        first_job = app.state.jobs.get(first.json()["id"])
 
         second = client.post("/build", json={"path": path})
         self.assertEqual(second.status_code, 202)
@@ -195,6 +195,50 @@ class Build(unittest.TestCase):
         release.set()
         wait_for_build(client, second.json()["id"])
         self.assertTrue(first_job.cancelled)
+
+
+def wait_for_grammar(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get("/fix/grammar/status", params={"id": job_id})
+        if response.status_code == 200 and not response.json()["running"]:
+            return response.json()
+        time.sleep(0.005)
+    raise AssertionError(f"grammar job {job_id} did not finish within {timeout}s")
+
+
+class GrammarFix(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.manuscript = Path(self._dir.name) / "story.md"
+        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+
+        def _restore_model():
+            app.state.grammar_model = None
+
+        self.addCleanup(_restore_model)
+
+        app.state.grammar_model = build_fake_completion_model(reply="the cat.")
+        app.state.jobs = ParallelJobsManager()
+
+    def test_corrects_in_the_background_then_returns_the_text(self) -> None:
+        client = TestClient(app)
+        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(status["text"], "the cat.")
+
+    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/fix/grammar",
+            json={"path": str(self.manuscript.with_name("nope.md"))},
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class ExportEpub(unittest.TestCase):

@@ -1,5 +1,6 @@
 """Backend API."""
 
+import abc
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -48,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.completion_model,
         app.state.grammar_model,
     ]
-    app.state.jobs = ParallelBuildJobsManager()
+    app.state.jobs = ParallelJobsManager()
     _log.info("Completion models created")
 
     _log.info("Yielding control to FastAPI server")
@@ -100,78 +101,100 @@ def _build_representations(model, markdown):
     ]
 
 
-class BuildJob:
-    """One build of one manuscript: runnable, cancellable, self-removing."""
+class Job(abc.ABC):
+    """A cancellable unit of work, keyed by the file it produces."""
 
-    def __init__(
-        self,
-        path: str,
-        model: InferenceModel,
-        markdown: str,
-        jobs_manager: "ParallelBuildJobsManager",
-    ) -> None:
-        self.path = path
-        self._model = model
-        self._markdown = markdown
-        self._jobs_manager = jobs_manager
+    def __init__(self, target: str) -> None:
+        self.target = target
+        self.error: str | None = None
         self._cancel = threading.Event()
+        self._done = threading.Event()
 
     @property
     def cancelled(self) -> bool:
         return self._cancel.is_set()
 
+    @property
+    def done(self) -> bool:
+        return self._done.is_set()
+
     def cancel(self) -> None:
         self._cancel.set()
 
-    def run(self) -> None:
-        try:
-            graphs = _build_representations(self._model, self._markdown)
-            if not self.cancelled:
-                graph_path_for(Path(self.path)).write_text(to_yaml(graphs))
-        finally:
-            self._jobs_manager.remove(self)
+    def finish(self) -> None:
+        self._done.set()
+
+    @abc.abstractmethod
+    def execute(self) -> None:
+        pass
 
 
-class ParallelBuildJobsManager:
-    """The in-flight build per path. Starting one for a path that already has a
-    job cancels that job first."""
+class RepresentationBuildJob(Job):
+    def __init__(self, model: InferenceModel, source: Path) -> None:
+        super().__init__(str(graph_path_for(source)))
+        self._model = model
+        self._source = source
+        self._markdown = source.read_text()
+
+    def execute(self) -> None:
+        graphs = _build_representations(self._model, self._markdown)
+        if not self.cancelled:
+            graph_path_for(self._source).write_text(to_yaml(graphs))
+
+
+class GrammarFixJob(Job):
+    def __init__(self, model: InferenceModel, source: Path) -> None:
+        super().__init__(str(source))
+        self._model = model
+        self._markdown = source.read_text()
+        self.result: str | None = None
+
+    def execute(self) -> None:
+        self.result = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
+
+
+class ParallelJobsManager:
+    """The job in flight, or the last one finished, per target file. Starting a
+    job for a target that already has one supersedes it — the newer write wins.
+    A finished job lingers so its result can be polled, until it is replaced."""
 
     def __init__(self) -> None:
         self._pool = ThreadPoolExecutor()
-        self._by_path: dict[str, BuildJob] = {}
+        self._by_target: dict[str, Job] = {}
         self._lock = threading.Lock()
 
-    def start(self, path: str, model: InferenceModel, markdown: str) -> BuildJob:
-        job = BuildJob(path, model, markdown, self)
+    def start(self, job: Job) -> Job:
         with self._lock:
-            superseded = self._by_path.get(path)
-            self._by_path[path] = job
+            superseded = self._by_target.get(job.target)
+            self._by_target[job.target] = job
         if superseded is not None:
             superseded.cancel()
-        self._pool.submit(job.run)
+        self._pool.submit(self._run, job)
         return job
 
-    def is_running(self, path: str) -> bool:
+    def get(self, target: str) -> Job | None:
         with self._lock:
-            return path in self._by_path
+            return self._by_target.get(target)
 
-    def remove(self, job: BuildJob) -> None:
-        with self._lock:
-            if self._by_path.get(job.path) is job:
-                del self._by_path[job.path]
+    def is_running(self, target: str) -> bool:
+        job = self.get(target)
+        return job is not None and not job.done
+
+    def _run(self, job: Job) -> None:
+        try:
+            job.execute()
+        except Exception as err:
+            job.error = str(err)
+        finally:
+            job.finish()
 
 
 @app.post("/build", status_code=202)
 def build(request: RepresentationBuildRequest) -> dict[str, Any]:
     """Generate representations of a manuscript."""
-    document = Path(request.path)
-    story_markdown = document.read_text()
-    target_graph_file = graph_path_for(document)
-
-    job = app.state.jobs.start(
-        str(document), app.state.completion_model, story_markdown
-    )
-    return {"id": job.path, "path": str(target_graph_file)}
+    job = RepresentationBuildJob(app.state.completion_model, Path(request.path))
+    app.state.jobs.start(job)
+    return {"id": job.target, "path": job.target}
 
 
 @app.get("/build/status")
@@ -217,22 +240,29 @@ class GrammarFixRequest(BaseModel):
     path: str
 
 
-@app.post("/fix/grammar")
+@app.post("/fix/grammar", status_code=202)
 def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Correct a manuscript's spelling and grammar, returning the new text.
+    """Start correcting a manuscript; poll /fix/grammar/status for the text.
 
-    The corrected text is handed back rather than written: it is the author's own
-    document, so the editor applies the change, where it can be reviewed and
-    undone. A 503 says the model is not ready yet, the one thing worth retrying.
+    A long document outlives an HTTP request, so the correction runs as a job.
+    The corrected text is handed back once it is done rather than written: it is
+    the author's own document, so the editor applies the change, where it can be
+    reviewed and undone.
     """
     document = Path(request.path)
     if not document.is_file():
         raise HTTPException(
             status_code=400, detail=f"No such manuscript: {request.path}"
         )
+    job = GrammarFixJob(app.state.grammar_model, document)
+    app.state.jobs.start(job)
+    return {"id": job.target}
 
-    try:
-        corrected = fix_grammar(app.state.grammar_model, document.read_text())
-    except ModelNotAvailable as err:
-        raise HTTPException(status_code=503, detail=str(err))
-    return {"text": corrected}
+
+@app.get("/fix/grammar/status")
+def fix_grammar_status(id: str) -> dict[str, Any]:
+    """Whether the grammar job is still running, and its text once it is done."""
+    job = app.state.jobs.get(id)
+    if not isinstance(job, GrammarFixJob):
+        raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
+    return {"running": not job.done, "text": job.result, "error": job.error}

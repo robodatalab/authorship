@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 
 from server.inference.inference import InferenceModel
 
@@ -15,10 +16,16 @@ _SEPARATOR = re.compile(r"(\n[ \t]*\n)")
 _LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 
 
-def fix_grammar(model: InferenceModel, markdown: str) -> str:
+def fix_grammar(
+    model: InferenceModel,
+    markdown: str,
+    cancelled: Callable[[], bool] = lambda: False,
+) -> str:
     """Return `markdown` with its prose corrected and its structure intact."""
     pieces: list[str] = []
     for piece in _SEPARATOR.split(markdown):
+        if cancelled():
+            break
         # Only prose is corrected. The blank-line separators, and blocks with no
         # letters at all — a horizontal rule, a row of numbers — are left as they
         # are; there is nothing in them to spell wrong.

@@ -31,6 +31,9 @@ const MODEL_POLL_MS = 1500;
 /** Generous, because loading weights starves the event loop for seconds. */
 const MODEL_REQUEST_TIMEOUT_MS = 10_000;
 
+/** How often a running grammar job is polled for its result. */
+const GRAMMAR_POLL_MS = 1000;
+
 export class PublishView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
 
@@ -267,16 +270,17 @@ export class PublishView implements vscode.WebviewViewProvider {
 			return;
 		}
 		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
+			const started = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ path: this.manuscript.fsPath }),
 			});
-			if (!response.ok) {
-				await this.status(`Grammar fix failed: ${await detailOf(response)}`, true, 'utils');
+			if (!started.ok) {
+				await this.status(`Grammar fix failed: ${await detailOf(started)}`, true, 'utils');
 				return;
 			}
-			const { text } = (await response.json()) as { text: string };
+			const { id } = (await started.json()) as { id: string };
+			const text = await this.followGrammar(id);
 			await this.applyText(this.manuscript, text);
 			await this.status('Grammar fixed — review and save.', false, 'utils');
 		} catch (err) {
@@ -287,6 +291,30 @@ export class PublishView implements vscode.WebviewViewProvider {
 				true,
 				'utils'
 			);
+		}
+	}
+
+	/** Poll a grammar job to the end and return its corrected text. */
+	private async followGrammar(id: string): Promise<string> {
+		for (;;) {
+			await delay(GRAMMAR_POLL_MS);
+			const response = await fetch(
+				`http://127.0.0.1:${this.port}/fix/grammar/status?id=${encodeURIComponent(id)}`
+			);
+			if (!response.ok) {
+				throw new Error(await detailOf(response));
+			}
+			const body = (await response.json()) as {
+				running: boolean;
+				text: string | null;
+				error: string | null;
+			};
+			if (body.error) {
+				throw new Error(body.error);
+			}
+			if (!body.running) {
+				return body.text ?? '';
+			}
 		}
 	}
 
@@ -456,6 +484,11 @@ function describe(err: unknown): string {
 /** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
 function isTimeout(err: unknown): boolean {
 	return err instanceof Error && err.name === 'TimeoutError';
+}
+
+/** A promise that settles after `ms`. */
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function nonceString(): string {
