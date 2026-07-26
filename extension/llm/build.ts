@@ -1,4 +1,4 @@
-// Rebuilds a manuscript's story graph when the manuscript is saved.
+// Rebuilds a manuscript's story graph, when the author asks for it.
 //
 // The server does the reading and the writing: it is handed a path and writes
 // the `.graph.yaml`, which reaches the viewer through the file watcher that was
@@ -18,9 +18,9 @@ export class GraphBuilder implements vscode.Disposable {
 	private readonly subscriptions: vscode.Disposable[] = [];
 
 	/**
-	 * The request in flight per path, so a save can end the one before it. The
-	 * abort stops our polling here; the server supersedes the older build on its
-	 * own side.
+	 * The request in flight per path, so a second ask can end the one before it.
+	 * The abort stops our polling here; the server supersedes the older build on
+	 * its own side.
 	 */
 	private readonly requests = new Map<string, AbortController>();
 
@@ -29,22 +29,18 @@ export class GraphBuilder implements vscode.Disposable {
 		status: ModelHealth,
 		private readonly activity: BuildActivity
 	) {
-		this.subscriptions.push(
-			vscode.workspace.onDidSaveTextDocument((document) => void this.build(document))
-		);
-
 		// The bar follows the activity rather than being told separately, so there
 		// is one answer to whether anything is building.
 		const stop = this.activity.onChange(() => status.setBuilding(this.activity.any()));
 		this.subscriptions.push({ dispose: stop });
 	}
 
-	private async build(document: vscode.TextDocument): Promise<void> {
-		if (document.languageId !== 'markdown' || document.uri.scheme !== 'file') {
+	async build(manuscript: vscode.Uri): Promise<void> {
+		if (manuscript.scheme !== 'file') {
 			return;
 		}
 
-		const path = document.uri.fsPath;
+		const path = manuscript.fsPath;
 		this.requests.get(path)?.abort();
 
 		const request = new AbortController();
@@ -66,11 +62,9 @@ export class GraphBuilder implements vscode.Disposable {
 			const { id } = (await started.json()) as { id: string };
 			await this.followToEnd(id, request.signal);
 		} catch (err) {
-			// Saving is not an act of asking for this, so a server that is simply
-			// not running must not interrupt. The status bar already says offline.
-			// An abort is ours, and means the newer save is already on it.
+			// An abort is ours, and means a newer build is already on it.
 			if (!isAbort(err)) {
-				console.error('Authorship: story graph build failed', err);
+				await this.warnAbout(err);
 			}
 		} finally {
 			if (this.requests.get(path) === request) {
@@ -112,6 +106,16 @@ export class GraphBuilder implements vscode.Disposable {
 		}
 		vscode.window.showWarningMessage(
 			`Authorship could not rebuild the story graph: ${detail}`
+		);
+	}
+
+	/** A build was asked for, so a server that is not answering has to be said. */
+	private async warnAbout(err: unknown): Promise<void> {
+		const message = (err as { message?: unknown } | null)?.message;
+		vscode.window.showWarningMessage(
+			`Authorship could not rebuild the story graph — is the model server running? (${
+				typeof message === 'string' ? message : String(err)
+			})`
 		);
 	}
 

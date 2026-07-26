@@ -34,11 +34,19 @@ export function activate(context: vscode.ExtensionContext) {
 	const health = new ModelHealth(8765);
 	context.subscriptions.push(health);
 
-	// Saving a manuscript rebuilds its story graph. Who is building what is held
-	// apart from the builder, because the status bar and the graph panel both
-	// report it and neither should have to ask the other.
+	// Building a manuscript's story graph, on request. Who is building what is
+	// held apart from the builder, because the status bar and the graph panel
+	// both report it and neither should have to ask the other.
 	const activity = new BuildActivity();
-	context.subscriptions.push(new GraphBuilder(8765, health, activity));
+	const builder = new GraphBuilder(8765, health, activity);
+	context.subscriptions.push(builder);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			'authorship.buildRepresentations',
+			(manuscript: vscode.Uri) => void builder.build(manuscript)
+		)
+	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('authorship.showStoryGraph', () => {

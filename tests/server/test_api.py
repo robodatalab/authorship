@@ -9,8 +9,9 @@ from unittest import mock
 from fastapi.testclient import TestClient
 import yaml
 
-from server.api import app, ParallelBuildJobsManager
-from server.inference.completion import ModelNotAvailable
+from server.api import app, ParallelJobsManager
+from server.inference.inference import MemoryReading, ModelNotAvailable
+from server.inference.kinds import ModelKind
 
 
 DEFAULT_REPLY = (
@@ -18,29 +19,93 @@ DEFAULT_REPLY = (
 )
 
 
-def build_fake_completion_model(
-    reply: str = DEFAULT_REPLY, status: str = "serving"
-) -> mock.MagicMock:
+def build_fake_completion_model(reply: str = DEFAULT_REPLY) -> mock.MagicMock:
     model = mock.MagicMock()
     model.complete.return_value = reply
-    model.status.return_value = status
     return model
 
 
-class Health(unittest.TestCase):
-    def test_reports_download_progress_while_the_model_loads(self) -> None:
-        app.state.completion_model = build_fake_completion_model(
-            status="37% downloaded"
-        )
-        response = TestClient(app).get("/health")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"inference_server_status": "37% downloaded"})
+def build_fake_kind(model_id: str) -> mock.MagicMock:
+    kind = mock.MagicMock(spec=ModelKind)
+    kind.model_id = model_id
+    return kind
 
-    def test_reports_serving_once_the_model_is_ready(self) -> None:
-        app.state.completion_model = build_fake_completion_model(status="serving")
+
+class Health(unittest.TestCase):
+    def test_reports_serving_while_a_model_is_loaded(self) -> None:
+        app.state.models = mock.Mock(serving=build_fake_kind("Qwen/Qwen3.5-4B"))
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "serving"})
+
+    def test_reports_unloaded_when_no_model_is_loaded(self) -> None:
+        app.state.models = mock.Mock(serving=None)
+        response = TestClient(app).get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"inference_server_status": "unloaded"})
+
+
+class Models(unittest.TestCase):
+    def test_lists_each_model_and_marks_the_loaded_one(self) -> None:
+        classifier = build_fake_kind("Qwen/Qwen3.5-4B")
+        grammar = build_fake_kind("grammarly/coedit-xl")
+        app.state.inference_models = [
+            mock.Mock(kind=classifier),
+            mock.Mock(kind=grammar),
+        ]
+        app.state.models = mock.Mock(serving=grammar)
+
+        response = TestClient(app).get("/models")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "models": [
+                    {
+                        "model": "Qwen/Qwen3.5-4B",
+                        "status": "unloaded",
+                        "resident": False,
+                    },
+                    {
+                        "model": "grammarly/coedit-xl",
+                        "status": "serving",
+                        "resident": True,
+                    },
+                ]
+            },
+        )
+
+
+class Memory(unittest.TestCase):
+    def test_reports_what_the_model_holds_and_which_one_it_is(self) -> None:
+        app.state.models = mock.Mock(
+            serving=build_fake_kind("grammarly/coedit-xl"),
+            **{"memory.return_value": MemoryReading(6.2, 30.2, 9.4)},
+        )
+
+        response = TestClient(app).get("/memory")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["gpu"], {"used": 6.2, "limit": 30.2})
+        self.assertEqual(body["process"], 9.4)
+        self.assertEqual(body["serving"], "grammarly/coedit-xl")
+        self.assertGreater(body["machine"], 0)
+
+    def test_reads_on_with_no_model_loaded(self) -> None:
+        app.state.models = mock.Mock(
+            serving=None,
+            **{"memory.return_value": MemoryReading(0.0, 30.2, 0.3)},
+        )
+
+        response = TestClient(app).get("/memory")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNone(body["serving"])
+        self.assertEqual(body["gpu"], {"used": 0.0, "limit": 30.2})
+        self.assertEqual(body["process"], 0.3)
 
 
 def wait_for_build(client: TestClient, build_id: str, timeout: float = 5.0) -> None:
@@ -73,7 +138,7 @@ class Build(unittest.TestCase):
 
         self.model = build_fake_completion_model()
         app.state.completion_model = self.model
-        app.state.jobs = ParallelBuildJobsManager()
+        app.state.jobs = ParallelJobsManager()
 
     def test_build_returns_at_once_then_writes_the_graph_file(self) -> None:
         client = TestClient(app)
@@ -147,7 +212,7 @@ class Build(unittest.TestCase):
         first = client.post("/build", json={"path": path})
         self.assertEqual(first.status_code, 202)
         self.assertTrue(entered.acquire(timeout=5))  # first build is in flight
-        first_job = app.state.jobs._by_path[path]
+        first_job = app.state.jobs.get(first.json()["id"])
 
         second = client.post("/build", json={"path": path})
         self.assertEqual(second.status_code, 202)
@@ -156,6 +221,101 @@ class Build(unittest.TestCase):
         release.set()
         wait_for_build(client, second.json()["id"])
         self.assertTrue(first_job.cancelled)
+
+
+def wait_for_grammar(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get("/fix/grammar/status", params={"id": job_id})
+        if response.status_code == 200 and not response.json()["running"]:
+            return response.json()
+        time.sleep(0.005)
+    raise AssertionError(f"grammar job {job_id} did not finish within {timeout}s")
+
+
+class GrammarFix(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.manuscript = Path(self._dir.name) / "story.md"
+        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+
+        def _restore_model():
+            app.state.grammar_model = None
+
+        self.addCleanup(_restore_model)
+
+        app.state.grammar_model = build_fake_completion_model(reply="the cat.")
+        app.state.jobs = ParallelJobsManager()
+
+    def test_corrects_in_the_background_then_writes_the_manuscript(self) -> None:
+        client = TestClient(app)
+        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(self.manuscript.read_text(), "the cat.")
+
+    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/fix/grammar",
+            json={"path": str(self.manuscript.with_name("nope.md"))},
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class Jobs(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.manuscript = Path(self._dir.name) / "story.md"
+        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+
+        def _restore_model():
+            app.state.grammar_model = None
+
+        self.addCleanup(_restore_model)
+        app.state.jobs = ParallelJobsManager()
+
+    def test_lists_the_work_in_flight_and_drops_it_once_finished(self) -> None:
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "the cat."
+
+        model = build_fake_completion_model()
+        model.complete.side_effect = complete
+        app.state.grammar_model = model
+        client = TestClient(app)
+
+        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        self.assertTrue(entered.acquire(timeout=5))
+
+        response = client.get("/jobs")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "jobs": [
+                    {
+                        "kind": "grammar fix",
+                        "path": str(self.manuscript),
+                        "status": "running",
+                    }
+                ]
+            },
+        )
+
+        release.set()
+        wait_for_grammar(client, started.json()["id"])
+        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
 
 
 class ExportEpub(unittest.TestCase):

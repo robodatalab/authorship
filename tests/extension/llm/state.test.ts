@@ -11,6 +11,11 @@ describe('phaseFor', () => {
 		expect(phaseFor('0% downloaded')).toBe('downloading');
 		expect(phaseFor('37% downloaded')).toBe('downloading');
 		expect(phaseFor('100% downloaded')).toBe('downloading');
+		expect(phaseFor('Qwen/Qwen3.5-4B: 37% downloaded')).toBe('downloading');
+	});
+
+	it('reads an unloaded model as unloaded, not offline', () => {
+		expect(phaseFor('unloaded')).toBe('unloaded');
 	});
 
 	it('treats no answer as offline', () => {

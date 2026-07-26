@@ -10,7 +10,7 @@ import unittest
 from typing import cast
 from unittest.mock import create_autospec
 
-from server.inference.completion import CompletionModel
+from server.inference.inference import InferenceModel
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -19,10 +19,10 @@ from server.story_graph import Edge, Node
 STORY = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten"
 
 
-def build_completion_model_mock(reply: str) -> CompletionModel:
-    model = create_autospec(CompletionModel, instance=True)
+def build_completion_model_mock(reply: str) -> InferenceModel:
+    model = create_autospec(InferenceModel, instance=True)
     model.complete.return_value = reply
-    return cast(CompletionModel, model)
+    return cast(InferenceModel, model)
 
 
 class InvalidReplies(unittest.TestCase):

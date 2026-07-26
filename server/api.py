@@ -1,36 +1,54 @@
 """Backend API."""
 
-from collections.abc import AsyncIterator
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-import threading
-from typing import Any
+from typing import Any, AsyncGenerator
 
+import tenacity
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
 from server.epub_exporter import build_epub
-from server.representations.character_representation import (
-    build_character_representation,
+from server.grammar import fix_grammar
+from server.inference import (
+    InferenceModel,
+    InferenceModelResourceManager,
+    ModelNotAvailable,
+    CausalModel, Seq2SeqModel,
+    coedit_prompt, machine_memory, qwen_chat_prompt
 )
-from server.representations.plot_representation import build_plot_representation
-from server.representations.scene_representation import build_scene_representation
-from server.representations.utils import graph_path_for
+from server.jobs import Job, ParallelJobsManager
+from server.representations import (
+    build_character_representation,
+    build_plot_representation,
+    build_scene_representation,
+    graph_path_for
+)
 from server.story_graph import to_yaml
-from server.inference.completion import CompletionModel, ModelNotAvailable
-import tenacity
 
 _log = log.logger(__name__)
 
 
+CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
+GRAMMAR_MODEL = "grammarly/coedit-xl"
+
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    _log.info("Starting a CompletionModel")
-    app.state.completion_model = CompletionModel()
-    app.state.jobs = ParallelBuildJobsManager()
-    _log.info("CompletionModel created")
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    _log.info("Starting the completion models")
+    app.state.models = InferenceModelResourceManager()
+    app.state.completion_model = InferenceModel(
+        CausalModel(CLASSIFIER_MODEL, qwen_chat_prompt), app.state.models
+    )
+    app.state.grammar_model = InferenceModel(
+        Seq2SeqModel(GRAMMAR_MODEL, coedit_prompt), app.state.models
+    )
+    app.state.inference_models = [
+        app.state.completion_model,
+        app.state.grammar_model,
+    ]
+    app.state.jobs = ParallelJobsManager()
+    _log.info("Completion models created")
 
     _log.info("Yielding control to FastAPI server")
     yield
@@ -43,9 +61,42 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Is the application healthy and ready to serve traffic"""
-    inference_server_status = app.state.completion_model.status()
+    serving = app.state.models.serving
     return {
-        "inference_server_status": inference_server_status,
+        "inference_server_status": "unloaded" if serving is None else "serving",
+    }
+
+
+@app.get("/models")
+def models() -> dict[str, Any]:
+    """Every inference model, and which one is loaded."""
+    serving = app.state.models.serving
+    return {
+        "models": [
+            {
+                "model": m.kind.model_id,
+                "status": "serving" if m.kind == serving else "unloaded",
+                "resident": m.kind == serving,
+            }
+            for m in app.state.inference_models
+        ]
+    }
+
+
+@app.get("/memory")
+def memory() -> dict[str, Any]:
+    """What the model is holding, against what the machine has.
+
+    The model runs in a process of its own, so these are its readings, taken
+    when it last had a moment between requests — not the server's.
+    """
+    serving = app.state.models.serving
+    reading = app.state.models.memory()
+    return {
+        "gpu": {"used": reading.gpu_used, "limit": reading.gpu_limit},
+        "process": reading.process,
+        "machine": machine_memory(),
+        "serving": None if serving is None else serving.model_id,
     }
 
 
@@ -68,78 +119,55 @@ def _build_representations(model, markdown):
     ]
 
 
-class BuildJob:
-    """One build of one manuscript: runnable, cancellable, self-removing."""
 
-    def __init__(
-        self,
-        path: str,
-        model: CompletionModel,
-        markdown: str,
-        jobs_manager: "ParallelBuildJobsManager",
-    ) -> None:
-        self.path = path
+class RepresentationBuildJob(Job):
+    kind = "representation build"
+
+    def __init__(self, model: InferenceModel, source: Path) -> None:
+        super().__init__(str(graph_path_for(source)))
         self._model = model
-        self._markdown = markdown
-        self._jobs_manager = jobs_manager
-        self._cancel = threading.Event()
+        self._source = source
+        self._markdown = source.read_text()
 
-    @property
-    def cancelled(self) -> bool:
-        return self._cancel.is_set()
-
-    def cancel(self) -> None:
-        self._cancel.set()
-
-    def run(self) -> None:
-        try:
-            graphs = _build_representations(self._model, self._markdown)
-            if not self.cancelled:
-                graph_path_for(Path(self.path)).write_text(to_yaml(graphs))
-        finally:
-            self._jobs_manager.remove(self)
+    def execute(self) -> None:
+        graphs = _build_representations(self._model, self._markdown)
+        if not self.cancelled:
+            graph_path_for(self._source).write_text(to_yaml(graphs))
 
 
-class ParallelBuildJobsManager:
-    """The in-flight build per path. Starting one for a path that already has a
-    job cancels that job first."""
+class GrammarFixJob(Job):
+    kind = "grammar fix"
 
-    def __init__(self) -> None:
-        self._pool = ThreadPoolExecutor()
-        self._by_path: dict[str, BuildJob] = {}
-        self._lock = threading.Lock()
+    def __init__(self, model: InferenceModel, source: Path) -> None:
+        super().__init__(str(source))
+        self._model = model
+        self._source = source
+        self._markdown = source.read_text()
 
-    def start(self, path: str, model: CompletionModel, markdown: str) -> BuildJob:
-        job = BuildJob(path, model, markdown, self)
-        with self._lock:
-            superseded = self._by_path.get(path)
-            self._by_path[path] = job
-        if superseded is not None:
-            superseded.cancel()
-        self._pool.submit(job.run)
-        return job
+    def execute(self) -> None:
+        corrected = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
+        if not self.cancelled:
+            self._source.write_text(corrected)
 
-    def is_running(self, path: str) -> bool:
-        with self._lock:
-            return path in self._by_path
 
-    def remove(self, job: BuildJob) -> None:
-        with self._lock:
-            if self._by_path.get(job.path) is job:
-                del self._by_path[job.path]
+
+@app.get("/jobs")
+def jobs() -> dict[str, Any]:
+    """The work in hand: every unfinished job and the file it is queued on."""
+    return {
+        "jobs": [
+            {"kind": job.kind, "path": job.target, "status": job.status}
+            for job in app.state.jobs.queued()
+        ]
+    }
 
 
 @app.post("/build", status_code=202)
 def build(request: RepresentationBuildRequest) -> dict[str, Any]:
     """Generate representations of a manuscript."""
-    document = Path(request.path)
-    story_markdown = document.read_text()
-    target_graph_file = graph_path_for(document)
-
-    job = app.state.jobs.start(
-        str(document), app.state.completion_model, story_markdown
-    )
-    return {"id": job.path, "path": str(target_graph_file)}
+    job = RepresentationBuildJob(app.state.completion_model, Path(request.path))
+    app.state.jobs.start(job)
+    return {"id": job.target, "path": job.target}
 
 
 @app.get("/build/status")
@@ -163,7 +191,9 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     """Export a manuscript to an EPUB written beside it, as `<name>.epub`."""
     document = Path(request.path)
     if not document.is_file():
-        raise HTTPException(status_code=400, detail=f"No such manuscript: {request.path}")
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
 
     out_path = document.with_suffix(".epub")
     cover = Path(request.cover) if request.cover else None
@@ -176,3 +206,34 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         request.language,
     )
     return {"path": str(out_path)}
+
+
+class GrammarFixRequest(BaseModel):
+    # Path of the manuscript to correct.
+    path: str
+
+
+@app.post("/fix/grammar", status_code=202)
+def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
+    """Start correcting a manuscript; poll /fix/grammar/status for the end of it.
+
+    A long document outlives an HTTP request, so the correction runs as a job,
+    and writes the manuscript back when it is done.
+    """
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
+    job = GrammarFixJob(app.state.grammar_model, document)
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+@app.get("/fix/grammar/status")
+def fix_grammar_status(id: str) -> dict[str, Any]:
+    """Whether the grammar job is still running; the manuscript is its result."""
+    job = app.state.jobs.get(id)
+    if not isinstance(job, GrammarFixJob):
+        raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
+    return {"running": not job.done, "error": job.error}

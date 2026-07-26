@@ -1,12 +1,15 @@
-// The Publish sidebar: a webview view in the Authorship container where a
-// manuscript is picked and its publication set, then exported to an EPUB beside
-// it.
+// The Authorship sidebar: a single webview view in the Authorship container,
+// laid out as drawers. Story picks the manuscript every other drawer works on;
+// Publishing sets its publication and exports an EPUB beside it; Utils runs
+// one-shot fixes over it, starting with a grammar pass.
 //
-// The settings live in `<name>.pub.yaml` and the blurb in `<name>.blurb.md`,
-// both sitting next to the manuscript exactly as `<name>.graph.yaml` does. This
-// module owns those files; the webview is only the form. Exporting hands the
-// manuscript and its settings to the server, which writes `<name>.epub` and is
-// the one place that knows how to build the book.
+// The publication settings live in `<name>.pub.yaml` and the blurb in
+// `<name>.blurb.md`, both sitting next to the manuscript exactly as
+// `<name>.graph.yaml` does. This module owns those files; the webview is only
+// the form. Exporting hands the manuscript and its settings to the server, which
+// writes `<name>.epub` and is the one place that knows how to build the book.
+// The grammar pass likewise runs on the server, which holds the model, and comes
+// back as text the editor applies — so a correction can be reviewed and undone.
 
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -22,11 +25,23 @@ import {
 /** Where the chosen manuscript is remembered between sessions. */
 const MANUSCRIPT_KEY = 'authorship.publish.manuscript';
 
+/** How often the status drawers refresh. */
+const STATUS_POLL_MS = 1500;
+
+/** Generous, because loading weights starves the event loop for seconds. */
+const STATUS_REQUEST_TIMEOUT_MS = 10_000;
+
+/** How often a running grammar job is polled for its result. */
+const GRAMMAR_POLL_MS = 1000;
+
 export class PublishView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
 
 	/** The manuscript being published, if one has been chosen. */
 	private manuscript?: vscode.Uri;
+
+	/** Refreshes the status drawers while the view is alive. */
+	private pollTimer?: ReturnType<typeof setInterval>;
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
@@ -35,17 +50,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 		// Pick up where we left off, or fall back to whatever markdown is open, so
 		// the panel has something to publish the first time it is shown.
 		const remembered = context.workspaceState.get<string>(MANUSCRIPT_KEY);
-		if (remembered) {
-			this.manuscript = vscode.Uri.file(remembered);
-		} else {
-			const active = vscode.window.activeTextEditor;
-			if (
-				active?.document.languageId === 'markdown' &&
-				active.document.uri.scheme === 'file'
-			) {
-				this.manuscript = active.document.uri;
-			}
-		}
+		this.manuscript = remembered
+			? vscode.Uri.file(remembered)
+			: activeMarkdown();
 	}
 
 	resolveWebviewView(view: vscode.WebviewView): void {
@@ -82,26 +89,40 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'export':
 					void this.export();
 					break;
+				case 'fixGrammar':
+					void this.fixGrammar();
+					break;
+				case 'buildRepresentations':
+					void this.buildRepresentations();
+					break;
 			}
 		});
 
+		void this.poll();
+		this.pollTimer = setInterval(() => void this.poll(), STATUS_POLL_MS);
+
 		view.onDidDispose(() => {
+			if (this.pollTimer !== undefined) {
+				clearInterval(this.pollTimer);
+				this.pollTimer = undefined;
+			}
 			this.view = undefined;
 		});
 	}
 
 	// --- manuscript selection ---
 
+	/**
+	 * Take the manuscript being edited, and only fall back to the file dialog
+	 * when there is nothing to take — the story the author means is nearly
+	 * always the one they are looking at.
+	 */
 	private async choose(): Promise<void> {
-		const picked = await vscode.window.showOpenDialog({
-			canSelectMany: false,
-			openLabel: 'Publish',
-			filters: { Markdown: ['md'] },
-		});
-		if (!picked || picked.length === 0) {
+		const chosen = activeMarkdown() ?? (await pickMarkdown());
+		if (!chosen) {
 			return;
 		}
-		this.manuscript = picked[0];
+		this.manuscript = chosen;
 		await this.context.workspaceState.update(MANUSCRIPT_KEY, this.manuscript.fsPath);
 		// A blurb the panel can display from the moment a manuscript is chosen.
 		await this.ensureBlurb();
@@ -232,6 +253,83 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 	}
 
+	// --- utils: representations ---
+
+	/**
+	 * Hand the manuscript to the builder, which owns the request and reports it
+	 * to the status bar. The build outlives this call by minutes; the Jobs Status
+	 * drawer is where it is followed.
+	 */
+	private async buildRepresentations(): Promise<void> {
+		if (!this.manuscript) {
+			return;
+		}
+		await vscode.commands.executeCommand(
+			'authorship.buildRepresentations',
+			this.manuscript
+		);
+		await this.status('Building representations…', false, 'utils');
+	}
+
+	// --- utils: grammar ---
+
+	/**
+	 * Correct the manuscript's grammar. The server holds the model and returns
+	 * the corrected text; the editor applies it, so the author sees the change as
+	 * an ordinary edit they can read over and undo, rather than a silent rewrite
+	 * of the file on disk.
+	 */
+	private async fixGrammar(): Promise<void> {
+		if (!this.manuscript) {
+			return;
+		}
+		try {
+			const started = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: this.manuscript.fsPath }),
+			});
+			if (!started.ok) {
+				await this.status(`Grammar fix failed: ${await detailOf(started)}`, true, 'utils');
+				return;
+			}
+			const { id } = (await started.json()) as { id: string };
+			await this.followGrammar(id);
+			await this.status('Grammar fixed.', false, 'utils');
+		} catch (err) {
+			// The server is what holds the model; a refused connection is the likely
+			// cause, and it is the one thing the author can act on.
+			await this.status(
+				`Grammar fix failed — is the model server running? (${describe(err)})`,
+				true,
+				'utils'
+			);
+		}
+	}
+
+	/** Wait out a grammar job. The manuscript itself is the result. */
+	private async followGrammar(id: string): Promise<void> {
+		for (;;) {
+			await delay(GRAMMAR_POLL_MS);
+			const response = await fetch(
+				`http://127.0.0.1:${this.port}/fix/grammar/status?id=${encodeURIComponent(id)}`
+			);
+			if (!response.ok) {
+				throw new Error(await detailOf(response));
+			}
+			const body = (await response.json()) as {
+				running: boolean;
+				error: string | null;
+			};
+			if (body.error) {
+				throw new Error(body.error);
+			}
+			if (!body.running) {
+				return;
+			}
+		}
+	}
+
 	// --- view plumbing ---
 
 	/** Read the files and hand the whole state to the view. */
@@ -241,14 +339,93 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 		await this.view.webview.postMessage({
 			type: 'state',
-			manuscript: this.manuscript ? basename(this.manuscript) : null,
+			// Shown root-relative, so a story nested in the workspace reads as its
+			// path rather than a bare filename shared with every other story.md.
+			manuscript: this.manuscript
+				? vscode.workspace.asRelativePath(this.manuscript)
+				: null,
 			settings: await this.readSettings(),
 			blurb: await this.readBlurb(),
 		});
 	}
 
-	private async status(message: string, error: boolean): Promise<void> {
-		await this.view?.webview.postMessage({ type: 'status', message, error });
+	/** A status line, sent to whichever drawer raised it. */
+	private async status(
+		message: string,
+		error: boolean,
+		scope: 'publish' | 'utils' = 'publish'
+	): Promise<void> {
+		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
+	}
+
+	/** Repaint the status drawers from the server. */
+	private async poll(): Promise<void> {
+		await Promise.all([this.pollModels(), this.pollMemory(), this.pollJobs()]);
+	}
+
+	/** Poll the server for what is loaded, and paint the Serving Status drawer. */
+	private async pollModels(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/models`, {
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+			});
+			const body = (await response.json()) as { models: unknown };
+			void this.view.webview.postMessage({ type: 'models', models: body.models });
+		} catch (err) {
+			// A timeout means the server is busy loading, not gone — leave the last
+			// reading up. Only a refused connection reads as offline.
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'models', models: null });
+			}
+		}
+	}
+
+	/** Poll what the model is holding, and paint the Memory drawer. */
+	private async pollMemory(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/memory`, {
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+			});
+			const memory = await response.json();
+			void this.view.webview.postMessage({ type: 'memory', memory });
+		} catch (err) {
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'memory', memory: null });
+			}
+		}
+	}
+
+	/** Poll the server for the work it has in hand, and paint the Jobs Status drawer. */
+	private async pollJobs(): Promise<void> {
+		if (!this.view) {
+			return;
+		}
+		try {
+			const response = await fetch(`http://127.0.0.1:${this.port}/jobs`, {
+				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+			});
+			const body = (await response.json()) as {
+				jobs: { kind: string; path: string; status: string }[];
+			};
+			const jobs = body.jobs.map((job) => ({
+				kind: job.kind,
+				// Shown root-relative, like the manuscript name: the panel is narrow,
+				// and the end of the path is the part that names the file.
+				path: vscode.workspace.asRelativePath(vscode.Uri.file(job.path)),
+				status: job.status,
+			}));
+			void this.view.webview.postMessage({ type: 'jobs', jobs });
+		} catch (err) {
+			if (!isTimeout(err)) {
+				void this.view.webview.postMessage({ type: 'jobs', jobs: null });
+			}
+		}
 	}
 
 	private html(webview: vscode.Webview): string {
@@ -269,13 +446,18 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<title>Publish</title>
 </head>
 <body>
+	<details class="drawer" id="story" open>
+		<summary>Story</summary>
+		<div class="body">
+			<div class="manuscript">
+				<span id="manuscript-name" class="name">No story selected</span>
+				<button id="choose" type="button">Choose…</button>
+			</div>
+		</div>
+	</details>
 	<details class="drawer" id="publishing" open>
 		<summary>Publishing</summary>
 		<div class="body">
-			<div class="manuscript">
-				<span id="manuscript-name" class="name">No manuscript selected</span>
-				<button id="choose" type="button">Choose…</button>
-			</div>
 			<label>Title
 				<input id="f-title" type="text" placeholder="From the manuscript">
 			</label>
@@ -301,10 +483,61 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div id="status" class="status" hidden></div>
 		</div>
 	</details>
+	<details class="drawer" id="utils" open>
+		<summary>Utils</summary>
+		<div class="body">
+			<div class="actions">
+				<button id="build-representations" type="button" class="primary">Build representations</button>
+			</div>
+			<div class="actions">
+				<button id="fix-grammar" type="button" class="primary">Fix grammar</button>
+			</div>
+			<div id="utils-status" class="status" hidden></div>
+		</div>
+	</details>
+	<details class="drawer" id="serving-status-drawer" open>
+		<summary>Serving Status</summary>
+		<div class="body">
+			<div id="model-status" class="models"></div>
+		</div>
+	</details>
+	<details class="drawer" id="memory-drawer" open>
+		<summary>Memory</summary>
+		<div class="body">
+			<div id="memory" class="memory"></div>
+		</div>
+	</details>
+	<details class="drawer" id="jobs-status-drawer" open>
+		<summary>Jobs Status</summary>
+		<div class="body">
+			<div id="jobs-status" class="jobs"></div>
+		</div>
+	</details>
 	<script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
 	}
+}
+
+/** The markdown file in the active editor, if that is what is open. */
+function activeMarkdown(): vscode.Uri | undefined {
+	const active = vscode.window.activeTextEditor;
+	if (
+		active?.document.languageId === 'markdown' &&
+		active.document.uri.scheme === 'file'
+	) {
+		return active.document.uri;
+	}
+	return undefined;
+}
+
+async function pickMarkdown(): Promise<vscode.Uri | undefined> {
+	const picked = await vscode.window.showOpenDialog({
+		canSelectMany: false,
+		openLabel: 'Select story',
+		filters: { Markdown: ['md'] },
+	});
+	return picked?.[0];
 }
 
 async function detailOf(response: Response): Promise<string> {
@@ -332,6 +565,16 @@ function basename(uri: vscode.Uri): string {
 function describe(err: unknown): string {
 	const message = (err as { message?: unknown } | null)?.message;
 	return typeof message === 'string' ? message : String(err);
+}
+
+/** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
+function isTimeout(err: unknown): boolean {
+	return err instanceof Error && err.name === 'TimeoutError';
+}
+
+/** A promise that settles after `ms`. */
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function nonceString(): string {
