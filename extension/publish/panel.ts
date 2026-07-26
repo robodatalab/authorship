@@ -50,17 +50,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 		// Pick up where we left off, or fall back to whatever markdown is open, so
 		// the panel has something to publish the first time it is shown.
 		const remembered = context.workspaceState.get<string>(MANUSCRIPT_KEY);
-		if (remembered) {
-			this.manuscript = vscode.Uri.file(remembered);
-		} else {
-			const active = vscode.window.activeTextEditor;
-			if (
-				active?.document.languageId === 'markdown' &&
-				active.document.uri.scheme === 'file'
-			) {
-				this.manuscript = active.document.uri;
-			}
-		}
+		this.manuscript = remembered
+			? vscode.Uri.file(remembered)
+			: activeMarkdown();
 	}
 
 	resolveWebviewView(view: vscode.WebviewView): void {
@@ -117,16 +109,17 @@ export class PublishView implements vscode.WebviewViewProvider {
 
 	// --- manuscript selection ---
 
+	/**
+	 * Take the manuscript being edited, and only fall back to the file dialog
+	 * when there is nothing to take — the story the author means is nearly
+	 * always the one they are looking at.
+	 */
 	private async choose(): Promise<void> {
-		const picked = await vscode.window.showOpenDialog({
-			canSelectMany: false,
-			openLabel: 'Select story',
-			filters: { Markdown: ['md'] },
-		});
-		if (!picked || picked.length === 0) {
+		const chosen = activeMarkdown() ?? (await pickMarkdown());
+		if (!chosen) {
 			return;
 		}
-		this.manuscript = picked[0];
+		this.manuscript = chosen;
 		await this.context.workspaceState.update(MANUSCRIPT_KEY, this.manuscript.fsPath);
 		// A blurb the panel can display from the moment a manuscript is chosen.
 		await this.ensureBlurb();
@@ -500,6 +493,27 @@ export class PublishView implements vscode.WebviewViewProvider {
 </body>
 </html>`;
 	}
+}
+
+/** The markdown file in the active editor, if that is what is open. */
+function activeMarkdown(): vscode.Uri | undefined {
+	const active = vscode.window.activeTextEditor;
+	if (
+		active?.document.languageId === 'markdown' &&
+		active.document.uri.scheme === 'file'
+	) {
+		return active.document.uri;
+	}
+	return undefined;
+}
+
+async function pickMarkdown(): Promise<vscode.Uri | undefined> {
+	const picked = await vscode.window.showOpenDialog({
+		canSelectMany: false,
+		openLabel: 'Select story',
+		filters: { Markdown: ['md'] },
+	});
+	return picked?.[0];
 }
 
 async function detailOf(response: Response): Promise<string> {
