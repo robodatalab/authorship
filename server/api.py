@@ -141,11 +141,13 @@ class GrammarFixJob(Job):
     def __init__(self, model: InferenceModel, source: Path) -> None:
         super().__init__(str(source))
         self._model = model
+        self._source = source
         self._markdown = source.read_text()
-        self.result: str | None = None
 
     def execute(self) -> None:
-        self.result = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
+        corrected = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
+        if not self.cancelled:
+            self._source.write_text(corrected)
 
 
 
@@ -213,12 +215,10 @@ class GrammarFixRequest(BaseModel):
 
 @app.post("/fix/grammar", status_code=202)
 def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Start correcting a manuscript; poll /fix/grammar/status for the text.
+    """Start correcting a manuscript; poll /fix/grammar/status for the end of it.
 
-    A long document outlives an HTTP request, so the correction runs as a job.
-    The corrected text is handed back once it is done rather than written: it is
-    the author's own document, so the editor applies the change, where it can be
-    reviewed and undone.
+    A long document outlives an HTTP request, so the correction runs as a job,
+    and writes the manuscript back when it is done.
     """
     document = Path(request.path)
     if not document.is_file():
@@ -232,8 +232,8 @@ def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
 
 @app.get("/fix/grammar/status")
 def fix_grammar_status(id: str) -> dict[str, Any]:
-    """Whether the grammar job is still running, and its text once it is done."""
+    """Whether the grammar job is still running; the manuscript is its result."""
     job = app.state.jobs.get(id)
     if not isinstance(job, GrammarFixJob):
         raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
-    return {"running": not job.done, "text": job.result, "error": job.error}
+    return {"running": not job.done, "error": job.error}

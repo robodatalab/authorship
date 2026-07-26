@@ -280,9 +280,8 @@ export class PublishView implements vscode.WebviewViewProvider {
 				return;
 			}
 			const { id } = (await started.json()) as { id: string };
-			const text = await this.followGrammar(id);
-			await this.applyText(this.manuscript, text);
-			await this.status('Grammar fixed — review and save.', false, 'utils');
+			await this.followGrammar(id);
+			await this.status('Grammar fixed.', false, 'utils');
 		} catch (err) {
 			// The server is what holds the model; a refused connection is the likely
 			// cause, and it is the one thing the author can act on.
@@ -294,8 +293,8 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 	}
 
-	/** Poll a grammar job to the end and return its corrected text. */
-	private async followGrammar(id: string): Promise<string> {
+	/** Wait out a grammar job. The manuscript itself is the result. */
+	private async followGrammar(id: string): Promise<void> {
 		for (;;) {
 			await delay(GRAMMAR_POLL_MS);
 			const response = await fetch(
@@ -306,28 +305,15 @@ export class PublishView implements vscode.WebviewViewProvider {
 			}
 			const body = (await response.json()) as {
 				running: boolean;
-				text: string | null;
 				error: string | null;
 			};
 			if (body.error) {
 				throw new Error(body.error);
 			}
 			if (!body.running) {
-				return body.text ?? '';
+				return;
 			}
 		}
-	}
-
-	/** Replace a document's whole text as one undoable edit, left unsaved. */
-	private async applyText(uri: vscode.Uri, text: string): Promise<void> {
-		const document = await vscode.workspace.openTextDocument(uri);
-		const whole = new vscode.Range(
-			document.positionAt(0),
-			document.positionAt(document.getText().length)
-		);
-		const edit = new vscode.WorkspaceEdit();
-		edit.replace(uri, whole, text);
-		await vscode.workspace.applyEdit(edit);
 	}
 
 	// --- view plumbing ---

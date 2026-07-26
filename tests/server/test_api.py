@@ -249,14 +249,14 @@ class GrammarFix(unittest.TestCase):
         app.state.grammar_model = build_fake_completion_model(reply="the cat.")
         app.state.jobs = ParallelJobsManager()
 
-    def test_corrects_in_the_background_then_returns_the_text(self) -> None:
+    def test_corrects_in_the_background_then_writes_the_manuscript(self) -> None:
         client = TestClient(app)
         started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
         self.assertEqual(started.status_code, 202)
 
         status = wait_for_grammar(client, started.json()["id"])
         self.assertIsNone(status["error"])
-        self.assertEqual(status["text"], "the cat.")
+        self.assertEqual(self.manuscript.read_text(), "the cat.")
 
     def test_a_missing_manuscript_is_a_bad_request(self) -> None:
         client = TestClient(app)
