@@ -141,7 +141,6 @@ class InferenceModelResourceManager:
             kind, process, requests, replies, stop, readings
         )
 
-
     @contextmanager
     def residency(
         self, 
@@ -153,11 +152,10 @@ class InferenceModelResourceManager:
                 self._start_model_process(kind)
             serving = self._serving
 
-        if serving is None:
-            raise ModelNotAvailable(f"{kind.model_id} did not start serving") 
-        
-        yield serving.requests, serving.replies
-
+            if serving is None:
+                raise ModelNotAvailable(f"{kind.model_id} did not start serving") 
+            
+            yield serving.requests, serving.replies
 
 def _memory_reading() -> MemoryReading:
     return MemoryReading(gpu_memory_used(), gpu_memory_limit(), process_memory())
