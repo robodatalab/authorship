@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelJobsManager
-from server.inference.inference import ModelNotAvailable
+from server.inference.inference import MemoryReading, ModelNotAvailable
+from server.inference.kinds import ModelKind
 
 
 DEFAULT_REPLY = (
@@ -18,47 +19,41 @@ DEFAULT_REPLY = (
 )
 
 
-def build_fake_completion_model(
-    reply: str = DEFAULT_REPLY, status: str = "serving"
-) -> mock.MagicMock:
+def build_fake_completion_model(reply: str = DEFAULT_REPLY) -> mock.MagicMock:
     model = mock.MagicMock()
     model.complete.return_value = reply
-    model.status.return_value = status
     return model
 
 
-class Health(unittest.TestCase):
-    def test_reports_the_resident_models_download_progress(self) -> None:
-        app.state.models = mock.Mock(
-            resident=build_fake_completion_model(status="37% downloaded")
-        )
-        response = TestClient(app).get("/health")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"inference_server_status": "37% downloaded"})
+def build_fake_kind(model_id: str) -> mock.MagicMock:
+    kind = mock.MagicMock(spec=ModelKind)
+    kind.model_id = model_id
+    return kind
 
-    def test_reports_serving_once_the_resident_model_is_ready(self) -> None:
-        app.state.models = mock.Mock(
-            resident=build_fake_completion_model(status="serving")
-        )
+
+class Health(unittest.TestCase):
+    def test_reports_serving_while_a_model_is_loaded(self) -> None:
+        app.state.models = mock.Mock(serving=build_fake_kind("Qwen/Qwen3.5-4B"))
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "serving"})
 
-    def test_reports_unloaded_when_no_model_is_resident(self) -> None:
-        app.state.models = mock.Mock(resident=None)
+    def test_reports_unloaded_when_no_model_is_loaded(self) -> None:
+        app.state.models = mock.Mock(serving=None)
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "unloaded"})
 
 
 class Models(unittest.TestCase):
-    def test_lists_each_model_and_marks_the_resident(self) -> None:
-        classifier = build_fake_completion_model(status="unloaded")
-        classifier.model_id = "Qwen/Qwen3.5-4B"
-        grammar = build_fake_completion_model(status="serving")
-        grammar.model_id = "grammarly/coedit-xl"
-        app.state.inference_models = [classifier, grammar]
-        app.state.models = mock.Mock(resident=grammar)
+    def test_lists_each_model_and_marks_the_loaded_one(self) -> None:
+        classifier = build_fake_kind("Qwen/Qwen3.5-4B")
+        grammar = build_fake_kind("grammarly/coedit-xl")
+        app.state.inference_models = [
+            mock.Mock(kind=classifier),
+            mock.Mock(kind=grammar),
+        ]
+        app.state.models = mock.Mock(serving=grammar)
 
         response = TestClient(app).get("/models")
 
@@ -80,6 +75,37 @@ class Models(unittest.TestCase):
                 ]
             },
         )
+
+
+class Memory(unittest.TestCase):
+    def test_reports_what_the_model_holds_and_which_one_it_is(self) -> None:
+        app.state.models = mock.Mock(
+            serving=build_fake_kind("grammarly/coedit-xl"),
+            **{"memory.return_value": MemoryReading(6.2, 30.2, 9.4)},
+        )
+
+        response = TestClient(app).get("/memory")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["gpu"], {"used": 6.2, "limit": 30.2})
+        self.assertEqual(body["process"], 9.4)
+        self.assertEqual(body["serving"], "grammarly/coedit-xl")
+        self.assertGreater(body["machine"], 0)
+
+    def test_reads_on_with_no_model_loaded(self) -> None:
+        app.state.models = mock.Mock(
+            serving=None,
+            **{"memory.return_value": MemoryReading(0.0, 30.2, 0.3)},
+        )
+
+        response = TestClient(app).get("/memory")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNone(body["serving"])
+        self.assertEqual(body["gpu"], {"used": 0.0, "limit": 30.2})
+        self.assertEqual(body["process"], 0.3)
 
 
 def wait_for_build(client: TestClient, build_id: str, timeout: float = 5.0) -> None:
