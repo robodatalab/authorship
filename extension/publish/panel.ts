@@ -92,6 +92,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'fixGrammar':
 					void this.fixGrammar();
 					break;
+				case 'buildRepresentations':
+					void this.buildRepresentations();
+					break;
 			}
 		});
 
@@ -248,6 +251,24 @@ export class PublishView implements vscode.WebviewViewProvider {
 				true
 			);
 		}
+	}
+
+	// --- utils: representations ---
+
+	/**
+	 * Hand the manuscript to the builder, which owns the request and reports it
+	 * to the status bar. The build outlives this call by minutes; the Jobs Status
+	 * drawer is where it is followed.
+	 */
+	private async buildRepresentations(): Promise<void> {
+		if (!this.manuscript) {
+			return;
+		}
+		await vscode.commands.executeCommand(
+			'authorship.buildRepresentations',
+			this.manuscript
+		);
+		await this.status('Building representations…', false, 'utils');
 	}
 
 	// --- utils: grammar ---
@@ -465,6 +486,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<details class="drawer" id="utils" open>
 		<summary>Utils</summary>
 		<div class="body">
+			<div class="actions">
+				<button id="build-representations" type="button" class="primary">Build representations</button>
+			</div>
 			<div class="actions">
 				<button id="fix-grammar" type="button" class="primary">Fix grammar</button>
 			</div>

@@ -63,6 +63,9 @@ const clearCover = document.getElementById('clear-cover') as HTMLButtonElement;
 const blurb = document.getElementById('f-blurb') as HTMLTextAreaElement;
 const exportButton = document.getElementById('export') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLElement;
+const buildRepresentations = document.getElementById(
+	'build-representations'
+) as HTMLButtonElement;
 const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
@@ -109,6 +112,10 @@ exportButton.addEventListener('click', () => {
 	setStatus(status, 'Exporting…', false);
 	vscode.postMessage({ type: 'export' });
 });
+buildRepresentations.addEventListener('click', () => {
+	setStatus(utilsStatus, 'Building representations…', false);
+	vscode.postMessage({ type: 'buildRepresentations' });
+});
 fixGrammar.addEventListener('click', () => {
 	setStatus(utilsStatus, 'Fixing grammar…', false);
 	vscode.postMessage({ type: 'fixGrammar' });
@@ -116,7 +123,17 @@ fixGrammar.addEventListener('click', () => {
 
 /** With no story chosen there is nothing to act on, so the panel is inert. */
 function setEnabled(enabled: boolean): void {
-	const controls = [title, author, language, chooseCover, clearCover, blurb, exportButton, fixGrammar];
+	const controls = [
+		title,
+		author,
+		language,
+		chooseCover,
+		clearCover,
+		blurb,
+		exportButton,
+		buildRepresentations,
+		fixGrammar,
+	];
 	for (const el of controls) {
 		el.disabled = !enabled;
 	}
