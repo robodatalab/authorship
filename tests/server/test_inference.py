@@ -1,217 +1,74 @@
 import threading
 import time
 import unittest
-from unittest import mock
+from unittest.mock import MagicMock, patch
 
-from server.inference import inference, kinds
+from server.inference import inference
+from server.inference.kinds import ModelKind
 from server.inference.inference import (
-    DOWNLOADED,
     InferenceModel,
-    InferenceModelLoading,
-    InferenceModelServing,
-    InferenceModelUnloaded,
+    InferenceModelResourceManager,
 )
-from server.inference.kinds import CausalModel
-
-MODEL_ID = "test-org/test-model"
-PROMPT_TOKENS = 5
-TOTAL_TOKENS = 8
-REPLY = "a bright, clean sentence"
 
 
-def format_prompt(system: str, user: str) -> str:
-    return f"{system}\n{user}"
+def fake_kind(response: str) -> MagicMock:
+    kind = MagicMock(spec=ModelKind)
+    kind.model_id = "test-org/test-model"
+    kind.load.return_value = (MagicMock(), MagicMock())
+    kind.complete.return_value = response
+    return kind
 
 
-def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(interval)
-    return predicate()
+class InferenceModelTests(unittest.TestCase):
 
-
-class FakeProcess:
-    """Stands in for a spawned child.
-
-    The download is driven by the test, so that target is never run. The serving
-    one is run on a thread, so a model can still be asked for a completion.
-    """
-
-    def __init__(self, target=None, kwargs=None, daemon=None, **_) -> None:
-        self.target = target
-        self.kwargs = kwargs or {}
-        self.daemon = daemon
-        self._thread = None
-
-    def start(self) -> None:
-        if self.target is inference.serving_process_main:
-            self._thread = threading.Thread(
-                target=self.target, kwargs=self.kwargs, daemon=True
-            )
-            self._thread.start()
-
-    def terminate(self) -> None:
-        # A thread cannot be killed the way the real process is; the serving
-        # loop stops on a request of None. Already stopped is nothing to do —
-        # the queues are closed once a model has been unloaded.
-        if self._thread is not None and self._thread.is_alive():
-            self.kwargs["requests"].put(None)
-
-    def join(self, timeout=None) -> None:
-        if self._thread is not None:
-            self._thread.join(timeout=timeout if timeout is not None else 2.0)
-
-    def is_alive(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
-
-
-class FakeTensor:
-    def __init__(self, length: int) -> None:
-        self.shape = (1, length)
-
-    def __getitem__(self, index):
-        return self
-
-
-class FakeEncoding:
-    def __init__(self, prompt_tokens: int) -> None:
-        self._tensors = {"input_ids": FakeTensor(prompt_tokens)}
-
-    def to(self, device):
-        return self._tensors
-
-
-class FakeTokenizer:
-    def __init__(self, prompt_tokens: int, reply: str) -> None:
-        self._prompt_tokens = prompt_tokens
-        self._reply = reply
-
-    def __call__(self, prompt, return_tensors=None):
-        return FakeEncoding(self._prompt_tokens)
-
-    def decode(self, token_ids, skip_special_tokens=True) -> str:
-        return self._reply
-
-
-class FakeModel:
-    device = "cpu"
-
-    def __init__(self, total_tokens: int) -> None:
-        self._total_tokens = total_tokens
-
-    def eval(self):
-        return self
-
-    def generate(self, input_ids=None, max_new_tokens=None, streamer=None, **_):
-        return [FakeTensor(self._total_tokens)]
-
-
-class InferenceModelStateMachine(unittest.TestCase):
-    def setUp(self) -> None:
-        # A serving process outlives the test unless the model is unloaded, and
-        # its thread would still be parked on the queue at interpreter shutdown.
-        running: list[FakeProcess] = []
-
-        def spawn(**kwargs) -> FakeProcess:
-            process = FakeProcess(**kwargs)
-            running.append(process)
+    def setUp(self):
+        def spawn(target=None, kwargs=None, daemon=None):
+            thread = threading.Thread(target=target, kwargs=kwargs, daemon=True)
+            process = MagicMock()
+            process.start.side_effect = thread.start
+            process.is_alive.side_effect = thread.is_alive
+            process.join.side_effect = thread.join
             return process
 
-        def stop_the_children() -> None:
-            for process in running:
-                process.terminate()
+        patcher = patch.object(inference, "Process", side_effect=spawn)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-        self.addCleanup(stop_the_children)
+        self.resource_manager = InferenceModelResourceManager()
+        self.addCleanup(self.resource_manager._stop_model_process)
 
-        process_patcher = mock.patch.object(
-            inference.multiprocessing, "Process", spawn
-        )
-        tokenizer_patcher = mock.patch.object(inference, "AutoTokenizer")
-        model_patcher = mock.patch.object(kinds, "AutoModelForCausalLM")
-        empty_cache_patcher = mock.patch("torch.mps.empty_cache")
+    def test_complete_waits_until_model_is_loaded(self):
+        loaded = threading.Event()
+        kind = fake_kind("model response 1")
 
-        process_patcher.start()
-        auto_tokenizer = tokenizer_patcher.start()
-        auto_model = model_patcher.start()
-        empty_cache_patcher.start()
-        for patcher in (
-            process_patcher,
-            tokenizer_patcher,
-            model_patcher,
-            empty_cache_patcher,
-        ):
-            self.addCleanup(patcher.stop)
+        def load():
+            loaded.wait(timeout=5)
+            return MagicMock(), MagicMock()
 
-        auto_tokenizer.from_pretrained.return_value = FakeTokenizer(PROMPT_TOKENS, REPLY)
-        auto_model.from_pretrained.return_value = FakeModel(TOTAL_TOKENS)
+        kind.load.side_effect = load
+        model = InferenceModel(kind, self.resource_manager)
 
-    def test_a_new_model_starts_unloaded(self) -> None:
-        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
-        self.assertIsInstance(model.state, InferenceModelUnloaded)
-        self.assertEqual(model.status(), "unloaded")
+        responses = []
 
-    def test_loading_reports_download_progress(self) -> None:
-        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
-        model.load()
-        loading = model.state
-        assert isinstance(loading, InferenceModelLoading)
+        def call():
+            responses.append(model.complete("system", "user", max_new_tokens=10))
 
-        self.assertEqual(model.status(), f"{MODEL_ID}: 0% downloaded")
+        caller = threading.Thread(target=call, daemon=True)
+        caller.start()
 
-        loading.downloaded.put(0.5)
-        self.assertTrue(
-            wait_until(lambda: model.status() == f"{MODEL_ID}: 50% downloaded")
-        )
+        time.sleep(0.05)
+        self.assertEqual(responses, [])
 
-        loading.downloaded.put(0.99)
-        self.assertTrue(
-            wait_until(lambda: model.status() == f"{MODEL_ID}: 99% downloaded")
-        )
+        loaded.set()
+        caller.join(timeout=5)
+        self.assertSequenceEqual(responses, ["model response 1"])
 
-    def test_loading_reaches_serving_when_the_download_finishes(self) -> None:
-        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
-        model.load()
-        model.state.downloaded.put(DOWNLOADED)
+    def test_model_runs_inference(self):
+        model = InferenceModel(fake_kind("model response 2"), self.resource_manager)
 
-        self.assertTrue(
-            wait_until(lambda: isinstance(model.state, InferenceModelServing))
-        )
-        self.assertEqual(model.status(), "serving")
+        response = model.complete("system", "user", max_new_tokens=10)
 
-    def test_a_serving_model_generates_the_reply(self) -> None:
-        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
-        model.load()
-        model.state.downloaded.put(DOWNLOADED)
-        self.assertTrue(
-            wait_until(lambda: isinstance(model.state, InferenceModelServing))
-        )
-
-        serving = model.state
-        assert isinstance(serving, InferenceModelServing)
-        self.assertEqual(serving.complete("system", "user", 16), REPLY)
-
-    def test_an_unloaded_model_can_be_loaded_again(self) -> None:
-        model = InferenceModel(MODEL_ID, CausalModel(format_prompt), mock.Mock())
-        model.load()
-        model.state.downloaded.put(DOWNLOADED)
-        self.assertTrue(
-            wait_until(lambda: isinstance(model.state, InferenceModelServing))
-        )
-
-        model.unload()
-        self.assertIsInstance(model.state, InferenceModelUnloaded)
-
-        model.load()
-        model.state.downloaded.put(DOWNLOADED)
-        self.assertTrue(
-            wait_until(lambda: isinstance(model.state, InferenceModelServing))
-        )
-
-        serving = model.state
-        assert isinstance(serving, InferenceModelServing)
-        self.assertEqual(serving.complete("system", "user", 16), REPLY)
+        self.assertEqual(response, "model response 2")
 
 
 if __name__ == "__main__":

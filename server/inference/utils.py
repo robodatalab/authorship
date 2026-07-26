@@ -1,3 +1,6 @@
+import torch
+
+
 def qwen_chat_prompt(system: str, user: str) -> str:
     """Render a turn the way Qwen's chat template does, with reasoning off."""
     return (
@@ -8,5 +11,22 @@ def qwen_chat_prompt(system: str, user: str) -> str:
 
 
 def coedit_prompt(instruction: str, text: str) -> str:
-    """CoEdIT reads a task instruction followed by the text to edit."""
     return f"{instruction}: {text}"
+
+
+def gpu_memory_used() -> float:
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.driver_allocated_memory() / 1e9
+
+
+def gpu_tensors() -> float:
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.current_allocated_memory() / 1e9
+
+
+def gpu_memory_limit() -> float:
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.recommended_max_memory() / 1e9

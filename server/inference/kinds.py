@@ -5,16 +5,27 @@ from typing import Any, Callable
 from server import log
 from server.inference.monitoring import TextStreamerProgressMonitor
 import torch
-from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
+from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 
 _log = log.logger(__name__)
 
 PromptFormatter = Callable[[str, str], str]
-
+Model = Any
+Tokenizer = Any
+    
 
 class ModelKind(abc.ABC):
+
+    def __init__(self, model_id: str) -> None:
+        self.model_id = model_id
+
+    def __eq__(self, model: Any) -> bool:
+        if not isinstance(model, ModelKind):
+            return False
+        return model.model_id == self.model_id
+
     @abc.abstractmethod
-    def load(self, model_id: str) -> Any:
+    def load(self) -> tuple[Model, AutoTokenizer]:
         pass
 
     @abc.abstractmethod
@@ -25,15 +36,17 @@ class ModelKind(abc.ABC):
 
 
 class CausalModel(ModelKind):
-    def __init__(self, prompt: PromptFormatter) -> None:
+    def __init__(self, model_id: str, prompt: PromptFormatter) -> None:
+        super().__init__(model_id)
         self.prompt = prompt
 
-    def load(self, model_id: str):
+    def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModelForCausalLM.from_pretrained(
-            model_id, dtype=torch.bfloat16, device_map="mps"
+            self.model_id, dtype=torch.bfloat16, device_map="mps"
         )
+        tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         model.eval()
-        return model
+        return model, tokenizer
 
     def complete(
         self, model, tokenizer, system: str, user: str, max_new_tokens: int
@@ -70,15 +83,17 @@ class CausalModel(ModelKind):
 
 
 class Seq2SeqModel(ModelKind):
-    def __init__(self, prompt: PromptFormatter) -> None:
+    def __init__(self, model_id: str, prompt: PromptFormatter) -> None:
+        super().__init__(model_id)
         self.prompt = prompt
 
-    def load(self, model_id: str):
+    def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_id, dtype=torch.bfloat16, device_map="mps"
+            self.model_id, dtype=torch.bfloat16, device_map="mps"
         )
+        tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         model.eval()
-        return model
+        return model, tokenizer
 
     def complete(
         self, model, tokenizer, system: str, user: str, max_new_tokens: int
