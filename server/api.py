@@ -16,7 +16,7 @@ from server.inference import (
     InferenceModelResourceManager,
     ModelNotAvailable,
     CausalModel, Seq2SeqModel,
-    coedit_prompt, qwen_chat_prompt
+    coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
 from server.representations import (
@@ -38,10 +38,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager()
     app.state.completion_model = InferenceModel(
-        CLASSIFIER_MODEL, CausalModel(qwen_chat_prompt), app.state.models
+        CausalModel(CLASSIFIER_MODEL, qwen_chat_prompt), app.state.models
     )
     app.state.grammar_model = InferenceModel(
-        GRAMMAR_MODEL, Seq2SeqModel(coedit_prompt), app.state.models
+        Seq2SeqModel(GRAMMAR_MODEL, coedit_prompt), app.state.models
     )
     app.state.inference_models = [
         app.state.completion_model,
@@ -61,40 +61,42 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Is the application healthy and ready to serve traffic"""
-    resident = app.state.models.resident
-    status = resident.status() if resident is not None else "unloaded"
+    serving = app.state.models.serving
     return {
-        "inference_server_status": status,
+        "inference_server_status": "unloaded" if serving is None else "serving",
     }
 
 
 @app.get("/models")
 def models() -> dict[str, Any]:
-    """Every inference model and which one currently holds the GPU."""
-    resident = app.state.models.resident
+    """Every inference model, and which one is loaded."""
+    serving = app.state.models.serving
     return {
         "models": [
-            {"model": m.model_id, "status": m.status(), "resident": m is resident}
+            {
+                "model": m.kind.model_id,
+                "status": "serving" if m.kind == serving else "unloaded",
+                "resident": m.kind == serving,
+            }
             for m in app.state.inference_models
         ]
     }
 
 
-@app.get("/residency")
-def residency() -> dict[str, Any]:
-    """Who holds the GPU, and the calls queued behind them."""
-    manager = app.state.models
-    holding = manager.holding
+@app.get("/memory")
+def memory() -> dict[str, Any]:
+    """What the model is holding, against what the machine has.
+
+    The model runs in a process of its own, so these are its readings, taken
+    when it last had a moment between requests — not the server's.
+    """
+    serving = app.state.models.serving
+    reading = app.state.models.memory()
     return {
-        "holding": (
-            None
-            if holding is None
-            else {"model": holding.model_id, "seconds": holding.elapsed}
-        ),
-        "waiting": [
-            {"model": request.model_id, "seconds": request.elapsed}
-            for request in manager.waiting
-        ],
+        "gpu": {"used": reading.gpu_used, "limit": reading.gpu_limit},
+        "process": reading.process,
+        "machine": machine_memory(),
+        "serving": None if serving is None else serving.model_id,
     }
 
 

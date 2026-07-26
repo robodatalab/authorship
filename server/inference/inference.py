@@ -11,7 +11,12 @@ from typing import Generator
 
 from server import log
 from server.inference.kinds import ModelKind
-from server.inference.utils import (gpu_memory_used, gpu_tensors, gpu_memory_limit)
+from server.inference.utils import (
+    gpu_memory_limit,
+    gpu_memory_used,
+    gpu_tensors,
+    process_memory,
+)
 import torch
 
 _log = log.logger(__name__)
@@ -36,12 +41,24 @@ def _log_memory_usage(kind: ModelKind) -> None:
 
 
 @dataclass
+class MemoryReading:
+    """What the serving process was holding, the last time it said so."""
+
+    gpu_used: float
+    gpu_limit: float
+    process: float
+
+
+@dataclass
 class _ServingProcess:
     kind: ModelKind
     process: Process
     requests: Queue
     replies: Queue
     stop: Event
+    # Readings the serving process volunteers, on their own queue: asking for
+    # one would sit behind a generation that runs for minutes.
+    readings: Queue
 
 
 class InferenceModelResourceManager:
@@ -49,6 +66,29 @@ class InferenceModelResourceManager:
     def __init__(self) -> None:
         self._model_process_access_lock = threading.Lock()
         self._serving: _ServingProcess | None = None
+        self._last_reading: MemoryReading | None = None
+
+    @property
+    def serving(self) -> ModelKind | None:
+        """The model loaded right now, if any."""
+        serving = self._serving
+        return serving.kind if serving is not None else None
+
+    def memory(self) -> MemoryReading:
+        """What the process holding the model last reported.
+
+        With no model loaded there is no such process, so this one answers for
+        itself — the reading stays continuous either way, and reads as the near
+        nothing the server holds on its own.
+        """
+        serving = self._serving
+        if serving is None:
+            return _memory_reading()
+        while True:
+            try:
+                self._last_reading = serving.readings.get_nowait()
+            except queue.Empty:
+                return self._last_reading or _memory_reading()
 
     def _stop_model_process(self) -> None:
         serving = self._serving
@@ -68,17 +108,26 @@ class InferenceModelResourceManager:
 
         serving.requests.close()
         serving.replies.close()
+        serving.readings.close()
         self._serving = None
+        self._last_reading = None
 
 
-    def _start_model_process(self, kind: ModelKind) -> None:        
+    def _start_model_process(self, kind: ModelKind) -> None:
         requests: Queue = Queue()
         replies: Queue = Queue()
+        readings: Queue = Queue()
         stop = multiprocessing.Event()
 
         process = Process(
             target=_serving_process_main,
-            kwargs=dict(requests=requests, replies=replies, kind=kind, stop=stop),
+            kwargs=dict(
+                requests=requests,
+                replies=replies,
+                readings=readings,
+                kind=kind,
+                stop=stop,
+            ),
             daemon=True,
         )
         process.start()
@@ -88,7 +137,9 @@ class InferenceModelResourceManager:
             process.join()
             raise ModelNotAvailable(f"{kind.model_id} did not load: {error}")
 
-        self._serving = _ServingProcess(kind, process, requests, replies, stop)
+        self._serving = _ServingProcess(
+            kind, process, requests, replies, stop, readings
+        )
 
 
     @contextmanager
@@ -108,9 +159,14 @@ class InferenceModelResourceManager:
         yield serving.requests, serving.replies
 
 
+def _memory_reading() -> MemoryReading:
+    return MemoryReading(gpu_memory_used(), gpu_memory_limit(), process_memory())
+
+
 def _serving_process_main(
     requests: Queue,
     replies: Queue,
+    readings: Queue,
     kind: ModelKind,
     stop: Event,
 ) -> None:
@@ -125,6 +181,7 @@ def _serving_process_main(
         return
 
     _log_memory_usage(kind)
+    readings.put(_memory_reading())
     replies.put((None, None))
     _log.info("Serving %s", kind.model_id)
 
@@ -132,6 +189,7 @@ def _serving_process_main(
         try:
             request = requests.get(timeout=REQUEST_POLL_S)
         except queue.Empty:
+            readings.put(_memory_reading())
             continue
         try:
             replies.put(

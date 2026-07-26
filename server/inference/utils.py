@@ -1,3 +1,7 @@
+import os
+import resource
+import sys
+
 import torch
 
 
@@ -30,3 +34,18 @@ def gpu_memory_limit() -> float:
     if not torch.backends.mps.is_available():
         return 0.0
     return torch.mps.recommended_max_memory() / 1e9
+
+
+def process_memory() -> float:
+    """GB this process has held at its highest — what it is killed over.
+
+    `ru_maxrss` is a peak rather than a reading of the moment, and it is counted
+    in bytes on Darwin and in kilobytes everywhere else.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / 1e9 if sys.platform == "darwin" else peak / 1e6
+
+
+def machine_memory() -> float:
+    """GB of RAM in the machine."""
+    return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1e9

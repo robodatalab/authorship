@@ -36,14 +36,18 @@ interface JobStatus {
 	status: string;
 }
 
-interface ResidencyRequest {
-	model: string;
-	seconds: number;
+interface Memory {
+	gpu: { used: number; limit: number };
+	process: number;
+	machine: number;
+	serving: string | null;
 }
 
-interface Residency {
-	holding: ResidencyRequest | null;
-	waiting: ResidencyRequest[];
+interface Sample {
+	gpu: number;
+	process: number;
+	serving: string | null;
+	at: number;
 }
 
 const vscode = acquireVsCodeApi();
@@ -62,7 +66,7 @@ const status = document.getElementById('status') as HTMLElement;
 const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
-const residency = document.getElementById('residency') as HTMLElement;
+const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
 
 /** How long after the last keystroke the blurb is written. */
@@ -192,59 +196,147 @@ function phaseClass(status: string): string {
 	return 'unloaded';
 }
 
-/** null means the server did not answer; otherwise the GPU's holder and its queue. */
-function renderResidency(state: Residency | null): void {
-	residency.textContent = '';
-	if (state === null) {
+/** How many readings the plot keeps — at the poll interval, a few minutes' worth. */
+const HISTORY = 120;
+
+/**
+ * The readings behind the plot. Which model was loaded is recorded alongside
+ * each one rather than as its own timeline, so the bands drawn over the plot
+ * cannot drift out of step with it.
+ */
+const samples: Sample[] = [];
+
+/** null means the server did not answer; otherwise what the model is holding. */
+function renderMemory(reading: Memory | null): void {
+	memory.textContent = '';
+	if (reading === null) {
 		const offline = document.createElement('div');
 		offline.className = 'offline';
 		offline.textContent = 'Model server offline';
-		residency.append(offline);
+		memory.append(offline);
 		return;
 	}
-	if (state.holding === null && state.waiting.length === 0) {
-		const idle = document.createElement('div');
-		idle.className = 'idle';
-		idle.textContent = 'Nobody is using the GPU';
-		residency.append(idle);
-		return;
+
+	samples.push({
+		gpu: reading.gpu.used,
+		process: reading.process,
+		serving: reading.serving,
+		at: Date.now(),
+	});
+	if (samples.length > HISTORY) {
+		samples.shift();
 	}
-	if (state.holding !== null) {
-		residency.append(requestRow(state.holding, 'holding'));
-	}
-	for (const queued of state.waiting) {
-		residency.append(requestRow(queued, 'waiting'));
-	}
+
+	// The GPU's ceiling is the number a load has to fit under; the machine's RAM
+	// is what the process is killed over. Each bar is read against its own.
+	memory.append(
+		gauge('GPU', reading.gpu.used, reading.gpu.limit),
+		gauge('Process', reading.process, reading.machine),
+		bands(samples),
+		plot(samples, Math.max(reading.gpu.limit, reading.machine))
+	);
 }
 
-function requestRow(request: ResidencyRequest, state: string): HTMLElement {
-	const row = document.createElement('div');
-	row.className = 'request';
+/** A box per run of the same model, over the stretch of plot it was loaded for. */
+function bands(history: Sample[]): HTMLElement {
+	const strip = document.createElement('div');
+	strip.className = 'bands';
 
-	const name = document.createElement('span');
-	name.className = 'name';
-	name.textContent = request.model;
-	name.title = request.model;
+	let start = 0;
+	while (start < history.length) {
+		const model = history[start].serving;
+		let end = start;
+		while (end + 1 < history.length && history[end + 1].serving === model) {
+			end += 1;
+		}
+		if (model !== null) {
+			const band = document.createElement('span');
+			band.className = 'band';
+			band.style.left = `${(start / (HISTORY - 1)) * 100}%`;
+			band.style.width = `${((end - start) / (HISTORY - 1)) * 100}%`;
+			band.textContent = shortName(model);
+			band.title = `${model} — ${duration(
+				history[end].at - history[start].at
+			)} and counting`;
+			strip.append(band);
+		}
+		start = end + 1;
+	}
+	return strip;
+}
 
-	const phase = document.createElement('span');
-	phase.className = `phase ${state}`;
-	phase.textContent = state;
-
-	const elapsed = document.createElement('span');
-	elapsed.className = 'elapsed';
-	elapsed.textContent = duration(request.seconds);
-
-	row.append(name, phase, elapsed);
-	return row;
+function shortName(model: string): string {
+	return model.split('/').pop() ?? model;
 }
 
 /** Whole seconds under a minute, then minutes and seconds. */
-function duration(seconds: number): string {
-	const whole = Math.floor(seconds);
+function duration(milliseconds: number): string {
+	const whole = Math.round(milliseconds / 1000);
 	if (whole < 60) {
 		return `${whole}s`;
 	}
 	return `${Math.floor(whole / 60)}m ${whole % 60}s`;
+}
+
+function gauge(label: string, used: number, of: number): HTMLElement {
+	const row = document.createElement('div');
+	row.className = 'gauge';
+
+	const name = document.createElement('span');
+	name.className = 'name';
+	name.textContent = label;
+
+	const track = document.createElement('span');
+	track.className = 'track';
+	const fill = document.createElement('span');
+	const share = of > 0 ? used / of : 0;
+	fill.className = share > 1 ? 'fill over' : 'fill';
+	fill.style.width = `${Math.min(share, 1) * 100}%`;
+	track.append(fill);
+
+	const figure = document.createElement('span');
+	figure.className = 'figure';
+	figure.textContent = `${used.toFixed(1)} / ${of.toFixed(0)} GB`;
+
+	row.append(name, track, figure);
+	return row;
+}
+
+/**
+ * The two histories over one scale, so the GPU's share of the machine reads at
+ * a glance. Hand-drawn SVG: the view's policy admits no script but its own.
+ */
+function plot(history: Sample[], ceiling: number): SVGElement {
+	const width = 240;
+	const height = 48;
+	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+	svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+	svg.setAttribute('preserveAspectRatio', 'none');
+	svg.classList.add('plot');
+
+	const series = [
+		['gpu', (sample: Sample) => sample.gpu],
+		['process', (sample: Sample) => sample.process],
+	] as const;
+
+	for (const [name, read] of series) {
+		if (history.length < 2) {
+			continue;
+		}
+		const step = width / (HISTORY - 1);
+		const points = history
+			.map((sample, index) => {
+				const x = index * step;
+				const y = height - (ceiling > 0 ? read(sample) / ceiling : 0) * height;
+				return `${x.toFixed(1)},${y.toFixed(1)}`;
+			})
+			.join(' ');
+		const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+		line.setAttribute('points', points);
+		line.classList.add(name);
+		svg.append(line);
+	}
+	return svg;
 }
 
 /** null means the server did not answer; a list is the work it has in hand. */
@@ -304,8 +396,8 @@ window.addEventListener('message', (event) => {
 		setStatus(target, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
-	} else if (message?.type === 'residency') {
-		renderResidency(message.residency as Residency | null);
+	} else if (message?.type === 'memory') {
+		renderMemory(message.memory as Memory | null);
 	} else if (message?.type === 'jobs') {
 		renderJobs(message.jobs as JobStatus[] | null);
 	}

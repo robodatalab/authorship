@@ -360,7 +360,7 @@ export class PublishView implements vscode.WebviewViewProvider {
 
 	/** Repaint the status drawers from the server. */
 	private async poll(): Promise<void> {
-		await Promise.all([this.pollModels(), this.pollResidency(), this.pollJobs()]);
+		await Promise.all([this.pollModels(), this.pollMemory(), this.pollJobs()]);
 	}
 
 	/** Poll the server for what is loaded, and paint the Serving Status drawer. */
@@ -383,20 +383,20 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 	}
 
-	/** Poll the GPU's queue, and paint the Inference Resources drawer. */
-	private async pollResidency(): Promise<void> {
+	/** Poll what the model is holding, and paint the Memory drawer. */
+	private async pollMemory(): Promise<void> {
 		if (!this.view) {
 			return;
 		}
 		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/residency`, {
+			const response = await fetch(`http://127.0.0.1:${this.port}/memory`, {
 				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
 			});
-			const residency = await response.json();
-			void this.view.webview.postMessage({ type: 'residency', residency });
+			const memory = await response.json();
+			void this.view.webview.postMessage({ type: 'memory', memory });
 		} catch (err) {
 			if (!isTimeout(err)) {
-				void this.view.webview.postMessage({ type: 'residency', residency: null });
+				void this.view.webview.postMessage({ type: 'memory', memory: null });
 			}
 		}
 	}
@@ -498,10 +498,10 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div id="model-status" class="models"></div>
 		</div>
 	</details>
-	<details class="drawer" id="inference-resources-drawer" open>
-		<summary>Inference Resources</summary>
+	<details class="drawer" id="memory-drawer" open>
+		<summary>Memory</summary>
 		<div class="body">
-			<div id="residency" class="requests"></div>
+			<div id="memory" class="memory"></div>
 		</div>
 	</details>
 	<details class="drawer" id="jobs-status-drawer" open>
