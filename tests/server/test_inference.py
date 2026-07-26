@@ -1,3 +1,4 @@
+import threading
 import time
 import unittest
 from unittest import mock
@@ -32,19 +33,38 @@ def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool
 
 
 class FakeProcess:
+    """Stands in for a spawned child.
+
+    The download is driven by the test, so that target is never run. The serving
+    one is run on a thread, so a model can still be asked for a completion.
+    """
+
     def __init__(self, target=None, kwargs=None, daemon=None, **_) -> None:
         self.target = target
         self.kwargs = kwargs or {}
         self.daemon = daemon
+        self._thread = None
 
     def start(self) -> None:
-        pass
+        if self.target is inference.serving_process_main:
+            self._thread = threading.Thread(
+                target=self.target, kwargs=self.kwargs, daemon=True
+            )
+            self._thread.start()
+
+    def terminate(self) -> None:
+        # A thread cannot be killed the way the real process is; the serving
+        # loop stops on a request of None. Already stopped is nothing to do —
+        # the queues are closed once a model has been unloaded.
+        if self._thread is not None and self._thread.is_alive():
+            self.kwargs["requests"].put(None)
 
     def join(self, timeout=None) -> None:
-        pass
+        if self._thread is not None:
+            self._thread.join(timeout=timeout if timeout is not None else 2.0)
 
     def is_alive(self) -> bool:
-        return False
+        return self._thread is not None and self._thread.is_alive()
 
 
 class FakeTensor:
@@ -90,8 +110,23 @@ class FakeModel:
 
 class InferenceModelStateMachine(unittest.TestCase):
     def setUp(self) -> None:
+        # A serving process outlives the test unless the model is unloaded, and
+        # its thread would still be parked on the queue at interpreter shutdown.
+        running: list[FakeProcess] = []
+
+        def spawn(**kwargs) -> FakeProcess:
+            process = FakeProcess(**kwargs)
+            running.append(process)
+            return process
+
+        def stop_the_children() -> None:
+            for process in running:
+                process.terminate()
+
+        self.addCleanup(stop_the_children)
+
         process_patcher = mock.patch.object(
-            inference.multiprocessing, "Process", FakeProcess
+            inference.multiprocessing, "Process", spawn
         )
         tokenizer_patcher = mock.patch.object(inference, "AutoTokenizer")
         model_patcher = mock.patch.object(kinds, "AutoModelForCausalLM")

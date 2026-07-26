@@ -125,10 +125,16 @@ class InferenceModelResourceManager:
                     self._resident = model
                 if not isinstance(model.state, InferenceModelServing):
                     model.load()
+                    # Waiting for the load to end, not to succeed: a load that
+                    # fails puts the model back to unloaded, and waiting for a
+                    # serving state it will never reach would hold this slot for
+                    # good, taking every other caller down with it.
                     with self._ready:
                         self._ready.wait_for(
-                            lambda: isinstance(model.state, InferenceModelServing)
+                            lambda: not isinstance(model.state, InferenceModelLoading)
                         )
+                    if not isinstance(model.state, InferenceModelServing):
+                        raise ModelNotAvailable(f"{model.model_id} did not load")
                 yield
             finally:
                 with self._queue:
@@ -196,7 +202,7 @@ class InferenceModelLoading(InferenceModelState):
         self.download_process.start()
 
         self.monitor_thread = threading.Thread(
-            target=monitor_thread_main,
+            target=_monitor_thread_main,
             kwargs=dict(loading=self, model_id=model_id),
             daemon=True,
         )
@@ -222,7 +228,7 @@ def download_process_main(signal: Queue[float | str], model_id: str) -> None:
     signal.put(DOWNLOADED)
 
 
-def monitor_thread_main(loading: InferenceModelLoading, model_id: str) -> None:
+def _monitor_thread_main(loading: InferenceModelLoading, model_id: str) -> None:
     """Track the download's progress, then load the model in this process."""
     while True:
         message = loading.downloaded.get()
@@ -232,10 +238,18 @@ def monitor_thread_main(loading: InferenceModelLoading, model_id: str) -> None:
 
     _log.info("download complete, handing %s to a serving process", model_id)
     controller = loading.controller
-    controller.set_state(InferenceModelServing(controller, model_id, controller.kind))
+    try:
+        serving = InferenceModelServing(controller, model_id, controller.kind)
+    except Exception:
+        # Back to unloaded, and say so: whoever is waiting on this load is
+        # holding the slot until the state stops being a loading one.
+        _log.exception("could not serve %s", model_id)
+        controller.unload()
+        return
+    controller.set_state(serving)
 
 
-def serving_process_main(
+def _serving_process_main(
     requests: Queue,
     replies: Queue,
     model_id: str,
@@ -260,7 +274,10 @@ def serving_process_main(
     replies.put((None, None))
 
     while True:
-        system, user, max_new_tokens = requests.get()
+        request = requests.get()
+        if request is None:
+            return
+        system, user, max_new_tokens = request
         try:
             replies.put((None, kind.complete(model, tokenizer, system, user, max_new_tokens)))
         except Exception as err:
@@ -280,7 +297,7 @@ class InferenceModelServing(InferenceModelState):
         self._requests: Queue = multiprocessing.Queue()
         self._replies: Queue = multiprocessing.Queue()
         self._process = multiprocessing.Process(
-            target=serving_process_main,
+            target=_serving_process_main,
             kwargs=dict(
                 requests=self._requests,
                 replies=self._replies,
@@ -295,6 +312,8 @@ class InferenceModelServing(InferenceModelState):
         # waits out the load rather than the first caller doing it.
         error, _ = self._replies.get()
         if error is not None:
+            self._process.terminate()
+            self._process.join()
             raise ModelNotAvailable(f"{model_id} did not load: {error}")
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:

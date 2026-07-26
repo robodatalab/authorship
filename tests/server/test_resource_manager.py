@@ -10,6 +10,7 @@ from server.inference.inference import (
     InferenceModelLoading,
     InferenceModelResourceManager,
     InferenceModelServing,
+    ModelNotAvailable,
 )
 
 MODEL_ID = "test-org/test-model"
@@ -135,10 +136,14 @@ class WaitingForCompletion(unittest.TestCase):
     def setUp(self) -> None:
         # Nothing is spawned here, so the serving process's "loaded" handshake
         # has to be faked — it is what the caller waits on.
+        self.load_error: str | None = None
+
         def spawn(target=None, kwargs=None, daemon=None) -> mock.Mock:
             process = mock.Mock()
             if target is inference.serving_process_main:
-                process.start.side_effect = lambda: kwargs["replies"].put((None, None))
+                process.start.side_effect = lambda: kwargs["replies"].put(
+                    (self.load_error, None)
+                )
             return process
 
         process_patcher = mock.patch.object(
@@ -230,6 +235,32 @@ class WaitingForCompletion(unittest.TestCase):
             caller.join(timeout=2.0)
 
         self.assertEqual(replies, {"first": REPLY, "second": REPLY, "third": REPLY})
+        self.assertIsNone(manager.holding)
+        self.assertEqual(manager.waiting, [])
+
+    def test_a_load_that_fails_frees_the_slot(self) -> None:
+        self.load_error = "MPS backend out of memory"
+        manager = InferenceModelResourceManager()
+        model = InferenceModel(MODEL_ID, mock.Mock(), manager)
+
+        failure: dict[str, Exception] = {}
+
+        def call() -> None:
+            try:
+                model.complete("system", "user", 8)
+            except Exception as err:
+                failure["error"] = err
+
+        caller = threading.Thread(target=call)
+        caller.start()
+        self.assertTrue(
+            wait_until(lambda: isinstance(model.state, InferenceModelLoading))
+        )
+        model.state.downloaded.put(DOWNLOADED)
+
+        caller.join(timeout=2.0)
+        self.assertIsInstance(failure["error"], ModelNotAvailable)
+        self.assertEqual(model.status(), "unloaded")
         self.assertIsNone(manager.holding)
         self.assertEqual(manager.waiting, [])
 
