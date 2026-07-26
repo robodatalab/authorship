@@ -12,7 +12,7 @@ from server import log
 from server.inference.kinds import ModelKind
 from server.inference.monitoring import reporting_tqdm
 import torch
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers import AutoTokenizer
 
 _log = log.logger(__name__)
 os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
@@ -22,6 +22,31 @@ DOWNLOADED = "downloaded"
 
 class ModelNotAvailable(Exception):
     pass
+
+
+def gpu_memory_used() -> float:
+    """GB the Metal driver holds for this process.
+
+    Allocator pools and MPSGraph included, so it does not fall when tensors are
+    freed — `empty_cache` only hands back unoccupied allocator blocks.
+    """
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.driver_allocated_memory() / 1e9
+
+
+def gpu_tensors() -> float:
+    """GB held by live tensors — what a model actually occupies."""
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.current_allocated_memory() / 1e9
+
+
+def gpu_memory_limit() -> float:
+    """GB the driver will hand this process before it starts refusing."""
+    if not torch.backends.mps.is_available():
+        return 0.0
+    return torch.mps.recommended_max_memory() / 1e9
 
 
 class InferenceModelState(abc.ABC):
@@ -205,33 +230,86 @@ def monitor_thread_main(loading: InferenceModelLoading, model_id: str) -> None:
             break
         loading.progress = float(message)
 
-    _log.info("download complete, loading %s in-process", model_id)
+    _log.info("download complete, handing %s to a serving process", model_id)
     controller = loading.controller
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = controller.kind.load(model_id)
-    controller.set_state(InferenceModelServing(controller, model, tokenizer))
+    controller.set_state(InferenceModelServing(controller, model_id, controller.kind))
+
+
+def serving_process_main(
+    requests: Queue,
+    replies: Queue,
+    model_id: str,
+    kind: ModelKind,
+) -> None:
+    """Child process: hold the model and answer completions until it is killed."""
+    log.setup()
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = kind.load(model_id)
+    except Exception as err:
+        replies.put((str(err), None))
+        return
+
+    _log.info(
+        "serving %s: tensors %.1fGB, driver %.1fGB, limit %.1fGB",
+        model_id,
+        gpu_tensors(),
+        gpu_memory_used(),
+        gpu_memory_limit(),
+    )
+    replies.put((None, None))
+
+    while True:
+        system, user, max_new_tokens = requests.get()
+        try:
+            replies.put((None, kind.complete(model, tokenizer, system, user, max_new_tokens)))
+        except Exception as err:
+            replies.put((str(err), None))
 
 
 class InferenceModelServing(InferenceModelState):
+
     def __init__(
         self,
         controller: InferenceModel,
-        model,
-        tokenizer: PreTrainedTokenizerBase,
+        model_id: str,
+        kind: ModelKind,
     ) -> None:
         self.controller = controller
-        self.model = model
-        self.tokenizer = tokenizer
+        self.model_id = model_id
+        self._requests: Queue = multiprocessing.Queue()
+        self._replies: Queue = multiprocessing.Queue()
+        self._process = multiprocessing.Process(
+            target=serving_process_main,
+            kwargs=dict(
+                requests=self._requests,
+                replies=self._replies,
+                model_id=model_id,
+                kind=kind,
+            ),
+            daemon=True,
+        )
+        self._process.start()
+
+        # The model is loaded before the first completion is asked for, so this
+        # waits out the load rather than the first caller doing it.
+        error, _ = self._replies.get()
+        if error is not None:
+            raise ModelNotAvailable(f"{model_id} did not load: {error}")
 
     def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        return self.controller.kind.complete(
-            self.model, self.tokenizer, system, user, max_new_tokens
-        )
+        self._requests.put((system, user, max_new_tokens))
+        error, text = self._replies.get()
+        if error is not None:
+            raise ModelNotAvailable(f"{self.model_id} failed to answer: {error}")
+        return text
 
     def status(self) -> str:
         return "serving"
 
     def cleanup(self) -> None:
-        del self.model
-        del self.tokenizer
-        torch.mps.empty_cache()
+        self._process.terminate()
+        self._process.join()
+        self._requests.close()
+        self._replies.close()
+        _log.info("unloaded %s — its process is gone", self.model_id)
