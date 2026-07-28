@@ -136,8 +136,9 @@ exportButton.addEventListener('click', () => {
 	setStatus(status, 'Exporting…', false);
 	vscode.postMessage({ type: 'export' });
 });
+// No status line: the build outlives the click, and the Jobs Status drawer is
+// where it is followed.
 buildRepresentations.addEventListener('click', () => {
-	setStatus(utilsStatus, 'Building representations…', false);
 	vscode.postMessage({ type: 'buildRepresentations' });
 });
 fixGrammar.addEventListener('click', () => {

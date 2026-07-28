@@ -292,7 +292,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 			'authorship.buildRepresentations',
 			this.manuscript
 		);
-		await this.status('Building representations…', false, 'utils');
 	}
 
 	// --- utils: section attribution ---
