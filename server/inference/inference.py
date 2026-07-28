@@ -1,3 +1,4 @@
+import abc
 from dataclasses import dataclass
 import gc
 import multiprocessing
@@ -7,10 +8,9 @@ import queue
 import os
 import threading
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any, Generator
 
 from server import log
-from server.inference.kinds import ModelKind
 from server.inference.utils import (
     gpu_memory_limit,
     gpu_memory_used,
@@ -18,12 +18,30 @@ from server.inference.utils import (
     process_memory,
 )
 import torch
+from transformers import AutoTokenizer
+
 
 _log = log.logger(__name__)
 os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
 REQUEST_POLL_S = 0.1
 STOP_GRACE_S = 30.0
+Model = Any
+
+
+class ModelKind(abc.ABC):
+
+    def __init__(self, model_id: str) -> None:
+        self.model_id = model_id
+
+    def __eq__(self, model: Any) -> bool:
+        if not isinstance(model, ModelKind):
+            return False
+        return model.model_id == self.model_id
+
+    @abc.abstractmethod
+    def load(self) -> tuple[Model, AutoTokenizer]:
+        pass
 
 
 class ModelNotAvailable(Exception):

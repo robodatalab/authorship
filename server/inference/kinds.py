@@ -5,9 +5,17 @@ from typing import Any, Callable
 
 from server import log
 from server.inference.monitoring import TextStreamerProgressMonitor
-from server.inference.inference import InferenceModelResourceManager, ModelNotAvailable
+from server.inference.inference import (
+    InferenceModelResourceManager, 
+    ModelKind, 
+    ModelNotAvailable
+)
 import torch
-from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM, 
+    AutoModelForSeq2SeqLM, 
+    AutoTokenizer
+)
 
 _log = log.logger(__name__)
 
@@ -15,21 +23,6 @@ PromptFormatter = Callable[[str, str], str]
 Model = Any
 Tokenizer = Any
     
-
-class ModelKind(abc.ABC):
-
-    def __init__(self, model_id: str) -> None:
-        self.model_id = model_id
-
-    def __eq__(self, model: Any) -> bool:
-        if not isinstance(model, ModelKind):
-            return False
-        return model.model_id == self.model_id
-
-    @abc.abstractmethod
-    def load(self) -> tuple[Model, AutoTokenizer]:
-        pass
-
 
 class CausalModel(ModelKind):
     def __init__(
