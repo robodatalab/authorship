@@ -32,15 +32,21 @@ _log = log.logger(__name__)
 CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
 GRAMMAR_MODEL = "grammarly/coedit-xl"
 
+# What each model was measured holding over a single batch, and what the models
+# are allowed between them. Two of these fit, a third waits for one to go.
+CLASSIFIER_MODEL_GB = 5.0
+GRAMMAR_MODEL_GB = 5.0
+MEMORY_QUOTA_GB = 10.0
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
-    app.state.models = InferenceModelResourceManager()
+    app.state.models = InferenceModelResourceManager(MEMORY_QUOTA_GB)
     app.state.completion_model = CausalModel(
-        CLASSIFIER_MODEL, qwen_chat_prompt, app.state.models
+        CLASSIFIER_MODEL, qwen_chat_prompt, app.state.models, CLASSIFIER_MODEL_GB
     )
     app.state.grammar_model = Seq2SeqModel(
-        GRAMMAR_MODEL, coedit_prompt, app.state.models
+        GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
     )
     app.state.inference_models = [
         app.state.completion_model,
@@ -60,22 +66,22 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Is the application healthy and ready to serve traffic"""
-    serving = app.state.models.serving
+    residents = app.state.models.residents
     return {
-        "inference_server_status": "unloaded" if serving is None else "serving",
+        "inference_server_status": "unloaded" if not residents else "serving",
     }
 
 
 @app.get("/models")
 def models() -> dict[str, Any]:
-    """Every inference model, and which one is loaded."""
-    serving = app.state.models.serving
+    """Every inference model, and which of them are loaded."""
+    residents = app.state.models.residents
     return {
         "models": [
             {
                 "model": model.model_id,
-                "status": "serving" if model == serving else "unloaded",
-                "resident": model == serving,
+                "status": "serving" if model in residents else "unloaded",
+                "resident": model in residents,
             }
             for model in app.state.inference_models
         ]
@@ -84,18 +90,19 @@ def models() -> dict[str, Any]:
 
 @app.get("/memory")
 def memory() -> dict[str, Any]:
-    """What the model is holding, against what the machine has.
+    """What the models are holding, against what the machine has.
 
-    The model runs in a process of its own, so these are its readings, taken
-    when it last had a moment between requests — not the server's.
+    Each model runs in a process of its own, so these are their readings added
+    together, each taken when that model last had a moment between requests —
+    not the server's.
     """
-    serving = app.state.models.serving
+    residents = app.state.models.residents
     reading = app.state.models.memory()
     return {
         "gpu": {"used": reading.gpu_used, "limit": reading.gpu_limit},
         "process": reading.process,
         "machine": machine_memory(),
-        "serving": None if serving is None else serving.model_id,
+        "serving": ", ".join(model.model_id for model in residents) or None,
     }
 
 

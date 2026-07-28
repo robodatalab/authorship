@@ -41,8 +41,9 @@ class ModelCompletionTests(unittest.TestCase):
         patch.object(causal, "AutoTokenizer").start()
         self.transformer = patch.object(causal, "AutoModelForCausalLM").start()
 
-        self.resource_manager = InferenceModelResourceManager()
-        self.addCleanup(self.resource_manager._stop_model_process)
+        # Room for one of the models below, so that a second one has to swap.
+        self.resource_manager = InferenceModelResourceManager(quota_gb=8.0)
+        self.addCleanup(self.resource_manager.shutdown)
 
     def test_complete_waits_until_model_is_loaded(self):
         loaded = threading.Event()
@@ -56,7 +57,7 @@ class ModelCompletionTests(unittest.TestCase):
             causal, "_complete_instruct", return_value="model response 1"
         ).start()
         model = CausalModel(
-            "test-org/test-model", qwen_chat_prompt, self.resource_manager
+            "test-org/test-model", qwen_chat_prompt, self.resource_manager, 5.0
         )
 
         responses = []
@@ -79,7 +80,7 @@ class ModelCompletionTests(unittest.TestCase):
             causal, "_complete_instruct", return_value="model response 2"
         ).start()
         model = CausalModel(
-            "test-org/test-model", qwen_chat_prompt, self.resource_manager
+            "test-org/test-model", qwen_chat_prompt, self.resource_manager, 5.0
         )
 
         response = model.complete("system", "user", max_new_tokens=10)
@@ -101,8 +102,12 @@ class ModelCompletionTests(unittest.TestCase):
 
         patch.object(causal, "_complete_instruct", side_effect=slow_generate).start()
 
-        first = CausalModel("test-org/first", qwen_chat_prompt, self.resource_manager)
-        second = CausalModel("test-org/second", qwen_chat_prompt, self.resource_manager)
+        first = CausalModel(
+            "test-org/first", qwen_chat_prompt, self.resource_manager, 5.0
+        )
+        second = CausalModel(
+            "test-org/second", qwen_chat_prompt, self.resource_manager, 5.0
+        )
 
         responses = []
 

@@ -61,8 +61,8 @@ class Encoding(unittest.TestCase):
         patch.object(encoder, "AutoTokenizer").start()
         patch.object(encoder, "AutoModel").start()
 
-        self.resource_manager = InferenceModelResourceManager()
-        self.addCleanup(self.resource_manager._stop_model_process)
+        self.resource_manager = InferenceModelResourceManager(quota_gb=8.0)
+        self.addCleanup(self.resource_manager.shutdown)
 
     def test_passages_are_encoded_as_they_stand(self):
         encoded = []
@@ -72,7 +72,7 @@ class Encoding(unittest.TestCase):
             return [[0.1, 0.2], [0.3, 0.4]]
 
         patch.object(encoder, "_encode", side_effect=encode).start()
-        model = EncoderModel("test-org/test-encoder", self.resource_manager)
+        model = EncoderModel("test-org/test-encoder", self.resource_manager, 5.0)
 
         vectors = model.encode(["knocking at the door", "michael goes down"])
 
@@ -87,7 +87,7 @@ class Encoding(unittest.TestCase):
             return [[0.5, 0.6]]
 
         patch.object(encoder, "_encode", side_effect=encode).start()
-        model = EncoderModel("test-org/test-encoder", self.resource_manager)
+        model = EncoderModel("test-org/test-encoder", self.resource_manager, 5.0)
 
         vector = model.encode_query("who knocks at the door?")
 
@@ -99,7 +99,7 @@ class Encoding(unittest.TestCase):
 
     def test_a_failure_in_the_serving_process_is_raised_to_the_caller(self):
         patch.object(encoder, "_encode", side_effect=RuntimeError("out of memory")).start()
-        model = EncoderModel("test-org/test-encoder", self.resource_manager)
+        model = EncoderModel("test-org/test-encoder", self.resource_manager, 5.0)
 
         with self.assertRaises(resource_manager.ModelNotAvailable):
             model.encode(["a passage"])

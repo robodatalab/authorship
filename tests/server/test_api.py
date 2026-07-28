@@ -36,13 +36,13 @@ def build_fake_kind(model_id: str) -> mock.MagicMock:
 
 class Health(unittest.TestCase):
     def test_reports_serving_while_a_model_is_loaded(self) -> None:
-        app.state.models = mock.Mock(serving=build_fake_kind("Qwen/Qwen3.5-4B"))
+        app.state.models = mock.Mock(residents=[build_fake_kind("Qwen/Qwen3.5-4B")])
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "serving"})
 
     def test_reports_unloaded_when_no_model_is_loaded(self) -> None:
-        app.state.models = mock.Mock(serving=None)
+        app.state.models = mock.Mock(residents=[])
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"inference_server_status": "unloaded"})
@@ -53,7 +53,7 @@ class Models(unittest.TestCase):
         classifier = build_fake_kind("Qwen/Qwen3.5-4B")
         grammar = build_fake_kind("grammarly/coedit-xl")
         app.state.inference_models = [classifier, grammar]
-        app.state.models = mock.Mock(serving=grammar)
+        app.state.models = mock.Mock(residents=[grammar])
 
         response = TestClient(app).get("/models")
 
@@ -78,8 +78,10 @@ class Models(unittest.TestCase):
 
 
 class Memory(unittest.TestCase):
-    def test_reports_what_the_model_holds_and_which_one_it_is(self) -> None:
-        app.state.models = mock.Mock(serving=build_fake_kind("grammarly/coedit-xl"))
+    def test_reports_what_the_models_hold_and_which_they_are(self) -> None:
+        app.state.models = mock.Mock(
+            residents=[build_fake_kind("grammarly/coedit-xl")]
+        )
         app.state.models.memory.return_value = MemoryReading(6.2, 30.2, 9.4)
 
         response = TestClient(app).get("/memory")
@@ -92,7 +94,7 @@ class Memory(unittest.TestCase):
         self.assertGreater(body["machine"], 0)
 
     def test_reads_on_with_no_model_loaded(self) -> None:
-        app.state.models = mock.Mock(serving=None)
+        app.state.models = mock.Mock(residents=[])
         app.state.models.memory.return_value = MemoryReading(0.0, 30.2, 0.3)
 
         response = TestClient(app).get("/memory")

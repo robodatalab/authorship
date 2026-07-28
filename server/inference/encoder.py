@@ -30,9 +30,10 @@ class EncoderModel(ModelKind):
     def __init__(
             self,
             model_id: str,
-            manager: InferenceModelResourceManager
+            manager: InferenceModelResourceManager,
+            mem_required_gb: float,
         ) -> None:
-        super().__init__(model_id)
+        super().__init__(model_id, mem_required_gb)
         self.manager = manager
 
     def load(self) -> tuple[Model, Tokenizer]:

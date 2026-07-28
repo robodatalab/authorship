@@ -17,12 +17,13 @@ _log = log.logger(__name__)
 
 class CausalModel(ModelKind):
     def __init__(
-            self, 
-            model_id: str, 
-            prompt: PromptFormatter, 
-            manager: InferenceModelResourceManager
+            self,
+            model_id: str,
+            prompt: PromptFormatter,
+            manager: InferenceModelResourceManager,
+            mem_required_gb: float,
         ) -> None:
-        super().__init__(model_id)
+        super().__init__(model_id, mem_required_gb)
         self.prompt = prompt
         self.manager = manager
 

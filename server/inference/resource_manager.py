@@ -1,5 +1,5 @@
 import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import gc
 import multiprocessing
 from multiprocessing import Process, Queue
@@ -7,6 +7,7 @@ from multiprocessing.synchronize import Event
 import queue
 import os
 import threading
+import time
 from contextlib import contextmanager
 from typing import Any, Generator
 
@@ -31,8 +32,9 @@ Model = Any
 
 class ModelKind(abc.ABC):
 
-    def __init__(self, model_id: str) -> None:
+    def __init__(self, model_id: str, mem_required_gb: float) -> None:
         self.model_id = model_id
+        self.mem_required_gb = mem_required_gb
 
     def __eq__(self, model: Any) -> bool:
         if not isinstance(model, ModelKind):
@@ -52,7 +54,7 @@ def _log_memory_usage(kind: ModelKind) -> None:
     _log.info(
             "serving %s: tensors %.1fGB, driver %.1fGB, limit %.1fGB",
             kind.model_id,
-            gpu_tensors(), 
+            gpu_tensors(),
             gpu_memory_used(),
             gpu_memory_limit(),
         )
@@ -60,7 +62,7 @@ def _log_memory_usage(kind: ModelKind) -> None:
 
 @dataclass
 class MemoryReading:
-    """What the serving process was holding, the last time it said so."""
+    """What the serving processes were holding, the last time they said so."""
 
     gpu_used: float
     gpu_limit: float
@@ -68,70 +70,153 @@ class MemoryReading:
 
 
 @dataclass
-class _ServingProcess:
+class _Resident:
     kind: ModelKind
-    process: Process
     requests: Queue
     replies: Queue
-    stop: Event
     # Readings the serving process volunteers, on their own queue: asking for
     # one would sit behind a generation that runs for minutes.
     readings: Queue
+    stop: Event
+    process: Process
+    # Loading takes minutes and cannot hold the quota table, so a second caller
+    # for the same model waits here rather than starting a twin.
+    ready: threading.Event = field(default_factory=threading.Event)
+    failure: str | None = None
+    # The replies carry no request ids, so only one caller may be in flight.
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    # Above zero the model is answering someone, and cannot be evicted.
+    leases: int = 0
+    last_used: float = 0.0
+    last_reading: MemoryReading | None = None
 
 
 class InferenceModelResourceManager:
+    """Serving processes, held side by side under a fixed memory quota.
 
-    def __init__(self) -> None:
-        self._model_process_access_lock = threading.Lock()
-        self._serving: _ServingProcess | None = None
-        self._last_reading: MemoryReading | None = None
+    Models stay resident for as long as their declared sizes fit the quota
+    together; past that, the least recently used of the idle ones give up their
+    processes to make room. The quota is spent in declarations — what the
+    processes report of themselves is read back out, never counted against it.
+    """
+
+    def __init__(self, quota_gb: float) -> None:
+        self._quota_gb = quota_gb
+        self._table = threading.Lock()
+        self._released = threading.Condition(self._table)
+        self._residents: dict[str, _Resident] = {}
 
     @property
-    def serving(self) -> ModelKind | None:
-        """The model loaded right now, if any."""
-        serving = self._serving
-        return serving.kind if serving is not None else None
+    def residents(self) -> list[ModelKind]:
+        """The models loaded right now, if any."""
+        with self._table:
+            return [resident.kind for resident in self._residents.values()]
 
     def memory(self) -> MemoryReading:
-        """What the process holding the model last reported.
+        """What the processes holding the models last reported, added up.
 
-        With no model loaded there is no such process, so this one answers for
-        itself — the reading stays continuous either way, and reads as the near
-        nothing the server holds on its own.
+        With no model loaded there are no such processes, so this one answers
+        for itself — the reading stays continuous either way, and reads as the
+        near nothing the server holds on its own.
         """
-        serving = self._serving
-        if serving is None:
-            return _memory_reading()
-        while True:
-            try:
-                self._last_reading = serving.readings.get_nowait()
-            except queue.Empty:
-                return self._last_reading or _memory_reading()
+        with self._table:
+            if not self._residents:
+                return _memory_reading()
+            readings = [self._reading(r) for r in self._residents.values()]
+            gpu_used = sum(reading.gpu_used for reading in readings)
+            process = sum(reading.process for reading in readings)
+        # A limit belongs to the machine rather than to any one process, so it
+        # is the one figure here that is not a sum.
+        return MemoryReading(gpu_used, gpu_memory_limit(), process)
 
-    def _stop_model_process(self) -> None:
-        serving = self._serving
-        if serving is None:
-            return
+    def shutdown(self) -> None:
+        """Stop every serving process and hand the whole quota back."""
+        with self._table:
+            for resident in list(self._residents.values()):
+                self._evict(resident)
+            self._released.notify_all()
 
-        serving.stop.set()
-        serving.process.join(timeout=STOP_GRACE_S)
+    @contextmanager
+    def residency(
+        self,
+        kind: ModelKind,
+    ) -> Generator[tuple[Queue, Queue], None, None]:
+        resident = self._admit(kind)
+        try:
+            with resident.lock:
+                yield resident.requests, resident.replies
+        finally:
+            self._release(resident)
 
-        if serving.process.is_alive():
-            # Whatever it is doing, its memory is needed now.
-            _log.warning("%s did not stop; killing it", serving.kind.model_id)
-            serving.process.terminate()
-            serving.process.join()
+    def _admit(self, kind: ModelKind) -> _Resident:
+        """A process serving this model, leased to the caller until it is done."""
+        if kind.mem_required_gb > self._quota_gb:
+            raise ModelNotAvailable(
+                f"{kind.model_id} wants {kind.mem_required_gb:.1f}GB of a "
+                f"{self._quota_gb:.1f}GB quota"
+            )
 
-        _log_memory_usage(serving.kind)
+        with self._table:
+            while True:
+                resident = self._residents.get(kind.model_id)
+                if resident is not None:
+                    resident.leases += 1
+                    ours = False
+                    break
+                if self._make_room(kind):
+                    resident = self._reserve(kind)
+                    ours = True
+                    break
+                # Every resident is answering someone. One of them will finish.
+                self._released.wait()
 
-        serving.requests.close()
-        serving.replies.close()
-        serving.readings.close()
-        self._serving = None
-        self._last_reading = None
+        if ours:
+            self._load(resident)
+        else:
+            resident.ready.wait()
 
+        if resident.failure is not None:
+            # It left the table on the way down; the lease is on nothing.
+            raise ModelNotAvailable(
+                f"{kind.model_id} did not load: {resident.failure}"
+            )
+        return resident
 
-    def _start_model_process(self, kind: ModelKind) -> None:
+    def _release(self, resident: _Resident) -> None:
+        with self._table:
+            resident.leases -= 1
+            resident.last_used = time.monotonic()
+            self._released.notify_all()
+
+    def _free_gb(self) -> float:
+        claimed = sum(r.kind.mem_required_gb for r in self._residents.values())
+        return self._quota_gb - claimed
+
+    def _make_room(self, kind: ModelKind) -> bool:
+        """Clear the model's share of the quota, oldest idle resident first."""
+        if self._free_gb() >= kind.mem_required_gb:
+            return True
+        idle = sorted(
+            (r for r in self._residents.values() if r.leases == 0),
+            key=lambda r: r.last_used,
+        )
+        for resident in idle:
+            _log.info(
+                "evicting %s to make room for %s",
+                resident.kind.model_id,
+                kind.model_id,
+            )
+            self._evict(resident)
+            if self._free_gb() >= kind.mem_required_gb:
+                return True
+        return False
+
+    def _reserve(self, kind: ModelKind) -> _Resident:
+        """Take the model's share of the quota, before its process exists.
+
+        The claim is entered first so that the load, which runs for minutes, can
+        happen with the table free for everybody else.
+        """
         requests: Queue = Queue()
         replies: Queue = Queue()
         readings: Queue = Queue()
@@ -148,32 +233,50 @@ class InferenceModelResourceManager:
             ),
             daemon=True,
         )
-        process.start()
 
-        error, _ = replies.get()
-        if error is not None:
-            process.join()
-            raise ModelNotAvailable(f"{kind.model_id} did not load: {error}")
-
-        self._serving = _ServingProcess(
-            kind, process, requests, replies, stop, readings
+        resident = _Resident(
+            kind, requests, replies, readings, stop, process, leases=1
         )
+        self._residents[kind.model_id] = resident
+        return resident
 
-    @contextmanager
-    def residency(
-        self, 
-        kind: ModelKind,
-    ) -> Generator[tuple[Queue, Queue], None, None]:
-        with self._model_process_access_lock:
-            if self._serving is None or self._serving.kind != kind:
-                self._stop_model_process()
-                self._start_model_process(kind)
-            serving = self._serving
+    def _load(self, resident: _Resident) -> None:
+        resident.process.start()
 
-            if serving is None:
-                raise ModelNotAvailable(f"{kind.model_id} did not start serving") 
-            
-            yield serving.requests, serving.replies
+        error, _ = resident.replies.get()
+        if error is not None:
+            resident.failure = error
+            resident.process.join()
+            with self._table:
+                self._residents.pop(resident.kind.model_id, None)
+                self._released.notify_all()
+
+        resident.ready.set()
+
+    def _evict(self, resident: _Resident) -> None:
+        resident.stop.set()
+        resident.process.join(timeout=STOP_GRACE_S)
+
+        if resident.process.is_alive():
+            # Whatever it is doing, its memory is needed now.
+            _log.warning("%s did not stop; killing it", resident.kind.model_id)
+            resident.process.terminate()
+            resident.process.join()
+
+        _log_memory_usage(resident.kind)
+
+        resident.requests.close()
+        resident.replies.close()
+        resident.readings.close()
+        self._residents.pop(resident.kind.model_id, None)
+
+    def _reading(self, resident: _Resident) -> MemoryReading:
+        while True:
+            try:
+                resident.last_reading = resident.readings.get_nowait()
+            except queue.Empty:
+                return resident.last_reading or MemoryReading(0.0, 0.0, 0.0)
+
 
 def _memory_reading() -> MemoryReading:
     return MemoryReading(gpu_memory_used(), gpu_memory_limit(), process_memory())
