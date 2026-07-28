@@ -10,8 +10,11 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelJobsManager
-from server.inference.resource_manager import MemoryReading, ModelNotAvailable
-from server.inference.kinds import ModelKind
+from server.inference.resource_manager import (
+    MemoryReading,
+    ModelKind,
+    ModelNotAvailable,
+)
 
 
 DEFAULT_REPLY = (

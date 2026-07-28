@@ -10,7 +10,7 @@ import unittest
 from typing import cast
 from unittest.mock import create_autospec
 
-from server.inference.kinds import CausalModel
+from server.inference.causal import CausalModel
 from server.representations.character_representation import (
     build_character_representation,
 )

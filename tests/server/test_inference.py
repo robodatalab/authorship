@@ -4,9 +4,9 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from server.inference import kinds, resource_manager
+from server.inference import causal, resource_manager
 from server.inference.resource_manager import InferenceModelResourceManager
-from server.inference.kinds import CausalModel
+from server.inference.causal import CausalModel
 from server.inference.utils import qwen_chat_prompt
 
 
@@ -38,8 +38,8 @@ class ModelCompletionTests(unittest.TestCase):
         self.addCleanup(patch.stopall)
         patch.object(resource_manager, "Process", side_effect=spawn).start()
         patch.object(resource_manager, "Queue", ThreadQueue).start()
-        patch.object(kinds, "AutoTokenizer").start()
-        self.transformer = patch.object(kinds, "AutoModelForCausalLM").start()
+        patch.object(causal, "AutoTokenizer").start()
+        self.transformer = patch.object(causal, "AutoModelForCausalLM").start()
 
         self.resource_manager = InferenceModelResourceManager()
         self.addCleanup(self.resource_manager._stop_model_process)
@@ -53,7 +53,7 @@ class ModelCompletionTests(unittest.TestCase):
 
         self.transformer.from_pretrained.side_effect = load
         patch.object(
-            kinds, "_complete_instruct", return_value="model response 1"
+            causal, "_complete_instruct", return_value="model response 1"
         ).start()
         model = CausalModel(
             "test-org/test-model", qwen_chat_prompt, self.resource_manager
@@ -76,7 +76,7 @@ class ModelCompletionTests(unittest.TestCase):
 
     def test_model_runs_inference(self):
         patch.object(
-            kinds, "_complete_instruct", return_value="model response 2"
+            causal, "_complete_instruct", return_value="model response 2"
         ).start()
         model = CausalModel(
             "test-org/test-model", qwen_chat_prompt, self.resource_manager
@@ -99,7 +99,7 @@ class ModelCompletionTests(unittest.TestCase):
             finish.wait(timeout=5)
             return "first response"
 
-        patch.object(kinds, "_complete_instruct", side_effect=slow_generate).start()
+        patch.object(causal, "_complete_instruct", side_effect=slow_generate).start()
 
         first = CausalModel("test-org/first", qwen_chat_prompt, self.resource_manager)
         second = CausalModel("test-org/second", qwen_chat_prompt, self.resource_manager)

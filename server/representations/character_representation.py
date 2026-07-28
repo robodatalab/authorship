@@ -1,5 +1,5 @@
 from server import log
-from server.inference.kinds import CausalModel
+from server.inference.causal import CausalModel
 from server.representations.utils import json_object, numbered, as_edge, as_node
 from server.story_graph import Edge, Node, StoryGraph
 

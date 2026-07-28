@@ -1,7 +1,7 @@
 import re
 from collections.abc import Callable
 
-from server.inference.kinds import Seq2SeqModel
+from server.inference.seq2seq import Seq2SeqModel
 
 
 GRAMMAR_INSTRUCTION = "Fix the grammar"
