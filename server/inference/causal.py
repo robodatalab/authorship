@@ -2,7 +2,7 @@ from functools import partial
 import time
 
 from server import log
-from server.inference.kinds import Model, PromptFormatter, Tokenizer
+from server.inference.types import Model, PromptFormatter, Tokenizer
 from server.inference.monitoring import TextStreamerProgressMonitor
 from server.inference.resource_manager import (
     InferenceModelResourceManager, 
