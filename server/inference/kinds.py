@@ -1,9 +1,11 @@
 import abc
+from functools import partial
 import time
 from typing import Any, Callable
 
 from server import log
 from server.inference.monitoring import TextStreamerProgressMonitor
+from server.inference.inference import InferenceModelResourceManager, ModelNotAvailable
 import torch
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -28,17 +30,17 @@ class ModelKind(abc.ABC):
     def load(self) -> tuple[Model, AutoTokenizer]:
         pass
 
-    @abc.abstractmethod
-    def complete(
-        self, model, tokenizer, system: str, user: str, max_new_tokens: int
-    ) -> str:
-        pass
-
 
 class CausalModel(ModelKind):
-    def __init__(self, model_id: str, prompt: PromptFormatter) -> None:
+    def __init__(
+            self, 
+            model_id: str, 
+            prompt: PromptFormatter, 
+            manager: InferenceModelResourceManager
+        ) -> None:
         super().__init__(model_id)
         self.prompt = prompt
+        self.manager = manager
 
     def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModelForCausalLM.from_pretrained(
@@ -48,44 +50,65 @@ class CausalModel(ModelKind):
         model.eval()
         return model, tokenizer
 
-    def complete(
-        self, model, tokenizer, system: str, user: str, max_new_tokens: int
-    ) -> str:
-        prompt = self.prompt(system, user)
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        prompt_tokens = int(inputs["input_ids"].shape[-1])
+    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
+        with self.manager.residency(self) as (requests, replies):
+            request = partial(_complete_instruct, self.prompt, system, user, max_new_tokens)
+            requests.put(request)
+            error, text = replies.get()
+        if error is not None:
+            raise ModelNotAvailable(f"{str(self)} failed to answer: {error}")
+        return text
 
-        _log.info(
-            "generating: %d prompt tokens, up to %d new", prompt_tokens, max_new_tokens
-        )
-        started = time.monotonic()
 
-        streamer = TextStreamerProgressMonitor(tokenizer, max_new_tokens)
-        output = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            streamer=streamer,
-        )
+def _complete_instruct(
+    prompt_formatter: PromptFormatter, 
+    system: str, 
+    user: str, 
+    max_new_tokens: int, 
+    model, 
+    tokenizer
+) -> str:
+    prompt = prompt_formatter(system, user)
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    prompt_tokens = int(inputs["input_ids"].shape[-1])
 
-        generated = int(output[0].shape[-1]) - prompt_tokens
-        elapsed = time.monotonic() - started
-        _log.info(
-            "generated %d tokens in %.1fs (%.1f tok/s)%s",
-            generated,
-            elapsed,
-            generated / elapsed if elapsed else 0.0,
-            " — hit the budget" if generated >= max_new_tokens else "",
-        )
+    _log.info(
+        "generating: %d prompt tokens, up to %d new", prompt_tokens, max_new_tokens
+    )
+    started = time.monotonic()
 
-        text = tokenizer.decode(output[0][prompt_tokens:], skip_special_tokens=True)
-        return text if isinstance(text, str) else "".join(text)
+    streamer = TextStreamerProgressMonitor(tokenizer, max_new_tokens)
+    output = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        streamer=streamer,
+    )
+
+    generated = int(output[0].shape[-1]) - prompt_tokens
+    elapsed = time.monotonic() - started
+    _log.info(
+        "generated %d tokens in %.1fs (%.1f tok/s)%s",
+        generated,
+        elapsed,
+        generated / elapsed if elapsed else 0.0,
+        " — hit the budget" if generated >= max_new_tokens else "",
+    )
+
+    text = tokenizer.decode(output[0][prompt_tokens:], skip_special_tokens=True)
+    return text if isinstance(text, str) else "".join(text)
 
 
 class Seq2SeqModel(ModelKind):
-    def __init__(self, model_id: str, prompt: PromptFormatter) -> None:
+    def __init__(
+            self, 
+            model_id: str, 
+            prompt: PromptFormatter,
+            manager: InferenceModelResourceManager
+        ) -> None:
         super().__init__(model_id)
         self.prompt = prompt
+        self.manager = manager
 
     def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModelForSeq2SeqLM.from_pretrained(
@@ -95,21 +118,36 @@ class Seq2SeqModel(ModelKind):
         model.eval()
         return model, tokenizer
 
-    def complete(
-        self, model, tokenizer, system: str, user: str, max_new_tokens: int
-    ) -> str:
-        prompt = self.prompt(system, user)
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
+        with self.manager.residency(self) as (requests, replies):
+            request = partial(_complete_seq2seq, self.prompt, system, user, max_new_tokens)
+            requests.put(request)
+            error, text = replies.get()
+        if error is not None:
+            raise ModelNotAvailable(f"{str(self)} failed to answer: {error}")
+        return text
 
-        started = time.monotonic()
-        output = model.generate(
-            **inputs, max_new_tokens=max_new_tokens, do_sample=False
-        )
-        _log.info(
-            "edited %d tokens in %.1fs",
-            int(output[0].shape[-1]),
-            time.monotonic() - started,
-        )
 
-        text = tokenizer.decode(output[0], skip_special_tokens=True)
-        return text if isinstance(text, str) else "".join(text)
+def _complete_seq2seq(
+    prompt_formatter: PromptFormatter, 
+    system: str, 
+    user: str, 
+    max_new_tokens: int,
+    model, 
+    tokenizer,
+) -> str:
+    prompt = prompt_formatter(system, user)
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+    started = time.monotonic()
+    output = model.generate(
+        **inputs, max_new_tokens=max_new_tokens, do_sample=False
+    )
+    _log.info(
+        "edited %d tokens in %.1fs",
+        int(output[0].shape[-1]),
+        time.monotonic() - started,
+    )
+
+    text = tokenizer.decode(output[0], skip_special_tokens=True)
+    return text if isinstance(text, str) else "".join(text)

@@ -12,7 +12,6 @@ from server import log
 from server.epub_exporter import build_epub
 from server.grammar import fix_grammar
 from server.inference import (
-    InferenceModel,
     InferenceModelResourceManager,
     ModelNotAvailable,
     CausalModel, Seq2SeqModel,
@@ -37,11 +36,11 @@ GRAMMAR_MODEL = "grammarly/coedit-xl"
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager()
-    app.state.completion_model = InferenceModel(
-        CausalModel(CLASSIFIER_MODEL, qwen_chat_prompt), app.state.models
+    app.state.completion_model = CausalModel(
+        CLASSIFIER_MODEL, qwen_chat_prompt, app.state.models
     )
-    app.state.grammar_model = InferenceModel(
-        Seq2SeqModel(GRAMMAR_MODEL, coedit_prompt), app.state.models
+    app.state.grammar_model = Seq2SeqModel(
+        GRAMMAR_MODEL, coedit_prompt, app.state.models
     )
     app.state.inference_models = [
         app.state.completion_model,
@@ -74,11 +73,11 @@ def models() -> dict[str, Any]:
     return {
         "models": [
             {
-                "model": m.kind.model_id,
-                "status": "serving" if m.kind == serving else "unloaded",
-                "resident": m.kind == serving,
+                "model": model.model_id,
+                "status": "serving" if model == serving else "unloaded",
+                "resident": model == serving,
             }
-            for m in app.state.inference_models
+            for model in app.state.inference_models
         ]
     }
 
@@ -123,7 +122,7 @@ def _build_representations(model, markdown):
 class RepresentationBuildJob(Job):
     kind = "representation build"
 
-    def __init__(self, model: InferenceModel, source: Path) -> None:
+    def __init__(self, model: CausalModel, source: Path) -> None:
         super().__init__(str(graph_path_for(source)))
         self._model = model
         self._source = source
@@ -138,7 +137,7 @@ class RepresentationBuildJob(Job):
 class GrammarFixJob(Job):
     kind = "grammar fix"
 
-    def __init__(self, model: InferenceModel, source: Path) -> None:
+    def __init__(self, model: Seq2SeqModel, source: Path) -> None:
         super().__init__(str(source))
         self._model = model
         self._source = source

@@ -1,7 +1,7 @@
 import re
 from collections.abc import Callable
 
-from server.inference.inference import InferenceModel
+from server.inference.kinds import Seq2SeqModel
 
 
 GRAMMAR_INSTRUCTION = "Fix the grammar"
@@ -17,7 +17,7 @@ _LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 
 
 def fix_grammar(
-    model: InferenceModel,
+    model: Seq2SeqModel,
     markdown: str,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> str:
@@ -36,7 +36,7 @@ def fix_grammar(
     return "".join(pieces)
 
 
-def _fix_block(model: InferenceModel, block: str) -> str:
+def _fix_block(model: Seq2SeqModel, block: str) -> str:
     # The corrected block should come back about as long as it went in; a budget
     # tied to its length leaves generous room without inviting a runaway.
     budget = max(64, len(block))

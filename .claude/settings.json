@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import server.inference.kinds\")",
+      "Bash(python -c ' *)",
+      "Bash(git --no-pager diff -- server/inference/inference.py server/inference/kinds.py)",
+      "Bash(git --no-pager diff --stat -- server/inference/inference.py server/inference/kinds.py)",
+      "Bash(git --no-pager diff -- server/inference/inference.py)",
+      "Bash(git --no-pager diff --stat -- server/inference/inference.py)"
+    ]
+  }
+}

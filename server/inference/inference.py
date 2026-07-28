@@ -190,18 +190,8 @@ def _serving_process_main(
             readings.put(_memory_reading())
             continue
         try:
-            replies.put(
-                (
-                    None,
-                    kind.complete(
-                        model,
-                        tokenizer,
-                        request.system,
-                        request.user,
-                        request.max_new_token,
-                    ),
-                )
-            )
+            reply = request(model, tokenizer)
+            replies.put((None, reply))
         except Exception as err:
             replies.put((str(err), None))
 
@@ -212,30 +202,3 @@ def _serving_process_main(
         torch.mps.empty_cache()
     _log_memory_usage(kind)
     _log.info("Stopped serving %s", kind.model_id)
-
-
-
-@dataclass
-class CompleteRequest:
-    system: str
-    user: str
-    max_new_token: int
-
-
-class InferenceModel:
-    def __init__(
-        self,
-        kind: ModelKind,
-        manager: InferenceModelResourceManager,
-    ) -> None:
-        self.kind = kind
-        self.manager = manager
-
-    def complete(self, system: str, user: str, max_new_tokens: int) -> str:
-        with self.manager.residency(self.kind) as (requests, replies):
-            requests.put(CompleteRequest(system, user, max_new_tokens))
-            error, text = replies.get()
-        if error is not None:
-            raise ModelNotAvailable(f"{str(self.kind)} failed to answer: {error}")
-        return text
-

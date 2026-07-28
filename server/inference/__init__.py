@@ -1,5 +1,4 @@
 from server.inference.inference import (
-    InferenceModel,
     InferenceModelResourceManager,
     ModelNotAvailable,
 )

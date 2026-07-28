@@ -49,10 +49,7 @@ class Models(unittest.TestCase):
     def test_lists_each_model_and_marks_the_loaded_one(self) -> None:
         classifier = build_fake_kind("Qwen/Qwen3.5-4B")
         grammar = build_fake_kind("grammarly/coedit-xl")
-        app.state.inference_models = [
-            mock.Mock(kind=classifier),
-            mock.Mock(kind=grammar),
-        ]
+        app.state.inference_models = [classifier, grammar]
         app.state.models = mock.Mock(serving=grammar)
 
         response = TestClient(app).get("/models")
