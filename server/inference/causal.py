@@ -23,9 +23,8 @@ class CausalModel(ModelKind):
             manager: InferenceModelResourceManager,
             mem_required_gb: float,
         ) -> None:
-        super().__init__(model_id, mem_required_gb)
+        super().__init__(model_id, manager, mem_required_gb)
         self.prompt = prompt
-        self.manager = manager
 
     def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModelForCausalLM.from_pretrained(

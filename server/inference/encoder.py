@@ -33,8 +33,7 @@ class EncoderModel(ModelKind):
             manager: InferenceModelResourceManager,
             mem_required_gb: float,
         ) -> None:
-        super().__init__(model_id, mem_required_gb)
-        self.manager = manager
+        super().__init__(model_id, manager, mem_required_gb)
 
     def load(self) -> tuple[Model, Tokenizer]:
         model = AutoModel.from_pretrained(

@@ -32,14 +32,29 @@ Model = Any
 
 class ModelKind(abc.ABC):
 
-    def __init__(self, model_id: str, mem_required_gb: float) -> None:
+    def __init__(
+        self,
+        model_id: str,
+        manager: "InferenceModelResourceManager",
+        mem_required_gb: float,
+    ) -> None:
         self.model_id = model_id
+        self.manager = manager
         self.mem_required_gb = mem_required_gb
 
     def __eq__(self, model: Any) -> bool:
         if not isinstance(model, ModelKind):
             return False
         return model.model_id == self.model_id
+
+    def __getstate__(self) -> dict[str, Any]:
+        """What crosses into the serving process: the model, not the manager.
+
+        The manager stays on this side. It holds the locks and the queues of
+        every resident, none of which survive being pickled, and none of which
+        mean anything to a process that only has to load one model and answer.
+        """
+        return {**self.__dict__, "manager": None}
 
     @abc.abstractmethod
     def load(self) -> tuple[Model, AutoTokenizer]:
