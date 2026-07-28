@@ -4,8 +4,8 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from server.inference import inference, kinds
-from server.inference.inference import InferenceModelResourceManager
+from server.inference import kinds, resource_manager
+from server.inference.resource_manager import InferenceModelResourceManager
 from server.inference.kinds import CausalModel
 from server.inference.utils import qwen_chat_prompt
 
@@ -24,7 +24,7 @@ class ThreadQueue(queue.Queue):
 class ModelCompletionTests(unittest.TestCase):
 
     def setUp(self):
-        self.spawned = []
+        self.spawned: list[MagicMock] = []
 
         def spawn(target=None, kwargs=None, daemon=None):
             thread = threading.Thread(target=target, kwargs=kwargs, daemon=True)
@@ -36,8 +36,8 @@ class ModelCompletionTests(unittest.TestCase):
             return process
 
         self.addCleanup(patch.stopall)
-        patch.object(inference, "Process", side_effect=spawn).start()
-        patch.object(inference, "Queue", ThreadQueue).start()
+        patch.object(resource_manager, "Process", side_effect=spawn).start()
+        patch.object(resource_manager, "Queue", ThreadQueue).start()
         patch.object(kinds, "AutoTokenizer").start()
         self.transformer = patch.object(kinds, "AutoModelForCausalLM").start()
 
@@ -89,7 +89,7 @@ class ModelCompletionTests(unittest.TestCase):
     def test_a_swap_waits_for_a_call_in_flight(self):
         # Otherwise the grace period hides the tear-down behind a long wait, and
         # the assertion below passes for the wrong reason.
-        patch.object(inference, "STOP_GRACE_S", 0.05).start()
+        patch.object(resource_manager, "STOP_GRACE_S", 0.05).start()
 
         generating = threading.Event()
         finish = threading.Event()

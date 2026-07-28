@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from server import log
 from server.inference.monitoring import TextStreamerProgressMonitor
-from server.inference.inference import (
+from server.inference.resource_manager import (
     InferenceModelResourceManager, 
     ModelKind, 
     ModelNotAvailable

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelJobsManager
-from server.inference.inference import MemoryReading, ModelNotAvailable
+from server.inference.resource_manager import MemoryReading, ModelNotAvailable
 from server.inference.kinds import ModelKind
 
 
@@ -76,10 +76,8 @@ class Models(unittest.TestCase):
 
 class Memory(unittest.TestCase):
     def test_reports_what_the_model_holds_and_which_one_it_is(self) -> None:
-        app.state.models = mock.Mock(
-            serving=build_fake_kind("grammarly/coedit-xl"),
-            **{"memory.return_value": MemoryReading(6.2, 30.2, 9.4)},
-        )
+        app.state.models = mock.Mock(serving=build_fake_kind("grammarly/coedit-xl"))
+        app.state.models.memory.return_value = MemoryReading(6.2, 30.2, 9.4)
 
         response = TestClient(app).get("/memory")
 
@@ -91,10 +89,8 @@ class Memory(unittest.TestCase):
         self.assertGreater(body["machine"], 0)
 
     def test_reads_on_with_no_model_loaded(self) -> None:
-        app.state.models = mock.Mock(
-            serving=None,
-            **{"memory.return_value": MemoryReading(0.0, 30.2, 0.3)},
-        )
+        app.state.models = mock.Mock(serving=None)
+        app.state.models.memory.return_value = MemoryReading(0.0, 30.2, 0.3)
 
         response = TestClient(app).get("/memory")
 

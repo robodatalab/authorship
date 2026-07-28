@@ -1,4 +1,4 @@
-from server.inference.inference import (
+from server.inference.resource_manager import (
     InferenceModelResourceManager,
     ModelNotAvailable,
 )
