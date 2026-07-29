@@ -22,5 +22,6 @@ dev = [
     "types-tqdm>=4.69.0.20260720",
     "ipykernel>=7.3.0",
     "ipywidgets>=8.1.8",
+    "matplotlib>=3.11.1",
 ]
 
