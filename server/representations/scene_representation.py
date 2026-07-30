@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from server import log
 from server.inference.causal import CausalModel
 from server.representations.utils import (
-    json_object, numbered, parse_sections, as_edge, as_node
+    json_object, numbered, as_edge, as_node
 )
 from server.story_graph import Edge, Node, StoryGraph
 
@@ -41,7 +41,7 @@ Answer with one JSON object and nothing else, in exactly this shape:
 """
 
 
-def build_scene_representation_old(
+def build_scene_representation(
     model: CausalModel, story_markdown: str
 ) -> StoryGraph:
     payload_str = model.complete(
@@ -69,23 +69,3 @@ def build_scene_representation_old(
 
     return StoryGraph(nodes=tuple(nodes), edges=tuple(edges))
 
-
-@dataclass
-class Scene:
-    purpose: str
-    start: int
-    end: int
-
-
-def build_scene_representation(
-    model: CausalModel, story_markdown: str
-) -> StoryGraph:
-    sections = parse_sections(story_markdown)
-    nodes = []
-    edges = []
-    for i, s in enumerate(sections):
-        nodes.append(Node(id=i, title=s.title, start=s.start, end=s.end))
-        if i > 0:
-            edges.append(Edge(source=i-1, target=i))
-
-    return StoryGraph(nodes=tuple(nodes), edges=tuple(edges))

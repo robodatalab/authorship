@@ -29,6 +29,7 @@ from server.representations import (
     build_scene_representation,
     graph_path_for
 )
+from server.semantic_search import DEFAULT_COUNT, SearchIndex
 from server.story_graph import to_yaml
 
 _log = log.logger(__name__)
@@ -66,6 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.encoder_model,
     ]
     app.state.jobs = ParallelJobsManager()
+    # The vectors a search reads. They live here rather than beside the
+    # manuscripts, and so last exactly as long as this process does.
+    app.state.search_index = SearchIndex()
     _log.info("Completion models created")
 
     _log.info("Yielding control to FastAPI server")
@@ -171,6 +175,24 @@ class LineContributionJob(Job):
             raise ValueError(f"no section covers line {self._line}")
         if not self.cancelled:
             write_attribution(Path(self.target), contribution)
+
+
+class SearchIndexJob(Job):
+    kind = "search index"
+
+    def __init__(self, index: SearchIndex, model: EncoderModel, source: Path) -> None:
+        # Keyed by the manuscript itself. Alone among the jobs this one writes no
+        # file, so there is no file to key it by — and a second indexing of a
+        # manuscript should supersede the first in any case.
+        super().__init__(str(source))
+        self._index = index
+        self._model = model
+        self._source = source
+        self._markdown = source.read_text()
+
+    def execute(self) -> None:
+        if not self.cancelled:
+            self._index.index(self._model, str(self._source), self._markdown)
 
 
 class GrammarFixJob(Job):
@@ -280,6 +302,77 @@ def line_contribution_status(id: str) -> dict[str, Any]:
     if not isinstance(job, LineContributionJob):
         raise HTTPException(status_code=404, detail=f"No scoring job for {id}")
     return {"running": not job.done, "error": job.error}
+
+
+class SearchIndexRequest(BaseModel):
+    # Path of the manuscript to encode.
+    path: str
+
+
+@app.post("/search/index", status_code=202)
+def search_index(request: SearchIndexRequest) -> dict[str, Any]:
+    """Encode a manuscript's lines, so that searching it is a lookup.
+
+    A forward pass per line runs for as long as the manuscript is long, so this
+    runs as a job — and being a job is all it takes to appear in /jobs, which is
+    where it is followed. It has no result to collect and no status of its own:
+    the vectors are held in memory, and /search says how much of a manuscript it
+    has yet to see.
+    """
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
+
+    job = SearchIndexJob(app.state.search_index, app.state.encoder_model, document)
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+class SearchRequest(BaseModel):
+    # Path of the manuscript to search.
+    path: str
+    # What to look for, in whatever words the author has for it.
+    phrase: str
+    # Lines to answer with, before adjacent ones are run together into a passage.
+    count: int = DEFAULT_COUNT
+
+
+@app.post("/search")
+def search(request: SearchRequest) -> dict[str, Any]:
+    """The passages of a manuscript that answer a phrase.
+
+    One forward pass on the phrase and a dot product per line, so this answers
+    inside the request rather than as a job. It runs against the lines encoded
+    so far and says how many it has yet to see, rather than waiting on an
+    indexing to finish — a manuscript half encoded can already be asked.
+    """
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
+
+    results = app.state.search_index.search(
+        app.state.encoder_model,
+        str(document),
+        document.read_text(),
+        request.phrase,
+        request.count,
+    )
+    return {
+        "hits": [
+            {
+                "start": hit.start,
+                "end": hit.end,
+                "score": round(hit.score, 4),
+                "text": hit.text,
+            }
+            for hit in results.hits
+        ],
+        "pending": results.pending,
+    }
 
 
 class GrammarFixRequest(BaseModel):

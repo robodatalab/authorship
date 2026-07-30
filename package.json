@@ -24,6 +24,12 @@
                 "title": "Score Section",
                 "category": "Authorship",
                 "icon": "$(graph-line)"
+            },
+            {
+                "command": "authorship.searchManuscript",
+                "title": "Search Manuscript",
+                "category": "Authorship",
+                "icon": "$(search)"
             }
         ],
         "menus": {
@@ -35,6 +41,11 @@
                 },
                 {
                     "command": "authorship.scoreSection",
+                    "when": "resourceExtname == .md",
+                    "group": "navigation"
+                },
+                {
+                    "command": "authorship.searchManuscript",
                     "when": "resourceExtname == .md",
                     "group": "navigation"
                 }

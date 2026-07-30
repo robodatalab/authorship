@@ -7,6 +7,7 @@ import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
 import { BuildActivity } from './llm/activity';
 import { LineContributionGutter } from './line_contribution/gutter';
+import { ManuscriptSearch } from './search/quick_pick';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -58,6 +59,17 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('authorship.scoreSection', () =>
 			void contribution.score()
+		)
+	);
+
+	// Finding the passages that answer a phrase. The vectors are the server's and
+	// live only as long as it does; nothing is written beside the manuscript.
+	const search = new ManuscriptSearch(8765);
+	context.subscriptions.push(search);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.searchManuscript', () =>
+			void search.search()
 		)
 	);
 

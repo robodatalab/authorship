@@ -70,6 +70,9 @@ const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const sectionAttribution = document.getElementById(
 	'section-attribution'
 ) as HTMLButtonElement;
+const searchManuscript = document.getElementById(
+	'search-manuscript'
+) as HTMLButtonElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
@@ -128,13 +131,17 @@ fixGrammar.addEventListener('click', () => {
 sectionAttribution.addEventListener('click', () =>
 	vscode.postMessage({ type: 'sectionAttribution' })
 );
+// Nor here: the picker opens over the editor and is its own report.
+searchManuscript.addEventListener('click', () =>
+	vscode.postMessage({ type: 'searchManuscript' })
+);
 
 /**
  * With no story chosen there is nothing to act on, so the panel is inert.
  *
- * Section attribution is deliberately not among them: it scores whatever the
- * cursor is in, so a story having been chosen here says nothing about whether
- * there is anything for it to do.
+ * Section attribution and search are deliberately not among them: they act on
+ * whatever the cursor is in, so a story having been chosen here says nothing
+ * about whether there is anything for them to do.
  */
 function setEnabled(enabled: boolean): void {
 	const controls = [

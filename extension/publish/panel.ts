@@ -98,6 +98,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'sectionAttribution':
 					void this.sectionAttribution();
 					break;
+				case 'searchManuscript':
+					void this.searchManuscript();
+					break;
 			}
 		});
 
@@ -287,6 +290,17 @@ export class PublishView implements vscode.WebviewViewProvider {
 	 */
 	private async sectionAttribution(): Promise<void> {
 		await vscode.commands.executeCommand('authorship.scoreSection');
+	}
+
+	// --- utils: search ---
+
+	/**
+	 * Search the manuscript in front of the author rather than the one chosen
+	 * here — like section attribution, this acts on the editor. The picker is
+	 * where the answer goes, so nothing comes back to the panel.
+	 */
+	private async searchManuscript(): Promise<void> {
+		await vscode.commands.executeCommand('authorship.searchManuscript');
 	}
 
 	// --- utils: grammar ---
@@ -512,6 +526,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 			</div>
 			<div class="actions">
 				<button id="section-attribution" type="button" class="primary">Section attribution</button>
+			</div>
+			<div class="actions">
+				<button id="search-manuscript" type="button" class="primary">Search manuscript</button>
 			</div>
 			<div id="utils-status" class="status" hidden></div>
 		</div>
