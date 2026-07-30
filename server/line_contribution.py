@@ -1,30 +1,21 @@
-"""How much each line of a section carries the meaning of the section.
-
-A line's score is the distance the section's embedding travels when that line is
-taken out. Near nothing means the rest of the section already said it; a large
-number means the section reads as something else without it.
-
-The measurement is confined to one section — the ablations are built from its
-lines and compared against its own vector, and nothing outside it is read. That
-is what makes it affordable to run while somebody is typing: one section costs
-one encode per line, not one per line of the manuscript.
-
-Scores come back as shares of the section's total. Only one section is ever on
-screen at a time, so a scale that spans the manuscript would buy nothing, and the
-share is the figure that answers "how much of this section rests on this line".
-Shares always sum to 100, so the unnormalized total travels with them: it is the
-only thing that separates a section with a spine from one whose lines are all
-interchangeable.
-"""
+"""How much each line of a section carries the meaning of the section."""
 
 from dataclasses import dataclass
-from typing import Sequence
+from pathlib import Path
+import re
+
+from yaml import dump
 
 from server import log
 from server.inference.encoder import EncoderModel
 from server.representations.utils import parse_sections, section_at, visible_lines
 
 _log = log.logger(__name__)
+
+
+def attribution_path_for(document: Path) -> Path:
+    stem = re.sub(r"\.md$", "", document.name, flags=re.I)
+    return document.with_name(stem + ".attribution.yaml")
 
 
 @dataclass
@@ -47,11 +38,6 @@ class SectionContribution:
 def line_contribution(
     model: EncoderModel, story_markdown: str, line: int
 ) -> SectionContribution | None:
-    """Score the lines of whichever section covers `line`.
-
-    Returns None when no section covers it, which an empty manuscript is the
-    only real way to arrange.
-    """
     lines = visible_lines(story_markdown.splitlines())
     section = section_at(parse_sections(story_markdown), line)
     if section is None:
@@ -98,7 +84,25 @@ def line_contribution(
     )
 
 
-def _displacements(model: EncoderModel, texts: Sequence[str]) -> list[float]:
+def attribution_to_yaml(contribution: SectionContribution) -> str:
+    return dump(
+        {
+            "section": {
+                "title": contribution.title,
+                "start": contribution.start,
+                "end": contribution.end,
+                "displacement": round(contribution.displacement, 6),
+            },
+            "lines": [
+                {"line": entry.line, "share": round(entry.share, 2)}
+                for entry in contribution.lines
+            ],
+        },
+        sort_keys=False,
+    )
+
+
+def _displacements(model: EncoderModel, texts: list[str]) -> list[float]:
     """How far the section's vector moves when each line is left out of it."""
     variants = ["\n".join(texts)]
     variants += ["\n".join(texts[:i] + texts[i + 1 :]) for i in range(len(texts))]
@@ -111,5 +115,5 @@ def _displacements(model: EncoderModel, texts: Sequence[str]) -> list[float]:
     return [max(0.0, 1.0 - _dot(vector, whole)) for vector in vectors[1:]]
 
 
-def _dot(left: Sequence[float], right: Sequence[float]) -> float:
+def _dot(left: list[float], right: list[float]) -> float:
     return sum(a * b for a, b in zip(left, right))

@@ -18,7 +18,11 @@ from server.inference import (
     coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
-from server.line_contribution import line_contribution
+from server.line_contribution import (
+    attribution_path_for,
+    line_contribution,
+    attribution_to_yaml,
+)
 from server.representations import (
     build_character_representation,
     build_plot_representation,
@@ -150,6 +154,28 @@ class RepresentationBuildJob(Job):
             graph_path_for(self._source).write_text(to_yaml(graphs))
 
 
+class LineContributionJob(Job):
+    kind = "line contribution"
+
+    def __init__(self, model: EncoderModel, source: Path, line: int) -> None:
+        # Keyed by the file it writes, like every other job — so scoring a section
+        # of a manuscript never supersedes a grammar pass on the manuscript itself.
+        super().__init__(str(attribution_path_for(source)))
+        self._model = model
+        self._source = source
+        self._line = line
+        self._markdown = source.read_text()
+
+    def execute(self) -> None:
+        contribution = line_contribution(self._model, self._markdown, self._line)
+        if contribution is None:
+            raise ValueError(f"no section covers line {self._line}")
+        if not self.cancelled:
+            attribution_path_for(self._source).write_text(
+                attribution_to_yaml(contribution)
+            )
+
+
 class GrammarFixJob(Job):
     kind = "grammar fix"
 
@@ -230,14 +256,14 @@ class LineContributionRequest(BaseModel):
     line: int
 
 
-@app.post("/line_contribution")
+@app.post("/line_contribution", status_code=202)
 def line_contribution_endpoint(request: LineContributionRequest) -> dict[str, Any]:
-    """Score the lines of the section the cursor is in.
+    """Start scoring the section the cursor is in; the scores land beside the
+    manuscript as `<name>.attribution.yaml`.
 
-    This answers in the request rather than as a job, which is what confining it
-    to one section buys: the encoder runs a forward pass per line of a section,
-    not per line of a manuscript, and the author is waiting on the answer with
-    the cursor still where they left it.
+    A forward pass per line of a section outlives an HTTP request often enough
+    that it runs as a job, and the job is followed through /jobs like the rest of
+    the work the server has in hand.
     """
     document = Path(request.path)
     if not document.is_file():
@@ -245,23 +271,18 @@ def line_contribution_endpoint(request: LineContributionRequest) -> dict[str, An
             status_code=400, detail=f"No such manuscript: {request.path}"
         )
 
-    contribution = line_contribution(
-        app.state.encoder_model, document.read_text(), request.line
-    )
-    if contribution is None:
-        raise HTTPException(
-            status_code=404, detail=f"No section covers line {request.line}"
-        )
+    job = LineContributionJob(app.state.encoder_model, document, request.line)
+    app.state.jobs.start(job)
+    return {"id": job.target, "path": job.target}
 
-    return {
-        "title": contribution.title,
-        "start": contribution.start,
-        "end": contribution.end,
-        "displacement": contribution.displacement,
-        "lines": [
-            {"line": entry.line, "share": entry.share} for entry in contribution.lines
-        ],
-    }
+
+@app.get("/line_contribution/status")
+def line_contribution_status(id: str) -> dict[str, Any]:
+    """Whether the scoring job is still running; the file it writes is its result."""
+    job = app.state.jobs.get(id)
+    if not isinstance(job, LineContributionJob):
+        raise HTTPException(status_code=404, detail=f"No scoring job for {id}")
+    return {"running": not job.done, "error": job.error}
 
 
 class GrammarFixRequest(BaseModel):

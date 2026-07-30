@@ -12,7 +12,7 @@ export interface LineShare {
 	share: number;
 }
 
-/** The server's answer for the section the cursor was in. */
+/** The scored section, as `<name>.attribution.yaml` holds it. */
 export interface SectionContribution {
 	title: string;
 	/** 0-based, inclusive. The heading sits at `start - 1`. */
@@ -21,6 +21,53 @@ export interface SectionContribution {
 	/** The summed displacement, before it was shared out. */
 	displacement: number;
 	lines: LineShare[];
+}
+
+/**
+ * `story.md` sits next to `story.attribution.yaml` — by convention, not
+ * configuration. Mirrors `attribution_path_for` in server/line_contribution.py.
+ */
+export function attributionPathFor(docPath: string): string {
+	return docPath.replace(/\.md$/i, '') + '.attribution.yaml';
+}
+
+/**
+ * Read the on-disk shape into the section the column draws.
+ *
+ * The file is machine-written and may be read mid-rewrite, so anything that is
+ * not a usable line is dropped rather than failing the read — a partial file
+ * draws whatever part of itself is whole.
+ */
+export function normalize(raw: unknown): SectionContribution | undefined {
+	const section = (raw as { section?: unknown } | null)?.section as
+		| Record<string, unknown>
+		| undefined;
+	if (!section) {
+		return undefined;
+	}
+	const start = Number(section.start);
+	const end = Number(section.end);
+	if (!Number.isFinite(start) || !Number.isFinite(end)) {
+		return undefined;
+	}
+
+	const rows = (raw as { lines?: unknown }).lines;
+	const lines: LineShare[] = [];
+	for (const entry of Array.isArray(rows) ? rows : []) {
+		const line = Number((entry as { line?: unknown })?.line);
+		const share = Number((entry as { share?: unknown })?.share);
+		if (Number.isFinite(line) && Number.isFinite(share)) {
+			lines.push({ line, share });
+		}
+	}
+
+	return {
+		title: String(section.title ?? ''),
+		start,
+		end,
+		displacement: Number(section.displacement) || 0,
+		lines,
+	};
 }
 
 const FILLED = '█';

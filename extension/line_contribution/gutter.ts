@@ -1,17 +1,23 @@
 // A column beside the prose saying how much each line carries its section.
 //
 // One decoration type holds the column's shape; the text and colour of each row
-// ride on the range, since every line says something different. The scores come
-// from the server, for the section the cursor is in and no more — which is what
-// makes asking again as the cursor moves affordable.
+// ride on the range, since every line says something different.
+//
+// The server does the reading and the writing: it is handed a path and a line
+// and writes `<name>.attribution.yaml`, exactly as a build writes the graph. The
+// POST only starts the job and a status poll follows it to the end; the scores
+// are read back off the file, so a rewrite by any other hand draws the same way.
 
 import * as vscode from 'vscode';
+import { parse as parseYaml } from 'yaml';
 
 import type { ModelHealth } from '../llm/health';
 import {
+	attributionPathFor,
 	covers,
 	isLow,
 	label,
+	normalize,
 	peakShare,
 	summary,
 	type SectionContribution,
@@ -19,6 +25,9 @@ import {
 
 /** How long the cursor must sit still before its section is asked for. */
 const SETTLE_MS = 250;
+
+/** How often to ask the server how the scoring is getting on. */
+const POLL_INTERVAL_MS = 500;
 
 export class LineContributionGutter implements vscode.Disposable {
 	private readonly disposables: vscode.Disposable[] = [];
@@ -50,7 +59,7 @@ export class LineContributionGutter implements vscode.Disposable {
 				this.onCursor(event.textEditor)
 			),
 			vscode.window.onDidChangeActiveTextEditor((editor) => {
-				// The answer belongs to the document it was scored from.
+				// The scores belong to the document they were read from.
 				this.shown = undefined;
 				if (editor) {
 					this.onCursor(editor);
@@ -97,10 +106,11 @@ export class LineContributionGutter implements vscode.Disposable {
 		}
 
 		clearTimeout(this.settling);
-		this.settling = setTimeout(() => void this.load(editor, line), SETTLE_MS);
+		this.settling = setTimeout(() => void this.score(editor, line), SETTLE_MS);
 	}
 
-	private async load(editor: vscode.TextEditor, line: number): Promise<void> {
+	/** Start a scoring job, follow it to the end, and draw what it wrote. */
+	private async score(editor: vscode.TextEditor, line: number): Promise<void> {
 		if (editor.document.uri.scheme !== 'file') {
 			return;
 		}
@@ -111,19 +121,19 @@ export class LineContributionGutter implements vscode.Disposable {
 		this.status.setScoring(true);
 
 		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/line_contribution`, {
+			const started = await fetch(`http://127.0.0.1:${this.port}/line_contribution`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ path: editor.document.uri.fsPath, line }),
 				signal: request.signal,
 			});
-			// A cursor outside every section is an absence, not a fault — it clears
-			// the column and says nothing.
-			if (!response.ok) {
+			if (!started.ok) {
 				this.clear();
 				return;
 			}
-			this.draw(editor, (await response.json()) as SectionContribution);
+			const { id } = (await started.json()) as { id: string };
+			await this.followToEnd(id, request.signal);
+			await this.load(editor);
 		} catch (err) {
 			// An abort is ours: the cursor reached another section first.
 			if (!isAbort(err)) {
@@ -145,6 +155,49 @@ export class LineContributionGutter implements vscode.Disposable {
 		}
 	}
 
+	/** Poll the job's status until it is no longer running. */
+	private async followToEnd(id: string, signal: AbortSignal): Promise<void> {
+		for (;;) {
+			await delay(POLL_INTERVAL_MS, signal);
+
+			const response = await fetch(
+				`http://127.0.0.1:${this.port}/line_contribution/status?id=${encodeURIComponent(id)}`,
+				{ signal }
+			);
+			// A 404 means the server has no record of this job — it restarted, say —
+			// so there is nothing left to wait for.
+			if (!response.ok) {
+				return;
+			}
+
+			const body = (await response.json()) as { running?: boolean; error?: string | null };
+			if (body.error) {
+				throw new Error(body.error);
+			}
+			if (!body.running) {
+				return;
+			}
+		}
+	}
+
+	/** Read the scores the job wrote beside the manuscript. */
+	private async load(editor: vscode.TextEditor): Promise<void> {
+		const uri = editor.document.uri.with({
+			path: attributionPathFor(editor.document.uri.path),
+		});
+		try {
+			const bytes = await vscode.workspace.fs.readFile(uri);
+			const section = normalize(parseYaml(new TextDecoder().decode(bytes)));
+			if (section) {
+				this.draw(editor, section);
+			}
+		} catch {
+			// A manuscript that has never been scored has no file, and a first run
+			// has none for as long as it takes. That is an absence, not a fault.
+			this.clear();
+		}
+	}
+
 	private draw(editor: vscode.TextEditor, section: SectionContribution): void {
 		this.shown = section;
 		const peak = peakShare(section.lines);
@@ -153,7 +206,7 @@ export class LineContributionGutter implements vscode.Disposable {
 		const rows: vscode.DecorationOptions[] = [];
 		for (const entry of section.lines) {
 			if (entry.line > lastLine) {
-				// The document was edited out from under the answer.
+				// The document was edited out from under the scores.
 				continue;
 			}
 			rows.push({
@@ -193,6 +246,32 @@ export class LineContributionGutter implements vscode.Disposable {
 	}
 }
 
+/** A promise that settles after `ms`, or rejects the moment `signal` aborts. */
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (signal.aborted) {
+			reject(abortError());
+			return;
+		}
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener(
+			'abort',
+			() => {
+				clearTimeout(timer);
+				reject(abortError());
+			},
+			{ once: true }
+		);
+	});
+}
+
+function abortError(): Error {
+	const err = new Error('Aborted');
+	err.name = 'AbortError';
+	return err;
+}
+
+/** Our own aborts — the cursor reaching another section — read as AbortError. */
 function isAbort(err: unknown): boolean {
 	return err instanceof Error && err.name === 'AbortError';
 }

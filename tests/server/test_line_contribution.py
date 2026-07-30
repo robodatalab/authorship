@@ -10,10 +10,13 @@ else says, exactly as an embedding would.
 
 import math
 import unittest
+from pathlib import Path
 from typing import Sequence, cast
 
+from yaml import safe_load
+
 from server.inference.encoder import EncoderModel
-from server.line_contribution import line_contribution
+from server.line_contribution import attribution_path_for, line_contribution, to_yaml
 from server.representations.utils import parse_sections, section_at, visible_lines
 
 
@@ -174,6 +177,45 @@ class Contribution(unittest.TestCase):
         # figure that says whether there was anything to share out.
         scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
         self.assertGreater(scored.displacement, 0.0)
+
+
+class Sidecar(unittest.TestCase):
+    """The file the job writes, beside the manuscript it scored."""
+
+    def test_the_file_sits_beside_the_manuscript(self) -> None:
+        self.assertEqual(
+            attribution_path_for(Path("/stories/story_2.md")),
+            Path("/stories/story_2.attribution.yaml"),
+        )
+
+    def test_the_extension_is_matched_whatever_its_case(self) -> None:
+        self.assertEqual(
+            attribution_path_for(Path("/stories/Story.MD")).name,
+            "Story.attribution.yaml",
+        )
+
+    def test_it_is_not_the_file_the_graph_is_written_to(self) -> None:
+        # The job table supersedes by target, so a scoring job sharing a name with
+        # a build would cancel it.
+        self.assertNotEqual(
+            attribution_path_for(Path("/stories/story_2.md")).name,
+            "story_2.graph.yaml",
+        )
+
+    def test_the_scored_section_round_trips(self) -> None:
+        scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
+        written = safe_load(to_yaml(scored))
+        self.assertEqual(written["section"]["title"], "One")
+        self.assertEqual(written["section"]["start"], 1)
+        self.assertEqual(written["section"]["end"], 3)
+        self.assertEqual([row["line"] for row in written["lines"]], [1, 2, 3])
+        self.assertAlmostEqual(sum(row["share"] for row in written["lines"]), 100.0)
+
+    def test_a_section_with_nothing_to_share_out_still_writes(self) -> None:
+        scored = line_contribution(encoder(), "## One\nalpha", 1)
+        written = safe_load(to_yaml(scored))
+        self.assertEqual(written["lines"], [])
+        self.assertEqual(written["section"]["displacement"], 0.0)
 
 
 if __name__ == "__main__":
