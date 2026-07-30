@@ -13,3 +13,16 @@ Sophia had felt the familiar warmth bloom in her belly.
 He kissed her back with that slow, deep intensity that made her melt.
 
 She padded down the hall to the bedroom
+
+But she also noticed something. When she looked at his face—flushed, happy, but somehow distant—she realized something was different for him. He was watching her pleasure, drinking it in, clearly aroused by her response. But there was a separation in his expression. A remove. Like he was watching a movie he couldn’t quite touch.
+
+He could feel pressure, warmth, the general sensation of being inside her, but the friction, the slick grip of her pussy, the intimate skin-to-skin contact that makes sex feel like sex—that was muted.
+
+His own orgasm stayed out of reach behind that layer of rubber.
+
+She never let him see that. Or rather, she tried not to.
+
+But she could barely feel him. His four inches moving inside her well-fucked, stretched-open pussy was like a whisper after the extender’s shout. She felt the love. She didn’t feel the cock.
+
+“God, I loved the way that big one felt,” she’d murmur against his ear, stroking his hair, her legs wrapped around his waist. “But I love your little guy too.”
+
