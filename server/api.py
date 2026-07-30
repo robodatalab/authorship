@@ -14,10 +14,11 @@ from server.grammar import fix_grammar
 from server.inference import (
     InferenceModelResourceManager,
     ModelNotAvailable,
-    CausalModel, Seq2SeqModel,
+    CausalModel, EncoderModel, Seq2SeqModel,
     coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
+from server.line_contribution import line_contribution
 from server.representations import (
     build_character_representation,
     build_plot_representation,
@@ -31,12 +32,16 @@ _log = log.logger(__name__)
 
 CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
 GRAMMAR_MODEL = "grammarly/coedit-xl"
+ENCODER_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 
 # What each model was measured holding over a single batch, and what the models
-# are allowed between them. Two of these fit, a third waits for one to go.
+# are allowed between them. The quota holds both large models and the encoder at
+# once: the encoder answers while the cursor moves, and evicting a 5GB model to
+# seat 1GB of it would make every section cost a reload.
 CLASSIFIER_MODEL_GB = 5.0
 GRAMMAR_MODEL_GB = 5.0
-MEMORY_QUOTA_GB = 10.0
+ENCODER_MODEL_GB = 1.0
+MEMORY_QUOTA_GB = 11.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -48,9 +53,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.grammar_model = Seq2SeqModel(
         GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
     )
+    app.state.encoder_model = EncoderModel(
+        ENCODER_MODEL, app.state.models, ENCODER_MODEL_GB
+    )
     app.state.inference_models = [
         app.state.completion_model,
         app.state.grammar_model,
+        app.state.encoder_model,
     ]
     app.state.jobs = ParallelJobsManager()
     _log.info("Completion models created")
@@ -212,6 +221,47 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         request.language,
     )
     return {"path": str(out_path)}
+
+
+class LineContributionRequest(BaseModel):
+    # Path of the manuscript.
+    path: str
+    # 0-based line the cursor is on. The section covering it is the one measured.
+    line: int
+
+
+@app.post("/line_contribution")
+def line_contribution_endpoint(request: LineContributionRequest) -> dict[str, Any]:
+    """Score the lines of the section the cursor is in.
+
+    This answers in the request rather than as a job, which is what confining it
+    to one section buys: the encoder runs a forward pass per line of a section,
+    not per line of a manuscript, and the author is waiting on the answer with
+    the cursor still where they left it.
+    """
+    document = Path(request.path)
+    if not document.is_file():
+        raise HTTPException(
+            status_code=400, detail=f"No such manuscript: {request.path}"
+        )
+
+    contribution = line_contribution(
+        app.state.encoder_model, document.read_text(), request.line
+    )
+    if contribution is None:
+        raise HTTPException(
+            status_code=404, detail=f"No section covers line {request.line}"
+        )
+
+    return {
+        "title": contribution.title,
+        "start": contribution.start,
+        "end": contribution.end,
+        "displacement": contribution.displacement,
+        "lines": [
+            {"line": entry.line, "share": entry.share} for entry in contribution.lines
+        ],
+    }
 
 
 class GrammarFixRequest(BaseModel):

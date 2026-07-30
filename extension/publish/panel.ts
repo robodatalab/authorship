@@ -95,6 +95,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'buildRepresentations':
 					void this.buildRepresentations();
 					break;
+				case 'sectionAttribution':
+					void this.sectionAttribution();
+					break;
 			}
 		});
 
@@ -269,6 +272,21 @@ export class PublishView implements vscode.WebviewViewProvider {
 			this.manuscript
 		);
 		await this.status('Building representations…', false, 'utils');
+	}
+
+	// --- utils: section attribution ---
+
+	/**
+	 * Show or hide the column scoring each line against its section.
+	 *
+	 * Alone among the Utils buttons this does not act on the chosen manuscript:
+	 * the column follows the cursor, and scores whichever section it is sitting
+	 * in. It reports nothing here either — the work happens each time the cursor
+	 * reaches a new section, long after this click, and the status bar is where
+	 * that is said.
+	 */
+	private async sectionAttribution(): Promise<void> {
+		await vscode.commands.executeCommand('authorship.toggleLineContribution');
 	}
 
 	// --- utils: grammar ---
@@ -491,6 +509,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 			</div>
 			<div class="actions">
 				<button id="fix-grammar" type="button" class="primary">Fix grammar</button>
+			</div>
+			<div class="actions">
+				<button id="section-attribution" type="button" class="primary">Section attribution</button>
 			</div>
 			<div id="utils-status" class="status" hidden></div>
 		</div>

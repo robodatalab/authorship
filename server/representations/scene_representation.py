@@ -2,7 +2,9 @@ from dataclasses import dataclass
 
 from server import log
 from server.inference.causal import CausalModel
-from server.representations.utils import json_object, numbered, as_edge, as_node
+from server.representations.utils import (
+    json_object, numbered, parse_sections, as_edge, as_node
+)
 from server.story_graph import Edge, Node, StoryGraph
 
 _log = log.logger(__name__)
@@ -69,28 +71,6 @@ def build_scene_representation_old(
 
 
 @dataclass
-class Section:
-    start: int
-    end: int
-    title: str
-
-_SECTION_SEPARATOR = "##"
-
-def _parse_sections(story_markdown: str) -> list[Section]:
-    lines = story_markdown.splitlines()
-    section: Section = Section(start=0, end=-1, title="First anonymous section")
-    sections: list[Section] = []
-    for i, line in enumerate(lines):
-        if line.startswith(_SECTION_SEPARATOR):
-            if section is not None:
-                section.end = i - 1
-                sections.append(section)
-                section = Section(start=i+1, end=-1, title=line[2:].strip())
-
-    return sections
-
-
-@dataclass
 class Scene:
     purpose: str
     start: int
@@ -100,14 +80,12 @@ class Scene:
 def build_scene_representation(
     model: CausalModel, story_markdown: str
 ) -> StoryGraph:
-    sections = _parse_sections(story_markdown)
+    sections = parse_sections(story_markdown)
     nodes = []
     edges = []
     for i, s in enumerate(sections):
         nodes.append(Node(id=i, title=s.title, start=s.start, end=s.end))
         if i > 0:
             edges.append(Edge(source=i-1, target=i))
-
-    
 
     return StoryGraph(nodes=tuple(nodes), edges=tuple(edges))

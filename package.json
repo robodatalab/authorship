@@ -18,12 +18,23 @@
                 "title": "Open Story Graph",
                 "category": "Authorship",
                 "icon": "$(type-hierarchy)"
+            },
+            {
+                "command": "authorship.toggleLineContribution",
+                "title": "Toggle Line Contribution",
+                "category": "Authorship",
+                "icon": "$(graph-line)"
             }
         ],
         "menus": {
             "editor/title": [
                 {
                     "command": "authorship.showStoryGraph",
+                    "when": "resourceExtname == .md",
+                    "group": "navigation"
+                },
+                {
+                    "command": "authorship.toggleLineContribution",
                     "when": "resourceExtname == .md",
                     "group": "navigation"
                 }

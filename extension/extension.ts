@@ -6,6 +6,7 @@ import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
 import { BuildActivity } from './llm/activity';
+import { LineContributionGutter } from './line_contribution/gutter';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -45,6 +46,18 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand(
 			'authorship.buildRepresentations',
 			(manuscript: vscode.Uri) => void builder.build(manuscript)
+		)
+	);
+
+	// How much each line carries the section it is in, drawn beside the prose.
+	// Off until asked for: it runs the encoder as the cursor moves between
+	// sections, which is not something to do to a manuscript nobody is auditing.
+	const contribution = new LineContributionGutter(8765, health);
+	context.subscriptions.push(contribution);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.toggleLineContribution', () =>
+			contribution.toggle()
 		)
 	);
 

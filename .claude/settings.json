@@ -11,7 +11,9 @@
       "Bash(uv tool *)",
       "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import CausalModel$|from server.inference.causal import CausalModel|' server/representations/character_representation.py server/representations/plot_representation.py server/representations/scene_representation.py tests/server/test_character_representation.py tests/server/test_plot_representation.py tests/server/test_scene_representation.py)",
       "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import Seq2SeqModel$|from server.inference.seq2seq import Seq2SeqModel|' server/grammar.py)",
-      "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import ModelKind$|from server.inference.resource_manager import ModelKind|' tests/server/test_api.py)"
+      "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import ModelKind$|from server.inference.resource_manager import ModelKind|' tests/server/test_api.py)",
+      "WebFetch(domain:help.gitkraken.com)",
+      "WebFetch(domain:vscode.rocks)"
     ]
   }
 }
