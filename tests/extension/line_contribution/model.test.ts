@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	CELLS,
+	afterEdits,
 	attributionPathFor,
 	bar,
-	covers,
+	denormalize,
 	isLow,
 	label,
 	normalize,
@@ -21,6 +22,28 @@ const SECTION: SectionContribution = {
 		{ line: 3, share: 40 },
 		{ line: 5, share: 10 },
 		{ line: 7, share: 50 },
+	],
+};
+
+const ONE: SectionContribution = {
+	title: 'One',
+	start: 3,
+	end: 6,
+	displacement: 0.2,
+	lines: [
+		{ line: 3, share: 60 },
+		{ line: 5, share: 40 },
+	],
+};
+
+const TWO: SectionContribution = {
+	title: 'Two',
+	start: 9,
+	end: 12,
+	displacement: 0.3,
+	lines: [
+		{ line: 9, share: 70 },
+		{ line: 11, share: 30 },
 	],
 };
 
@@ -113,69 +136,117 @@ describe('attributionPathFor', () => {
 
 describe('normalize', () => {
 	it('reads the shape the server writes', () => {
-		const section = normalize({
-			section: { title: 'One', start: 3, end: 9, displacement: 0.21 },
-			lines: [
-				{ line: 3, share: 40 },
-				{ line: 5, share: 60 },
-			],
-		});
-		expect(section).toEqual({
-			title: 'One',
-			start: 3,
-			end: 9,
-			displacement: 0.21,
-			lines: [
-				{ line: 3, share: 40 },
-				{ line: 5, share: 60 },
-			],
-		});
+		expect(normalize({ sections: [ONE] })).toEqual([ONE]);
+	});
+
+	it('reads every section the file has accumulated', () => {
+		const sections = normalize({ sections: [ONE, TWO] });
+		expect(sections.map((section) => section.title)).toEqual(['One', 'Two']);
 	});
 
 	it('drops rows it cannot use rather than failing the read', () => {
 		// The file is machine-written and may be read mid-rewrite.
-		const section = normalize({
-			section: { title: 'One', start: 0, end: 4 },
-			lines: [{ line: 1, share: 50 }, 'not a row', { share: 50 }, { line: 3, share: 50 }],
+		const sections = normalize({
+			sections: [
+				{
+					title: 'One',
+					start: 0,
+					end: 4,
+					lines: [{ line: 1, share: 50 }, 'not a row', { share: 50 }, { line: 3, share: 50 }],
+				},
+			],
 		});
-		expect(section?.lines).toEqual([
+		expect(sections[0].lines).toEqual([
 			{ line: 1, share: 50 },
 			{ line: 3, share: 50 },
 		]);
 	});
 
-	it('reads a section with no scored lines as empty, not as absent', () => {
-		const section = normalize({
-			section: { title: 'One', start: 1, end: 1, displacement: 0 },
-			lines: [],
-		});
-		expect(section?.lines).toEqual([]);
+	it('drops a section with no line numbers and keeps the rest', () => {
+		const sections = normalize({ sections: [{ title: 'Nowhere' }, TWO] });
+		expect(sections.map((section) => section.title)).toEqual(['Two']);
 	});
 
-	it('gives nothing back when there is no section to read', () => {
-		expect(normalize({})).toBeUndefined();
-		expect(normalize(null)).toBeUndefined();
-		expect(normalize({ section: { title: 'One' } })).toBeUndefined();
+	it('reads a section with no scored lines as empty, not as absent', () => {
+		const sections = normalize({
+			sections: [{ title: 'One', start: 1, end: 1, displacement: 0, lines: [] }],
+		});
+		expect(sections).toHaveLength(1);
+		expect(sections[0].lines).toEqual([]);
+	});
+
+	it('gives an empty list back when there is nothing to read', () => {
+		expect(normalize({})).toEqual([]);
+		expect(normalize(null)).toEqual([]);
+		expect(normalize({ sections: 'not a list' })).toEqual([]);
 	});
 });
 
-describe('covers', () => {
-	it('holds for a line inside the section', () => {
-		expect(covers(SECTION, 5)).toBe(true);
+describe('denormalize', () => {
+	it('writes the shape normalize reads', () => {
+		expect(normalize(denormalize([ONE, TWO]))).toEqual([ONE, TWO]);
 	});
 
-	it('holds for the heading the section hangs from', () => {
-		// A cursor parked on `## One` is in One, not in whatever came before it.
-		expect(covers(SECTION, 2)).toBe(true);
+	it('writes an empty file rather than nothing when every score is gone', () => {
+		expect(denormalize([])).toEqual({ sections: [] });
+	});
+});
+
+describe('afterEdits', () => {
+	it('drops the scores of a section that was written in', () => {
+		// Line 4 is inside One. What was scored is no longer what is there.
+		const after = afterEdits([ONE, TWO], [{ start: 4, end: 4, delta: 0 }]);
+		expect(after.map((section) => section.title)).toEqual(['Two']);
 	});
 
-	it('holds at both ends', () => {
-		expect(covers(SECTION, 3)).toBe(true);
-		expect(covers(SECTION, 9)).toBe(true);
+	it('drops a section edited through its heading', () => {
+		// One hangs from line 2; retitling it rescores it.
+		const after = afterEdits([ONE, TWO], [{ start: 2, end: 2, delta: 0 }]);
+		expect(after.map((section) => section.title)).toEqual(['Two']);
 	});
 
-	it('fails past either end, so the next section is asked for', () => {
-		expect(covers(SECTION, 1)).toBe(false);
-		expect(covers(SECTION, 10)).toBe(false);
+	it('leaves a section above the edit exactly as it was', () => {
+		expect(afterEdits([ONE, TWO], [{ start: 10, end: 10, delta: 0 }])).toEqual([ONE]);
+	});
+
+	it('moves a section below the edit down with the prose', () => {
+		const after = afterEdits([ONE, TWO], [{ start: 4, end: 4, delta: 2 }]);
+		expect(after).toEqual([
+			{
+				...TWO,
+				start: 11,
+				end: 14,
+				lines: [
+					{ line: 11, share: 70 },
+					{ line: 13, share: 30 },
+				],
+			},
+		]);
+	});
+
+	it('moves a section up when lines are deleted above it', () => {
+		const after = afterEdits([TWO], [{ start: 1, end: 3, delta: -2 }]);
+		expect(after[0].start).toBe(7);
+		expect(after[0].lines.map((entry) => entry.line)).toEqual([7, 9]);
+	});
+
+	it('gives the same list back when the edit reached nothing', () => {
+		// An edit below every scored section changes neither their lines nor their
+		// membership, and must not provoke a rewrite of the file.
+		const sections = [ONE, TWO];
+		expect(afterEdits(sections, [{ start: 20, end: 20, delta: 3 }])).toBe(sections);
+	});
+
+	it('applies several edits in one change against the document as it was', () => {
+		// Both ranges are in pre-edit coordinates; taking the later one first is
+		// what keeps the earlier one's line numbers meaning what they said.
+		const after = afterEdits(
+			[ONE, TWO],
+			[
+				{ start: 4, end: 4, delta: 1 },
+				{ start: 10, end: 10, delta: 1 },
+			]
+		);
+		expect(after).toEqual([]);
 	});
 });

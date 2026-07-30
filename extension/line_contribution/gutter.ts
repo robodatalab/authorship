@@ -1,33 +1,40 @@
 // A column beside the prose saying how much each line carries its section.
 //
+// The file is what is drawn, not the request. `<name>.attribution.yaml` beside
+// the manuscript accumulates a section at a time, and this watches it and paints
+// whatever it holds — so a manuscript scored last week draws the moment it is
+// opened, and scoring a second section leaves the first on screen.
+//
+// Editing takes scores away rather than leaving them to go quietly wrong: a
+// section that has been written in is no longer the section that was scored, so
+// its bars go from the screen and its entry from the file. Sections below the
+// edit move with the prose and keep theirs.
+//
 // One decoration type holds the column's shape; the text and colour of each row
 // ride on the range, since every line says something different.
-//
-// The server does the reading and the writing: it is handed a path and a line
-// and writes `<name>.attribution.yaml`, exactly as a build writes the graph. The
-// POST only starts the job and a status poll follows it to the end; the scores
-// are read back off the file, so a rewrite by any other hand draws the same way.
 
 import * as vscode from 'vscode';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import type { ModelHealth } from '../llm/health';
 import {
+	afterEdits,
 	attributionPathFor,
-	covers,
+	denormalize,
 	isLow,
 	label,
 	normalize,
 	peakShare,
 	summary,
+	type LineEdit,
 	type SectionContribution,
 } from './model';
 
-/** How long the cursor must sit still before its section is asked for. */
-const SETTLE_MS = 250;
-
 /** How often to ask the server how the scoring is getting on. */
 const POLL_INTERVAL_MS = 500;
+
+/** How long after the last keystroke the pruned scores are written back. */
+const WRITE_DEBOUNCE_MS = 400;
 
 export class LineContributionGutter implements vscode.Disposable {
 	private readonly disposables: vscode.Disposable[] = [];
@@ -45,76 +52,45 @@ export class LineContributionGutter implements vscode.Disposable {
 		rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 	});
 
-	private shown: SectionContribution | undefined;
+	/** The manuscript being drawn, and the scores it has. */
+	private document: vscode.Uri | undefined;
+	private sections: SectionContribution[] = [];
+
+	private watcher: vscode.FileSystemWatcher | undefined;
 	private request: AbortController | undefined;
-	private settling: NodeJS.Timeout | undefined;
-	private enabled = false;
+	private pendingWrite: NodeJS.Timeout | undefined;
 
 	constructor(
 		private readonly port: number,
 		private readonly status: ModelHealth
 	) {
 		this.disposables.push(
-			vscode.window.onDidChangeTextEditorSelection((event) =>
-				this.onCursor(event.textEditor)
+			vscode.window.onDidChangeActiveTextEditor((editor) => this.follow(editor?.document)),
+			// A manuscript can already be open when this is constructed, and can be
+			// opened into a split without ever becoming active.
+			vscode.window.onDidChangeVisibleTextEditors(() =>
+				this.follow(vscode.window.activeTextEditor?.document)
 			),
-			vscode.window.onDidChangeActiveTextEditor((editor) => {
-				// The scores belong to the document they were read from.
-				this.shown = undefined;
-				if (editor) {
-					this.onCursor(editor);
-				}
-			}),
-			// An edit shifts every line below it, so the column stops describing the
-			// prose it sits beside. Clearing is the honest response: percentages that
-			// have quietly slid onto the wrong paragraphs are worse than none.
-			vscode.workspace.onDidChangeTextDocument((event) => {
-				if (event.document === vscode.window.activeTextEditor?.document) {
-					this.clear();
-				}
-			}),
-			vscode.workspace.onDidSaveTextDocument(() => {
-				const editor = vscode.window.activeTextEditor;
-				if (editor) {
-					this.onCursor(editor);
-				}
-			})
+			vscode.workspace.onDidChangeTextDocument((event) => this.onEdit(event))
 		);
+		this.follow(vscode.window.activeTextEditor?.document);
 	}
 
-	toggle(): void {
-		this.enabled = !this.enabled;
-		if (!this.enabled) {
-			this.clear();
-			return;
-		}
+	/** Score the section the cursor is in. The file it writes is what gets drawn. */
+	async score(): Promise<void> {
 		const editor = vscode.window.activeTextEditor;
-		if (editor) {
-			this.onCursor(editor);
-		}
-	}
-
-	private onCursor(editor: vscode.TextEditor): void {
-		if (!this.enabled || editor.document.languageId !== 'markdown') {
+		if (!editor || editor.document.languageId !== 'markdown') {
+			vscode.window.showInformationMessage(
+				'Open a manuscript and put the cursor in the section to score.'
+			);
 			return;
 		}
-		const line = editor.selection.active.line;
-		// Moving about within a section changes nothing about its scores, and
-		// re-asking on every arrow key would keep the encoder permanently busy.
-		if (this.shown && covers(this.shown, line)) {
-			return;
-		}
-
-		clearTimeout(this.settling);
-		this.settling = setTimeout(() => void this.score(editor, line), SETTLE_MS);
-	}
-
-	/** Start a scoring job, follow it to the end, and draw what it wrote. */
-	private async score(editor: vscode.TextEditor, line: number): Promise<void> {
 		if (editor.document.uri.scheme !== 'file') {
 			return;
 		}
 
+		// A second ask supersedes the first here; the server supersedes the older
+		// job on its own side, keyed by the file they both write.
 		this.request?.abort();
 		const request = new AbortController();
 		this.request = request;
@@ -124,20 +100,26 @@ export class LineContributionGutter implements vscode.Disposable {
 			const started = await fetch(`http://127.0.0.1:${this.port}/line_contribution`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: editor.document.uri.fsPath, line }),
+				body: JSON.stringify({
+					path: editor.document.uri.fsPath,
+					line: editor.selection.active.line,
+				}),
 				signal: request.signal,
 			});
 			if (!started.ok) {
-				this.clear();
+				vscode.window.showWarningMessage(
+					`Authorship could not score this section: ${await detailOf(started)}`
+				);
 				return;
 			}
 			const { id } = (await started.json()) as { id: string };
 			await this.followToEnd(id, request.signal);
-			await this.load(editor);
+			// The watcher will have fired too, but a write landing between the two
+			// would otherwise go unread.
+			await this.load();
 		} catch (err) {
-			// An abort is ours: the cursor reached another section first.
+			// An abort is ours, and means a newer scoring is already on it.
 			if (!isAbort(err)) {
-				this.clear();
 				vscode.window.showWarningMessage(
 					`Authorship could not score this section — is the model server running? (${describe(
 						err
@@ -145,9 +127,6 @@ export class LineContributionGutter implements vscode.Disposable {
 				);
 			}
 		} finally {
-			// Only if nothing has taken over since: a request aborted by a newer one
-			// unwinds after that one announced itself, and would otherwise put the
-			// bar back to idle while the encoder is still working.
 			if (this.request === request) {
 				this.request = undefined;
 				this.status.setScoring(false);
@@ -180,65 +159,163 @@ export class LineContributionGutter implements vscode.Disposable {
 		}
 	}
 
-	/** Read the scores the job wrote beside the manuscript. */
-	private async load(editor: vscode.TextEditor): Promise<void> {
-		const uri = editor.document.uri.with({
-			path: attributionPathFor(editor.document.uri.path),
-		});
+	/** Watch the scores belonging to the manuscript now in front, and draw them. */
+	private follow(document: vscode.TextDocument | undefined): void {
+		if (
+			!document ||
+			document.languageId !== 'markdown' ||
+			document.uri.scheme !== 'file'
+		) {
+			return;
+		}
+		// Already following it — the scores in hand are current, and what may have
+		// changed is which editors are showing them.
+		if (this.document?.toString() === document.uri.toString()) {
+			this.draw();
+			return;
+		}
+
+		this.watcher?.dispose();
+		this.document = document.uri;
+		this.sections = [];
+
+		// The scores are rewritten by the server behind our back, so they are
+		// watched and pushed rather than read once when the manuscript is opened.
+		const scores = this.scoresUri();
+		const watcher = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(vscode.Uri.joinPath(scores, '..'), basename(scores))
+		);
+		const reload = () => void this.load();
+		watcher.onDidChange(reload);
+		watcher.onDidCreate(reload);
+		watcher.onDidDelete(reload);
+		this.watcher = watcher;
+
+		void this.load();
+	}
+
+	/**
+	 * Drop the scores for every section the edit reached, and move the rest.
+	 *
+	 * The screen is repainted at once; the file follows on a debounce, because a
+	 * write per keystroke would have the watcher reloading throughout a sentence.
+	 */
+	private onEdit(event: vscode.TextDocumentChangeEvent): void {
+		if (
+			event.document.uri.toString() !== this.document?.toString() ||
+			event.contentChanges.length === 0 ||
+			this.sections.length === 0
+		) {
+			return;
+		}
+
+		const edits: LineEdit[] = event.contentChanges.map((change) => ({
+			start: change.range.start.line,
+			end: change.range.end.line,
+			delta:
+				(change.text.match(/\n/g)?.length ?? 0) -
+				(change.range.end.line - change.range.start.line),
+		}));
+
+		const surviving = afterEdits(this.sections, edits);
+		if (surviving === this.sections) {
+			return;
+		}
+		this.sections = surviving;
+		this.draw();
+
+		clearTimeout(this.pendingWrite);
+		this.pendingWrite = setTimeout(() => void this.save(), WRITE_DEBOUNCE_MS);
+	}
+
+	/** Read the scores beside the manuscript and paint every section in them. */
+	private async load(): Promise<void> {
+		if (!this.document) {
+			return;
+		}
 		try {
-			const bytes = await vscode.workspace.fs.readFile(uri);
-			const section = normalize(parseYaml(new TextDecoder().decode(bytes)));
-			if (section) {
-				this.draw(editor, section);
-			}
+			const bytes = await vscode.workspace.fs.readFile(this.scoresUri());
+			this.sections = normalize(parseYaml(new TextDecoder().decode(bytes)));
 		} catch {
-			// A manuscript that has never been scored has no file, and a first run
-			// has none for as long as it takes. That is an absence, not a fault.
-			this.clear();
+			// A manuscript that has never been scored has no file. That is an
+			// absence, not a fault, and it draws as an empty column.
+			this.sections = [];
+		}
+		this.draw();
+	}
+
+	/**
+	 * Write the pruned scores back. The watcher then reloads them, so the screen
+	 * is confirmed along the same path the server's writes take — there is no
+	 * special case for our own.
+	 */
+	private async save(): Promise<void> {
+		if (!this.document) {
+			return;
+		}
+		try {
+			await vscode.workspace.fs.writeFile(
+				this.scoresUri(),
+				new TextEncoder().encode(stringifyYaml(denormalize(this.sections), { lineWidth: 0 }))
+			);
+		} catch {
+			// Nothing to write to means nothing was ever scored, and the screen is
+			// already showing that.
 		}
 	}
 
-	private draw(editor: vscode.TextEditor, section: SectionContribution): void {
-		this.shown = section;
-		const peak = peakShare(section.lines);
-		const lastLine = editor.document.lineCount - 1;
+	private draw(): void {
+		const editors = vscode.window.visibleTextEditors.filter(
+			(candidate) => candidate.document.uri.toString() === this.document?.toString()
+		);
+		if (editors.length === 0) {
+			return;
+		}
 
+		const lastLine = editors[0].document.lineCount - 1;
 		const rows: vscode.DecorationOptions[] = [];
-		for (const entry of section.lines) {
-			if (entry.line > lastLine) {
-				// The document was edited out from under the scores.
-				continue;
-			}
-			rows.push({
-				range: new vscode.Range(entry.line, 0, entry.line, 0),
-				// The bar carries the magnitude, so colour is free to carry the one
-				// thing the length cannot: which lines the section would barely miss.
-				renderOptions: {
-					before: {
-						contentText: label(entry.share, peak),
-						color: new vscode.ThemeColor(
-							isLow(entry.share, peak) ? 'charts.orange' : 'charts.blue'
-						),
+
+		for (const section of this.sections) {
+			// Each section is scaled to its own strongest line: the column is read a
+			// section at a time, and a manuscript-wide scale would flatten a short
+			// section against a long one.
+			const peak = peakShare(section.lines);
+			for (const entry of section.lines) {
+				if (entry.line > lastLine) {
+					// The manuscript has been cut back since it was scored.
+					continue;
+				}
+				rows.push({
+					range: new vscode.Range(entry.line, 0, entry.line, 0),
+					// The bar carries the magnitude, so colour is free to carry the one
+					// thing the length cannot: which lines the section would barely miss.
+					renderOptions: {
+						before: {
+							contentText: label(entry.share, peak),
+							color: new vscode.ThemeColor(
+								isLow(entry.share, peak) ? 'charts.orange' : 'charts.blue'
+							),
+						},
 					},
-				},
-				hoverMessage: `${entry.share.toFixed(1)}% of this section\n\n${summary(section)}`,
-			});
+					hoverMessage: `${entry.share.toFixed(1)}% of this section\n\n${summary(section)}`,
+				});
+			}
 		}
-		editor.setDecorations(this.column, rows);
+
+		for (const editor of editors) {
+			editor.setDecorations(this.column, rows);
+		}
 	}
 
-	private clear(): void {
-		this.shown = undefined;
-		this.request?.abort();
-		clearTimeout(this.settling);
-		for (const editor of vscode.window.visibleTextEditors) {
-			editor.setDecorations(this.column, []);
-		}
+	private scoresUri(): vscode.Uri {
+		const document = this.document as vscode.Uri;
+		return document.with({ path: attributionPathFor(document.path) });
 	}
 
 	dispose(): void {
-		clearTimeout(this.settling);
+		clearTimeout(this.pendingWrite);
 		this.request?.abort();
+		this.watcher?.dispose();
 		this.column.dispose(); // also clears the column from the editors
 		for (const item of this.disposables) {
 			item.dispose();
@@ -271,9 +348,22 @@ function abortError(): Error {
 	return err;
 }
 
-/** Our own aborts — the cursor reaching another section — read as AbortError. */
+/** Our own aborts — a newer scoring taking over — read as AbortError. */
 function isAbort(err: unknown): boolean {
 	return err instanceof Error && err.name === 'AbortError';
+}
+
+function basename(uri: vscode.Uri): string {
+	return uri.path.split('/').pop() ?? uri.path;
+}
+
+async function detailOf(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { detail?: string };
+		return body.detail ?? response.statusText;
+	} catch {
+		return response.statusText;
+	}
 }
 
 function describe(err: unknown): string {

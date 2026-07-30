@@ -123,8 +123,8 @@ fixGrammar.addEventListener('click', () => {
 	setStatus(utilsStatus, 'Fixing grammar…', false);
 	vscode.postMessage({ type: 'fixGrammar' });
 });
-// No status set here: this one toggles, so what to say is only known once the
-// host has flipped it, and guessing would read as off every other click.
+// No status set here: the scoring is reported in the status bar, and the column
+// beside the prose is where the answer lands.
 sectionAttribution.addEventListener('click', () =>
 	vscode.postMessage({ type: 'sectionAttribution' })
 );

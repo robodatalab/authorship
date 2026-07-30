@@ -21,7 +21,7 @@ from server.jobs import Job, ParallelJobsManager
 from server.line_contribution import (
     attribution_path_for,
     line_contribution,
-    attribution_to_yaml,
+    write_attribution,
 )
 from server.representations import (
     build_character_representation,
@@ -162,7 +162,6 @@ class LineContributionJob(Job):
         # of a manuscript never supersedes a grammar pass on the manuscript itself.
         super().__init__(str(attribution_path_for(source)))
         self._model = model
-        self._source = source
         self._line = line
         self._markdown = source.read_text()
 
@@ -171,9 +170,7 @@ class LineContributionJob(Job):
         if contribution is None:
             raise ValueError(f"no section covers line {self._line}")
         if not self.cancelled:
-            attribution_path_for(self._source).write_text(
-                attribution_to_yaml(contribution)
-            )
+            write_attribution(Path(self.target), contribution)
 
 
 class GrammarFixJob(Job):

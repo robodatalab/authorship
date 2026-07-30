@@ -20,8 +20,8 @@
                 "icon": "$(type-hierarchy)"
             },
             {
-                "command": "authorship.toggleLineContribution",
-                "title": "Toggle Line Contribution",
+                "command": "authorship.scoreSection",
+                "title": "Score Section",
                 "category": "Authorship",
                 "icon": "$(graph-line)"
             }
@@ -34,7 +34,7 @@
                     "group": "navigation"
                 },
                 {
-                    "command": "authorship.toggleLineContribution",
+                    "command": "authorship.scoreSection",
                     "when": "resourceExtname == .md",
                     "group": "navigation"
                 }

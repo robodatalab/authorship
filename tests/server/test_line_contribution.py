@@ -11,6 +11,7 @@ else says, exactly as an embedding would.
 import math
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Sequence, cast
 
 from yaml import safe_load
@@ -19,8 +20,8 @@ from server.inference.encoder import EncoderModel
 from server.line_contribution import (
     SectionContribution,
     attribution_path_for,
-    attribution_to_yaml,
     line_contribution,
+    write_attribution,
 )
 from server.representations.utils import (
     Section,
@@ -221,10 +222,13 @@ class Sidecar(unittest.TestCase):
 
     def test_the_scored_section_round_trips(self) -> None:
         scored = score("## One\nalpha\nbeta\ngamma", 1)
-        written = safe_load(attribution_to_yaml(scored))
-        self.assertEqual(written["section"]["title"], "One")
-        self.assertEqual(written["section"]["start"], 1)
-        self.assertEqual(written["section"]["end"], 3)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, scored)
+            written = safe_load(path.read_text())["sections"][0]
+        self.assertEqual(written["title"], "One")
+        self.assertEqual(written["start"], 1)
+        self.assertEqual(written["end"], 3)
         self.assertEqual([row["line"] for row in written["lines"]], [1, 2, 3])
         for row, entry in zip(written["lines"], scored.lines):
             self.assertAlmostEqual(row["share"], entry.share, places=2)
@@ -233,13 +237,73 @@ class Sidecar(unittest.TestCase):
         # Deliberately lossy: a hundredth of a percent is far below anything a
         # bar eight cells wide can show, and the shares no longer sum to exactly
         # a hundred once written. The file is read to be drawn, not summed.
-        written = safe_load(attribution_to_yaml(score("## One\nalpha\nbeta\ngamma", 1)))
-        self.assertEqual([row["share"] for row in written["lines"]], [33.33, 33.33, 33.33])
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, score("## One\nalpha\nbeta\ngamma", 1))
+            written = safe_load(path.read_text())
+        self.assertEqual(
+            [row["share"] for row in written["sections"][0]["lines"]],
+            [33.33, 33.33, 33.33],
+        )
 
     def test_a_section_with_nothing_to_share_out_still_writes(self) -> None:
-        written = safe_load(attribution_to_yaml(score("## One\nalpha", 1)))
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, score("## One\nalpha", 1))
+            written = safe_load(path.read_text())["sections"][0]
         self.assertEqual(written["lines"], [])
-        self.assertEqual(written["section"]["displacement"], 0.0)
+        self.assertEqual(written["displacement"], 0.0)
+
+
+class Merging(unittest.TestCase):
+    """Sections are scored one at a time and read all at once."""
+
+    STORY = "## One\nalpha\nbeta\n## Two\ngamma\ndelta"
+
+    def test_a_second_section_joins_the_first_rather_than_replacing_it(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, score(self.STORY, 1))
+            write_attribution(path, score(self.STORY, 4))
+            written = safe_load(path.read_text())
+        self.assertEqual([s["title"] for s in written["sections"]], ["One", "Two"])
+
+    def test_rescoring_a_section_replaces_only_its_own_entry(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, score(self.STORY, 1))
+            write_attribution(path, score(self.STORY, 4))
+            write_attribution(path, score(self.STORY, 1))
+            written = safe_load(path.read_text())
+        self.assertEqual([s["title"] for s in written["sections"]], ["One", "Two"])
+        self.assertEqual([s["start"] for s in written["sections"]], [1, 4])
+
+    def test_sections_are_held_in_manuscript_order(self) -> None:
+        # Scored back to front; read front to back.
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            write_attribution(path, score(self.STORY, 4))
+            write_attribution(path, score(self.STORY, 1))
+            written = safe_load(path.read_text())
+        self.assertEqual([s["start"] for s in written["sections"]], [1, 4])
+
+    def test_a_file_that_will_not_parse_is_replaced(self) -> None:
+        # Losing scores that can be recomputed beats never scoring again.
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "story.attribution.yaml"
+            path.write_text("{[not yaml")
+            write_attribution(path, score(self.STORY, 1))
+            written = safe_load(path.read_text())
+        self.assertEqual([s["title"] for s in written["sections"]], ["One"])
+
+    def test_a_file_holding_nothing_usable_is_started_over(self) -> None:
+        for existing in ["", "sections:\n", "just a string\n"]:
+            with TemporaryDirectory() as directory:
+                path = Path(directory) / "story.attribution.yaml"
+                path.write_text(existing)
+                write_attribution(path, score(self.STORY, 1))
+                written = safe_load(path.read_text())
+            self.assertEqual([s["title"] for s in written["sections"]], ["One"])
 
 
 if __name__ == "__main__":

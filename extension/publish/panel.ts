@@ -277,16 +277,16 @@ export class PublishView implements vscode.WebviewViewProvider {
 	// --- utils: section attribution ---
 
 	/**
-	 * Show or hide the column scoring each line against its section.
+	 * Score the section the cursor is in, adding it to the scores already held
+	 * beside the manuscript.
 	 *
 	 * Alone among the Utils buttons this does not act on the chosen manuscript:
-	 * the column follows the cursor, and scores whichever section it is sitting
-	 * in. It reports nothing here either — the work happens each time the cursor
-	 * reaches a new section, long after this click, and the status bar is where
-	 * that is said.
+	 * it scores whichever section the cursor is sitting in. It reports nothing
+	 * here either — the status bar says the scoring is running, and the column
+	 * beside the prose is the result.
 	 */
 	private async sectionAttribution(): Promise<void> {
-		await vscode.commands.executeCommand('authorship.toggleLineContribution');
+		await vscode.commands.executeCommand('authorship.scoreSection');
 	}
 
 	// --- utils: grammar ---

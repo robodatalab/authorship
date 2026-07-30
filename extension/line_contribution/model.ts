@@ -32,41 +32,56 @@ export function attributionPathFor(docPath: string): string {
 }
 
 /**
- * Read the on-disk shape into the section the column draws.
+ * Read the on-disk shape into the sections the column draws.
  *
- * The file is machine-written and may be read mid-rewrite, so anything that is
- * not a usable line is dropped rather than failing the read — a partial file
- * draws whatever part of itself is whole.
+ * The file accumulates: sections are scored one at a time but read all at once.
+ * It is machine-written and may be read mid-rewrite, so anything unusable is
+ * dropped rather than failing the read — a partial file draws whatever part of
+ * itself is whole.
  */
-export function normalize(raw: unknown): SectionContribution | undefined {
-	const section = (raw as { section?: unknown } | null)?.section as
-		| Record<string, unknown>
-		| undefined;
-	if (!section) {
-		return undefined;
-	}
-	const start = Number(section.start);
-	const end = Number(section.end);
-	if (!Number.isFinite(start) || !Number.isFinite(end)) {
-		return undefined;
-	}
+export function normalize(raw: unknown): SectionContribution[] {
+	const rows = (raw as { sections?: unknown } | null)?.sections;
+	const sections: SectionContribution[] = [];
 
-	const rows = (raw as { lines?: unknown }).lines;
-	const lines: LineShare[] = [];
 	for (const entry of Array.isArray(rows) ? rows : []) {
-		const line = Number((entry as { line?: unknown })?.line);
-		const share = Number((entry as { share?: unknown })?.share);
-		if (Number.isFinite(line) && Number.isFinite(share)) {
-			lines.push({ line, share });
+		const section = entry as Record<string, unknown> | null;
+		const start = Number(section?.start);
+		const end = Number(section?.end);
+		if (!section || !Number.isFinite(start) || !Number.isFinite(end)) {
+			continue;
 		}
+
+		const lines: LineShare[] = [];
+		for (const row of Array.isArray(section.lines) ? section.lines : []) {
+			const line = Number((row as { line?: unknown })?.line);
+			const share = Number((row as { share?: unknown })?.share);
+			if (Number.isFinite(line) && Number.isFinite(share)) {
+				lines.push({ line, share });
+			}
+		}
+
+		sections.push({
+			title: String(section.title ?? ''),
+			start,
+			end,
+			displacement: Number(section.displacement) || 0,
+			lines,
+		});
 	}
 
+	return sections;
+}
+
+/** The on-disk shape, as the server writes it. */
+export function denormalize(sections: SectionContribution[]): unknown {
 	return {
-		title: String(section.title ?? ''),
-		start,
-		end,
-		displacement: Number(section.displacement) || 0,
-		lines,
+		sections: sections.map((section) => ({
+			title: section.title,
+			start: section.start,
+			end: section.end,
+			displacement: section.displacement,
+			lines: section.lines.map((entry) => ({ line: entry.line, share: entry.share })),
+		})),
 	};
 }
 
@@ -119,9 +134,63 @@ export function isLow(share: number, peak: number): boolean {
 	return peak > 0 && share < peak * LOW_FRACTION;
 }
 
-/** Does this section's answer still describe the line the cursor is on? */
-export function covers(section: SectionContribution, line: number): boolean {
-	return line >= section.start - 1 && line <= section.end;
+/** A stretch of lines an edit replaced, in the document as it was before it. */
+export interface LineEdit {
+	/** First line the edit touched. */
+	start: number;
+	/** Last line it touched, before the edit. */
+	end: number;
+	/** Lines the document gained, or lost where negative. */
+	delta: number;
+}
+
+/**
+ * The scores that still describe the manuscript after an edit.
+ *
+ * A section that has been written in is no longer the section that was scored,
+ * so its scores go rather than being carried forward wrong. Sections below the
+ * edit keep theirs and move down or up with the prose; sections above it are
+ * untouched.
+ *
+ * Edits arriving in one change event are all expressed against the document as
+ * it was, so they are applied last-first and each one's line numbers still mean
+ * what they said.
+ */
+export function afterEdits(
+	sections: SectionContribution[],
+	edits: LineEdit[]
+): SectionContribution[] {
+	let surviving = sections;
+	for (const edit of [...edits].sort((a, b) => b.start - a.start)) {
+		const kept = surviving.filter((section) => !touches(section, edit));
+		const moved = kept.map((section) =>
+			section.start - 1 > edit.end ? shift(section, edit.delta) : section
+		);
+		// The same array back when nothing was dropped and nothing moved, so the
+		// caller can tell an edit that reached the scores from one that did not.
+		const untouched =
+			kept.length === surviving.length &&
+			moved.every((section, index) => section === kept[index]);
+		surviving = untouched ? surviving : moved;
+	}
+	return surviving;
+}
+
+/** A heading counts as part of its section — retitling it rescores it. */
+function touches(section: SectionContribution, edit: LineEdit): boolean {
+	return section.start - 1 <= edit.end && section.end >= edit.start;
+}
+
+function shift(section: SectionContribution, delta: number): SectionContribution {
+	if (delta === 0) {
+		return section;
+	}
+	return {
+		...section,
+		start: section.start + delta,
+		end: section.end + delta,
+		lines: section.lines.map((entry) => ({ ...entry, line: entry.line + delta })),
+	};
 }
 
 /**

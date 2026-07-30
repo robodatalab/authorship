@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 import re
+from typing import Any
 
-from yaml import dump
+from yaml import YAMLError, dump, safe_load
 
 from server import log
 from server.inference.encoder import EncoderModel
@@ -84,22 +85,57 @@ def line_contribution(
     )
 
 
-def attribution_to_yaml(contribution: SectionContribution) -> str:
-    return dump(
-        {
-            "section": {
-                "title": contribution.title,
-                "start": contribution.start,
-                "end": contribution.end,
-                "displacement": round(contribution.displacement, 6),
-            },
-            "lines": [
-                {"line": entry.line, "share": round(entry.share, 2)}
-                for entry in contribution.lines
-            ],
-        },
-        sort_keys=False,
-    )
+def write_attribution(path: Path, contribution: SectionContribution) -> None:
+    """Put this section's scores into the file, leaving the rest as they were.
+
+    Sections are scored one at a time, as they are asked for, but a manuscript's
+    scores are read all at once. A section is identified by the line it starts
+    on: two cannot share one.
+    """
+    sections = [
+        section
+        for section in _sections_in(path)
+        if section.get("start") != contribution.start
+    ]
+    sections.append(_section_fields(contribution))
+    sections.sort(key=lambda section: section.get("start", 0))
+    path.write_text(dump({"sections": sections}, sort_keys=False))
+
+
+def _section_fields(contribution: SectionContribution) -> dict[str, Any]:
+    return {
+        "title": contribution.title,
+        "start": contribution.start,
+        "end": contribution.end,
+        "displacement": round(contribution.displacement, 6),
+        "lines": [
+            {"line": entry.line, "share": round(entry.share, 2)}
+            for entry in contribution.lines
+        ],
+    }
+
+
+def _sections_in(path: Path) -> list[dict[str, Any]]:
+    """What the file already holds, or nothing if it holds nothing usable.
+
+    A manuscript that has never been scored has no file, and one that will not
+    parse is replaced rather than allowed to fail the job that would have
+    rewritten it — losing scores that can be recomputed beats refusing to score
+    anything ever again.
+    """
+    if not path.exists():
+        return []
+    try:
+        parsed = safe_load(path.read_text())
+    except YAMLError:
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    return [
+        section
+        for section in parsed.get("sections") or []
+        if isinstance(section, dict) and "start" in section
+    ]
 
 
 def _displacements(model: EncoderModel, texts: list[str]) -> list[float]:
