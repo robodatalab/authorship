@@ -14,13 +14,17 @@ import unittest
 from typing import Sequence, cast
 
 from server.inference.encoder import EncoderModel
-from server.semantic_search import DEFAULT_COUNT, Hit, SearchIndex
+from server.semantic_search import DEFAULT_COUNT, INDEX_CHUNK, Hit, SearchIndex
 
 PATH = "/stories/story.md"
 
 
 def words(text: str) -> list[str]:
-    return re.findall(r"[a-z']+", text.lower())
+    return re.findall(r"[a-z0-9']+", text.lower())
+
+
+def long_story(paragraphs: int) -> str:
+    return "\n\n".join(f"line {n} of the story" for n in range(paragraphs))
 
 
 class WordSpaceEncoder:
@@ -226,6 +230,47 @@ class Index(unittest.TestCase):
         index.index(cast(EncoderModel, model), PATH, "the horse bolted through the gate")
         index.index(cast(EncoderModel, model), PATH, self.STORY)
         self.assertEqual(model.batches[-1], ["she poured the tea and waited"])
+
+    def test_lines_are_encoded_a_chunk_at_a_time(self) -> None:
+        # The encoder answers one caller at a time. A manuscript encoded in a
+        # single call would hold it for the whole pass, and a search would wait
+        # out the indexing rather than answering from what was ready.
+        story = long_story(INDEX_CHUNK + 5)
+        model = WordSpaceEncoder(story)
+        SearchIndex().index(cast(EncoderModel, model), PATH, story)
+        self.assertEqual([len(batch) for batch in model.batches], [INDEX_CHUNK, 5])
+
+    def test_a_manuscript_answers_while_it_is_still_being_encoded(self) -> None:
+        # Vectors published only at the end of a pass leave a search answering
+        # nothing for as long as the whole manuscript takes to read.
+        story = long_story(INDEX_CHUNK + 5)
+        index = SearchIndex()
+        model = WordSpaceEncoder(story)
+        encoded = model.encode
+        found_during: list[int] = []
+
+        def encode_and_look(texts: Sequence[str]) -> list[list[float]]:
+            vectors = encoded(texts)
+            found_during.append(
+                len(
+                    index.search(
+                        cast(EncoderModel, model), PATH, story, "line 0 of the story"
+                    ).hits
+                )
+            )
+            return vectors
+
+        model.encode = encode_and_look  # type: ignore[method-assign]
+        index.index(cast(EncoderModel, model), PATH, story)
+
+        self.assertEqual(found_during[0], 0)
+        self.assertGreater(found_during[1], 0)
+
+    def test_a_superseded_pass_stops_rather_than_spending_the_encoder(self) -> None:
+        story = long_story(INDEX_CHUNK + 5)
+        model = WordSpaceEncoder(story)
+        SearchIndex().index(cast(EncoderModel, model), PATH, story, lambda: True)
+        self.assertEqual(model.batches, [])
 
     def test_manuscripts_are_indexed_apart_from_each_other(self) -> None:
         index = SearchIndex()

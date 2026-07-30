@@ -1,8 +1,11 @@
-// Turning the passages a search found into the rows of the picker.
+// Turning the passages a search found into the rows of the Search drawer.
 //
-// Deliberately free of the `vscode` module, so what a row says can be read and
-// tested without launching an editor. Everything here deals in plain numbers and
-// strings; quick_pick.ts turns them into a picker and decorations.
+// Deliberately free of the `vscode` module, so what a row says and what an edit
+// does to it can be read and tested without launching an editor. Everything here
+// deals in plain numbers and strings; results.ts turns them into a drawer, a
+// jump, and a highlight.
+
+import type { LineEdit } from '../document/edits';
 
 /** A passage that answers the phrase, as the server ranked it. */
 export interface Hit {
@@ -76,17 +79,52 @@ export function rowDescription(hit: Hit): string {
 }
 
 /**
- * What the picker calls itself while the server is still encoding.
+ * What the drawer says about a search while the server is still encoding.
  *
  * The answer improves on its own as the indexing job gets through the
  * manuscript, and a search that says nothing about that reads as a search that
  * found little — rather than one that has not been told everything yet.
  */
-export function title(manuscript: string, pending: number): string {
+export function progress(pending: number): string {
 	if (pending <= 0) {
-		return `Search ${manuscript}`;
+		return '';
 	}
-	return `Search ${manuscript} — indexing, ${pending} ${
+	return `Encoding the manuscript — ${pending} ${
 		pending === 1 ? 'line' : 'lines'
 	} to go`;
+}
+
+/**
+ * The results that still describe the manuscript after an edit.
+ *
+ * A passage that has been written in is no longer the passage that was found, so
+ * it goes rather than being carried forward pointing at prose that has changed
+ * under it. Passages below the edit keep their place in the answer and move down
+ * or up with the words; passages above it are untouched.
+ *
+ * Edits arriving in one change event are all expressed against the document as
+ * it was, so they are applied last-first and each one's line numbers still mean
+ * what they said.
+ */
+export function afterEdits(hits: Hit[], edits: LineEdit[]): Hit[] {
+	let surviving = hits;
+	for (const edit of [...edits].sort((a, b) => b.start - a.start)) {
+		const kept = surviving.filter((hit) => !touches(hit, edit));
+		const moved = kept.map((hit) => (hit.start > edit.end ? shift(hit, edit.delta) : hit));
+		// The same array back when nothing was dropped and nothing moved, so the
+		// caller can tell an edit that reached the results from one that did not.
+		const untouched =
+			kept.length === surviving.length &&
+			moved.every((hit, index) => hit === kept[index]);
+		surviving = untouched ? surviving : moved;
+	}
+	return surviving;
+}
+
+function touches(hit: Hit, edit: LineEdit): boolean {
+	return hit.start <= edit.end && hit.end >= edit.start;
+}
+
+function shift(hit: Hit, delta: number): Hit {
+	return delta === 0 ? hit : { ...hit, start: hit.start + delta, end: hit.end + delta };
 }

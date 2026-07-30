@@ -1,5 +1,6 @@
 """Which passages of a manuscript answer a phrase."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from server import log
@@ -15,6 +16,15 @@ MIN_WORDS = 3
 
 # Lines a search answers with, before adjacent ones are run together.
 DEFAULT_COUNT = 10
+
+# Lines handed to the encoder at a time.
+#
+# The encoder answers one caller at a time, so a manuscript encoded in a single
+# call would hold it for as long as the manuscript is long and a search would
+# wait out the whole indexing. Encoded a chunk at a time, a search waits for one
+# chunk — and the vectors land as they are made, so a manuscript answers while
+# the rest of it is still being read.
+INDEX_CHUNK = 32
 
 # How near the best line in the manuscript a line has to come to be an answer at
 # all. Without a floor the tail of `count` is whatever the manuscript happens to
@@ -60,19 +70,40 @@ class SearchIndex:
     def __init__(self) -> None:
         self._by_path: dict[str, dict[str, list[float]]] = {}
 
-    def index(self, model: EncoderModel, path: str, story_markdown: str) -> None:
-        """Encode whatever this manuscript says that the index does not hold."""
-        held = self._by_path.get(path, {})
+    def index(
+        self,
+        model: EncoderModel,
+        path: str,
+        story_markdown: str,
+        cancelled: Callable[[], bool] = lambda: False,
+    ) -> None:
+        """Encode whatever this manuscript says that the index does not hold.
+
+        The vectors go into the map a search reads as each chunk comes back, so
+        the manuscript is searchable while it is still being encoded rather than
+        all at the end. A manuscript saved twice over supersedes itself, and the
+        pass that was left behind stops rather than spending the encoder on
+        vectors somebody else is already making.
+        """
+        held = self._by_path.setdefault(path, {})
         passages = _passages(visible_lines(story_markdown.splitlines()))
 
-        # Sorted so a batch is the same batch whichever order the lines arrived
+        # Sorted so a chunk is the same chunk whichever order the lines arrived
         # in; a set because a manuscript that says a thing twice needs one vector
         # for it.
         missing = sorted({text for _, text in passages if text not in held})
         if missing:
             _log.info("encoding %d lines of %s", len(missing), path)
-            held.update(zip(missing, model.encode(missing)))
 
+        for start in range(0, len(missing), INDEX_CHUNK):
+            if cancelled():
+                return
+            chunk = missing[start : start + INDEX_CHUNK]
+            held.update(zip(chunk, model.encode(chunk)))
+
+        # What the manuscript no longer says goes, now that everything it does
+        # say is in hand — pruning against a half-encoded map would throw away
+        # the work of the pass that is making it.
         self._by_path[path] = {text: held[text] for _, text in passages}
 
     def search(

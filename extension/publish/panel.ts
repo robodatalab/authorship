@@ -14,6 +14,8 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { progress, rowDescription, rowLabel } from '../search/model';
+import type { ManuscriptSearch, Results } from '../search/results';
 import {
 	DEFAULT_SETTINGS,
 	blurbPathFor,
@@ -45,7 +47,8 @@ export class PublishView implements vscode.WebviewViewProvider {
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly port: number
+		private readonly port: number,
+		private readonly search: ManuscriptSearch
 	) {
 		// Pick up where we left off, or fall back to whatever markdown is open, so
 		// the panel has something to publish the first time it is shown.
@@ -70,6 +73,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 			switch (message?.type) {
 				case 'ready':
 					void this.send();
+					// A search made before the view was ever shown, or before it was
+					// hidden and brought back, is still the search in force.
+					this.sendSearch(this.search.current());
 					break;
 				case 'choose':
 					void this.choose();
@@ -98,8 +104,14 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'sectionAttribution':
 					void this.sectionAttribution();
 					break;
-				case 'searchManuscript':
-					void this.searchManuscript();
+				case 'search':
+					void this.search.search(String(message.phrase ?? ''));
+					break;
+				case 'revealHit':
+					void this.search.reveal(Number(message.index));
+					break;
+				case 'clearSearch':
+					this.search.clear();
 					break;
 			}
 		});
@@ -107,11 +119,17 @@ export class PublishView implements vscode.WebviewViewProvider {
 		void this.poll();
 		this.pollTimer = setInterval(() => void this.poll(), STATUS_POLL_MS);
 
+		// The search is owned elsewhere and moves on its own — an indexing pass
+		// finishing, an edit shifting the passages — so the drawer follows it
+		// rather than asking.
+		const following = this.search.onChange((results) => this.sendSearch(results));
+
 		view.onDidDispose(() => {
 			if (this.pollTimer !== undefined) {
 				clearInterval(this.pollTimer);
 				this.pollTimer = undefined;
 			}
+			following.dispose();
 			this.view = undefined;
 		});
 	}
@@ -292,15 +310,31 @@ export class PublishView implements vscode.WebviewViewProvider {
 		await vscode.commands.executeCommand('authorship.scoreSection');
 	}
 
-	// --- utils: search ---
+	// --- search ---
 
 	/**
-	 * Search the manuscript in front of the author rather than the one chosen
-	 * here — like section attribution, this acts on the editor. The picker is
-	 * where the answer goes, so nothing comes back to the panel.
+	 * Hand the drawer the search as it stands.
+	 *
+	 * The rows are built here rather than in the view: what a row says about a
+	 * passage is the same question whichever way it is displayed, and it is
+	 * answered in search/model.ts where it can be read without a webview.
 	 */
-	private async searchManuscript(): Promise<void> {
-		await vscode.commands.executeCommand('authorship.searchManuscript');
+	private sendSearch(results: Results | null): void {
+		void this.view?.webview.postMessage({
+			type: 'search',
+			search: results && {
+				manuscript: results.manuscript,
+				phrase: results.phrase,
+				searching: results.searching,
+				error: results.error,
+				progress: progress(results.pending),
+				hits: results.hits.map((hit) => ({
+					label: rowLabel(hit),
+					where: rowDescription(hit),
+					text: hit.text,
+				})),
+			},
+		});
 	}
 
 	// --- utils: grammar ---
@@ -527,10 +561,19 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div class="actions">
 				<button id="section-attribution" type="button" class="primary">Section attribution</button>
 			</div>
-			<div class="actions">
-				<button id="search-manuscript" type="button" class="primary">Search manuscript</button>
-			</div>
 			<div id="utils-status" class="status" hidden></div>
+		</div>
+	</details>
+	<details class="drawer" id="search-drawer" open>
+		<summary>Search</summary>
+		<div class="body">
+			<div class="search-ask">
+				<input id="search-phrase" type="text"
+					placeholder="Describe what you are looking for">
+				<button id="search-clear" type="button" title="Put the answer away" hidden>Clear</button>
+			</div>
+			<div id="search-note" class="status" hidden></div>
+			<div id="search-hits" class="hits"></div>
 		</div>
 	</details>
 	<details class="drawer" id="serving-status-drawer" open>

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	LABEL_LIMIT,
+	afterEdits,
 	normalize,
+	progress,
 	rowDescription,
 	rowLabel,
-	title,
 	type Hit,
 } from '../../../extension/search/model';
 
@@ -85,16 +86,71 @@ describe('rowDescription — where the passage is', () => {
 	});
 });
 
-describe('title — what the picker calls itself', () => {
-	it('names the manuscript once there is nothing left to encode', () => {
-		expect(title('story.md', 0)).toBe('Search story.md');
+describe('progress — what the drawer says while the server is still encoding', () => {
+	it('says nothing once there is nothing left to encode', () => {
+		expect(progress(0)).toBe('');
 	});
 
-	it('says how much is still being encoded, so a thin answer reads as unfinished', () => {
-		expect(title('story.md', 120)).toBe('Search story.md — indexing, 120 lines to go');
+	it('says how much is left, so a thin answer reads as unfinished', () => {
+		expect(progress(120)).toBe('Encoding the manuscript — 120 lines to go');
 	});
 
 	it('counts a single line as a line', () => {
-		expect(title('story.md', 1)).toBe('Search story.md — indexing, 1 line to go');
+		expect(progress(1)).toBe('Encoding the manuscript — 1 line to go');
+	});
+});
+
+describe('afterEdits — results surviving the prose moving under them', () => {
+	const results = [hit({ start: 4, end: 6 }), hit({ start: 20, end: 20 })];
+
+	it('an edit below every result leaves them all where they are', () => {
+		expect(afterEdits(results, [{ start: 40, end: 40, delta: 1 }])).toBe(results);
+	});
+
+	it('an edit above a result moves it down by the lines the document gained', () => {
+		const after = afterEdits(results, [{ start: 0, end: 0, delta: 2 }]);
+		expect(after.map((entry) => [entry.start, entry.end])).toEqual([
+			[6, 8],
+			[22, 22],
+		]);
+	});
+
+	it('an edit above a result moves it up by the lines the document lost', () => {
+		const after = afterEdits(results, [{ start: 0, end: 1, delta: -1 }]);
+		expect(after.map((entry) => [entry.start, entry.end])).toEqual([
+			[3, 5],
+			[19, 19],
+		]);
+	});
+
+	it('a result written into is dropped rather than carried forward wrong', () => {
+		const after = afterEdits(results, [{ start: 5, end: 5, delta: 0 }]);
+		expect(after.map((entry) => entry.start)).toEqual([20]);
+	});
+
+	it('an edit touching the first line of a result drops it', () => {
+		expect(afterEdits(results, [{ start: 4, end: 4, delta: 0 }])).toHaveLength(1);
+	});
+
+	it('an edit touching the last line of a result drops it', () => {
+		expect(afterEdits(results, [{ start: 6, end: 6, delta: 0 }])).toHaveLength(1);
+	});
+
+	it('a typed character between two results disturbs neither', () => {
+		expect(afterEdits(results, [{ start: 10, end: 10, delta: 0 }])).toBe(results);
+	});
+
+	it('several edits in one event are applied against the document as it was', () => {
+		// Both are expressed against the same original text, so they are worked
+		// last-first and the earlier one's numbers still mean what they said.
+		const after = afterEdits(results, [
+			{ start: 0, end: 0, delta: 1 },
+			{ start: 10, end: 10, delta: 1 },
+		]);
+		expect(after.map((entry) => entry.start)).toEqual([5, 22]);
+	});
+
+	it('the same array back when nothing moved, so a caller can tell', () => {
+		expect(afterEdits(results, [])).toBe(results);
 	});
 });

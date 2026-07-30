@@ -36,6 +36,23 @@ interface JobStatus {
 	status: string;
 }
 
+/** A passage, already turned into what a row says by the host. */
+interface HitRow {
+	label: string;
+	where: string;
+	text: string;
+}
+
+interface SearchMessage {
+	manuscript: string;
+	phrase: string;
+	searching: boolean;
+	error: string | null;
+	/** What is left to encode, or empty once nothing is. */
+	progress: string;
+	hits: HitRow[];
+}
+
 interface Memory {
 	gpu: { used: number; limit: number };
 	process: number;
@@ -70,9 +87,10 @@ const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
 const sectionAttribution = document.getElementById(
 	'section-attribution'
 ) as HTMLButtonElement;
-const searchManuscript = document.getElementById(
-	'search-manuscript'
-) as HTMLButtonElement;
+const searchPhrase = document.getElementById('search-phrase') as HTMLInputElement;
+const searchClear = document.getElementById('search-clear') as HTMLButtonElement;
+const searchNote = document.getElementById('search-note') as HTMLElement;
+const searchHits = document.getElementById('search-hits') as HTMLElement;
 const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
@@ -131,10 +149,17 @@ fixGrammar.addEventListener('click', () => {
 sectionAttribution.addEventListener('click', () =>
 	vscode.postMessage({ type: 'sectionAttribution' })
 );
-// Nor here: the picker opens over the editor and is its own report.
-searchManuscript.addEventListener('click', () =>
-	vscode.postMessage({ type: 'searchManuscript' })
-);
+// The phrase is asked on Enter rather than as it is typed: a search is a forward
+// pass on the server, and half a phrase asks half a question.
+searchPhrase.addEventListener('keydown', (event) => {
+	if (event.key === 'Enter') {
+		vscode.postMessage({ type: 'search', phrase: searchPhrase.value });
+	}
+});
+searchClear.addEventListener('click', () => {
+	searchPhrase.value = '';
+	vscode.postMessage({ type: 'clearSearch' });
+});
 
 /**
  * With no story chosen there is nothing to act on, so the panel is inert.
@@ -423,9 +448,65 @@ function renderJobs(jobs: JobStatus[] | null): void {
 	}
 }
 
+/**
+ * The search, or null once it has been put away.
+ *
+ * The rows say what the host decided they say; nothing here reads a passage or a
+ * line number. A row carries its position, and clicking it asks the host to send
+ * the cursor there — the host is what holds the manuscript and the highlights.
+ */
+function renderSearch(search: SearchMessage | null): void {
+	searchHits.textContent = '';
+	searchClear.hidden = search === null;
+
+	if (search === null) {
+		setStatus(searchNote, '', false);
+		return;
+	}
+
+	if (search.error) {
+		setStatus(searchNote, search.error, true);
+	} else if (search.searching) {
+		setStatus(searchNote, `Searching ${search.manuscript}…`, false);
+	} else if (search.progress) {
+		// An empty list reads as a manuscript that holds no answer, which is a
+		// different thing from one the server has not finished reading.
+		setStatus(searchNote, search.progress, false);
+	} else if (search.hits.length === 0) {
+		setStatus(searchNote, `Nothing in ${search.manuscript} answers that.`, false);
+	} else {
+		setStatus(searchNote, search.manuscript, false);
+	}
+
+	search.hits.forEach((hit, index) => {
+		const row = document.createElement('button');
+		row.type = 'button';
+		row.className = 'hit';
+		// The passage is cut to a row's width; the whole of it is worth having on
+		// hover, since a line number alone says nothing about what is there.
+		row.title = hit.text;
+		row.addEventListener('click', () =>
+			vscode.postMessage({ type: 'revealHit', index })
+		);
+
+		const passage = document.createElement('span');
+		passage.className = 'passage';
+		passage.textContent = hit.label;
+
+		const where = document.createElement('span');
+		where.className = 'where';
+		where.textContent = hit.where;
+
+		row.append(passage, where);
+		searchHits.append(row);
+	});
+}
+
 window.addEventListener('message', (event) => {
 	const message = event.data;
-	if (message?.type === 'state') {
+	if (message?.type === 'search') {
+		renderSearch(message.search as SearchMessage | null);
+	} else if (message?.type === 'state') {
 		renderState(message as StateMessage);
 	} else if (message?.type === 'cover') {
 		showCover(String(message.cover ?? ''));

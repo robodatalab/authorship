@@ -191,8 +191,12 @@ class SearchIndexJob(Job):
         self._markdown = source.read_text()
 
     def execute(self) -> None:
-        if not self.cancelled:
-            self._index.index(self._model, str(self._source), self._markdown)
+        self._index.index(
+            self._model,
+            str(self._source),
+            self._markdown,
+            lambda: self.cancelled,
+        )
 
 
 class GrammarFixJob(Job):

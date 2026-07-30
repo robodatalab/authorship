@@ -26,3 +26,9 @@ But she could barely feel him. His four inches moving inside her well-fucked, st
 
 “God, I loved the way that big one felt,” she’d murmur against his ear, stroking his hair, her legs wrapped around his waist. “But I love your little guy too.”
 
+“What do you mean?” I asked, and my voice was too careful. Too measured. The voice of a person who knows the answer matters.
+
+Liam turned his head and looked at me. His eyes were calm. Curious. Not accusatory.
+
+I felt the world tilt. I felt the floor shift under me. I felt the magnitude of what he was suggesting press against me from all sides.
+

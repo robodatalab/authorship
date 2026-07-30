@@ -1,5 +1,11 @@
 // Turning a section's line scores into the column drawn beside the prose.
 //
+// What an edit is, in line terms, lives in document/edits.ts: attribution and
+// search both hold line numbers and both have to survive the prose moving under
+// them, but what each does about it differs and stays with the feature.
+
+import type { LineEdit } from '../document/edits';
+//
 // Deliberately free of the `vscode` module, so the drawing decisions can be read
 // and tested without launching an editor. Everything here deals in plain numbers
 // and strings; gutter.ts turns them into decorations.
@@ -132,16 +138,6 @@ export function peakShare(lines: readonly LineShare[]): number {
 
 export function isLow(share: number, peak: number): boolean {
 	return peak > 0 && share < peak * LOW_FRACTION;
-}
-
-/** A stretch of lines an edit replaced, in the document as it was before it. */
-export interface LineEdit {
-	/** First line the edit touched. */
-	start: number;
-	/** Last line it touched, before the edit. */
-	end: number;
-	/** Lines the document gained, or lost where negative. */
-	delta: number;
 }
 
 /**

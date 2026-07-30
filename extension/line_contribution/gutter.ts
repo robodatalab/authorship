@@ -16,6 +16,7 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { editsIn } from '../document/edits';
 import type { ModelHealth } from '../llm/health';
 import {
 	afterEdits,
@@ -26,7 +27,6 @@ import {
 	normalize,
 	peakShare,
 	summary,
-	type LineEdit,
 	type SectionContribution,
 } from './model';
 
@@ -209,15 +209,7 @@ export class LineContributionGutter implements vscode.Disposable {
 			return;
 		}
 
-		const edits: LineEdit[] = event.contentChanges.map((change) => ({
-			start: change.range.start.line,
-			end: change.range.end.line,
-			delta:
-				(change.text.match(/\n/g)?.length ?? 0) -
-				(change.range.end.line - change.range.start.line),
-		}));
-
-		const surviving = afterEdits(this.sections, edits);
+		const surviving = afterEdits(this.sections, editsIn(event.contentChanges));
 		if (surviving === this.sections) {
 			return;
 		}
