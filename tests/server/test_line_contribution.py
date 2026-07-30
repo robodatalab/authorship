@@ -16,8 +16,18 @@ from typing import Sequence, cast
 from yaml import safe_load
 
 from server.inference.encoder import EncoderModel
-from server.line_contribution import attribution_path_for, line_contribution, to_yaml
-from server.representations.utils import parse_sections, section_at, visible_lines
+from server.line_contribution import (
+    SectionContribution,
+    attribution_path_for,
+    attribution_to_yaml,
+    line_contribution,
+)
+from server.representations.utils import (
+    Section,
+    parse_sections,
+    section_at,
+    visible_lines,
+)
 
 
 class LineAxisEncoder:
@@ -36,8 +46,20 @@ class LineAxisEncoder:
         return vectors
 
 
-def encoder() -> EncoderModel:
-    return cast(EncoderModel, LineAxisEncoder())
+def score(story: str, line: int) -> SectionContribution:
+    """The section covering `line`, scored. Only a manuscript with no lines at
+    all has no section to cover one, and none of these are that."""
+    contribution = line_contribution(
+        cast(EncoderModel, LineAxisEncoder()), story, line
+    )
+    assert contribution is not None
+    return contribution
+
+
+def section_covering(story: str, line: int) -> Section:
+    found = section_at(parse_sections(story), line)
+    assert found is not None
+    return found
 
 
 class VisibleLines(unittest.TestCase):
@@ -104,12 +126,10 @@ class SectionAt(unittest.TestCase):
     """Which section a cursor is in."""
 
     def test_a_line_in_the_body_belongs_to_its_section(self) -> None:
-        sections = parse_sections("## One\na\n## Two\nb")
-        self.assertEqual(section_at(sections, 3).title, "Two")
+        self.assertEqual(section_covering("## One\na\n## Two\nb", 3).title, "Two")
 
     def test_a_heading_belongs_to_the_section_it_opens(self) -> None:
-        sections = parse_sections("## One\na\n## Two\nb")
-        self.assertEqual(section_at(sections, 2).title, "Two")
+        self.assertEqual(section_covering("## One\na\n## Two\nb", 2).title, "Two")
 
     def test_a_line_before_the_first_heading_lands_in_the_opening_section(self) -> None:
         sections = parse_sections("a title\n\n## One\nprose")
@@ -120,62 +140,59 @@ class Contribution(unittest.TestCase):
     """Scoring the section the cursor is in."""
 
     def test_scores_carry_the_line_they_belong_to(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha\n\nbeta\n\ngamma", 1)
+        scored = score("## One\nalpha\n\nbeta\n\ngamma", 1)
         self.assertEqual([entry.line for entry in scored.lines], [1, 3, 5])
 
     def test_shares_are_a_hundred_between_them(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
+        scored = score("## One\nalpha\nbeta\ngamma", 1)
         self.assertAlmostEqual(sum(entry.share for entry in scored.lines), 100.0)
 
     def test_lines_nothing_else_says_share_the_section_evenly(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
+        scored = score("## One\nalpha\nbeta\ngamma", 1)
         for entry in scored.lines:
             self.assertAlmostEqual(entry.share, 100.0 / 3.0)
 
     def test_a_line_the_section_repeats_scores_below_one_it_does_not(self) -> None:
         # Removing either "alpha" leaves the other saying it, so each moves the
         # section less than "beta", which nothing else covers.
-        scored = line_contribution(encoder(), "## One\nalpha\nalpha\nbeta", 1)
+        scored = score("## One\nalpha\nalpha\nbeta", 1)
         first, second, only = scored.lines
         self.assertAlmostEqual(first.share, second.share)
         self.assertGreater(only.share, first.share)
 
     def test_blank_lines_are_not_scored(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha\n\n\nbeta", 1)
+        scored = score("## One\nalpha\n\n\nbeta", 1)
         self.assertEqual([entry.line for entry in scored.lines], [1, 4])
 
     def test_commented_lines_are_not_scored(self) -> None:
-        scored = line_contribution(
-            encoder(), "## One\nalpha\n<!-- a note to self -->\nbeta", 1
-        )
+        scored = score("## One\nalpha\n<!-- a note to self -->\nbeta", 1)
         self.assertEqual([entry.line for entry in scored.lines], [1, 3])
 
     def test_a_comment_beside_prose_is_not_weighed_with_it(self) -> None:
         # The note would otherwise be content of the line it trails, and the two
         # sections here would not score alike.
-        noted = line_contribution(encoder(), "## One\nalpha <!-- cut? -->\nbeta", 1)
-        plain = line_contribution(encoder(), "## One\nalpha \nbeta", 1)
+        noted = score("## One\nalpha <!-- cut? -->\nbeta", 1)
+        plain = score("## One\nalpha \nbeta", 1)
         self.assertEqual(
             [entry.share for entry in noted.lines],
             [entry.share for entry in plain.lines],
         )
 
     def test_only_the_cursor_s_section_is_scored(self) -> None:
-        story = "## One\nalpha\nbeta\n## Two\ngamma\ndelta"
-        scored = line_contribution(encoder(), story, 4)
+        scored = score("## One\nalpha\nbeta\n## Two\ngamma\ndelta", 4)
         self.assertEqual(scored.title, "Two")
         self.assertEqual([entry.line for entry in scored.lines], [4, 5])
 
     def test_a_section_of_one_line_has_nothing_to_share_out(self) -> None:
         # Removing the only line leaves nothing to compare the section against.
-        scored = line_contribution(encoder(), "## One\nalpha", 1)
+        scored = score("## One\nalpha", 1)
         self.assertEqual(scored.lines, [])
         self.assertEqual(scored.displacement, 0.0)
 
     def test_displacement_travels_with_the_shares(self) -> None:
         # Shares sum to 100 whatever the section is like, so this is the only
         # figure that says whether there was anything to share out.
-        scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
+        scored = score("## One\nalpha\nbeta\ngamma", 1)
         self.assertGreater(scored.displacement, 0.0)
 
 
@@ -203,17 +220,24 @@ class Sidecar(unittest.TestCase):
         )
 
     def test_the_scored_section_round_trips(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha\nbeta\ngamma", 1)
-        written = safe_load(to_yaml(scored))
+        scored = score("## One\nalpha\nbeta\ngamma", 1)
+        written = safe_load(attribution_to_yaml(scored))
         self.assertEqual(written["section"]["title"], "One")
         self.assertEqual(written["section"]["start"], 1)
         self.assertEqual(written["section"]["end"], 3)
         self.assertEqual([row["line"] for row in written["lines"]], [1, 2, 3])
-        self.assertAlmostEqual(sum(row["share"] for row in written["lines"]), 100.0)
+        for row, entry in zip(written["lines"], scored.lines):
+            self.assertAlmostEqual(row["share"], entry.share, places=2)
+
+    def test_shares_are_written_to_two_decimals(self) -> None:
+        # Deliberately lossy: a hundredth of a percent is far below anything a
+        # bar eight cells wide can show, and the shares no longer sum to exactly
+        # a hundred once written. The file is read to be drawn, not summed.
+        written = safe_load(attribution_to_yaml(score("## One\nalpha\nbeta\ngamma", 1)))
+        self.assertEqual([row["share"] for row in written["lines"]], [33.33, 33.33, 33.33])
 
     def test_a_section_with_nothing_to_share_out_still_writes(self) -> None:
-        scored = line_contribution(encoder(), "## One\nalpha", 1)
-        written = safe_load(to_yaml(scored))
+        written = safe_load(attribution_to_yaml(score("## One\nalpha", 1)))
         self.assertEqual(written["lines"], [])
         self.assertEqual(written["section"]["displacement"], 0.0)
 
