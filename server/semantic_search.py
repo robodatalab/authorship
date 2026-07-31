@@ -163,19 +163,18 @@ def _join_adjacent_lines_into_passages(
         else:
             adjacent_runs.append([line_number])
 
-    return sorted(
-        (
-            MatchedPassage(
-                first_line=run[0],
-                last_line=run[-1],
-                similarity=max(similarity_by_line[line_number] for line_number in run),
-                text="\n".join(visible[run[0] : run[-1] + 1]).strip(),
-            )
-            for run in adjacent_runs
-        ),
-        key=lambda passage: passage.similarity,
-        reverse=True,
-    )
+    # Which lines answer is a matter of similarity; the order they are read in is
+    # the manuscript's, so an answer can be followed from the first chapter to the
+    # last rather than jumping about the story.
+    return [
+        MatchedPassage(
+            first_line=run[0],
+            last_line=run[-1],
+            similarity=max(similarity_by_line[line_number] for line_number in run),
+            text="\n".join(visible[run[0] : run[-1] + 1]).strip(),
+        )
+        for run in adjacent_runs
+    ]
 
 
 def _cosine_of_unit_vectors(left: list[float], right: list[float]) -> float:

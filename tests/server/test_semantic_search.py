@@ -126,7 +126,7 @@ class Ranking(unittest.TestCase):
         self.encoder.encode_query.return_value = PHRASE_VECTOR
         self.index = SearchIndex()
 
-    def test_the_nearest_line_comes_first(self) -> None:
+    def test_passages_come_in_the_order_the_manuscript_says_them(self) -> None:
         self.vector_by_line = {
             "the first paragraph": NEAR_THE_PHRASE,
             "the third paragraph": IDENTICAL_TO_PHRASE,
@@ -139,7 +139,7 @@ class Ranking(unittest.TestCase):
 
         self.assertEqual(
             [match.first_line for match in results.passages],
-            [THIRD_PARAGRAPH_LINE, FIRST_PARAGRAPH_LINE],
+            [FIRST_PARAGRAPH_LINE, THIRD_PARAGRAPH_LINE],
         )
 
     def test_a_line_below_half_the_best_similarity_does_not_match(self) -> None:
