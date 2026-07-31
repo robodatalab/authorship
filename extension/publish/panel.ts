@@ -1,15 +1,17 @@
 // The Authorship sidebar: a single webview view in the Authorship container,
 // laid out as drawers. Story picks the manuscript every other drawer works on;
-// Publishing sets its publication and exports an EPUB beside it; Utils runs
-// one-shot fixes over it, starting with a grammar pass.
+// Publishing sets its publication and exports an EPUB beside it; the rest
+// report what the server is doing.
+//
+// The one-shot passes over a manuscript — building its representations, fixing
+// its grammar, scoring a section — are not here: they act on the file being
+// edited, so they are buttons in its title bar and commands in extension.ts.
 //
 // The publication settings live in `<name>.pub.yaml` and the blurb in
 // `<name>.blurb.md`, both sitting next to the manuscript exactly as
 // `<name>.graph.yaml` does. This module owns those files; the webview is only
 // the form. Exporting hands the manuscript and its settings to the server, which
 // writes `<name>.epub` and is the one place that knows how to build the book.
-// The grammar pass likewise runs on the server, which holds the model, and comes
-// back as text the editor applies — so a correction can be reviewed and undone.
 
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -32,9 +34,6 @@ const STATUS_POLL_MS = 1500;
 
 /** Generous, because loading weights starves the event loop for seconds. */
 const STATUS_REQUEST_TIMEOUT_MS = 10_000;
-
-/** How often a running grammar job is polled for its result. */
-const GRAMMAR_POLL_MS = 1000;
 
 export class PublishView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
@@ -94,15 +93,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 					break;
 				case 'export':
 					void this.export();
-					break;
-				case 'fixGrammar':
-					void this.fixGrammar();
-					break;
-				case 'buildRepresentations':
-					void this.buildRepresentations();
-					break;
-				case 'sectionAttribution':
-					void this.sectionAttribution();
 					break;
 				case 'search':
 					void this.search.search(String(message.phrase ?? ''));
@@ -277,38 +267,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 		}
 	}
 
-	// --- utils: representations ---
-
-	/**
-	 * Hand the manuscript to the builder, which owns the request and reports it
-	 * to the status bar. The build outlives this call by minutes; the Jobs Status
-	 * drawer is where it is followed.
-	 */
-	private async buildRepresentations(): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		await vscode.commands.executeCommand(
-			'authorship.buildRepresentations',
-			this.manuscript
-		);
-	}
-
-	// --- utils: section attribution ---
-
-	/**
-	 * Score the section the cursor is in, adding it to the scores already held
-	 * beside the manuscript.
-	 *
-	 * Alone among the Utils buttons this does not act on the chosen manuscript:
-	 * it scores whichever section the cursor is sitting in. It reports nothing
-	 * here either — the status bar says the scoring is running, and the column
-	 * beside the prose is the result.
-	 */
-	private async sectionAttribution(): Promise<void> {
-		await vscode.commands.executeCommand('authorship.scoreSection');
-	}
-
 	// --- search ---
 
 	/**
@@ -336,65 +294,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 		});
 	}
 
-	// --- utils: grammar ---
-
-	/**
-	 * Correct the manuscript's grammar. The server holds the model and returns
-	 * the corrected text; the editor applies it, so the author sees the change as
-	 * an ordinary edit they can read over and undo, rather than a silent rewrite
-	 * of the file on disk.
-	 */
-	private async fixGrammar(): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		try {
-			const started = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: this.manuscript.fsPath }),
-			});
-			if (!started.ok) {
-				await this.status(`Grammar fix failed: ${await detailOf(started)}`, true, 'utils');
-				return;
-			}
-			const { id } = (await started.json()) as { id: string };
-			await this.followGrammar(id);
-			await this.status('Grammar fixed.', false, 'utils');
-		} catch (err) {
-			// The server is what holds the model; a refused connection is the likely
-			// cause, and it is the one thing the author can act on.
-			await this.status(
-				`Grammar fix failed — is the model server running? (${describe(err)})`,
-				true,
-				'utils'
-			);
-		}
-	}
-
-	/** Wait out a grammar job. The manuscript itself is the result. */
-	private async followGrammar(id: string): Promise<void> {
-		for (;;) {
-			await delay(GRAMMAR_POLL_MS);
-			const response = await fetch(
-				`http://127.0.0.1:${this.port}/fix/grammar/status?id=${encodeURIComponent(id)}`
-			);
-			if (!response.ok) {
-				throw new Error(await detailOf(response));
-			}
-			const body = (await response.json()) as {
-				running: boolean;
-				error: string | null;
-			};
-			if (body.error) {
-				throw new Error(body.error);
-			}
-			if (!body.running) {
-				return;
-			}
-		}
-	}
-
 	// --- view plumbing ---
 
 	/** Read the files and hand the whole state to the view. */
@@ -414,13 +313,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 		});
 	}
 
-	/** A status line, sent to whichever drawer raised it. */
-	private async status(
-		message: string,
-		error: boolean,
-		scope: 'publish' | 'utils' = 'publish'
-	): Promise<void> {
-		await this.view?.webview.postMessage({ type: 'status', scope, message, error });
+	/** A status line under the Publishing drawer, which is what raises them. */
+	private async status(message: string, error: boolean): Promise<void> {
+		await this.view?.webview.postMessage({ type: 'status', message, error });
 	}
 
 	/** Repaint the status drawers from the server. */
@@ -548,21 +443,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 			<div id="status" class="status" hidden></div>
 		</div>
 	</details>
-	<details class="drawer" id="utils" open>
-		<summary>Utils</summary>
-		<div class="body">
-			<div class="actions">
-				<button id="build-representations" type="button" class="primary">Build representations</button>
-			</div>
-			<div class="actions">
-				<button id="fix-grammar" type="button" class="primary">Fix grammar</button>
-			</div>
-			<div class="actions">
-				<button id="section-attribution" type="button" class="primary">Section attribution</button>
-			</div>
-			<div id="utils-status" class="status" hidden></div>
-		</div>
-	</details>
 	<details class="drawer" id="search-drawer" open>
 		<summary>Search</summary>
 		<div class="body">
@@ -650,11 +530,6 @@ function describe(err: unknown): string {
 /** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
 function isTimeout(err: unknown): boolean {
 	return err instanceof Error && err.name === 'TimeoutError';
-}
-
-/** A promise that settles after `ms`. */
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function nonceString(): string {

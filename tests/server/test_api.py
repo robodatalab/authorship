@@ -238,7 +238,9 @@ class GrammarFix(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+        self.manuscript.write_text(
+            "## One\n\nteh cat.\n\n## Two\n\nteh dog.\n", encoding="utf-8"
+        )
 
         def _restore_model():
             app.state.grammar_model = None
@@ -248,20 +250,58 @@ class GrammarFix(unittest.TestCase):
         app.state.grammar_model = build_fake_completion_model(reply="the cat.")
         app.state.jobs = ParallelJobsManager()
 
-    def test_corrects_in_the_background_then_writes_the_manuscript(self) -> None:
+    def test_corrects_the_section_the_cursor_is_in_and_leaves_the_rest(self) -> None:
         client = TestClient(app)
-        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        started = client.post(
+            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
+        )
         self.assertEqual(started.status_code, 202)
 
         status = wait_for_grammar(client, started.json()["id"])
         self.assertIsNone(status["error"])
-        self.assertEqual(self.manuscript.read_text(), "the cat.")
+        self.assertEqual(
+            self.manuscript.read_text(),
+            "## One\n\nthe cat.\n\n## Two\n\nteh dog.\n",
+        )
+
+    def test_corrects_the_selected_lines_rather_than_the_section_around_them(
+        self,
+    ) -> None:
+        client = TestClient(app)
+        started = client.post(
+            "/fix/grammar",
+            json={
+                "path": str(self.manuscript),
+                "line": 6,
+                "selection": {"start": 6, "end": 6},
+            },
+        )
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(
+            self.manuscript.read_text(),
+            "## One\n\nteh cat.\n\n## Two\n\nthe cat.\n",
+        )
+
+    def test_a_selection_of_blank_lines_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/fix/grammar",
+            json={
+                "path": str(self.manuscript),
+                "line": 3,
+                "selection": {"start": 3, "end": 3},
+            },
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_a_missing_manuscript_is_a_bad_request(self) -> None:
         client = TestClient(app)
         response = client.post(
             "/fix/grammar",
-            json={"path": str(self.manuscript.with_name("nope.md"))},
+            json={"path": str(self.manuscript.with_name("nope.md")), "line": 0},
         )
         self.assertEqual(response.status_code, 400)
 
@@ -294,7 +334,9 @@ class Jobs(unittest.TestCase):
         app.state.grammar_model = model
         client = TestClient(app)
 
-        started = client.post("/fix/grammar", json={"path": str(self.manuscript)})
+        started = client.post(
+            "/fix/grammar", json={"path": str(self.manuscript), "line": 0}
+        )
         self.assertTrue(entered.acquire(timeout=5))
 
         response = client.get("/jobs")

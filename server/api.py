@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from server import log
 from server.epub_exporter import build_epub
-from server.grammar import fix_grammar
+from server.grammar import Span, correct_span, section_span, selected_span
 from server.inference import (
     InferenceModelResourceManager,
     ModelNotAvailable,
@@ -202,14 +202,21 @@ class SearchIndexJob(Job):
 class GrammarFixJob(Job):
     kind = "grammar fix"
 
-    def __init__(self, model: Seq2SeqModel, source: Path) -> None:
+    def __init__(
+        self, model: Seq2SeqModel, source: Path, markdown: str, span: Span
+    ) -> None:
         super().__init__(str(source))
         self._model = model
         self._source = source
-        self._markdown = source.read_text()
+        # A span means nothing apart from the text it was measured in, so the two
+        # arrive together rather than the manuscript being read a second time.
+        self._markdown = markdown
+        self._span = span
 
     def execute(self) -> None:
-        corrected = fix_grammar(self._model, self._markdown, lambda: self.cancelled)
+        corrected = correct_span(
+            self._model, self._markdown, self._span, lambda: self.cancelled
+        )
         if not self.cancelled:
             self._source.write_text(corrected)
 
@@ -373,20 +380,46 @@ def search(request: SearchRequest) -> dict[str, Any]:
     }
 
 
+class LineSelection(BaseModel):
+    # 0-based and inclusive.
+    start: int
+    end: int
+
+
 class GrammarFixRequest(BaseModel):
     # Path of the manuscript to correct.
     path: str
+    # Where the cursor is.
+    line: int
+    # The lines the author selected, if they selected any.
+    selection: LineSelection | None = None
 
 
 @app.post("/fix/grammar", status_code=202)
 def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Start correcting a manuscript; poll /fix/grammar/status for the end of it."""
+    """Start correcting a passage; poll /fix/grammar/status for the end of it.
+
+    A pass is over what the author is working on rather than the whole
+    manuscript: the lines they selected, or — having selected none — the section
+    their cursor is in. Where a section ends is the server's to say, so the
+    request carries the cursor rather than a span it worked out for itself.
+    """
     document = Path(request.path)
     if not document.is_file():
         raise HTTPException(
             status_code=400, detail=f"No such manuscript: {request.path}"
         )
-    job = GrammarFixJob(app.state.grammar_model, document)
+    markdown = document.read_text()
+    span = (
+        selected_span(markdown, request.selection.start, request.selection.end)
+        if request.selection
+        else section_span(markdown, request.line)
+    )
+    if span is None:
+        raise HTTPException(
+            status_code=400, detail="There is no prose there to correct."
+        )
+    job = GrammarFixJob(app.state.grammar_model, document, markdown, span)
     app.state.jobs.start(job)
     return {"id": job.target}
 

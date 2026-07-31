@@ -32,3 +32,4 @@ Liam turned his head and looked at me. His eyes were calm. Curious. Not accusato
 
 I felt the world tilt. I felt the floor shift under me. I felt the magnitude of what he was suggesting press against me from all sides.
 
+He pushed into me and I felt myself stretch. I felt the walls of my pussy open around him, felt the fullness build inch by inch, felt the deep, aching pressure that I had been missing

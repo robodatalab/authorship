@@ -20,10 +20,22 @@
                 "icon": "$(type-hierarchy)"
             },
             {
+                "command": "authorship.buildRepresentations",
+                "title": "Build Representations",
+                "category": "Authorship",
+                "icon": "$(layers)"
+            },
+            {
                 "command": "authorship.scoreSection",
                 "title": "Score Section",
                 "category": "Authorship",
                 "icon": "$(graph-line)"
+            },
+            {
+                "command": "authorship.fixGrammar",
+                "title": "Fix Grammar",
+                "category": "Authorship",
+                "icon": "$(wand)"
             },
             {
                 "command": "authorship.searchManuscript",
@@ -37,17 +49,27 @@
                 {
                     "command": "authorship.showStoryGraph",
                     "when": "resourceExtname == .md",
-                    "group": "navigation"
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "authorship.buildRepresentations",
+                    "when": "resourceExtname == .md",
+                    "group": "navigation@2"
                 },
                 {
                     "command": "authorship.scoreSection",
                     "when": "resourceExtname == .md",
-                    "group": "navigation"
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "authorship.fixGrammar",
+                    "when": "resourceExtname == .md",
+                    "group": "navigation@4"
                 },
                 {
                     "command": "authorship.searchManuscript",
                     "when": "resourceExtname == .md",
-                    "group": "navigation"
+                    "group": "navigation@5"
                 }
             ]
         },
