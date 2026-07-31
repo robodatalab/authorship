@@ -13,7 +13,8 @@
       "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import Seq2SeqModel$|from server.inference.seq2seq import Seq2SeqModel|' server/grammar.py)",
       "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import ModelKind$|from server.inference.resource_manager import ModelKind|' tests/server/test_api.py)",
       "WebFetch(domain:help.gitkraken.com)",
-      "WebFetch(domain:vscode.rocks)"
+      "WebFetch(domain:vscode.rocks)",
+      "Bash(git -C /Users/piotrtrochim/GitHub/writer diff --stat tests/server/test_semantic_search.py)"
     ]
   }
 }

@@ -1,292 +1,417 @@
-"""Tests for semantic search: a manuscript and a phrase in, passages out.
-
-No model. `SearchIndex` takes its encoder by injection and only ever asks it to
-`encode` and `encode_query`, so a stand-in drives the whole path. The stand-in
-puts each word of the manuscript on an axis of its own and returns the unit
-vector of what a text holds — which is enough for the ranking under test to be
-real: a line that says what the phrase says scores above one that does not,
-exactly as an embedding would.
-"""
-
-import math
-import re
 import unittest
-from typing import Sequence, cast
+from unittest import mock
 
-from server.inference.encoder import EncoderModel
-from server.semantic_search import (
-    DEFAULT_MAX_MATCHING_LINES,
-    LINES_PER_ENCODE_REQUEST,
-    MatchedPassage,
-    SearchIndex,
+from server.semantic_search import LINES_PER_ENCODE_REQUEST, SearchIndex
+
+MANUSCRIPT_PATH = "/stories/story.md"
+ANOTHER_MANUSCRIPT_PATH = "/stories/other.md"
+MAX_MATCHING_LINES = 10
+
+PHRASE = "what the author is looking for"
+PHRASE_VECTOR = [1.0, 0.0]
+
+IDENTICAL_TO_PHRASE = [1.0, 0.0]
+NEAR_THE_PHRASE = [0.8, 0.6]
+TOO_FAR_FROM_PHRASE_TO_MATCH = [0.28, 0.96]
+UNRELATED_TO_PHRASE = [0.0, 1.0]
+
+FOUR_PARAGRAPHS = (
+    "the first paragraph\n"
+    "\n"
+    "the second paragraph\n"
+    "\n"
+    "the third paragraph\n"
+    "\n"
+    "the fourth paragraph\n"
 )
+FIRST_PARAGRAPH_LINE = 0
+SECOND_PARAGRAPH_LINE = 2
+THIRD_PARAGRAPH_LINE = 4
 
-PATH = "/stories/story.md"
+TWO_PARAGRAPHS = "the first paragraph\n\nthe second paragraph\n"
 
-
-def words(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9']+", text.lower())
-
-
-def long_story(paragraphs: int) -> str:
-    return "\n\n".join(f"line {n} of the story" for n in range(paragraphs))
-
-
-class WordSpaceEncoder:
-    """A unit vector per text, in a space where each word of a manuscript is an axis.
-
-    The lines and the phrase are encoded in separate calls and have to land in
-    the same space, so the axes are fixed when the encoder is made rather than
-    taken from whatever was handed over at the time. A word the manuscript never
-    uses is off every axis and moves nothing, as a word the model had no sense of
-    would.
-    """
-
-    def __init__(self, story: str) -> None:
-        self._axes = sorted(set(words(story)))
-        # Every batch this was asked for, so a test can see what was encoded
-        # again and what was not.
-        self.batches: list[list[str]] = []
-
-    def encode(self, passages: Sequence[str]) -> list[list[float]]:
-        self.batches.append(list(passages))
-        return [self._vector(text) for text in passages]
-
-    def encode_query(self, query: str, task: str = "") -> list[float]:
-        return self._vector(query)
-
-    def _vector(self, text: str) -> list[float]:
-        held = words(text)
-        counts = [float(held.count(axis)) for axis in self._axes]
-        length = math.sqrt(sum(count * count for count in counts))
-        return [count / length for count in counts] if length else counts
+LONGER_THAN_ONE_BATCH = "\n\n".join(
+    f"paragraph {number} of the story"
+    for number in range(LINES_PER_ENCODE_REQUEST + 5)
+)
+FIRST_PARAGRAPH_OF_THE_LONGER_STORY = "paragraph 0 of the story"
 
 
-def found(
-    story: str, phrase: str, count: int = DEFAULT_MAX_MATCHING_LINES
-) -> list[MatchedPassage]:
-    """The passages of a freshly indexed manuscript that answer a phrase."""
-    index = SearchIndex()
-    model = cast(EncoderModel, WordSpaceEncoder(story))
-    index.encode_manuscript(model, PATH, story)
-    return index.search(model, PATH, story, phrase, count).passages
+class SearchableLines(unittest.TestCase):
 
+    def setUp(self) -> None:
+        self.vector_by_line: dict[str, list[float]] = {}
+        self.encoder = mock.MagicMock()
+        self.encoder.encode.side_effect = lambda lines: [
+            self.vector_by_line.get(line, UNRELATED_TO_PHRASE) for line in lines
+        ]
+        self.encoder.encode_query.return_value = PHRASE_VECTOR
+        self.index = SearchIndex()
 
-class Passages(unittest.TestCase):
-    """Which lines a search can land on."""
+    def test_a_heading_never_matches_even_when_it_is_the_nearest_text(self) -> None:
+        story = "# A Heading\n\n## A Heading\n\nthe only prose in this manuscript"
+        self.vector_by_line = {
+            "# A Heading": IDENTICAL_TO_PHRASE,
+            "## A Heading": IDENTICAL_TO_PHRASE,
+            "the only prose in this manuscript": NEAR_THE_PHRASE,
+        }
 
-    def test_a_line_that_says_the_phrase_is_found(self) -> None:
-        story = "## One\nthe horse bolted through the gate\n\nshe poured the tea"
-        self.assertEqual(found(story, "the horse bolted")[0].first_line, 1)
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, story)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, story, PHRASE, MAX_MATCHING_LINES
+        )
 
-    def test_headings_are_not_searchable(self) -> None:
-        # Structure, not story. Asking what happens should not land on "Three".
-        # Both headings say "horse" more purely than the prose does, so they
-        # would come first if they were passages at all.
-        story = "# The Horse\n\n## Horse\n\nshe poured the tea slowly"
-        self.assertEqual([passage.first_line for passage in found(story, "the horse tea")], [4])
+        self.assertEqual([match.first_line for match in results.passages], [4])
 
-    def test_blank_lines_are_not_searchable(self) -> None:
-        # The passage is the prose, not the run of nothing above it.
-        story = "the horse bolted through the gate\n\n\nshe poured the tea slowly"
-        passage = found(story, "tea slowly")[0]
-        self.assertEqual((passage.first_line, passage.last_line), (3, 3))
+    def test_a_line_of_fewer_than_three_words_never_matches(self) -> None:
+        story = "two words\n\nthree words here"
+        self.vector_by_line = {
+            "two words": IDENTICAL_TO_PHRASE,
+            "three words here": NEAR_THE_PHRASE,
+        }
 
-    def test_a_line_of_one_or_two_words_is_not_searchable(self) -> None:
-        # Too thin to mean anything on its own; it would answer on one word, and
-        # saying nothing else would put it above the line that says more.
-        story = "the horse\n\nthe horse bolted through the gate"
-        self.assertEqual([passage.first_line for passage in found(story, "horse")], [2])
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, story)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, story, PHRASE, MAX_MATCHING_LINES
+        )
 
-    def test_commented_lines_are_not_searchable(self) -> None:
-        story = "<!-- the horse bolted here -->\n\nshe poured the tea slowly"
-        self.assertEqual([passage.first_line for passage in found(story, "the horse bolted")], [2])
+        self.assertEqual([match.first_line for match in results.passages], [2])
 
-    def test_a_comment_beside_prose_leaves_the_prose_searchable(self) -> None:
-        story = "the horse bolted <!-- cut? -->\n\nshe poured the tea slowly"
-        self.assertEqual(found(story, "the horse bolted")[0].first_line, 0)
+    def test_a_commented_out_line_never_matches(self) -> None:
+        story = "<!-- the note the author left themselves -->\n\nthe only prose here"
+        self.vector_by_line = {
+            "<!-- the note the author left themselves -->": IDENTICAL_TO_PHRASE,
+            "the only prose here": NEAR_THE_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, story)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, story, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual([match.first_line for match in results.passages], [2])
+
+    def test_a_comment_beside_prose_leaves_the_prose_matching(self) -> None:
+        story = "the only prose here <!-- cut? -->\n\nthe second paragraph"
+        self.vector_by_line = {"the only prose here": IDENTICAL_TO_PHRASE}
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, story)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, story, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual([match.first_line for match in results.passages], [0])
+
+    def test_a_passage_does_not_reach_back_over_the_blank_lines_above_it(self) -> None:
+        story = "the first paragraph\n\n\n\nthe second paragraph"
+        self.vector_by_line = {"the second paragraph": IDENTICAL_TO_PHRASE}
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, story)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, story, PHRASE, MAX_MATCHING_LINES
+        )
+
+        match = results.passages[0]
+        self.assertEqual((match.first_line, match.last_line), (4, 4))
 
 
 class Ranking(unittest.TestCase):
-    """Best first, and only what answers."""
 
-    STORY = (
-        "the horse bolted through the open gate\n"
-        "\n"
-        "she poured the tea and waited\n"
-        "\n"
-        "the gate swung shut behind them\n"
-    )
+    def setUp(self) -> None:
+        self.vector_by_line: dict[str, list[float]] = {}
+        self.encoder = mock.MagicMock()
+        self.encoder.encode.side_effect = lambda lines: [
+            self.vector_by_line.get(line, UNRELATED_TO_PHRASE) for line in lines
+        ]
+        self.encoder.encode_query.return_value = PHRASE_VECTOR
+        self.index = SearchIndex()
 
-    def test_the_nearest_passage_comes_first(self) -> None:
-        self.assertEqual(found(self.STORY, "a horse bolting")[0].first_line, 0)
+    def test_the_nearest_line_comes_first(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": NEAR_THE_PHRASE,
+            "the third paragraph": IDENTICAL_TO_PHRASE,
+        }
 
-    def test_passages_are_ordered_by_how_near_they_are(self) -> None:
-        scores = [passage.similarity for passage in found(self.STORY, "the gate")]
-        self.assertEqual(scores, sorted(scores, reverse=True))
-
-    def test_a_line_far_from_the_best_is_not_an_answer(self) -> None:
-        # The tea is what the manuscript happens to hold, not what was asked.
-        self.assertEqual([passage.first_line for passage in found(self.STORY, "the gate")], [0, 4])
-
-    def test_count_bounds_the_answer(self) -> None:
-        self.assertEqual(len(found(self.STORY, "the gate", count=1)), 1)
-
-    def test_an_empty_phrase_answers_nothing(self) -> None:
-        self.assertEqual(found(self.STORY, "   "), [])
-
-
-class Runs(unittest.TestCase):
-    """A passage may be more than one line."""
-
-    STORY = (
-        "the horse bolted through the open gate\n"
-        "\n"
-        "the gate swung shut behind them\n"
-        "\n"
-        "she poured the tea and waited\n"
-        "\n"
-        "the gate was painted green\n"
-    )
-
-    def test_a_single_line_passage_starts_and_ends_on_it(self) -> None:
-        passage = found(self.STORY, "pouring tea", count=1)[0]
-        self.assertEqual((passage.first_line, passage.last_line), (4, 4))
-
-    def test_answers_with_nothing_scored_between_them_are_one_passage(self) -> None:
-        # Lines 0 and 2 are parted by a blank line, so they follow each other.
-        passages = found(self.STORY, "the gate", count=3)
-        self.assertEqual((passages[0].first_line, passages[0].last_line), (0, 2))
-
-    def test_a_passage_carries_the_lines_between_its_ends(self) -> None:
-        passage = found(self.STORY, "the gate", count=3)[0]
-        self.assertEqual(
-            passage.text,
-            "the horse bolted through the open gate\n\nthe gate swung shut behind them",
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
         )
 
-    def test_answers_with_a_line_between_them_stay_apart(self) -> None:
-        # The tea sits between them and did not answer, so line 6 is its own
-        # passage rather than the tail of the one that opens the manuscript.
-        passages = found(self.STORY, "the gate", count=3)
-        self.assertEqual([(passage.first_line, passage.last_line) for passage in passages], [(0, 2), (6, 6)])
+        self.assertEqual(
+            [match.first_line for match in results.passages],
+            [THIRD_PARAGRAPH_LINE, FIRST_PARAGRAPH_LINE],
+        )
 
-    def test_a_passage_scores_as_its_best_line(self) -> None:
-        # The second line is in it because it runs on from the first, not
-        # because it answered as well.
-        joined = found(self.STORY, "the gate", count=3)[0]
-        alone = found(self.STORY, "the gate", count=1)[0]
-        self.assertAlmostEqual(joined.similarity, alone.similarity)
+    def test_a_line_below_half_the_best_similarity_does_not_match(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": IDENTICAL_TO_PHRASE,
+            "the third paragraph": TOO_FAR_FROM_PHRASE_TO_MATCH,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(
+            [match.first_line for match in results.passages], [FIRST_PARAGRAPH_LINE]
+        )
+
+    def test_a_line_unrelated_to_the_phrase_does_not_match(self) -> None:
+        self.vector_by_line = {"the first paragraph": IDENTICAL_TO_PHRASE}
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(
+            [match.first_line for match in results.passages], [FIRST_PARAGRAPH_LINE]
+        )
+
+    def test_nothing_matches_when_every_line_is_unrelated(self) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(results.passages, [])
+
+    def test_max_matching_lines_bounds_the_answer(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": IDENTICAL_TO_PHRASE,
+            "the second paragraph": IDENTICAL_TO_PHRASE,
+            "the third paragraph": IDENTICAL_TO_PHRASE,
+            "the fourth paragraph": IDENTICAL_TO_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, 1
+        )
+
+        self.assertEqual(len(results.passages), 1)
+
+    def test_an_empty_phrase_matches_nothing(self) -> None:
+        self.vector_by_line = {"the first paragraph": IDENTICAL_TO_PHRASE}
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, "   ", MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(results.passages, [])
 
 
-class Index(unittest.TestCase):
-    """What is encoded, and what is not encoded again."""
+class JoiningAdjacentLines(unittest.TestCase):
 
-    STORY = "the horse bolted through the gate\n\nshe poured the tea and waited\n"
+    def setUp(self) -> None:
+        self.vector_by_line: dict[str, list[float]] = {}
+        self.encoder = mock.MagicMock()
+        self.encoder.encode.side_effect = lambda lines: [
+            self.vector_by_line.get(line, UNRELATED_TO_PHRASE) for line in lines
+        ]
+        self.encoder.encode_query.return_value = PHRASE_VECTOR
+        self.index = SearchIndex()
 
-    def test_a_manuscript_never_indexed_answers_nothing_and_reports_it(self) -> None:
-        index = SearchIndex()
-        model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        results = index.search(model, PATH, self.STORY, "the horse")
+    def test_matching_lines_with_nothing_matching_between_them_are_one_passage(
+        self,
+    ) -> None:
+        self.vector_by_line = {
+            "the first paragraph": IDENTICAL_TO_PHRASE,
+            "the second paragraph": NEAR_THE_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(
+            [(match.first_line, match.last_line) for match in results.passages],
+            [(FIRST_PARAGRAPH_LINE, SECOND_PARAGRAPH_LINE)],
+        )
+
+    def test_matching_lines_with_an_unmatched_line_between_them_stay_apart(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": IDENTICAL_TO_PHRASE,
+            "the third paragraph": NEAR_THE_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(
+            [(match.first_line, match.last_line) for match in results.passages],
+            [
+                (FIRST_PARAGRAPH_LINE, FIRST_PARAGRAPH_LINE),
+                (THIRD_PARAGRAPH_LINE, THIRD_PARAGRAPH_LINE),
+            ],
+        )
+
+    def test_a_passage_carries_every_line_between_its_ends(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": IDENTICAL_TO_PHRASE,
+            "the second paragraph": NEAR_THE_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(
+            results.passages[0].text, "the first paragraph\n\nthe second paragraph"
+        )
+
+    def test_a_passage_takes_the_similarity_of_its_nearest_line(self) -> None:
+        self.vector_by_line = {
+            "the first paragraph": NEAR_THE_PHRASE,
+            "the second paragraph": IDENTICAL_TO_PHRASE,
+        }
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, FOUR_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(results.passages[0].similarity, 1.0)
+
+
+class Encoding(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.vector_by_line: dict[str, list[float]] = {}
+        self.encoder = mock.MagicMock()
+        self.encoder.encode.side_effect = lambda lines: [
+            self.vector_by_line.get(line, UNRELATED_TO_PHRASE) for line in lines
+        ]
+        self.encoder.encode_query.return_value = PHRASE_VECTOR
+        self.index = SearchIndex()
+
+    def test_a_manuscript_never_encoded_matches_nothing_and_reports_every_line(
+        self,
+    ) -> None:
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
+
         self.assertEqual(results.passages, [])
         self.assertEqual(results.lines_awaiting_encoding, 2)
 
-    def test_an_indexed_manuscript_has_nothing_pending(self) -> None:
-        index = SearchIndex()
-        model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.encode_manuscript(model, PATH, self.STORY)
-        self.assertEqual(index.search(model, PATH, self.STORY, "the horse").lines_awaiting_encoding, 0)
+    def test_an_encoded_manuscript_has_no_lines_awaiting_encoding(self) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS, PHRASE, MAX_MATCHING_LINES
+        )
 
-    def test_a_line_written_since_the_indexing_is_pending(self) -> None:
-        index = SearchIndex()
-        model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.encode_manuscript(model, PATH, self.STORY)
-        written = self.STORY + "\nthe gate swung shut behind them\n"
-        self.assertEqual(index.search(model, PATH, written, "the gate").lines_awaiting_encoding, 1)
+        self.assertEqual(results.lines_awaiting_encoding, 0)
 
-    def test_indexing_again_encodes_nothing_that_has_not_changed(self) -> None:
-        index = SearchIndex()
-        model = WordSpaceEncoder(self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        self.assertEqual(len(model.batches), 1)
+    def test_a_line_written_since_the_encoding_is_awaiting_encoding(self) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        written_since = TWO_PARAGRAPHS + "\nthe third paragraph\n"
+
+        results = self.index.search(
+            self.encoder, MANUSCRIPT_PATH, written_since, PHRASE, MAX_MATCHING_LINES
+        )
+
+        self.assertEqual(results.lines_awaiting_encoding, 1)
+
+    def test_encoding_again_asks_for_nothing_that_has_not_changed(self) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+
+        self.assertEqual(self.encoder.encode.call_count, 1)
 
     def test_only_the_lines_that_were_rewritten_are_encoded_again(self) -> None:
-        index = SearchIndex()
-        model = WordSpaceEncoder(self.STORY + " gate swung shut")
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        rewritten = self.STORY.replace("she poured the tea and waited", "gate swung shut")
-        index.encode_manuscript(cast(EncoderModel, model), PATH, rewritten)
-        self.assertEqual(model.batches[1], ["gate swung shut"])
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        rewritten = TWO_PARAGRAPHS.replace(
+            "the second paragraph", "a rewritten paragraph"
+        )
+
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, rewritten)
+
+        self.assertEqual(
+            self.encoder.encode.call_args_list[1].args[0], ["a rewritten paragraph"]
+        )
 
     def test_a_line_that_only_moved_is_not_encoded_again(self) -> None:
-        # Keyed by what a line says, not by where it sits.
-        index = SearchIndex()
-        model = WordSpaceEncoder(self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, "\n\n" + self.STORY)
-        self.assertEqual(len(model.batches), 1)
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        self.index.encode_manuscript(
+            self.encoder, MANUSCRIPT_PATH, "\n\n" + TWO_PARAGRAPHS
+        )
 
-    def test_a_line_the_manuscript_no_longer_says_is_dropped(self) -> None:
-        # Pruned rather than kept, so an afternoon of editing does not accumulate
-        # the vectors of every draft it passed through. Writing the line back is
-        # what shows it went: it has to be encoded a second time.
-        index = SearchIndex()
-        model = WordSpaceEncoder(self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        index.encode_manuscript(cast(EncoderModel, model), PATH, "the horse bolted through the gate")
-        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
-        self.assertEqual(model.batches[-1], ["she poured the tea and waited"])
+        self.assertEqual(self.encoder.encode.call_count, 1)
 
-    def test_lines_are_encoded_a_chunk_at_a_time(self) -> None:
-        # The encoder answers one caller at a time. A manuscript encoded in a
-        # single call would hold it for the whole pass, and a search would wait
-        # out the indexing rather than answering from what was ready.
-        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
-        model = WordSpaceEncoder(story)
-        SearchIndex().encode_manuscript(cast(EncoderModel, model), PATH, story)
-        self.assertEqual([len(batch) for batch in model.batches], [LINES_PER_ENCODE_REQUEST, 5])
+    def test_a_line_the_manuscript_dropped_is_encoded_afresh_when_it_returns(
+        self,
+    ) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+        self.index.encode_manuscript(
+            self.encoder, MANUSCRIPT_PATH, "the first paragraph"
+        )
 
-    def test_a_manuscript_answers_while_it_is_still_being_encoded(self) -> None:
-        # Vectors published only at the end of a pass leave a search answering
-        # nothing for as long as the whole manuscript takes to read.
-        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
-        index = SearchIndex()
-        model = WordSpaceEncoder(story)
-        encoded = model.encode
-        found_during: list[int] = []
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
 
-        def encode_and_look(texts: Sequence[str]) -> list[list[float]]:
-            vectors = encoded(texts)
-            found_during.append(
-                len(
-                    index.search(
-                        cast(EncoderModel, model), PATH, story, "line 0 of the story"
-                    ).passages
-                )
-            )
-            return vectors
+        self.assertEqual(
+            self.encoder.encode.call_args_list[-1].args[0], ["the second paragraph"]
+        )
 
-        model.encode = encode_and_look  # type: ignore[method-assign]
-        index.encode_manuscript(cast(EncoderModel, model), PATH, story)
+    def test_lines_are_encoded_in_batches(self) -> None:
+        self.index.encode_manuscript(
+            self.encoder, MANUSCRIPT_PATH, LONGER_THAN_ONE_BATCH
+        )
 
-        self.assertEqual(found_during[0], 0)
-        self.assertGreater(found_during[1], 0)
+        self.assertEqual(
+            [len(call.args[0]) for call in self.encoder.encode.call_args_list],
+            [LINES_PER_ENCODE_REQUEST, 5],
+        )
 
-    def test_a_superseded_pass_stops_rather_than_spending_the_encoder(self) -> None:
-        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
-        model = WordSpaceEncoder(story)
-        SearchIndex().encode_manuscript(cast(EncoderModel, model), PATH, story, lambda: True)
-        self.assertEqual(model.batches, [])
+    def test_lines_encoded_so_far_match_before_the_rest_are_encoded(self) -> None:
+        self.vector_by_line = {
+            FIRST_PARAGRAPH_OF_THE_LONGER_STORY: IDENTICAL_TO_PHRASE
+        }
 
-    def test_manuscripts_are_indexed_apart_from_each_other(self) -> None:
-        index = SearchIndex()
-        model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.encode_manuscript(model, PATH, self.STORY)
-        other = index.search(model, "/stories/other.md", self.STORY, "the horse")
-        self.assertEqual(other.passages, [])
-        self.assertEqual(other.lines_awaiting_encoding, 2)
+        self.index.encode_manuscript(
+            self.encoder,
+            MANUSCRIPT_PATH,
+            LONGER_THAN_ONE_BATCH,
+            lambda: self.encoder.encode.call_count >= 1,
+        )
+        results = self.index.search(
+            self.encoder,
+            MANUSCRIPT_PATH,
+            LONGER_THAN_ONE_BATCH,
+            PHRASE,
+            MAX_MATCHING_LINES,
+        )
 
+        self.assertEqual([match.first_line for match in results.passages], [0])
+        self.assertEqual(results.lines_awaiting_encoding, 5)
+
+    def test_encoding_stops_when_it_is_superseded(self) -> None:
+        self.index.encode_manuscript(
+            self.encoder, MANUSCRIPT_PATH, LONGER_THAN_ONE_BATCH, lambda: True
+        )
+
+        self.encoder.encode.assert_not_called()
+
+    def test_each_manuscript_is_encoded_apart_from_the_others(self) -> None:
+        self.index.encode_manuscript(self.encoder, MANUSCRIPT_PATH, TWO_PARAGRAPHS)
+
+        results = self.index.search(
+            self.encoder,
+            ANOTHER_MANUSCRIPT_PATH,
+            TWO_PARAGRAPHS,
+            PHRASE,
+            MAX_MATCHING_LINES,
+        )
+
+        self.assertEqual(results.passages, [])
+        self.assertEqual(results.lines_awaiting_encoding, 2)
+ 
 
 if __name__ == "__main__":
     unittest.main()
