@@ -1,6 +1,10 @@
+from dataclasses import dataclass
+
 from server import log
-from server.inference.inference import InferenceModel
-from server.representations.utils import json_object, numbered, as_edge, as_node
+from server.inference.causal import CausalModel
+from server.representations.utils import (
+    json_object, numbered, as_edge, as_node
+)
 from server.story_graph import Edge, Node, StoryGraph
 
 _log = log.logger(__name__)
@@ -38,7 +42,7 @@ Answer with one JSON object and nothing else, in exactly this shape:
 
 
 def build_scene_representation(
-    model: InferenceModel, story_markdown: str
+    model: CausalModel, story_markdown: str
 ) -> StoryGraph:
     payload_str = model.complete(
         SCENE_SYSTEM, numbered(story_markdown), max_new_tokens=1024
@@ -64,3 +68,4 @@ def build_scene_representation(
             edges.append(edge)
 
     return StoryGraph(nodes=tuple(nodes), edges=tuple(edges))
+

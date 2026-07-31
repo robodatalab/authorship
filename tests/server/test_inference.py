@@ -1,28 +1,30 @@
+import queue
 import threading
 import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from server.inference import inference
-from server.inference.kinds import ModelKind
-from server.inference.inference import (
-    InferenceModel,
-    InferenceModelResourceManager,
-)
+from server.inference import causal, resource_manager
+from server.inference.resource_manager import InferenceModelResourceManager
+from server.inference.causal import CausalModel
+from server.inference.utils import qwen_chat_prompt
 
 
-def fake_kind(response: str) -> MagicMock:
-    kind = MagicMock(spec=ModelKind)
-    kind.model_id = "test-org/test-model"
-    kind.load.return_value = (MagicMock(), MagicMock())
-    kind.complete.return_value = response
-    return kind
+class ThreadQueue(queue.Queue):
+    """The queue of a serving process that is really a thread.
+
+    A request reaches the real serving process by pickling; here it is handed
+    over as it is, so a test can send one that closes over its own events.
+    """
+
+    def close(self) -> None:
+        pass
 
 
-class InferenceModelTests(unittest.TestCase):
+class ModelCompletionTests(unittest.TestCase):
 
     def setUp(self):
-        self.spawned = []
+        self.spawned: list[MagicMock] = []
 
         def spawn(target=None, kwargs=None, daemon=None):
             thread = threading.Thread(target=target, kwargs=kwargs, daemon=True)
@@ -33,23 +35,30 @@ class InferenceModelTests(unittest.TestCase):
             self.spawned.append(process)
             return process
 
-        patcher = patch.object(inference, "Process", side_effect=spawn)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.addCleanup(patch.stopall)
+        patch.object(resource_manager, "Process", side_effect=spawn).start()
+        patch.object(resource_manager, "Queue", ThreadQueue).start()
+        patch.object(causal, "AutoTokenizer").start()
+        self.transformer = patch.object(causal, "AutoModelForCausalLM").start()
 
-        self.resource_manager = InferenceModelResourceManager()
-        self.addCleanup(self.resource_manager._stop_model_process)
+        # Room for one of the models below, so that a second one has to swap.
+        self.resource_manager = InferenceModelResourceManager(quota_gb=8.0)
+        self.addCleanup(self.resource_manager.shutdown)
 
     def test_complete_waits_until_model_is_loaded(self):
         loaded = threading.Event()
-        kind = fake_kind("model response 1")
 
-        def load():
+        def load(*_args, **_kwargs):
             loaded.wait(timeout=5)
-            return MagicMock(), MagicMock()
+            return MagicMock()
 
-        kind.load.side_effect = load
-        model = InferenceModel(kind, self.resource_manager)
+        self.transformer.from_pretrained.side_effect = load
+        patch.object(
+            causal, "_complete_instruct", return_value="model response 1"
+        ).start()
+        model = CausalModel(
+            "test-org/test-model", qwen_chat_prompt, self.resource_manager, 5.0
+        )
 
         responses = []
 
@@ -67,7 +76,12 @@ class InferenceModelTests(unittest.TestCase):
         self.assertSequenceEqual(responses, ["model response 1"])
 
     def test_model_runs_inference(self):
-        model = InferenceModel(fake_kind("model response 2"), self.resource_manager)
+        patch.object(
+            causal, "_complete_instruct", return_value="model response 2"
+        ).start()
+        model = CausalModel(
+            "test-org/test-model", qwen_chat_prompt, self.resource_manager, 5.0
+        )
 
         response = model.complete("system", "user", max_new_tokens=10)
 
@@ -76,35 +90,32 @@ class InferenceModelTests(unittest.TestCase):
     def test_a_swap_waits_for_a_call_in_flight(self):
         # Otherwise the grace period hides the tear-down behind a long wait, and
         # the assertion below passes for the wrong reason.
-        patcher = patch.object(inference, "STOP_GRACE_S", 0.05)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        patch.object(resource_manager, "STOP_GRACE_S", 0.05).start()
 
         generating = threading.Event()
         finish = threading.Event()
 
-        first = fake_kind("first response")
-        first.model_id = "test-org/first"
-
-        def slow_complete(*_args, **_kwargs):
+        def slow_generate(*_args, **_kwargs):
             generating.set()
             finish.wait(timeout=5)
             return "first response"
 
-        first.complete.side_effect = slow_complete
+        patch.object(causal, "_complete_instruct", side_effect=slow_generate).start()
 
-        second = fake_kind("second response")
-        second.model_id = "test-org/second"
+        first = CausalModel(
+            "test-org/first", qwen_chat_prompt, self.resource_manager, 5.0
+        )
+        second = CausalModel(
+            "test-org/second", qwen_chat_prompt, self.resource_manager, 5.0
+        )
 
         responses = []
 
         def call_first():
-            model = InferenceModel(first, self.resource_manager)
-            responses.append(model.complete("system", "user", max_new_tokens=10))
+            responses.append(first.complete("system", "user", max_new_tokens=10))
 
         def call_second():
-            model = InferenceModel(second, self.resource_manager)
-            model.complete("system", "user", max_new_tokens=10)
+            second.complete("system", "user", max_new_tokens=10)
 
         caller = threading.Thread(target=call_first, daemon=True)
         caller.start()

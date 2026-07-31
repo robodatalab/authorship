@@ -6,11 +6,17 @@
  * What `GET /health` reports, plus the case where nothing answers, plus what we
  * are doing to the server ourselves.
  *
- * `building` is the odd one out: it is not a state the server publishes, it is
- * a request of ours that is still in flight. `/health` stays a statement about
- * the model alone.
+ * `building` and `scoring` are the odd ones out: they are not states the server
+ * publishes, they are requests of ours that are still in flight. `/health` stays
+ * a statement about the model alone.
  */
-export type Phase = 'offline' | 'unloaded' | 'downloading' | 'ready' | 'building';
+export type Phase =
+	| 'offline'
+	| 'unloaded'
+	| 'downloading'
+	| 'ready'
+	| 'building'
+	| 'scoring';
 
 export interface StatusDisplay {
 	text: string;
@@ -70,6 +76,11 @@ export function renderStatus(phase: Phase): StatusDisplay {
 			return {
 				text: '$(sync~spin) Authorship: building',
 				tooltip: 'Reading the manuscript.',
+			};
+		case 'scoring':
+			return {
+				text: '$(sync~spin) Authorship: scoring',
+				tooltip: 'Weighing the lines of the section the cursor is in.',
 			};
 	}
 }

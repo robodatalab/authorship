@@ -9,6 +9,7 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import type { Highlights } from '../highlight/orchestrator';
 import type { BuildActivity } from '../llm/activity';
 import {
 	denormalize,
@@ -20,6 +21,9 @@ import {
 	type Layer,
 	type LineSpan,
 } from './model';
+
+/** Who this is, to the highlight orchestrator. */
+const SOURCE = 'story-graph';
 
 /**
  * A webview showing one manuscript's story graph, opened beside the document it
@@ -36,15 +40,10 @@ export class StoryGraphPanel {
 	/** Last graph read from disk, kept so selections can be matched against it. */
 	private layers: Layer[] = [];
 
-	/** Marks the lines belonging to the node that was last clicked. */
-	private readonly highlight = vscode.window.createTextEditorDecorationType({
-		backgroundColor: new vscode.ThemeColor('editor.rangeHighlightBackground'),
-		isWholeLine: true,
-	});
-
 	static reveal(
 		context: vscode.ExtensionContext,
 		activity: BuildActivity,
+		highlights: Highlights,
 		docUri: vscode.Uri,
 		sourceColumn: vscode.ViewColumn | undefined
 	): void {
@@ -61,6 +60,7 @@ export class StoryGraphPanel {
 			new StoryGraphPanel(
 				context,
 				activity,
+				highlights,
 				docUri,
 				sourceColumn ?? vscode.ViewColumn.One
 			)
@@ -70,6 +70,7 @@ export class StoryGraphPanel {
 	private constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly activity: BuildActivity,
+		private readonly highlights: Highlights,
 		private readonly docUri: vscode.Uri,
 		private readonly sourceColumn: vscode.ViewColumn
 	) {
@@ -122,9 +123,9 @@ export class StoryGraphPanel {
 		this.disposables.push(
 			vscode.window.onDidChangeTextEditorSelection((event) => {
 				if (event.textEditor.document.uri.toString() === this.docUri.toString()) {
-					// Moving in the manuscript supersedes the last node click, so its
-					// highlight goes with it.
-					event.textEditor.setDecorations(this.highlight, []);
+					// Moving out of the clicked node supersedes it, and the orchestrator
+					// puts its highlight out — this only has to say which nodes the
+					// cursor is in now.
 					this.sendActive(event.selections);
 				}
 			})
@@ -240,19 +241,17 @@ export class StoryGraphPanel {
 			spans.push({ start: Math.min(start, end), end: Math.max(start, end) });
 		}
 
-		const merged = mergeSpans(spans).map((span) => {
-			const first = clamp(span.start - 1, 0, lastLine);
-			const final = clamp(span.end - 1, 0, lastLine);
-			return new vscode.Range(first, 0, final, doc.lineAt(final).text.length);
-		});
+		// The graph counts lines from one; the editor counts from zero.
+		const merged = mergeSpans(spans).map((span) => ({
+			start: clamp(span.start - 1, 0, lastLine),
+			end: clamp(span.end - 1, 0, lastLine),
+		}));
 
 		// An empty selection still has to be applied — switching to a layer that
-		// matches nothing must clear the old highlight, not leave it behind.
+		// matches nothing must clear the old highlight, not leave it behind. The
+		// orchestrator reads an empty claim as exactly that.
+		this.highlights.claim(SOURCE, 'focus', this.docUri, merged);
 		if (merged.length === 0) {
-			const open = vscode.window.visibleTextEditors.find(
-				(candidate) => candidate.document.uri.toString() === this.docUri.toString()
-			);
-			open?.setDecorations(this.highlight, []);
 			return;
 		}
 
@@ -261,10 +260,11 @@ export class StoryGraphPanel {
 			preserveFocus: true,
 			preview: false,
 		});
-		editor.setDecorations(this.highlight, merged);
-
 		// Scroll to the earliest of them, so the top of the selection is on screen.
-		editor.revealRange(merged[0], vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+		editor.revealRange(
+			new vscode.Range(merged[0].start, 0, merged[0].end, 0),
+			vscode.TextEditorRevealType.InCenterIfOutsideViewport
+		);
 	}
 
 	/**
@@ -295,7 +295,8 @@ export class StoryGraphPanel {
 
 	private dispose(): void {
 		StoryGraphPanel.panels.delete(this.docUri.toString());
-		this.highlight.dispose(); // also clears the decoration from the editor
+		// The panel is gone, so what it lit up has nothing left pointing at it.
+		this.highlights.release(SOURCE);
 		for (const item of this.disposables) {
 			item.dispose();
 		}

@@ -164,6 +164,65 @@ textarea:focus {
 	display: none;
 }
 
+/* The Search drawer: a phrase, and the passages of the manuscript that answer
+   it. Rows are buttons because that is what they do — clicking one sends the
+   cursor to the passage — and a button is what a keyboard already knows how to
+   reach. */
+.search-ask {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.search-ask input {
+	flex: 1;
+	min-width: 0;
+}
+
+.hits {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.hit {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	width: 100%;
+	padding: 3px 6px;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	text-align: left;
+}
+
+.hit:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.hit:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+/* The passage gives up its width first: the line number is short, fixed, and the
+   thing you navigate by, so it stays whole while the prose is ellipsized. */
+.hit .passage {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hit .where {
+	flex: none;
+	font-size: calc(var(--vscode-font-size) - 1px);
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+}
+
 /* The Serving Status drawer: one row per model, the resident marked with a dot. */
 .models {
 	display: flex;

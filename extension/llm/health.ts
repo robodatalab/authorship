@@ -18,6 +18,7 @@ export class ModelHealth implements vscode.Disposable {
 	private readonly timer: NodeJS.Timeout;
 	private phase: Phase = 'offline';
 	private building = false;
+	private scoring = false;
 
 	constructor(private readonly port: number) {
 		this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -58,12 +59,26 @@ export class ModelHealth implements vscode.Disposable {
 		this.render();
 	}
 
+	/** Say whether a section is being scored — seconds, not the minutes a build takes. */
+	setScoring(scoring: boolean): void {
+		this.scoring = scoring;
+		this.render();
+	}
+
 	private render(): void {
-		// A build outranks the health phases: it can only have started from
-		// `ready`, and it is the more specific thing to say.
-		const display = renderStatus(this.building ? 'building' : this.phase);
+		// Our own requests outrank the health phases: they can only have started
+		// from `ready`, and they are the more specific thing to say. A build
+		// outranks a scoring in turn, being the one that runs for minutes.
+		const display = renderStatus(this.current());
 		this.status.text = display.text;
 		this.status.tooltip = display.tooltip;
+	}
+
+	private current(): Phase {
+		if (this.building) {
+			return 'building';
+		}
+		return this.scoring ? 'scoring' : this.phase;
 	}
 
 	dispose(): void {

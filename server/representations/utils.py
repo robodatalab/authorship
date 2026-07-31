@@ -1,9 +1,95 @@
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Sequence
 
 from server.story_graph import Edge, Node
+
+SECTION_SEPARATOR = "##"
+
+_COMMENT_OPEN = "<!--"
+_COMMENT_CLOSE = "-->"
+
+
+def visible_lines(lines: Sequence[str]) -> list[str]:
+    """Each line with its comments taken out.
+
+    A comment may span several lines, and one that is never closed runs to the
+    end of the file — which is how the tail of a draft gets silenced. A line that
+    was nothing but a comment comes back empty and so reads as blank to
+    everything downstream; a line with prose beside a comment keeps the prose.
+
+    Notes to self are not the story. A heading inside a comment does not open a
+    section, and a commented paragraph is not a line the section rests on.
+    """
+    inside = False
+    visible: list[str] = []
+    for line in lines:
+        kept: list[str] = []
+        rest = line
+        while rest:
+            if inside:
+                close = rest.find(_COMMENT_CLOSE)
+                if close < 0:
+                    break
+                inside = False
+                rest = rest[close + len(_COMMENT_CLOSE) :]
+            else:
+                opened = rest.find(_COMMENT_OPEN)
+                if opened < 0:
+                    kept.append(rest)
+                    break
+                kept.append(rest[:opened])
+                inside = True
+                rest = rest[opened + len(_COMMENT_OPEN) :]
+        visible.append("".join(kept))
+    return visible
+
+
+@dataclass
+class Section:
+    """A heading and the lines beneath it, 0-based and inclusive.
+
+    `start` is the line after the heading, so a section's own heading sits at
+    `start - 1`. A section with `end < start` has a heading and nothing under it.
+    """
+
+    start: int
+    end: int
+    title: str
+
+
+def parse_sections(story_markdown: str) -> list[Section]:
+    """Split a manuscript at its `##` headings.
+
+    Whatever precedes the first heading is a section too — a manuscript may open
+    with prose, and a title block is still lines somebody wrote. Headings are
+    read off the prose with comments removed, so a section commented out for now
+    does not go on dividing the manuscript.
+    """
+    lines = visible_lines(story_markdown.splitlines())
+    last = len(lines) - 1
+
+    sections: list[Section] = []
+    section = Section(start=0, end=last, title="First anonymous section")
+    for index, line in enumerate(lines):
+        if line.startswith(SECTION_SEPARATOR):
+            section.end = index - 1
+            sections.append(section)
+            section = Section(start=index + 1, end=last, title=line[2:].strip())
+    # The final section is closed by the end of the file rather than by a heading,
+    # so nothing in the loop appends it.
+    sections.append(section)
+    return sections
+
+
+def section_at(sections: list[Section], line: int) -> Section | None:
+    """The section a line falls in, counting a heading as part of what it opens."""
+    for section in sections:
+        if section.start - 1 <= line <= section.end:
+            return section
+    return None
 
 
 def graph_path_for(document: Path) -> Path:

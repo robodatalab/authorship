@@ -3,9 +3,12 @@
 import * as vscode from 'vscode';
 import { StoryGraphPanel } from './story_graph/panel';
 import { PublishView } from './publish/panel';
+import { Highlights } from './highlight/orchestrator';
 import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
 import { BuildActivity } from './llm/activity';
+import { LineContributionGutter } from './line_contribution/gutter';
+import { ManuscriptSearch } from './search/results';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -15,6 +18,17 @@ export function activate(context: vscode.ExtensionContext) {
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "authorship" is now active!');
 
+	// The one thing that lights up lines of a manuscript. Both the graph and the
+	// search send the reader to passages, and without a single owner they paint
+	// over each other's marks and clear marks they did not make.
+	const highlights = new Highlights();
+	context.subscriptions.push(highlights);
+
+	// The search a manuscript is under. It outlives the Authorship view, which
+	// only draws it — hiding the panel does not put the answer away.
+	const search = new ManuscriptSearch(8765, highlights);
+	context.subscriptions.push(search);
+
 	// The view container and view are declared in package.json under
 	// contributes.viewsContainers / contributes.views. Registering the provider
 	// here is what makes the view render; VS Code activates the extension
@@ -22,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			'authorship.manuscript',
-			new PublishView(context, 8765),
+			new PublishView(context, 8765, search),
 			// Keep the form's state while the view is hidden, so switching away and
 			// back doesn't reset an edit in progress.
 			{ webviewOptions: { retainContextWhenHidden: true } }
@@ -48,6 +62,26 @@ export function activate(context: vscode.ExtensionContext) {
 		)
 	);
 
+	// How much each line carries the section it is in, drawn beside the prose from
+	// the scores held next to the manuscript. Showing them costs nothing and needs
+	// no model; only the command computes, and only for one section at a time.
+	const contribution = new LineContributionGutter(8765, health);
+	context.subscriptions.push(contribution);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.scoreSection', () =>
+			void contribution.score()
+		)
+	);
+
+	// The results live in the Search drawer, so the command's job is to put the
+	// author in front of it rather than to ask anything itself.
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.searchManuscript', () =>
+			void vscode.commands.executeCommand('authorship.manuscript.focus')
+		)
+	);
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('authorship.showStoryGraph', () => {
 			const editor = vscode.window.activeTextEditor;
@@ -57,7 +91,13 @@ export function activate(context: vscode.ExtensionContext) {
 				);
 				return;
 			}
-			StoryGraphPanel.reveal(context, activity, editor.document.uri, editor.viewColumn);
+			StoryGraphPanel.reveal(
+				context,
+				activity,
+				highlights,
+				editor.document.uri,
+				editor.viewColumn
+			);
 		})
 	);
 }
