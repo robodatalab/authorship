@@ -6,6 +6,7 @@ import { PublishView } from './publish/panel';
 import { Highlights } from './highlight/orchestrator';
 import { ModelHealth } from './llm/health';
 import { GraphBuilder } from './llm/build';
+import { GrammarFix } from './llm/grammar';
 import { BuildActivity } from './llm/activity';
 import { LineContributionGutter } from './line_contribution/gutter';
 import { ManuscriptSearch } from './search/results';
@@ -56,10 +57,34 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(builder);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(
-			'authorship.buildRepresentations',
-			(manuscript: vscode.Uri) => void builder.build(manuscript)
-		)
+		vscode.commands.registerCommand('authorship.buildRepresentations', () => {
+			const editor = activeManuscript();
+			if (!editor) {
+				vscode.window.showInformationMessage(
+					'Open a manuscript to build its representations.'
+				);
+				return;
+			}
+			void builder.build(editor.document.uri);
+		})
+	);
+
+	// Correcting the passage in hand. The server rewrites the file, so the
+	// correction arrives as a change to the prose rather than a report about it.
+	const grammar = new GrammarFix(8765, health);
+	context.subscriptions.push(grammar);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('authorship.fixGrammar', () => {
+			const editor = activeManuscript();
+			if (!editor) {
+				vscode.window.showInformationMessage(
+					'Open a manuscript, and select the lines to correct or put the cursor in the section to correct.'
+				);
+				return;
+			}
+			void grammar.fix(editor);
+		})
 	);
 
 	// How much each line carries the section it is in, drawn beside the prose from
@@ -100,6 +125,22 @@ export function activate(context: vscode.ExtensionContext) {
 			);
 		})
 	);
+}
+
+/**
+ * The manuscript a title-bar button acts on — the editor rather than the file,
+ * because what an author has selected, and where their cursor is, is half of
+ * what they are asking for.
+ */
+function activeManuscript(): vscode.TextEditor | undefined {
+	const editor = vscode.window.activeTextEditor;
+	if (
+		editor?.document.languageId === 'markdown' &&
+		editor.document.uri.scheme === 'file'
+	) {
+		return editor;
+	}
+	return undefined;
 }
 
 // This method is called when your extension is deactivated

@@ -18,6 +18,7 @@ export class ModelHealth implements vscode.Disposable {
 	private readonly timer: NodeJS.Timeout;
 	private phase: Phase = 'offline';
 	private building = false;
+	private fixing = false;
 	private scoring = false;
 
 	constructor(private readonly port: number) {
@@ -59,6 +60,12 @@ export class ModelHealth implements vscode.Disposable {
 		this.render();
 	}
 
+	/** Say whether a grammar pass is in flight. */
+	setFixing(fixing: boolean): void {
+		this.fixing = fixing;
+		this.render();
+	}
+
 	/** Say whether a section is being scored — seconds, not the minutes a build takes. */
 	setScoring(scoring: boolean): void {
 		this.scoring = scoring;
@@ -67,8 +74,9 @@ export class ModelHealth implements vscode.Disposable {
 
 	private render(): void {
 		// Our own requests outrank the health phases: they can only have started
-		// from `ready`, and they are the more specific thing to say. A build
-		// outranks a scoring in turn, being the one that runs for minutes.
+		// from `ready`, and they are the more specific thing to say. Among
+		// themselves the longer-running request wins, a scoring being seconds
+		// where the other two are minutes.
 		const display = renderStatus(this.current());
 		this.status.text = display.text;
 		this.status.tooltip = display.tooltip;
@@ -77,6 +85,9 @@ export class ModelHealth implements vscode.Disposable {
 	private current(): Phase {
 		if (this.building) {
 			return 'building';
+		}
+		if (this.fixing) {
+			return 'fixing';
 		}
 		return this.scoring ? 'scoring' : this.phase;
 	}

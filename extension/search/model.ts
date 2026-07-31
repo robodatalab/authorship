@@ -7,7 +7,7 @@
 
 import type { LineEdit } from '../document/edits';
 
-/** A passage that answers the phrase, as the server ranked it. */
+/** A passage that answers the phrase, in the order the manuscript says it. */
 export interface Hit {
 	/** 0-based lines of the manuscript, both ends inclusive. */
 	start: number;

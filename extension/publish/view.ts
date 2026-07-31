@@ -80,18 +80,10 @@ const clearCover = document.getElementById('clear-cover') as HTMLButtonElement;
 const blurb = document.getElementById('f-blurb') as HTMLTextAreaElement;
 const exportButton = document.getElementById('export') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLElement;
-const buildRepresentations = document.getElementById(
-	'build-representations'
-) as HTMLButtonElement;
-const fixGrammar = document.getElementById('fix-grammar') as HTMLButtonElement;
-const sectionAttribution = document.getElementById(
-	'section-attribution'
-) as HTMLButtonElement;
 const searchPhrase = document.getElementById('search-phrase') as HTMLInputElement;
 const searchClear = document.getElementById('search-clear') as HTMLButtonElement;
 const searchNote = document.getElementById('search-note') as HTMLElement;
 const searchHits = document.getElementById('search-hits') as HTMLElement;
-const utilsStatus = document.getElementById('utils-status') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
@@ -136,20 +128,6 @@ exportButton.addEventListener('click', () => {
 	setStatus(status, 'Exporting…', false);
 	vscode.postMessage({ type: 'export' });
 });
-// No status line: the build outlives the click, and the Jobs Status drawer is
-// where it is followed.
-buildRepresentations.addEventListener('click', () => {
-	vscode.postMessage({ type: 'buildRepresentations' });
-});
-fixGrammar.addEventListener('click', () => {
-	setStatus(utilsStatus, 'Fixing grammar…', false);
-	vscode.postMessage({ type: 'fixGrammar' });
-});
-// No status set here: the scoring is reported in the status bar, and the column
-// beside the prose is where the answer lands.
-sectionAttribution.addEventListener('click', () =>
-	vscode.postMessage({ type: 'sectionAttribution' })
-);
 // The phrase is asked on Enter rather than as it is typed: a search is a forward
 // pass on the server, and half a phrase asks half a question.
 searchPhrase.addEventListener('keydown', (event) => {
@@ -163,11 +141,11 @@ searchClear.addEventListener('click', () => {
 });
 
 /**
- * With no story chosen there is nothing to act on, so the panel is inert.
+ * With no story chosen there is nothing to publish, so the form is inert.
  *
- * Section attribution and search are deliberately not among them: they act on
- * whatever the cursor is in, so a story having been chosen here says nothing
- * about whether there is anything for them to do.
+ * Search is deliberately not among them: it acts on whatever the cursor is in,
+ * so a story having been chosen here says nothing about whether there is
+ * anything for it to do.
  */
 function setEnabled(enabled: boolean): void {
 	const controls = [
@@ -178,8 +156,6 @@ function setEnabled(enabled: boolean): void {
 		clearCover,
 		blurb,
 		exportButton,
-		buildRepresentations,
-		fixGrammar,
 	];
 	for (const el of controls) {
 		el.disabled = !enabled;
@@ -209,7 +185,6 @@ function renderState(state: StateMessage): void {
 	blurb.value = state.blurb;
 	setEnabled(hasStory);
 	setStatus(status, '', false);
-	setStatus(utilsStatus, '', false);
 }
 
 function baseName(p: string): string {
@@ -512,8 +487,7 @@ window.addEventListener('message', (event) => {
 	} else if (message?.type === 'cover') {
 		showCover(String(message.cover ?? ''));
 	} else if (message?.type === 'status') {
-		const target = message.scope === 'utils' ? utilsStatus : status;
-		setStatus(target, String(message.message ?? ''), Boolean(message.error));
+		setStatus(status, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
 	} else if (message?.type === 'memory') {
