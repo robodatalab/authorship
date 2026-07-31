@@ -29,7 +29,7 @@ from server.representations import (
     build_scene_representation,
     graph_path_for
 )
-from server.semantic_search import DEFAULT_MAX_MATCHING_LINES, SearchIndex
+from server.semantic_search import SearchIndex
 from server.story_graph import to_yaml
 
 _log = log.logger(__name__)
