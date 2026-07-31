@@ -14,7 +14,12 @@ import unittest
 from typing import Sequence, cast
 
 from server.inference.encoder import EncoderModel
-from server.semantic_search import DEFAULT_COUNT, INDEX_CHUNK, Hit, SearchIndex
+from server.semantic_search import (
+    DEFAULT_MAX_MATCHING_LINES,
+    LINES_PER_ENCODE_REQUEST,
+    MatchedPassage,
+    SearchIndex,
+)
 
 PATH = "/stories/story.md"
 
@@ -57,12 +62,14 @@ class WordSpaceEncoder:
         return [count / length for count in counts] if length else counts
 
 
-def found(story: str, phrase: str, count: int = DEFAULT_COUNT) -> list[Hit]:
+def found(
+    story: str, phrase: str, count: int = DEFAULT_MAX_MATCHING_LINES
+) -> list[MatchedPassage]:
     """The passages of a freshly indexed manuscript that answer a phrase."""
     index = SearchIndex()
     model = cast(EncoderModel, WordSpaceEncoder(story))
-    index.index(model, PATH, story)
-    return index.search(model, PATH, story, phrase, count).hits
+    index.encode_manuscript(model, PATH, story)
+    return index.search(model, PATH, story, phrase, count).passages
 
 
 class Passages(unittest.TestCase):
@@ -70,34 +77,34 @@ class Passages(unittest.TestCase):
 
     def test_a_line_that_says_the_phrase_is_found(self) -> None:
         story = "## One\nthe horse bolted through the gate\n\nshe poured the tea"
-        self.assertEqual(found(story, "the horse bolted")[0].start, 1)
+        self.assertEqual(found(story, "the horse bolted")[0].first_line, 1)
 
     def test_headings_are_not_searchable(self) -> None:
         # Structure, not story. Asking what happens should not land on "Three".
         # Both headings say "horse" more purely than the prose does, so they
         # would come first if they were passages at all.
         story = "# The Horse\n\n## Horse\n\nshe poured the tea slowly"
-        self.assertEqual([hit.start for hit in found(story, "the horse tea")], [4])
+        self.assertEqual([passage.first_line for passage in found(story, "the horse tea")], [4])
 
     def test_blank_lines_are_not_searchable(self) -> None:
         # The passage is the prose, not the run of nothing above it.
         story = "the horse bolted through the gate\n\n\nshe poured the tea slowly"
-        hit = found(story, "tea slowly")[0]
-        self.assertEqual((hit.start, hit.end), (3, 3))
+        passage = found(story, "tea slowly")[0]
+        self.assertEqual((passage.first_line, passage.last_line), (3, 3))
 
     def test_a_line_of_one_or_two_words_is_not_searchable(self) -> None:
         # Too thin to mean anything on its own; it would answer on one word, and
         # saying nothing else would put it above the line that says more.
         story = "the horse\n\nthe horse bolted through the gate"
-        self.assertEqual([hit.start for hit in found(story, "horse")], [2])
+        self.assertEqual([passage.first_line for passage in found(story, "horse")], [2])
 
     def test_commented_lines_are_not_searchable(self) -> None:
         story = "<!-- the horse bolted here -->\n\nshe poured the tea slowly"
-        self.assertEqual([hit.start for hit in found(story, "the horse bolted")], [2])
+        self.assertEqual([passage.first_line for passage in found(story, "the horse bolted")], [2])
 
     def test_a_comment_beside_prose_leaves_the_prose_searchable(self) -> None:
         story = "the horse bolted <!-- cut? -->\n\nshe poured the tea slowly"
-        self.assertEqual(found(story, "the horse bolted")[0].start, 0)
+        self.assertEqual(found(story, "the horse bolted")[0].first_line, 0)
 
 
 class Ranking(unittest.TestCase):
@@ -112,15 +119,15 @@ class Ranking(unittest.TestCase):
     )
 
     def test_the_nearest_passage_comes_first(self) -> None:
-        self.assertEqual(found(self.STORY, "a horse bolting")[0].start, 0)
+        self.assertEqual(found(self.STORY, "a horse bolting")[0].first_line, 0)
 
     def test_passages_are_ordered_by_how_near_they_are(self) -> None:
-        scores = [hit.score for hit in found(self.STORY, "the gate")]
+        scores = [passage.similarity for passage in found(self.STORY, "the gate")]
         self.assertEqual(scores, sorted(scores, reverse=True))
 
     def test_a_line_far_from_the_best_is_not_an_answer(self) -> None:
         # The tea is what the manuscript happens to hold, not what was asked.
-        self.assertEqual([hit.start for hit in found(self.STORY, "the gate")], [0, 4])
+        self.assertEqual([passage.first_line for passage in found(self.STORY, "the gate")], [0, 4])
 
     def test_count_bounds_the_answer(self) -> None:
         self.assertEqual(len(found(self.STORY, "the gate", count=1)), 1)
@@ -143,33 +150,33 @@ class Runs(unittest.TestCase):
     )
 
     def test_a_single_line_passage_starts_and_ends_on_it(self) -> None:
-        hit = found(self.STORY, "pouring tea", count=1)[0]
-        self.assertEqual((hit.start, hit.end), (4, 4))
+        passage = found(self.STORY, "pouring tea", count=1)[0]
+        self.assertEqual((passage.first_line, passage.last_line), (4, 4))
 
     def test_answers_with_nothing_scored_between_them_are_one_passage(self) -> None:
         # Lines 0 and 2 are parted by a blank line, so they follow each other.
-        hits = found(self.STORY, "the gate", count=3)
-        self.assertEqual((hits[0].start, hits[0].end), (0, 2))
+        passages = found(self.STORY, "the gate", count=3)
+        self.assertEqual((passages[0].first_line, passages[0].last_line), (0, 2))
 
     def test_a_passage_carries_the_lines_between_its_ends(self) -> None:
-        hit = found(self.STORY, "the gate", count=3)[0]
+        passage = found(self.STORY, "the gate", count=3)[0]
         self.assertEqual(
-            hit.text,
+            passage.text,
             "the horse bolted through the open gate\n\nthe gate swung shut behind them",
         )
 
     def test_answers_with_a_line_between_them_stay_apart(self) -> None:
         # The tea sits between them and did not answer, so line 6 is its own
         # passage rather than the tail of the one that opens the manuscript.
-        hits = found(self.STORY, "the gate", count=3)
-        self.assertEqual([(hit.start, hit.end) for hit in hits], [(0, 2), (6, 6)])
+        passages = found(self.STORY, "the gate", count=3)
+        self.assertEqual([(passage.first_line, passage.last_line) for passage in passages], [(0, 2), (6, 6)])
 
     def test_a_passage_scores_as_its_best_line(self) -> None:
         # The second line is in it because it runs on from the first, not
         # because it answered as well.
         joined = found(self.STORY, "the gate", count=3)[0]
         alone = found(self.STORY, "the gate", count=1)[0]
-        self.assertAlmostEqual(joined.score, alone.score)
+        self.assertAlmostEqual(joined.similarity, alone.similarity)
 
 
 class Index(unittest.TestCase):
@@ -181,43 +188,43 @@ class Index(unittest.TestCase):
         index = SearchIndex()
         model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
         results = index.search(model, PATH, self.STORY, "the horse")
-        self.assertEqual(results.hits, [])
-        self.assertEqual(results.pending, 2)
+        self.assertEqual(results.passages, [])
+        self.assertEqual(results.lines_awaiting_encoding, 2)
 
     def test_an_indexed_manuscript_has_nothing_pending(self) -> None:
         index = SearchIndex()
         model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.index(model, PATH, self.STORY)
-        self.assertEqual(index.search(model, PATH, self.STORY, "the horse").pending, 0)
+        index.encode_manuscript(model, PATH, self.STORY)
+        self.assertEqual(index.search(model, PATH, self.STORY, "the horse").lines_awaiting_encoding, 0)
 
     def test_a_line_written_since_the_indexing_is_pending(self) -> None:
         index = SearchIndex()
         model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.index(model, PATH, self.STORY)
+        index.encode_manuscript(model, PATH, self.STORY)
         written = self.STORY + "\nthe gate swung shut behind them\n"
-        self.assertEqual(index.search(model, PATH, written, "the gate").pending, 1)
+        self.assertEqual(index.search(model, PATH, written, "the gate").lines_awaiting_encoding, 1)
 
     def test_indexing_again_encodes_nothing_that_has_not_changed(self) -> None:
         index = SearchIndex()
         model = WordSpaceEncoder(self.STORY)
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
         self.assertEqual(len(model.batches), 1)
 
     def test_only_the_lines_that_were_rewritten_are_encoded_again(self) -> None:
         index = SearchIndex()
         model = WordSpaceEncoder(self.STORY + " gate swung shut")
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
         rewritten = self.STORY.replace("she poured the tea and waited", "gate swung shut")
-        index.index(cast(EncoderModel, model), PATH, rewritten)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, rewritten)
         self.assertEqual(model.batches[1], ["gate swung shut"])
 
     def test_a_line_that_only_moved_is_not_encoded_again(self) -> None:
         # Keyed by what a line says, not by where it sits.
         index = SearchIndex()
         model = WordSpaceEncoder(self.STORY)
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
-        index.index(cast(EncoderModel, model), PATH, "\n\n" + self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, "\n\n" + self.STORY)
         self.assertEqual(len(model.batches), 1)
 
     def test_a_line_the_manuscript_no_longer_says_is_dropped(self) -> None:
@@ -226,24 +233,24 @@ class Index(unittest.TestCase):
         # what shows it went: it has to be encoded a second time.
         index = SearchIndex()
         model = WordSpaceEncoder(self.STORY)
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
-        index.index(cast(EncoderModel, model), PATH, "the horse bolted through the gate")
-        index.index(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, "the horse bolted through the gate")
+        index.encode_manuscript(cast(EncoderModel, model), PATH, self.STORY)
         self.assertEqual(model.batches[-1], ["she poured the tea and waited"])
 
     def test_lines_are_encoded_a_chunk_at_a_time(self) -> None:
         # The encoder answers one caller at a time. A manuscript encoded in a
         # single call would hold it for the whole pass, and a search would wait
         # out the indexing rather than answering from what was ready.
-        story = long_story(INDEX_CHUNK + 5)
+        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
         model = WordSpaceEncoder(story)
-        SearchIndex().index(cast(EncoderModel, model), PATH, story)
-        self.assertEqual([len(batch) for batch in model.batches], [INDEX_CHUNK, 5])
+        SearchIndex().encode_manuscript(cast(EncoderModel, model), PATH, story)
+        self.assertEqual([len(batch) for batch in model.batches], [LINES_PER_ENCODE_REQUEST, 5])
 
     def test_a_manuscript_answers_while_it_is_still_being_encoded(self) -> None:
         # Vectors published only at the end of a pass leave a search answering
         # nothing for as long as the whole manuscript takes to read.
-        story = long_story(INDEX_CHUNK + 5)
+        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
         index = SearchIndex()
         model = WordSpaceEncoder(story)
         encoded = model.encode
@@ -255,30 +262,30 @@ class Index(unittest.TestCase):
                 len(
                     index.search(
                         cast(EncoderModel, model), PATH, story, "line 0 of the story"
-                    ).hits
+                    ).passages
                 )
             )
             return vectors
 
         model.encode = encode_and_look  # type: ignore[method-assign]
-        index.index(cast(EncoderModel, model), PATH, story)
+        index.encode_manuscript(cast(EncoderModel, model), PATH, story)
 
         self.assertEqual(found_during[0], 0)
         self.assertGreater(found_during[1], 0)
 
     def test_a_superseded_pass_stops_rather_than_spending_the_encoder(self) -> None:
-        story = long_story(INDEX_CHUNK + 5)
+        story = long_story(LINES_PER_ENCODE_REQUEST + 5)
         model = WordSpaceEncoder(story)
-        SearchIndex().index(cast(EncoderModel, model), PATH, story, lambda: True)
+        SearchIndex().encode_manuscript(cast(EncoderModel, model), PATH, story, lambda: True)
         self.assertEqual(model.batches, [])
 
     def test_manuscripts_are_indexed_apart_from_each_other(self) -> None:
         index = SearchIndex()
         model = cast(EncoderModel, WordSpaceEncoder(self.STORY))
-        index.index(model, PATH, self.STORY)
+        index.encode_manuscript(model, PATH, self.STORY)
         other = index.search(model, "/stories/other.md", self.STORY, "the horse")
-        self.assertEqual(other.hits, [])
-        self.assertEqual(other.pending, 2)
+        self.assertEqual(other.passages, [])
+        self.assertEqual(other.lines_awaiting_encoding, 2)
 
 
 if __name__ == "__main__":

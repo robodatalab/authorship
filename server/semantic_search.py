@@ -1,5 +1,3 @@
-"""Which passages of a manuscript answer a phrase."""
-
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -9,201 +7,176 @@ from server.representations.utils import visible_lines
 
 _log = log.logger(__name__)
 
-# Under this a line is too thin to mean anything on its own: it would answer on
-# the strength of a single word, which is what an ordinary find already does
-# better.
-MIN_WORDS = 3
+MIN_WORDS_PER_SEARCHABLE_LINE = 3
 
-# Lines a search answers with, before adjacent ones are run together.
-DEFAULT_COUNT = 10
-
-# Lines handed to the encoder at a time.
-#
-# The encoder answers one caller at a time, so a manuscript encoded in a single
-# call would hold it for as long as the manuscript is long and a search would
-# wait out the whole indexing. Encoded a chunk at a time, a search waits for one
-# chunk — and the vectors land as they are made, so a manuscript answers while
-# the rest of it is still being read.
-INDEX_CHUNK = 32
-
-# How near the best line in the manuscript a line has to come to be an answer at
-# all. Without a floor the tail of `count` is whatever the manuscript happens to
-# hold, and in a short one those lines sit next to the real answers and would be
-# run together with them into a single passage — so a search for one paragraph
-# would come back holding the chapter.
-MIN_FRACTION = 0.5
+MIN_SIMILARITY_AS_FRACTION_OF_BEST = 0.5
+LINES_PER_ENCODE_REQUEST = 32
 
 
 @dataclass
-class Hit:
-    """A passage that answers the phrase — 0-based lines, both ends inclusive."""
-
-    start: int
-    end: int
-    score: float
+class MatchedPassage:
+    first_line: int
+    last_line: int
+    similarity: float
     text: str
 
 
 @dataclass
 class SearchResults:
-    hits: list[Hit]
-    # Lines of prose the index has no vector for yet. A search runs against what
-    # has been encoded so far rather than waiting on the rest, so this is what
-    # says whether the answer is the whole answer.
-    pending: int
+    passages: list[MatchedPassage]
+    lines_awaiting_encoding: int
 
 
 class SearchIndex:
-    """A vector per line of prose, held for as long as the server is up.
-
-    Keyed by what a line says rather than by where it sits: a paragraph that
-    moves down the manuscript keeps its vector, and only the paragraphs that
-    were rewritten are encoded again. Each manuscript holds its own map, pruned
-    on every indexing to the lines it currently has — an afternoon of editing
-    would otherwise accumulate the vectors of every draft it passed through.
-
-    Nothing here reaches disk. These vectors are worth seconds of GPU and
-    nothing at all to a reader, unlike every other file written beside a
-    manuscript, so a server restart is the only thing they cost.
-    """
 
     def __init__(self) -> None:
-        self._by_path: dict[str, dict[str, list[float]]] = {}
+        self._vectors_by_manuscript: dict[str, dict[str, list[float]]] = {}
 
-    def index(
+    def encode_manuscript(
         self,
-        model: EncoderModel,
-        path: str,
+        encoder: EncoderModel,
+        manuscript_path: str,
         story_markdown: str,
-        cancelled: Callable[[], bool] = lambda: False,
+        should_stop: Callable[[], bool] = lambda: False,
     ) -> None:
-        """Encode whatever this manuscript says that the index does not hold.
+        vectors_by_line_text = self._vectors_by_manuscript.setdefault(
+            manuscript_path, {}
+        )
+        searchable = _searchable_lines(visible_lines(story_markdown.splitlines()))
+        not_yet_encoded = sorted(
+            {text for _, text in searchable if text not in vectors_by_line_text}
+        )
 
-        The vectors go into the map a search reads as each chunk comes back, so
-        the manuscript is searchable while it is still being encoded rather than
-        all at the end. A manuscript saved twice over supersedes itself, and the
-        pass that was left behind stops rather than spending the encoder on
-        vectors somebody else is already making.
-        """
-        held = self._by_path.setdefault(path, {})
-        passages = _passages(visible_lines(story_markdown.splitlines()))
+        if not_yet_encoded:
+            _log.info("encoding %d lines of %s", len(not_yet_encoded), manuscript_path)
 
-        # Sorted so a chunk is the same chunk whichever order the lines arrived
-        # in; a set because a manuscript that says a thing twice needs one vector
-        # for it.
-        missing = sorted({text for _, text in passages if text not in held})
-        if missing:
-            _log.info("encoding %d lines of %s", len(missing), path)
-
-        for start in range(0, len(missing), INDEX_CHUNK):
-            if cancelled():
+        for batch_start in range(0, len(not_yet_encoded), LINES_PER_ENCODE_REQUEST):
+            if should_stop():
                 return
-            chunk = missing[start : start + INDEX_CHUNK]
-            held.update(zip(chunk, model.encode(chunk)))
+            batch = not_yet_encoded[batch_start : batch_start + LINES_PER_ENCODE_REQUEST]
+            vectors_by_line_text.update(zip(batch, encoder.encode(batch)))
 
-        # What the manuscript no longer says goes, now that everything it does
-        # say is in hand — pruning against a half-encoded map would throw away
-        # the work of the pass that is making it.
-        self._by_path[path] = {text: held[text] for _, text in passages}
+        self._forget_lines_the_manuscript_no_longer_says(manuscript_path, searchable)
 
     def search(
         self,
-        model: EncoderModel,
-        path: str,
+        encoder: EncoderModel,
+        manuscript_path: str,
         story_markdown: str,
         phrase: str,
-        count: int = DEFAULT_COUNT,
+        max_matching_lines: int,
     ) -> SearchResults:
-        """The passages nearest the phrase, best first.
+        visible = visible_lines(story_markdown.splitlines())
+        vectors_by_line_text = self._vectors_by_manuscript.get(manuscript_path, {})
+        searchable = _searchable_lines(visible)
+        already_encoded = [
+            (line_number, text)
+            for line_number, text in searchable
+            if text in vectors_by_line_text
+        ]
+        awaiting_encoding = len(searchable) - len(already_encoded)
 
-        Answers from the vectors in hand. A manuscript written in since it was
-        indexed has lines with no vector, and those are counted rather than
-        encoded here: one forward pass on the phrase is what keeps this inside a
-        request, and a manuscript's worth of prose would not.
-        """
-        lines = visible_lines(story_markdown.splitlines())
-        held = self._by_path.get(path, {})
-        passages = _passages(lines)
-        encoded = [(line, text) for line, text in passages if text in held]
+        if not already_encoded or not phrase.strip():
+            return SearchResults(passages=[], lines_awaiting_encoding=awaiting_encoding)
 
-        if not encoded or not phrase.strip():
-            return SearchResults(hits=[], pending=len(passages) - len(encoded))
-
-        query = model.encode_query(phrase)
-        # Both sides are unit length, so a dot product is the cosine and
-        # nearness is a sort.
-        scores = {line: _dot(held[text], query) for line, text in encoded}
-        floor = max(scores.values()) * MIN_FRACTION
-        answering = sorted(
-            (line for line, score in scores.items() if score > 0 and score >= floor),
-            key=lambda line: scores[line],
+        phrase_vector = encoder.encode_query(phrase)
+        similarity_by_line = {
+            line_number: _cosine_of_unit_vectors(
+                vectors_by_line_text[text], phrase_vector
+            )
+            for line_number, text in already_encoded
+        }
+        minimum_similarity = (
+            max(similarity_by_line.values()) * MIN_SIMILARITY_AS_FRACTION_OF_BEST
+        )
+        matching_lines = sorted(
+            (
+                line_number
+                for line_number, similarity in similarity_by_line.items()
+                if similarity > 0 and similarity >= minimum_similarity
+            ),
+            key=lambda line_number: similarity_by_line[line_number],
             reverse=True,
-        )[:count]
+        )[:max_matching_lines]
 
-        _log.info("searched %d lines of %s for %r", len(encoded), path, phrase)
+        _log.info(
+            "searched %d lines of %s for %r",
+            len(already_encoded),
+            manuscript_path,
+            phrase,
+        )
         return SearchResults(
-            hits=_runs(answering, scores, lines, [line for line, _ in encoded]),
-            pending=len(passages) - len(encoded),
+            passages=_join_adjacent_lines_into_passages(
+                matching_lines,
+                similarity_by_line,
+                visible,
+                [line_number for line_number, _ in already_encoded],
+            ),
+            lines_awaiting_encoding=awaiting_encoding,
         )
 
+    def _forget_lines_the_manuscript_no_longer_says(
+        self, manuscript_path: str, searchable: list[tuple[int, str]]
+    ) -> None:
+        vectors_by_line_text = self._vectors_by_manuscript[manuscript_path]
+        self._vectors_by_manuscript[manuscript_path] = {
+            text: vectors_by_line_text[text] for _, text in searchable
+        }
 
-def _passages(lines: list[str]) -> list[tuple[int, str]]:
-    """The lines a search can land on, each with the line of the manuscript it is.
 
-    Blank lines hold nothing to answer with, and a line that was only a note to
-    self is blank by the time it arrives here. A heading is the manuscript's
-    structure rather than its story: asking what happens in a scene should not
-    land on the word "Three".
-
-    The text is stripped, so a line reads the same to the index whether or not a
-    note trailed it — cutting a comment would otherwise spend a forward pass
-    re-encoding a line nobody rewrote.
-    """
+def _searchable_lines(visible: list[str]) -> list[tuple[int, str]]:
     return [
-        (index, line.strip())
-        for index, line in enumerate(lines)
-        if not line.lstrip().startswith("#") and len(line.split()) >= MIN_WORDS
+        (line_number, text.strip())
+        for line_number, text in enumerate(visible)
+        if not _is_heading(text) and _says_enough_to_search(text)
     ]
 
 
-def _runs(
-    chosen: list[int],
-    scores: dict[int, float],
-    lines: list[str],
-    order: list[int],
-) -> list[Hit]:
-    """Winners with nothing scored between them are one passage, not several.
+def _is_heading(text: str) -> bool:
+    return text.lstrip().startswith("#")
 
-    Paragraphs are parted by a blank line, so two that follow each other are two
-    lines apart rather than one. What makes them one passage is that the
-    manuscript says nothing else in between, not that their numbers run on.
-    """
-    position = {line: index for index, line in enumerate(order)}
 
-    runs: list[list[int]] = []
-    for line in sorted(chosen):
-        if runs and position[line] == position[runs[-1][-1]] + 1:
-            runs[-1].append(line)
+def _says_enough_to_search(text: str) -> bool:
+    return len(text.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
+
+
+def _join_adjacent_lines_into_passages(
+    matching_lines: list[int],
+    similarity_by_line: dict[int, float],
+    visible: list[str],
+    searchable_line_numbers: list[int],
+) -> list[MatchedPassage]:
+    rank_among_searchable = {
+        line_number: rank for rank, line_number in enumerate(searchable_line_numbers)
+    }
+
+    adjacent_runs: list[list[int]] = []
+    for line_number in sorted(matching_lines):
+        previous_line = adjacent_runs[-1][-1] if adjacent_runs else None
+        nothing_searchable_in_between = (
+            previous_line is not None
+            and rank_among_searchable[line_number]
+            == rank_among_searchable[previous_line] + 1
+        )
+        if nothing_searchable_in_between:
+            adjacent_runs[-1].append(line_number)
         else:
-            runs.append([line])
+            adjacent_runs.append([line_number])
 
     return sorted(
         (
-            Hit(
-                start=run[0],
-                end=run[-1],
-                # A passage is as good as its best line: the lines around that
-                # one are here because they run on from it, not because each of
-                # them answered the phrase.
-                score=max(scores[line] for line in run),
-                text="\n".join(lines[run[0] : run[-1] + 1]).strip(),
+            MatchedPassage(
+                first_line=run[0],
+                last_line=run[-1],
+                similarity=max(similarity_by_line[line_number] for line_number in run),
+                text="\n".join(visible[run[0] : run[-1] + 1]).strip(),
             )
-            for run in runs
+            for run in adjacent_runs
         ),
-        key=lambda hit: hit.score,
+        key=lambda passage: passage.similarity,
         reverse=True,
     )
 
 
-def _dot(left: list[float], right: list[float]) -> float:
+def _cosine_of_unit_vectors(left: list[float], right: list[float]) -> float:
     return sum(a * b for a, b in zip(left, right))

@@ -29,7 +29,7 @@ from server.representations import (
     build_scene_representation,
     graph_path_for
 )
-from server.semantic_search import DEFAULT_COUNT, SearchIndex
+from server.semantic_search import DEFAULT_MAX_MATCHING_LINES, SearchIndex
 from server.story_graph import to_yaml
 
 _log = log.logger(__name__)
@@ -191,7 +191,7 @@ class SearchIndexJob(Job):
         self._markdown = source.read_text()
 
     def execute(self) -> None:
-        self._index.index(
+        self._index.encode_manuscript(
             self._model,
             str(self._source),
             self._markdown,
@@ -340,18 +340,12 @@ class SearchRequest(BaseModel):
     # What to look for, in whatever words the author has for it.
     phrase: str
     # Lines to answer with, before adjacent ones are run together into a passage.
-    count: int = DEFAULT_COUNT
+    count: int = 10
 
 
 @app.post("/search")
 def search(request: SearchRequest) -> dict[str, Any]:
-    """The passages of a manuscript that answer a phrase.
-
-    One forward pass on the phrase and a dot product per line, so this answers
-    inside the request rather than as a job. It runs against the lines encoded
-    so far and says how many it has yet to see, rather than waiting on an
-    indexing to finish — a manuscript half encoded can already be asked.
-    """
+    """The passages of a manuscript that answer a phrase."""
     document = Path(request.path)
     if not document.is_file():
         raise HTTPException(
@@ -368,14 +362,14 @@ def search(request: SearchRequest) -> dict[str, Any]:
     return {
         "hits": [
             {
-                "start": hit.start,
-                "end": hit.end,
-                "score": round(hit.score, 4),
-                "text": hit.text,
+                "start": passage.first_line,
+                "end": passage.last_line,
+                "score": round(passage.similarity, 4),
+                "text": passage.text,
             }
-            for hit in results.hits
+            for passage in results.passages
         ],
-        "pending": results.pending,
+        "pending": results.lines_awaiting_encoding,
     }
 
 
@@ -386,11 +380,7 @@ class GrammarFixRequest(BaseModel):
 
 @app.post("/fix/grammar", status_code=202)
 def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Start correcting a manuscript; poll /fix/grammar/status for the end of it.
-
-    A long document outlives an HTTP request, so the correction runs as a job,
-    and writes the manuscript back when it is done.
-    """
+    """Start correcting a manuscript; poll /fix/grammar/status for the end of it."""
     document = Path(request.path)
     if not document.is_file():
         raise HTTPException(
