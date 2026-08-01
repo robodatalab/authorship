@@ -12,38 +12,53 @@ _COMMENT_OPEN = "<!--"
 _COMMENT_CLOSE = "-->"
 
 
+@dataclass(frozen=True)
+class Piece:
+    """A stretch of a manuscript, and whether it is a comment rather than story."""
+
+    text: str
+    comment: bool
+
+
+def split_comments(text: str, inside: bool = False) -> tuple[list[Piece], bool]:
+    """`text` in runs of story and comment, and whether it ends inside one."""
+    pieces: list[Piece] = []
+    start = 0
+    position = 0
+
+    while position < len(text):
+        if inside:
+            close = text.find(_COMMENT_CLOSE, position)
+            if close < 0:
+                break
+            position = close + len(_COMMENT_CLOSE)
+            pieces.append(Piece(text[start:position], comment=True))
+            start = position
+            inside = False
+        else:
+            opened = text.find(_COMMENT_OPEN, position)
+            if opened < 0:
+                break
+            if opened > start:
+                pieces.append(Piece(text[start:opened], comment=False))
+            start = opened
+            position = opened + len(_COMMENT_OPEN)
+            inside = True
+
+    # Whatever the scan ran off the end of: prose if nothing had opened, and the
+    # unclosed comment itself if something had.
+    if start < len(text):
+        pieces.append(Piece(text[start:], comment=inside))
+    return pieces, inside
+
+
 def visible_lines(lines: Sequence[str]) -> list[str]:
-    """Each line with its comments taken out.
-
-    A comment may span several lines, and one that is never closed runs to the
-    end of the file — which is how the tail of a draft gets silenced. A line that
-    was nothing but a comment comes back empty and so reads as blank to
-    everything downstream; a line with prose beside a comment keeps the prose.
-
-    Notes to self are not the story. A heading inside a comment does not open a
-    section, and a commented paragraph is not a line the section rests on.
-    """
+    """Each line with its comments taken out."""
     inside = False
     visible: list[str] = []
     for line in lines:
-        kept: list[str] = []
-        rest = line
-        while rest:
-            if inside:
-                close = rest.find(_COMMENT_CLOSE)
-                if close < 0:
-                    break
-                inside = False
-                rest = rest[close + len(_COMMENT_CLOSE) :]
-            else:
-                opened = rest.find(_COMMENT_OPEN)
-                if opened < 0:
-                    kept.append(rest)
-                    break
-                kept.append(rest[:opened])
-                inside = True
-                rest = rest[opened + len(_COMMENT_OPEN) :]
-        visible.append("".join(kept))
+        pieces, inside = split_comments(line, inside)
+        visible.append("".join(piece.text for piece in pieces if not piece.comment))
     return visible
 
 
@@ -61,13 +76,7 @@ class Section:
 
 
 def parse_sections(story_markdown: str) -> list[Section]:
-    """Split a manuscript at its `##` headings.
-
-    Whatever precedes the first heading is a section too — a manuscript may open
-    with prose, and a title block is still lines somebody wrote. Headings are
-    read off the prose with comments removed, so a section commented out for now
-    does not go on dividing the manuscript.
-    """
+    """Split a manuscript at its `##` headings."""
     lines = visible_lines(story_markdown.splitlines())
     last = len(lines) - 1
 
