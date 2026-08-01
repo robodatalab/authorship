@@ -24,9 +24,11 @@ from server.line_contribution import (
     write_attribution,
 )
 from server.representations.utils import (
+    Piece,
     Section,
     parse_sections,
     section_at,
+    split_comments,
     visible_lines,
 )
 
@@ -91,6 +93,64 @@ class VisibleLines(unittest.TestCase):
 
     def test_prose_after_a_comment_closes_survives(self) -> None:
         self.assertEqual(visible_lines(["<!-- note -->real"]), ["real"])
+
+
+class SplitComments(unittest.TestCase):
+    """Which stretches of a manuscript are story and which are notes to self.
+
+    `visible_lines` drops the notes; a correction pass keeps them and leaves them
+    alone. Both ask this the same question.
+    """
+
+    def test_text_with_no_comment_in_it_is_one_piece_of_story(self) -> None:
+        self.assertEqual(
+            split_comments("she left."), ([Piece("she left.", comment=False)], False)
+        )
+
+    def test_a_comment_carries_its_own_markers(self) -> None:
+        pieces, inside = split_comments("<!-- fix this -->")
+        self.assertEqual(pieces, [Piece("<!-- fix this -->", comment=True)])
+        self.assertFalse(inside)
+
+    def test_prose_on_either_side_of_a_comment_is_kept_apart_from_it(self) -> None:
+        pieces, _ = split_comments("she left. <!-- or did she --> he stayed.")
+        self.assertEqual(
+            pieces,
+            [
+                Piece("she left. ", comment=False),
+                Piece("<!-- or did she -->", comment=True),
+                Piece(" he stayed.", comment=False),
+            ],
+        )
+
+    def test_the_pieces_joined_back_together_are_the_text_again(self) -> None:
+        text = "a <!-- one --> b <!-- two --> c"
+        pieces, _ = split_comments(text)
+        self.assertEqual("".join(piece.text for piece in pieces), text)
+
+    def test_a_comment_that_never_closes_runs_to_the_end_and_says_so(self) -> None:
+        pieces, inside = split_comments("kept <!-- from here on")
+        self.assertEqual(
+            pieces,
+            [Piece("kept ", comment=False), Piece("<!-- from here on", comment=True)],
+        )
+        self.assertTrue(inside)
+
+    def test_text_opening_inside_a_comment_carries_on_being_one(self) -> None:
+        pieces, inside = split_comments("still a note -->real", inside=True)
+        self.assertEqual(
+            pieces,
+            [Piece("still a note -->", comment=True), Piece("real", comment=False)],
+        )
+        self.assertFalse(inside)
+
+    def test_the_dashes_that_open_a_comment_cannot_also_close_it(self) -> None:
+        pieces, inside = split_comments("<!-->")
+        self.assertEqual(pieces, [Piece("<!-->", comment=True)])
+        self.assertTrue(inside)
+
+    def test_nothing_at_all_is_no_pieces_at_all(self) -> None:
+        self.assertEqual(split_comments(""), ([], False))
 
 
 class ParseSections(unittest.TestCase):

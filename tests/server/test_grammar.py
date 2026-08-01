@@ -18,6 +18,17 @@ class Uppercase:
         return text.upper()
 
 
+class Recording:
+    """A corrector that keeps everything it was asked to correct."""
+
+    def __init__(self) -> None:
+        self.asked: list[str] = []
+
+    def complete(self, instruction: str, text: str, max_new_tokens: int = 0) -> str:
+        self.asked.append(text)
+        return text.upper()
+
+
 MANUSCRIPT = "## One\n\nteh cat sat.\n\nit purred.\n\n## Two\n\nteh dog.\n"
 
 
@@ -85,3 +96,69 @@ class CorrectSpan(unittest.TestCase):
 
         correct_span(Counting(), MANUSCRIPT, Span(start=2, end=4), lambda: True)
         self.assertEqual(asked, [])
+
+
+class Notes(unittest.TestCase):
+    """A note to self is not the story, and a correction leaves it alone.
+
+    The model answers whatever it is given with a sentence, so a note that
+    reached it would come back as prose the author never wrote — which is why
+    what is asserted here is as much what the model is asked as what lands in the
+    manuscript.
+    """
+
+    def test_a_note_between_paragraphs_comes_back_exactly_as_it_was(self) -> None:
+        noted = "## One\n\nteh cat sat.\n\n<!-- check this -->\n\nit purred.\n"
+        corrected = correct_span(Uppercase(), noted, Span(start=2, end=6))
+        self.assertEqual(
+            corrected,
+            "## One\n\nTEH CAT SAT.\n\n<!-- check this -->\n\nIT PURRED.\n",
+        )
+
+    def test_a_note_spanning_blank_lines_is_never_handed_over_in_halves(self) -> None:
+        noted = (
+            "## One\n\nteh cat sat.\n\n"
+            "<!--\nnot yet:\n\nteh dog barked.\n-->\n\nit purred.\n"
+        )
+        model = Recording()
+        corrected = correct_span(model, noted, Span(start=2, end=10))
+        self.assertEqual(model.asked, ["teh cat sat.", "it purred."])
+        self.assertEqual(
+            corrected,
+            "## One\n\nTEH CAT SAT.\n\n"
+            "<!--\nnot yet:\n\nteh dog barked.\n-->\n\nIT PURRED.\n",
+        )
+
+    def test_a_note_beside_prose_keeps_the_space_it_was_sitting_in(self) -> None:
+        corrected = correct_span(
+            Uppercase(), "teh cat sat. <!-- check -->\n", Span(start=0, end=0)
+        )
+        self.assertEqual(corrected, "TEH CAT SAT. <!-- check -->\n")
+
+    def test_a_note_never_closed_silences_the_rest_of_the_span(self) -> None:
+        noted = "teh cat sat.\n\n<!-- from here on, notes\nteh dog.\n"
+        corrected = correct_span(Uppercase(), noted, Span(start=0, end=3))
+        self.assertEqual(
+            corrected, "TEH CAT SAT.\n\n<!-- from here on, notes\nteh dog.\n"
+        )
+
+    def test_a_selection_beginning_partway_through_a_note_leaves_the_rest_of_it(
+        self,
+    ) -> None:
+        noted = "<!-- a note\nabout the cat\n-->\n\nteh cat sat.\n"
+        model = Recording()
+        corrected = correct_span(model, noted, Span(start=1, end=4))
+        self.assertEqual(model.asked, ["teh cat sat."])
+        self.assertEqual(corrected, "<!-- a note\nabout the cat\n-->\n\nTEH CAT SAT.\n")
+
+    def test_nothing_carrying_a_note_marker_ever_reaches_the_model(self) -> None:
+        noted = (
+            "teh cat sat. <!-- inline -->\n\n"
+            "<!-- alone -->\n\n"
+            "it purred.\n\n"
+            "<!--\nover\nseveral lines\n-->\n\n"
+            "teh dog.\n"
+        )
+        model = Recording()
+        correct_span(model, noted, Span(start=0, end=11))
+        self.assertEqual(model.asked, ["teh cat sat.", "it purred.", "teh dog."])

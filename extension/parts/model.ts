@@ -215,9 +215,11 @@ interface Visible {
 }
 
 /**
- * Mirrors `visible_lines` in server/representations/utils.py: a comment may span
- * several lines, and one never closed runs to the end of the file — which is how
- * the tail of a draft gets silenced.
+ * Mirrors `split_comments` in server/representations/utils.py, which is where
+ * the server keeps the same reading: a comment may span several lines, and one
+ * never closed runs to the end of the file — which is how the tail of a draft
+ * gets silenced. Dividing a manuscript asks nothing of a model and so never
+ * leaves the editor, which is the one reason there are two of these.
  *
  * A line wholly inside a comment counts as commented even though it carries no
  * marker of its own, so the blank lines within a note are known to belong to it.

@@ -18,7 +18,14 @@
       "Bash(npx vite-node *)",
       "Bash(git --no-pager diff --stat)",
       "Bash(git --no-pager diff extension/publish/ media/)",
-      "Bash(git --no-pager diff .claude/settings.json)"
+      "Bash(git --no-pager diff .claude/settings.json)",
+      "Bash(.venv/bin/python -m pytest tests/server/test_grammar.py -q)",
+      "Bash(.venv/bin/python -m unittest tests.server.test_grammar -v)",
+      "Bash(.venv/bin/python -m unittest tests.server.test_grammar)",
+      "Bash(timeout 240 .venv/bin/python -m unittest discover -s tests/server -t .)",
+      "Bash(.venv/bin/python -m unittest discover -s tests/server -t .)",
+      "Bash(.venv/bin/python -m mypy server/grammar.py)",
+      "Bash(git --no-pager diff server/)"
     ]
   }
 }
