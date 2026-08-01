@@ -46,7 +46,13 @@ describe('readFields — the fields the form is allowed to change', () => {
 });
 
 describe('DEFAULT_SETTINGS', () => {
-	it('defaults the language to en and leaves the rest blank', () => {
-		expect(DEFAULT_SETTINGS).toEqual({ title: '', author: '', language: 'en', cover: '' });
+	it('defaults the language to en and a part to a sitting, and leaves the rest blank', () => {
+		expect(DEFAULT_SETTINGS).toEqual({
+			title: '',
+			author: '',
+			language: 'en',
+			cover: '',
+			partWords: 5000,
+		});
 	});
 });

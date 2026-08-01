@@ -1,9 +1,14 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 from server.inference.seq2seq import Seq2SeqModel
-from server.representations.utils import parse_sections, section_at
+from server.representations.utils import (
+    Piece,
+    parse_sections,
+    section_at,
+    split_comments,
+)
 
 
 GRAMMAR_INSTRUCTION = "Fix the grammar"
@@ -64,16 +69,12 @@ def correct_span(
     span: Span,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> str:
-    """Return `markdown` with the prose in `span` corrected and the rest of it as it was.
-
-    The newline that closed the span is put back around the correction rather
-    than left to the model, which answers with prose and no particular ending —
-    and a span that lost its last newline would run into the heading below it.
-    """
+    """Return `markdown` with the prose in `span` corrected and the rest of it as it was."""
     lines = markdown.splitlines(keepends=True)
     body = "".join(lines[span.start : span.end + 1])
     prose = body.rstrip("\n")
-    corrected = fix_grammar(model, prose, cancelled)
+    _, inside_note = split_comments("".join(lines[: span.start]))
+    corrected = fix_grammar(model, prose, cancelled, inside_note=inside_note)
     return (
         "".join(lines[: span.start])
         + corrected
@@ -86,27 +87,46 @@ def fix_grammar(
     model: Seq2SeqModel,
     markdown: str,
     cancelled: Callable[[], bool] = lambda: False,
+    inside_note: bool = False,
 ) -> str:
     """Return `markdown` with its prose corrected and its structure intact."""
-    pieces: list[str] = []
-    for piece in _SEPARATOR.split(markdown):
+    corrected: list[str] = []
+    for piece in _pieces(markdown, inside_note):
         if cancelled():
             break
-        # Only prose is corrected. The blank-line separators, and blocks with no
-        # letters at all — a horizontal rule, a row of numbers — are left as they
-        # are; there is nothing in them to spell wrong.
-        if _LETTER.search(piece):
-            pieces.append(_fix_block(model, piece))
+        if _is_prose(piece):
+            corrected.append(_fix_block(model, piece.text))
         else:
-            pieces.append(piece)
-    return "".join(pieces)
+            corrected.append(piece.text)
+    return "".join(corrected)
+
+
+def _pieces(markdown: str, inside_note: bool) -> Iterator[Piece]:
+    """The text in the pieces a correction treats one at a time."""
+    pieces, _ = split_comments(markdown, inside_note)
+    for piece in pieces:
+        if piece.comment:
+            yield piece
+        else:
+            for block in _SEPARATOR.split(piece.text):
+                yield Piece(block, comment=False)
+
+
+def _is_prose(piece: Piece) -> bool:
+    """Only prose is corrected."""
+    return not piece.comment and bool(_LETTER.search(piece.text))
 
 
 def _fix_block(model: Seq2SeqModel, block: str) -> str:
     # The corrected block should come back about as long as it went in; a budget
     # tied to its length leaves generous room without inviting a runaway.
     budget = max(64, len(block))
-    reply = model.complete(GRAMMAR_INSTRUCTION, block, max_new_tokens=budget)
+    reply = model.complete(GRAMMAR_INSTRUCTION, block.strip(), max_new_tokens=budget)
     # The block was split out from between blank lines and carried none of its
     # own; the model tends to frame its answer in one or two, so strip them back.
-    return reply.strip("\n")
+    # The space at either end is put back rather than left to the model: a block
+    # ending where a note was lifted out of the line still has to keep the gap
+    # the note was sitting in.
+    lead = block[: len(block) - len(block.lstrip())]
+    trail = block[len(block.rstrip()) :]
+    return lead + reply.strip("\n") + trail

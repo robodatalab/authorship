@@ -16,6 +16,8 @@
 import * as vscode from 'vscode';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { divideManuscript } from '../parts/divide';
+import { quotaOf } from '../parts/model';
 import { progress, rowDescription, rowLabel } from '../search/model';
 import type { ManuscriptSearch, Results } from '../search/results';
 import {
@@ -88,6 +90,12 @@ export class PublishView implements vscode.WebviewViewProvider {
 				case 'settings':
 					void this.writeSettings(readFields(message.settings));
 					break;
+				case 'partWords':
+					void this.writeSettings({ partWords: quotaOf(message.words) });
+					break;
+				case 'divide':
+					void this.divide(quotaOf(message.words));
+					break;
 				case 'blurb':
 					void this.saveBlurb(String(message.text ?? ''));
 					break;
@@ -153,6 +161,34 @@ export class PublishView implements vscode.WebviewViewProvider {
 			return;
 		}
 		await this.setCover(picked[0].fsPath);
+	}
+
+	// --- parts (parts/part_N.md) ---
+
+	/**
+	 * Cut the manuscript into parts of about the asked-for length.
+	 *
+	 * The cuts fall between sections, so a part never opens mid-scene and the
+	 * lengths land near the quota rather than on it. How near is worth saying: a
+	 * division that made three parts out of a quota meant to make ten is the
+	 * author's cue that their sections are longer than they thought.
+	 */
+	private async divide(quota: number): Promise<void> {
+		if (!this.manuscript) {
+			return;
+		}
+		await this.writeSettings({ partWords: quota });
+		try {
+			const { folder, parts } = await divideManuscript(this.manuscript, quota);
+			await this.partsStatus(
+				parts === 0
+					? 'Nothing to divide — the manuscript has no prose.'
+					: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`,
+				false
+			);
+		} catch (err) {
+			await this.partsStatus(`Could not divide: ${describe(err)}`, true);
+		}
 	}
 
 	// --- settings (<name>.pub.yaml) ---
@@ -318,6 +354,11 @@ export class PublishView implements vscode.WebviewViewProvider {
 		await this.view?.webview.postMessage({ type: 'status', message, error });
 	}
 
+	/** The same, under the Parts drawer — a division says nothing about an export. */
+	private async partsStatus(message: string, error: boolean): Promise<void> {
+		await this.view?.webview.postMessage({ type: 'partsStatus', message, error });
+	}
+
 	/** Repaint the status drawers from the server. */
 	private async poll(): Promise<void> {
 		await Promise.all([this.pollModels(), this.pollMemory(), this.pollJobs()]);
@@ -413,6 +454,18 @@ export class PublishView implements vscode.WebviewViewProvider {
 				<span id="manuscript-name" class="name">No story selected</span>
 				<button id="choose" type="button">Choose…</button>
 			</div>
+		</div>
+	</details>
+	<details class="drawer" id="parts" open>
+		<summary>Parts</summary>
+		<div class="body">
+			<label>Words per part
+				<input id="f-part-words" type="number" min="1" step="100">
+			</label>
+			<div class="actions">
+				<button id="divide" type="button">Divide into parts</button>
+			</div>
+			<div id="parts-status" class="status" hidden></div>
 		</div>
 	</details>
 	<details class="drawer" id="publishing" open>

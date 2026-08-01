@@ -148,7 +148,7 @@ textarea:focus {
 	margin-top: 4px;
 }
 
-.actions .primary {
+.actions > button {
 	flex: 1;
 }
 
