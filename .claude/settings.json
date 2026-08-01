@@ -25,7 +25,8 @@
       "Bash(timeout 240 .venv/bin/python -m unittest discover -s tests/server -t .)",
       "Bash(.venv/bin/python -m unittest discover -s tests/server -t .)",
       "Bash(.venv/bin/python -m mypy server/grammar.py)",
-      "Bash(git --no-pager diff server/)"
+      "Bash(git --no-pager diff server/)",
+      "Bash(git --no-pager diff extension/parts/model.ts)"
     ]
   }
 }
