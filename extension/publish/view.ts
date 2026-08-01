@@ -16,6 +16,7 @@ interface PubSettings {
 	author: string;
 	language: string;
 	cover: string;
+	partWords: number;
 }
 
 interface StateMessage {
@@ -71,6 +72,9 @@ const vscode = acquireVsCodeApi();
 
 const manuscriptName = document.getElementById('manuscript-name') as HTMLElement;
 const chooseButton = document.getElementById('choose') as HTMLButtonElement;
+const partWords = document.getElementById('f-part-words') as HTMLInputElement;
+const divideButton = document.getElementById('divide') as HTMLButtonElement;
+const partsStatus = document.getElementById('parts-status') as HTMLElement;
 const title = document.getElementById('f-title') as HTMLInputElement;
 const author = document.getElementById('f-author') as HTMLInputElement;
 const language = document.getElementById('f-language') as HTMLInputElement;
@@ -121,6 +125,17 @@ blurb.addEventListener('input', () => {
 // Leaving the field shouldn't wait out the debounce.
 blurb.addEventListener('change', commitBlurb);
 
+partWords.addEventListener('change', () =>
+	vscode.postMessage({ type: 'partWords', words: partWords.value })
+);
+divideButton.addEventListener('click', () => {
+	setStatus(partsStatus, 'Dividing…', false);
+	// The quota travels with the request rather than being read back from the
+	// settings, so a click that lands before the field's own change has been
+	// written still divides by the number the author is looking at.
+	vscode.postMessage({ type: 'divide', words: partWords.value });
+});
+
 chooseButton.addEventListener('click', () => vscode.postMessage({ type: 'choose' }));
 chooseCover.addEventListener('click', () => vscode.postMessage({ type: 'chooseCover' }));
 clearCover.addEventListener('click', () => vscode.postMessage({ type: 'clearCover' }));
@@ -149,6 +164,8 @@ searchClear.addEventListener('click', () => {
  */
 function setEnabled(enabled: boolean): void {
 	const controls = [
+		partWords,
+		divideButton,
 		title,
 		author,
 		language,
@@ -178,6 +195,7 @@ function renderState(state: StateMessage): void {
 	manuscriptName.textContent = state.manuscript ?? 'No story selected';
 	// The name is ellipsized when the path is long; the tooltip keeps it legible.
 	manuscriptName.title = state.manuscript ?? '';
+	partWords.value = String(state.settings.partWords);
 	title.value = state.settings.title;
 	author.value = state.settings.author;
 	language.value = state.settings.language;
@@ -185,6 +203,7 @@ function renderState(state: StateMessage): void {
 	blurb.value = state.blurb;
 	setEnabled(hasStory);
 	setStatus(status, '', false);
+	setStatus(partsStatus, '', false);
 }
 
 function baseName(p: string): string {
@@ -488,6 +507,8 @@ window.addEventListener('message', (event) => {
 		showCover(String(message.cover ?? ''));
 	} else if (message?.type === 'status') {
 		setStatus(status, String(message.message ?? ''), Boolean(message.error));
+	} else if (message?.type === 'partsStatus') {
+		setStatus(partsStatus, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
 	} else if (message?.type === 'memory') {

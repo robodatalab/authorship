@@ -14,7 +14,11 @@
       "Bash(sed -i '' 's|^from server\\\\.inference\\\\.kinds import ModelKind$|from server.inference.resource_manager import ModelKind|' tests/server/test_api.py)",
       "WebFetch(domain:help.gitkraken.com)",
       "WebFetch(domain:vscode.rocks)",
-      "Bash(git -C /Users/piotrtrochim/GitHub/writer diff --stat tests/server/test_semantic_search.py)"
+      "Bash(git -C /Users/piotrtrochim/GitHub/writer diff --stat tests/server/test_semantic_search.py)",
+      "Bash(npx vite-node *)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git --no-pager diff extension/publish/ media/)",
+      "Bash(git --no-pager diff .claude/settings.json)"
     ]
   }
 }

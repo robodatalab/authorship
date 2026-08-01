@@ -5,11 +5,15 @@
 // launching an editor. panel.ts wraps these paths in vscode.Uri at the call
 // sites — the same split story_graph/model.ts keeps.
 
+import { DEFAULT_PART_WORDS } from '../parts/model';
+
 export interface PubSettings {
 	title: string;
 	author: string;
 	language: string;
 	cover: string;
+	/** How long a part should be when the manuscript is divided into them. */
+	partWords: number;
 }
 
 export const DEFAULT_SETTINGS: PubSettings = {
@@ -17,6 +21,7 @@ export const DEFAULT_SETTINGS: PubSettings = {
 	author: '',
 	language: 'en',
 	cover: '',
+	partWords: DEFAULT_PART_WORDS,
 };
 
 /** `story.md` sits next to `story.pub.yaml`, as `story.graph.yaml` does. */
