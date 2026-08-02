@@ -1,5 +1,6 @@
 from server import log
 from server.inference.causal import CausalModel
+from server.manuscript import Manuscript
 from server.representations.utils import json_object, numbered, as_edge, as_node
 from server.story_graph import Edge, Node, StoryGraph
 
@@ -49,10 +50,10 @@ Answer with one JSON object and nothing else, in exactly this shape:
 
 
 def build_plot_representation(
-    model: CausalModel, story_markdown: str
+    model: CausalModel, manuscript: Manuscript
 ) -> StoryGraph:
     payload_str = model.complete(
-        PLOT_SYSTEM, numbered(story_markdown), max_new_tokens=1536
+        PLOT_SYSTEM, numbered(manuscript), max_new_tokens=1536
     )
     payload = json_object(payload_str)
 

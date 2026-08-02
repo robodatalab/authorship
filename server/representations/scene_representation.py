@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from server import log
 from server.inference.causal import CausalModel
+from server.manuscript import Manuscript
 from server.representations.utils import (
     json_object, numbered, as_edge, as_node
 )
@@ -42,10 +43,10 @@ Answer with one JSON object and nothing else, in exactly this shape:
 
 
 def build_scene_representation(
-    model: CausalModel, story_markdown: str
+    model: CausalModel, manuscript: Manuscript
 ) -> StoryGraph:
     payload_str = model.complete(
-        SCENE_SYSTEM, numbered(story_markdown), max_new_tokens=1024
+        SCENE_SYSTEM, numbered(manuscript), max_new_tokens=1024
     )
     payload = json_object(payload_str)
 

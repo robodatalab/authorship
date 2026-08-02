@@ -1,5 +1,6 @@
 """A story manuscript as the server reads it."""
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -170,3 +171,23 @@ class Manuscript:
         assert self.path is not None
         stem = re.sub(r"\.md$", "", self.path.name, flags=re.I)
         return self.path.with_name(stem + suffix)
+
+
+class StoryLines:
+    """Given a manuscript it walks only the lines that comprise the story, excluding titles and comments.
+    """
+
+    def __init__(
+        self, manuscript: Manuscript, start: int = 0, end: int | None = None
+    ) -> None:
+        self._manuscript = manuscript
+        self._start = start
+        self._end = len(manuscript.lines) - 1 if end is None else end
+
+    def __iter__(self) -> Iterator[tuple[int, str]]:
+        for section in self._manuscript.sections:
+            for first, last in section.lines:
+                for index in range(max(first, self._start), min(last, self._end) + 1):
+                    said = self._manuscript.lines[index].strip()
+                    if said:
+                        yield index, said
