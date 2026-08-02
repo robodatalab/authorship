@@ -57,14 +57,6 @@ def split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int,
     return ranges
 
 
-@dataclass(frozen=True)
-class Span:
-    """Lines of a manuscript, 0-based and inclusive."""
-
-    start: int
-    end: int
-
-
 class Section:
     """A `##` heading and the lines beneath it, 0-based and inclusive.
 
@@ -79,7 +71,11 @@ class Section:
         self.title = title
         self.start = start
         self.end = end
-        self.lines: list[tuple[int, int]] = split_comments(manuscript.lines, list(range(start, end + 1)))
+
+    @property
+    def lines(self) -> list[tuple[int, int]]:
+        indices = list(range(self.start, self.end + 1))
+        return split_comments([self._manuscript.lines[i] for i in indices], indices)
 
     def __str__(self) -> str:
         return "\n".join(
