@@ -78,13 +78,11 @@ class Section:
         return split_comments([self._manuscript.lines[i] for i in indices], indices)
 
     def __str__(self) -> str:
+        # The section as the author wrote it, notes and all — `lines` says which
+        # of it is story, which is a different question from what is on the page.
+        heading = [] if self.start == 0 else [self._manuscript.lines[self.start - 1]]
         return "\n".join(
-            [f"## {self.title}"]
-            + [
-                self._manuscript.lines[index]
-                for first, last in self.lines
-                for index in range(first, last + 1)
-            ]
+            heading + self._manuscript.lines[self.start : self.end + 1]
         )
 
 
@@ -118,12 +116,20 @@ class Manuscript:
     def load(cls, path: Path) -> "Manuscript":
         return cls(path.read_text(encoding="utf-8"), path)
 
-    def save(self, path: Path) -> None:
-        path.write_text(
-            "\n".join([
-                f"# {self.title}",
-            ] + [str(section) for section in self.sections])
+    def __str__(self) -> str:
+        # The title is a line of the first section rather than something held
+        # apart, so writing the sections out writes the whole manuscript.
+        written = "\n".join(
+            str(section)
+            for section in self.sections
+            # A manuscript opening on a heading has no first section, only the
+            # empty stretch the parse always begins with.
+            if section.start <= section.end or section.start > 0
         )
+        return written + "\n" if self.text.endswith("\n") else written
+
+    def save(self, path: Path) -> None:
+        path.write_text(str(self))
 
     def section_at(self, line: int) -> Section | None:
         """The section a line falls in, counting a heading as part of what it opens."""
