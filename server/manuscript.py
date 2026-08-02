@@ -11,7 +11,7 @@ _COMMENT_OPEN = "<!--"
 _COMMENT_CLOSE = "-->"
 
 
-def split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
+def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
     """Parses an indexed list of lines in search for comments and returns
     a set of ranges that show which lines are not the comment lines"""
     ranges: list[tuple[int, int]] = []
@@ -75,7 +75,7 @@ class Section:
     @property
     def lines(self) -> list[tuple[int, int]]:
         indices = list(range(self.start, self.end + 1))
-        return split_comments([self._manuscript.lines[i] for i in indices], indices)
+        return _split_comments([self._manuscript.lines[i] for i in indices], indices)
 
     def __str__(self) -> str:
         # The section as the author wrote it, notes and all — `lines` says which
