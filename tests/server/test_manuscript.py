@@ -92,6 +92,69 @@ class ManuscriptTests(unittest.TestCase):
             [section.lines for section in Manuscript(document).sections], expected
         )
 
+    @parameterized.expand(
+        [
+            (MANUSCRIPT_1,),
+            (MANUSCRIPT_2,),
+            (MANUSCRIPT_3,),
+        ]
+    )
+    def test_saving_manuscript_doesnt_change_it(self, document):
+        manuscript = Manuscript(document)
+        serialized_manuscript = str(manuscript)
+        self.assertEqual(document, serialized_manuscript)
+
+    @parameterized.expand(
+            [
+                (MANUSCRIPT_1, 5, 5, "Modified text in section 1",
+                 """
+# Title 1
+
+## Section 1
+
+Modified text in section 1
+Another line in section 1
+"""
+                 ),
+                (MANUSCRIPT_2, 4, 9, "Something\nWicked\nThis\nWay\nComes",
+"""
+# Title 1
+<!-- comment -->
+## Section 1
+Something
+Wicked
+This
+Way
+Comes
+Another line in section 1
+"""),
+            ]
+        )
+    def test_modify_section_text(self, document, mod_start_line, mod_end_line, mod_text, expected):
+        manuscript = Manuscript(document)
+        manuscript.delete(mod_start_line, mod_end_line)
+        manuscript.insert(mod_start_line, mod_text)
+
+        serialized_manuscript = str(manuscript)
+        self.assertEqual(expected, serialized_manuscript)
+
+    def test_deleting_a_comment_changes_the_lines_its_section_holds(self):
+        manuscript = Manuscript(MANUSCRIPT_2)
+        self.assertEqual(manuscript.sections[1].lines, [(4, 5), (10, 10)])
+
+        manuscript.delete(6, 9)
+
+        self.assertEqual(
+            [section.title for section in manuscript.sections],
+            ["First anonymous section", "Section 1"],
+        )
+        self.assertEqual(manuscript.sections[1].lines, [(4, 6)])
+        self.assertEqual(
+            str(manuscript),
+            "\n# Title 1\n<!-- comment -->\n## Section 1\n\n"
+            "Text in section 1\nAnother line in section 1\n",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

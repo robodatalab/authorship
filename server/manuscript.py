@@ -116,6 +116,22 @@ class Manuscript:
     def load(cls, path: Path) -> "Manuscript":
         return cls(path.read_text(encoding="utf-8"), path)
 
+    def delete(self, start: int, end: int) -> None:
+        """Take out lines `start` to `end`, both included."""
+        del self.lines[start : end + 1]
+        self._reread()
+
+    def insert(self, at: int, text: str) -> None:
+        """Put `text` in as whole lines, the first of them landing on line `at`."""
+        self.lines[at:at] = text.splitlines()
+        self._reread()
+
+    def _reread(self) -> None:
+        # Where the sections fall is a reading of the lines, so a manuscript that
+        # has been written in is read again rather than adjusted.
+        self.text = "\n".join(self.lines) + ("\n" if self.text.endswith("\n") else "")
+        self.title, self.sections = self._parse_manuscript(self.lines)
+
     def __str__(self) -> str:
         # The title is a line of the first section rather than something held
         # apart, so writing the sections out writes the whole manuscript.
