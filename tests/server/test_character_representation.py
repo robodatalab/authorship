@@ -11,6 +11,7 @@ from typing import cast
 from unittest.mock import create_autospec
 
 from server.inference.causal import CausalModel
+from server.manuscript import Manuscript
 from server.representations.character_representation import (
     build_character_representation,
 )
@@ -33,19 +34,19 @@ class InvalidReplies(unittest.TestCase):
             reply="No character in this story changes."
         )
         with self.assertRaises(ValueError):
-            build_character_representation(model, STORY)
+            build_character_representation(model, Manuscript(STORY))
 
     def test_object_never_closes(self) -> None:
         model = build_completion_model_mock(
             reply='{"nodes": [{"id": 1, "title": "guarded", "start": 0, "end": 1, "group": 1}'
         )
         with self.assertRaises(ValueError):
-            build_character_representation(model, STORY)
+            build_character_representation(model, Manuscript(STORY))
 
     def test_reply_is_an_array_not_an_object(self) -> None:
         model = build_completion_model_mock(reply="[1, 2, 3]")
         with self.assertRaises(ValueError):
-            build_character_representation(model, STORY)
+            build_character_representation(model, Manuscript(STORY))
 
 
 class GroupedGraphs(unittest.TestCase):
@@ -65,7 +66,7 @@ class GroupedGraphs(unittest.TestCase):
                 "]}"
             )
         )
-        graph = build_character_representation(model, STORY)
+        graph = build_character_representation(model, Manuscript(STORY))
         # Lines arrive 0-based from the model and are stored 1-based, as read.
         self.assertEqual(
             graph.nodes,
@@ -94,7 +95,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": []}'
             )
         )
-        graph = build_character_representation(model, STORY)
+        graph = build_character_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -112,7 +113,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": [{"from": 1, "to": 2}]}'
             )
         )
-        graph = build_character_representation(model, STORY)
+        graph = build_character_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -134,7 +135,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": []}'
             )
         )
-        graph = build_character_representation(model, STORY)
+        graph = build_character_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -156,7 +157,7 @@ class GroupedGraphs(unittest.TestCase):
                 "]}"
             )
         )
-        graph = build_character_representation(model, STORY)
+        graph = build_character_representation(model, Manuscript(STORY))
         # A link needs both ends, and a state does not lead into itself.
         self.assertEqual(graph.edges, (Edge(source=1, target=2, group=1),))
 

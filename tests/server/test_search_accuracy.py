@@ -5,6 +5,7 @@ import unittest
 from server.api import ENCODER_MODEL, ENCODER_MODEL_GB
 from server.inference.encoder import EncoderModel
 from server.inference.resource_manager import InferenceModelResourceManager
+from server.manuscript import Manuscript
 from server.semantic_search import SearchIndex
 
 MANUSCRIPT = Path(__file__).parents[2] / "data" / "story_2.md"
@@ -275,9 +276,9 @@ def line_of(lines: list[str], answer: str) -> int:
 
 
 def accuracy(
-    index: SearchIndex, encoder: EncoderModel, story: str, queries: list[Query]
+    index: SearchIndex, encoder: EncoderModel, story: Manuscript, queries: list[Query]
 ) -> Accuracy:
-    lines = story.splitlines()
+    lines = story.lines
     found = 0
     first = 0
     missed = []
@@ -285,7 +286,7 @@ def accuracy(
     for query in queries:
         wanted = {line_of(lines, answer) for answer in query.answers}
         passages = index.search(
-            encoder, str(MANUSCRIPT), story, query.phrase, PASSAGES_PER_SEARCH
+            encoder, story, query.phrase, PASSAGES_PER_SEARCH
         ).passages
         answering = [
             passage
@@ -310,18 +311,18 @@ def report(difficulty: str, measured: Accuracy) -> None:
 
 class SearchAccuracy(unittest.TestCase):
 
-    story: str
+    story: Manuscript
     models: InferenceModelResourceManager
     encoder: EncoderModel
     index: SearchIndex
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.story = MANUSCRIPT.read_text()
+        cls.story = Manuscript.load(MANUSCRIPT)
         cls.models = InferenceModelResourceManager(ENCODER_MODEL_GB)
         cls.encoder = EncoderModel(ENCODER_MODEL, cls.models, ENCODER_MODEL_GB)
         cls.index = SearchIndex()
-        cls.index.encode_manuscript(cls.encoder, str(MANUSCRIPT), cls.story)
+        cls.index.encode_manuscript(cls.encoder, cls.story)
 
     @classmethod
     def tearDownClass(cls) -> None:
