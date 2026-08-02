@@ -18,6 +18,7 @@ package = false
 
 [dependency-groups]
 dev = [
+    "parameterized>=0.9",
     "types-pyyaml>=6.0.12.20260518",
     "types-tqdm>=4.69.0.20260720",
     "ipykernel>=7.3.0",
