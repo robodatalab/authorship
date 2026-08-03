@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from server.manuscript import Manuscript
+from server.manuscript import Manuscript, StoryLines
 
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
@@ -77,12 +77,16 @@ def chapters_of(manuscript: Manuscript) -> list[Chapter]:
     written on the page — the author's notes are not published."""
     chapters: list[Chapter] = []
     for section in manuscript.sections:
-        body = [
-            manuscript.lines[index]
-            for first, last in section.lines
-            for index in range(first, last + 1)
-        ]
-        if not any(line.strip() for line in body):
+        body: list[str] = []
+        previous: int | None = None
+        for index, said in StoryLines(manuscript, section.start, section.end):
+            # A gap in the numbers is the blank line or the note that was there;
+            # either way it is where one paragraph ends and the next begins.
+            if previous is not None and index != previous + 1:
+                body.append("")
+            body.append(said)
+            previous = index
+        if not body:
             continue
         title = manuscript.title if section.start == 0 else section.title
         chapters.append(Chapter(len(chapters), title, body))

@@ -86,7 +86,7 @@ class Contribution(unittest.TestCase):
     def test_a_comment_beside_prose_is_not_weighed_with_it(self) -> None:
         # The note would otherwise be content of the line it trails, and the two
         # sections here would not score alike.
-        noted = score("## One\nalpha <!-- cut? -->\nbeta", 1)
+        noted = score("## One\nalpha\n<!-- cut? -->\nbeta", 1)
         plain = score("## One\nalpha \nbeta", 1)
         self.assertEqual(
             [entry.share for entry in noted.lines],

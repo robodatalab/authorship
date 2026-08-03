@@ -19,10 +19,18 @@ def correct_span(
     cancelled: Callable[[], bool] = lambda: False,
 ) -> None:
     """Correct the prose in lines `start` to `end`, both included, leaving the
-    notes and the structure alone."""
+    notes and the structure alone.
+
+    Raises `ValueError` if those lines hold no prose: a correction pass over a
+    run of blank lines asks the model to invent some.
+    """
+    blocks = _prose_blocks(manuscript, start, end)
+    if not blocks:
+        raise ValueError("There is no prose there to correct.")
+
     # Back to front, so that a block coming back longer or shorter than it went
     # in does not move the blocks still to be corrected.
-    for first, last in reversed(prose_blocks(manuscript, start, end)):
+    for first, last in reversed(blocks):
         if cancelled():
             return
         block = "\n".join(manuscript.lines[first : last + 1])
@@ -37,7 +45,7 @@ def correct_span(
         manuscript.insert(first, corrected.strip("\n"))
 
 
-def prose_blocks(
+def _prose_blocks(
     manuscript: Manuscript, start: int, end: int
 ) -> list[tuple[int, int]]:
     """The paragraphs of prose those lines cover.

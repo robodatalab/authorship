@@ -8,7 +8,7 @@ put back, not the correcting itself.
 
 import unittest
 
-from server.grammar import correct_span, prose_blocks
+from server.grammar import _prose_blocks, correct_span
 from server.manuscript import Manuscript
 
 
@@ -38,23 +38,23 @@ class ProseBlocks(unittest.TestCase):
 
     def test_a_blank_line_ends_a_paragraph(self) -> None:
         manuscript = Manuscript(MANUSCRIPT)
-        self.assertEqual(prose_blocks(manuscript, 0, 8), [(2, 2), (4, 4), (8, 8)])
+        self.assertEqual(_prose_blocks(manuscript, 0, 8), [(2, 2), (4, 4), (8, 8)])
 
     def test_lines_running_together_are_one_paragraph(self) -> None:
         manuscript = Manuscript("## One\n\nteh cat sat.\nit purred.\n")
-        self.assertEqual(prose_blocks(manuscript, 0, 3), [(2, 3)])
+        self.assertEqual(_prose_blocks(manuscript, 0, 3), [(2, 3)])
 
     def test_a_note_is_not_a_paragraph(self) -> None:
         manuscript = Manuscript("## One\n\nteh cat sat.\n<!-- check -->\nteh dog.\n")
-        self.assertEqual(prose_blocks(manuscript, 0, 4), [(2, 2), (4, 4)])
+        self.assertEqual(_prose_blocks(manuscript, 0, 4), [(2, 2), (4, 4)])
 
     def test_only_the_lines_asked_for_are_covered(self) -> None:
         manuscript = Manuscript(MANUSCRIPT)
-        self.assertEqual(prose_blocks(manuscript, 4, 8), [(4, 4), (8, 8)])
+        self.assertEqual(_prose_blocks(manuscript, 4, 8), [(4, 4), (8, 8)])
 
     def test_a_section_heading_is_never_a_paragraph(self) -> None:
         manuscript = Manuscript(MANUSCRIPT)
-        self.assertNotIn((6, 6), prose_blocks(manuscript, 0, 8))
+        self.assertNotIn((6, 6), _prose_blocks(manuscript, 0, 8))
 
 
 class CorrectSpan(unittest.TestCase):
@@ -88,6 +88,10 @@ class CorrectSpan(unittest.TestCase):
         self.assertEqual(
             sorted(model.asked), ["it purred.", "teh cat sat.", "teh dog."]
         )
+
+    def test_lines_holding_no_prose_are_nothing_to_correct(self) -> None:
+        with self.assertRaises(ValueError):
+            correct_span(Uppercase(), Manuscript(MANUSCRIPT), 3, 3)
 
     def test_a_cancelled_pass_stops_asking(self) -> None:
         model = Recording()

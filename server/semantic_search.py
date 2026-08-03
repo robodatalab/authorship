@@ -7,6 +7,9 @@ from server.manuscript import Manuscript, StoryLines
 
 _log = log.logger(__name__)
 
+# A line too short to say much drags a search off course more than it helps it.
+MIN_WORDS_PER_SEARCHABLE_LINE = 3
+
 MIN_SIMILARITY_AS_FRACTION_OF_BEST = 0.5
 LINES_PER_ENCODE_REQUEST = 32
 
@@ -40,7 +43,11 @@ class SearchIndex:
         vectors_by_line_text = self._vectors_by_manuscript.setdefault(
             manuscript_path, {}
         )
-        searchable = list(StoryLines(manuscript))
+        searchable = [
+            (number, said)
+            for number, said in StoryLines(manuscript)
+            if len(said.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
+        ]
         not_yet_encoded = sorted(
             {text for _, text in searchable if text not in vectors_by_line_text}
         )
@@ -65,7 +72,11 @@ class SearchIndex:
     ) -> SearchResults:
         manuscript_path = str(manuscript.path)
         vectors_by_line_text = self._vectors_by_manuscript.get(manuscript_path, {})
-        searchable = list(StoryLines(manuscript))
+        searchable = [
+            (number, said)
+            for number, said in StoryLines(manuscript)
+            if len(said.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
+        ]
         already_encoded = [
             (line_number, text)
             for line_number, text in searchable

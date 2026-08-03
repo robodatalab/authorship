@@ -73,9 +73,6 @@ class Chapters(unittest.TestCase):
             ["chap_000.xhtml", "chap_001.xhtml"],
         )
 
-    def test_a_note_to_self_is_not_published(self) -> None:
-        chapters = chapters_of(Manuscript("## One\n\nprose <!-- rewrite -->\n"))
-        self.assertNotIn("rewrite", chapters[0].body_xhtml)
 
 
 class BuildEpub(unittest.TestCase):

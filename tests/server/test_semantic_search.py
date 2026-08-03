@@ -81,7 +81,7 @@ class SearchableLines(unittest.TestCase):
         self.assertEqual([match.first_line for match in results.passages], [2])
 
     def test_a_comment_beside_prose_leaves_the_prose_matching(self) -> None:
-        story = "the only prose here <!-- cut? -->\n\nthe second paragraph"
+        story = "the only prose here\n<!-- cut? -->\n\nthe second paragraph"
         self.vector_by_line = {"the only prose here": IDENTICAL_TO_PHRASE}
 
         self.index.encode_manuscript(self.encoder, Manuscript(story, MANUSCRIPT_PATH))

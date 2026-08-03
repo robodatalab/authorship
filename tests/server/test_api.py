@@ -285,9 +285,11 @@ class GrammarFix(unittest.TestCase):
             "## One\n\nteh cat.\n\n## Two\n\nthe cat.\n",
         )
 
-    def test_a_selection_of_blank_lines_is_a_bad_request(self) -> None:
+    def test_a_selection_of_blank_lines_has_nothing_to_correct(self) -> None:
+        # Where a section ends is the server's to say, and so is whether there is
+        # prose in it — which it only knows once the job has the manuscript open.
         client = TestClient(app)
-        response = client.post(
+        started = client.post(
             "/fix/grammar",
             json={
                 "path": str(self.manuscript),
@@ -295,7 +297,13 @@ class GrammarFix(unittest.TestCase):
                 "selection": {"start": 3, "end": 3},
             },
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertEqual(status["error"], "There is no prose there to correct.")
+        self.assertEqual(
+            self.manuscript.read_text(), "## One\n\nteh cat.\n\n## Two\n\nteh dog.\n"
+        )
 
     def test_a_missing_manuscript_is_a_bad_request(self) -> None:
         client = TestClient(app)
