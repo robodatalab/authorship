@@ -26,7 +26,10 @@
       "Bash(.venv/bin/python -m unittest discover -s tests/server -t .)",
       "Bash(.venv/bin/python -m mypy server/grammar.py)",
       "Bash(git --no-pager diff server/)",
-      "Bash(git --no-pager diff extension/parts/model.ts)"
+      "Bash(git --no-pager diff extension/parts/model.ts)",
+      "Bash(.venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/ablate.py)",
+      "Bash(PYTHONPATH=/Users/piotrtrochim/GitHub/writer .venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/ablate.py)",
+      "Bash(PYTHONPATH=/Users/piotrtrochim/GitHub/writer .venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/name_check.py)"
     ]
   }
 }

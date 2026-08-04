@@ -87,7 +87,7 @@ class SearchIndex:
         if not already_encoded or not phrase.strip():
             return SearchResults(passages=[], lines_awaiting_encoding=awaiting_encoding)
 
-        phrase_vector = encoder.encode_query(phrase)
+        phrase_vector = encoder.encode([phrase])[0]
         similarity_by_line = {
             line_number: _cosine_of_unit_vectors(
                 vectors_by_line_text[text], phrase_vector

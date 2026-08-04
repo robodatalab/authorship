@@ -14,10 +14,6 @@ from transformers import AutoModel, AutoTokenizer
 
 _log = log.logger(__name__)
 
-# What a query is looking for. The passages carry no instruction of their own;
-# only the question says what it is a question about.
-SEARCH_TASK = "Given a search query, retrieve the passages of a story that answer it"
-
 # Longer than any passage a manuscript is cut into, and well inside the window.
 MAX_TOKENS = 8192
 
@@ -48,10 +44,6 @@ class EncoderModel(ModelKind):
     def encode(self, passages: Sequence[str]) -> list[list[float]]:
         """A vector per passage, as the passage stands."""
         return self._vectors(tuple(passages))
-
-    def encode_query(self, query: str, task: str = SEARCH_TASK) -> list[float]:
-        """A vector for a question, in the same space the passages live in."""
-        return self._vectors((f"Instruct: {task}\nQuery:{query}",))[0]
 
     def _vectors(self, texts: tuple[str, ...]) -> list[list[float]]:
         with self.manager.residency(self) as (requests, replies):

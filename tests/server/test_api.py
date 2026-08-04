@@ -429,7 +429,7 @@ class Search(unittest.TestCase):
 
         model = mock.MagicMock()
         model.encode.side_effect = lambda texts: [self.VECTORS[text] for text in texts]
-        model.encode_query.return_value = [1.0, 0.0]
+        model.encode.return_value = [1.0, 0.0]
 
         app.state.encoder_model = model
         app.state.search_index = SearchIndex()

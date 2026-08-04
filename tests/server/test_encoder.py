@@ -89,7 +89,7 @@ class Encoding(unittest.TestCase):
         patch.object(encoder, "_encode", side_effect=encode).start()
         model = EncoderModel("test-org/test-encoder", self.resource_manager, 5.0)
 
-        vector = model.encode_query("who knocks at the door?")
+        vector = model.encode(["who knocks at the door?"])[0]
 
         self.assertEqual(
             encoded,
