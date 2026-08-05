@@ -54,11 +54,11 @@ class EncoderModel(ModelKind):
         return vectors
 
 
-def _encode(texts: tuple[str, ...], model, tokenizer) -> list[list[float]]:
+def _encode(texts: tuple[str, ...], model, tokenizer) -> torch.Tensor:
     _log.info("encoding %d passages", len(texts))
     started = time.monotonic()
 
-    vectors: list[list[float]] = []
+    batches: list[torch.Tensor] = []
     for start in range(0, len(texts), BATCH_SIZE):
         batch = list(texts[start:start + BATCH_SIZE])
         inputs = tokenizer(
@@ -75,9 +75,9 @@ def _encode(texts: tuple[str, ...], model, tokenizer) -> list[list[float]]:
         pooled = _last_token(output.last_hidden_state, inputs["attention_mask"])
         # Unit length, so that a dot product is a cosine and nearness is a sort.
         unit = torch.nn.functional.normalize(pooled, p=2, dim=1)
-        # Plain floats: the vectors go back across a process boundary, and a
-        # tensor would carry its device with it.
-        vectors.extend(unit.float().cpu().tolist())
+        # On the CPU in float32: the vectors go back across a process boundary,
+        # and a tensor would otherwise carry its device with it.
+        batches.append(unit.float().cpu())
 
     elapsed = time.monotonic() - started
     _log.info(
@@ -86,7 +86,7 @@ def _encode(texts: tuple[str, ...], model, tokenizer) -> list[list[float]]:
         elapsed,
         len(texts) / elapsed if elapsed else 0.0,
     )
-    return vectors
+    return torch.cat(batches) if batches else torch.empty(0)
 
 
 def _last_token(hidden: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
