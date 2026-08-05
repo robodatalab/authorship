@@ -37,11 +37,11 @@ It was a day she had long anticipated. She had just accepted an offer from a pre
 
 Giddy with happiness, she twirled on her heel and glided toward the wardrobe to find something appropriate—sexy, yet professional and understated. She was meeting Sophia shortly to celebrate with a reckless shopping spree, which would be followed by a proper hot date.
 
-Finding nothing suitable—which was the entire excuse for the shopping trip—she finally selected an outfit for the morning: a form-fitting black sequined dress that highlighted her legs, a matching blazer, and a jade necklace on a fine gold chain to draw Sophia's gaze exactly where she wanted it.
+Finding nothing suitable — which was the entire excuse for the shopping trip — she finally selected an outfit for the morning: a form-fitting black sequined dress that highlighted her legs, a matching blazer, and a jade necklace on a fine gold chain to draw Sophia's gaze exactly where she wanted it.
 
 She draped the clothes on the bed and flicked her fingers. Her Companion approached, and she pressed the release button on his collar, letting the armbinder on his back click open. 
 
-He stretched his stiff arms and knelt before her, his hands working quickly through a routine trained deep into his muscles. Panties slid up her thighs, followed by her hosiery and skirt. Her bra was clasped behind her back, her shirt meticulously buttoned, and her tie knotted with expert precision. His eyes never once rose to her face. On other mornings she might have caught his gaze to challenge him, but she had no time for such games today.
+He stretched his stiff arms and knelt before her, his hands working quickly through a routine trained deep into his muscles. Panties slid up her thighs, followed by her hosiery and skirt. Her dress zipped with expert precision. His eyes never once rose to her face. On other mornings she might have caught his gaze to challenge him, but she had no time for such games today.
 
 Her Companion slid the stilettos onto her feet and planted a reverent kiss on her instep, signaling his task was complete. His arms swept back behind him, and the armbinder locked shut over his wrists once more.
 
