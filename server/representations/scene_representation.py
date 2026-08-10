@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from server import log
-from server.inference.causal import CausalModel
+from roost import CausalModel
 from server.manuscript import Manuscript
 from server.representations.utils import (
     json_object, numbered, as_edge, as_node

@@ -1,7 +1,7 @@
 import re
 from collections.abc import Callable
 
-from server.inference.seq2seq import Seq2SeqModel
+from roost import Seq2SeqModel
 from server.manuscript import Manuscript, StoryLines
 
 

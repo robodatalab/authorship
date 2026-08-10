@@ -3,7 +3,7 @@ from pathlib import Path
 import string
 import unittest
 
-from server.inference import (
+from roost import (
     InferenceModelResourceManager,
     EncoderModel,
     coedit_prompt, machine_memory, qwen_chat_prompt

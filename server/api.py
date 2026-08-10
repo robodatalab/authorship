@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from server import log
 from server.epub_exporter import build_epub
 from server.grammar import correct_span
-from server.inference import (
+from roost import (
     InferenceModelResourceManager,
     ModelNotAvailable,
     CausalModel, EncoderModel, Seq2SeqModel,

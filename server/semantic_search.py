@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from server import log
-from server.inference.encoder import EncoderModel
+from roost import EncoderModel
 from server.manuscript import Manuscript, StoryLines
 
 _log = log.logger(__name__)

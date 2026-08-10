@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelJobsManager
-from server.inference.resource_manager import (
+from roost.resource_manager import (
     MemoryReading,
     ModelKind,
     ModelNotAvailable,

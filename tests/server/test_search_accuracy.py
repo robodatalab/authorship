@@ -3,8 +3,7 @@ from pathlib import Path
 import unittest
 
 from server.api import ENCODER_MODEL, ENCODER_MODEL_GB
-from server.inference.encoder import EncoderModel
-from server.inference.resource_manager import InferenceModelResourceManager
+from roost import EncoderModel, InferenceModelResourceManager
 from server.manuscript import Manuscript
 from server.semantic_search import SearchIndex
 

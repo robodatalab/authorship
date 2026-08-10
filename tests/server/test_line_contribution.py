@@ -16,7 +16,7 @@ from typing import Sequence, cast
 
 from yaml import safe_load
 
-from server.inference.encoder import EncoderModel
+from roost import EncoderModel
 from server.line_contribution import (
     SectionContribution,
     line_contribution,
