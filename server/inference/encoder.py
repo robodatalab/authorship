@@ -55,7 +55,7 @@ class EncoderModel(ModelKind):
 
 
 def _encode(texts: tuple[str, ...], model, tokenizer) -> torch.Tensor:
-    _log.info("encoding %d passages", len(texts))
+    _log.debug("encoding %d passages", len(texts))
     started = time.monotonic()
 
     batches: list[torch.Tensor] = []
@@ -80,7 +80,7 @@ def _encode(texts: tuple[str, ...], model, tokenizer) -> torch.Tensor:
         batches.append(unit.float().cpu())
 
     elapsed = time.monotonic() - started
-    _log.info(
+    _log.debug(
         "encoded %d passages in %.1fs (%.1f/s)",
         len(texts),
         elapsed,
