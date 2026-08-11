@@ -35,7 +35,7 @@ When she finished, she swung her feet over the edge of the mattress and watched 
 
 It was a day she had long anticipated. She had just accepted an offer from a prestigious law firm; the years spent devouring endless books and memorizing complex regulations were finally about to pay off.
 
-Giddy with happiness, she twirled on her heel and glided toward the wardrobe to find something appropriate—sexy, yet professional and understated. She was meeting Sophia shortly to celebrate with a reckless shopping spree, which would be followed by a proper hot date.
+Giddy with happiness, she twirled on her heel and glided toward the wardrobe to find something appropriate — sexy, yet professional and understated. She was meeting Sophia shortly to celebrate with a reckless shopping spree, which would be followed by a proper hot date.
 
 Finding nothing suitable — which was the entire excuse for the shopping trip — she finally selected an outfit for the morning: a form-fitting black sequined dress that highlighted her legs, a matching blazer, and a jade necklace on a fine gold chain to draw Sophia's gaze exactly where she wanted it.
 
