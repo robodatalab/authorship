@@ -15,7 +15,7 @@ from roost.resource_manager import (
     ModelKind,
     ModelNotAvailable,
 )
-from server.semantic_search import SearchIndex
+from server.representations.semantic_search import SearchIndex
 
 
 DEFAULT_REPLY = (

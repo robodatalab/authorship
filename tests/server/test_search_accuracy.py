@@ -5,7 +5,7 @@ import unittest
 from server.api import ENCODER_MODEL, ENCODER_MODEL_GB
 from roost import EncoderModel, InferenceModelResourceManager
 from server.manuscript import Manuscript
-from server.semantic_search import SearchIndex
+from server.representations.semantic_search import SearchIndex
 
 MANUSCRIPT = Path(__file__).parents[2] / "data" / "story_2.md"
 PASSAGES_PER_SEARCH = 10

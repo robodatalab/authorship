@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 from roost import CausalModel
 from server.manuscript import Manuscript
 from server.representations.plot_representation import build_plot_representation
-from server.story_graph import Edge, Node
+from server.representations.story_graph import Edge, Node
 
 STORY = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten"
 

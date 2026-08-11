@@ -15,7 +15,7 @@ from server.manuscript import Manuscript
 from server.representations.character_representation import (
     build_character_representation,
 )
-from server.story_graph import Edge, Node
+from server.representations.story_graph import Edge, Node
 
 STORY = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten"
 

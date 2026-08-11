@@ -9,8 +9,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
-from server.epub_exporter import build_epub
-from server.grammar import correct_span
+from server.publishing.epub_exporter import build_epub
+from server.writing_tools.grammar import correct_span
 from roost import (
     InferenceModelResourceManager,
     ModelNotAvailable,
@@ -18,15 +18,15 @@ from roost import (
     coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
-from server.line_contribution import line_contribution, write_attribution
+from server.representations.line_contribution import line_contribution, write_attribution
 from server.manuscript import Manuscript
 from server.representations import (
     build_character_representation,
     build_plot_representation,
     build_scene_representation,
 )
-from server.semantic_search import SearchIndex
-from server.story_graph import to_yaml
+from server.representations.semantic_search import SearchIndex
+from server.representations.story_graph import to_yaml
 
 _log = log.logger(__name__)
 

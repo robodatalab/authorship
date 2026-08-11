@@ -8,7 +8,7 @@ put back, not the correcting itself.
 
 import unittest
 
-from server.grammar import _prose_blocks, correct_span
+from server.writing_tools.grammar import _prose_blocks, correct_span
 from server.manuscript import Manuscript
 
 

@@ -17,7 +17,7 @@ from typing import Sequence, cast
 from yaml import safe_load
 
 from roost import EncoderModel
-from server.line_contribution import (
+from server.representations.line_contribution import (
     SectionContribution,
     line_contribution,
     write_attribution,

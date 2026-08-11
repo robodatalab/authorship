@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from server.manuscript import Manuscript
-from server.story_graph import Edge, Node
+from server.representations.story_graph import Edge, Node
 
 
 def numbered(manuscript: Manuscript) -> str:

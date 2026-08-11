@@ -6,7 +6,7 @@ from server.manuscript import Manuscript
 from server.representations.utils import (
     json_object, numbered, as_edge, as_node
 )
-from server.story_graph import Edge, Node, StoryGraph
+from server.representations.story_graph import Edge, Node, StoryGraph
 
 _log = log.logger(__name__)
 

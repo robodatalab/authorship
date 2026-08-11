@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest import mock
 
 from server.manuscript import Manuscript
-from server.semantic_search import LINES_PER_ENCODE_REQUEST, SearchIndex
+from server.representations.semantic_search import LINES_PER_ENCODE_REQUEST, SearchIndex
 
 MANUSCRIPT_PATH = Path("/stories/story.md")
 ANOTHER_MANUSCRIPT_PATH = Path("/stories/other.md")

@@ -3,7 +3,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from server.epub_exporter import (
+from server.publishing.epub_exporter import (
     _inline,
     blocks_to_xhtml,
     build_epub,
