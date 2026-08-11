@@ -74,13 +74,31 @@ class Section:
         self.end = end
 
     @property
-    def lines(self) -> list[tuple[int, int]]:
+    def line_ranges_in_manuscript(self) -> list[tuple[int, int]]:
         indices = list(range(self.start, self.end + 1))
-        return _split_comments([self._manuscript.lines[i] for i in indices], indices)
+        return _split_comments([self._manuscript.lines[i] for i in indices], indices)  
+
+    @property
+    def lines(self) -> Iterator[str]:
+        for first, last in self.line_ranges_in_manuscript:
+            for index in range(first, last + 1):
+                line = self._manuscript.lines[index]
+                if line.strip() and not line.startswith(TITLE_PREFIX):
+                    yield line
+
+
+    def reference(self, line: int, phrase: str) -> tuple[int, int] | None:
+        """Where `phrase` falls on `line`, in characters, 0-based and inclusive."""
+        if not phrase or not self.start <= line <= self.end:
+            return None
+        lines = list(self.lines)
+        at = lines.index(phrase)
+        return None if at < 0 else (at, at + len(phrase) - 1)
 
     def __str__(self) -> str:
-        # The section as the author wrote it, notes and all — `lines` says which
-        # of it is story, which is a different question from what is on the page.
+        # The section as the author wrote it, notes and all —
+        # `line_ranges_in_manuscript` says which of it is story, which is a
+        # different question from what is on the page.
         heading = [] if self.start == 0 else [self._manuscript.lines[self.start - 1]]
         return "\n".join(
             heading + self._manuscript.lines[self.start : self.end + 1]
@@ -186,7 +204,7 @@ class StoryLines:
 
     def __iter__(self) -> Iterator[tuple[int, str]]:
         for section in self._manuscript.sections:
-            for first, last in section.lines:
+            for first, last in section.line_ranges_in_manuscript:
                 for index in range(max(first, self._start), min(last, self._end) + 1):
                     said = self._manuscript.lines[index].strip()
                     if said:
