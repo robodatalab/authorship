@@ -11,7 +11,7 @@ It is a world of abundance, beauty, and peace — blessings granted exclusively 
 
 That choice is demanded the moment a man comes of age. He can walk away to the outer lands, choosing a life of humble poverty in a patriarchal society shaken by conflict and uncertainty. Or, he can enter the Matriarchy, enveloped in safety and luxury for the rest of his days. But to stay, he must accept one absolute law: Women rule, men serve.
 
-To choose the Society is to willingly forfeit your sovereignty—to pledge your existence to a woman’s comfort, anticipate her every command, and bow before her without question. Disobedience is not tolerated; the punishments are harsh. The men who surrender to this life are divided by their devotion. *Drones* perform the heavy lifting, while *Companions* are kept as personal maids, bound to their Mistresses' private quarters.
+To choose the Society is to willingly forfeit your sovereignty — to pledge your existence to a woman’s comfort, anticipate her every command, and bow before her without question. Disobedience is not tolerated; the punishments are harsh. The men who surrender to this life are divided by their devotion. *Drones* perform the heavy lifting, while *Companions* are kept as personal maids, bound to their Mistresses' private quarters.
 
 This society has flourished and evolved because of the strict rules that govern it — laws that extend far beyond controlling basic male instincts. There are boundaries that apply to the ruling class as well. One in particular is held sacred above all others: no woman may ever make a man her equal. He is a subject, never a partner.
 
