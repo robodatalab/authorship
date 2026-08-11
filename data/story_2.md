@@ -27,7 +27,7 @@ As he strained against his confinement, the little bell attached to his caged ge
 
 She bit into the delicious pastry while making a lazy, whirlpool gesture in the air with her other hand. Her Companion obeyed the silent cue instantly, turning around. 
 
-The chastity belt held him aching and snug, exactly the way she liked to keep him—a Companion always serves sharpest when kept slightly starved. The small gauge set into the metal read full; he was due for his milking, a routine he would see to later in the day. He held the pose without complaint, honoring the vow he had made when he first knelt for her collar.
+The chastity belt held him aching and snug, exactly the way she liked to keep him — a Companion always serves sharpest when kept slightly starved. The small gauge set into the metal read full; he was due for his milking, a routine he would see to later in the day. He held the pose without complaint, honoring the vow he had made when he first knelt for her collar.
 
 Anabelle ran a slow finger along his hip, smiling as a delicious shiver passed through his skin under her touch. She loved having that absolute effect on him. Taking another bite, she washed the pastry down with a solid swig of juice, entirely in no hurry.
 
