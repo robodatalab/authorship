@@ -89,19 +89,25 @@ class Section:
 
     def reference(self, line: int, phrase: str) -> tuple[int, int] | None:
         """Where `phrase` falls on `line`, in characters, 0-based and inclusive."""
-        if not phrase or not self.start <= line <= self.end:
-            return None
+        if not phrase:
+            raise ValueError("Empty phrase")
+        if line < 0:
+            raise IndexError(f"Invalid line number: {line} < 0")
+        
         lines = list(self.lines)
-        at = lines.index(phrase)
+        if line >= len(lines):
+            raise IndexError(f"Invalid line number: {line} >= {len(lines)}")
+
+        at = lines[line].index(phrase)
         return None if at < 0 else (at, at + len(phrase) - 1)
 
     def __str__(self) -> str:
         # The section as the author wrote it, notes and all —
         # `line_ranges_in_manuscript` says which of it is story, which is a
         # different question from what is on the page.
-        heading = [] if self.start == 0 else [self._manuscript.lines[self.start - 1]]
         return "\n".join(
-            heading + self._manuscript.lines[self.start : self.end + 1]
+            [self._manuscript.lines[self.start - 1]]
+            + self._manuscript.lines[self.start : self.end + 1]
         )
 
 
@@ -117,18 +123,23 @@ class Manuscript:
     def _parse_manuscript(self, lines: list[str]) -> tuple[str, list[Section]]:
         last_line_idx = len(lines) - 1
         sections: list[Section] = []
-        section = Section(self, "First anonymous section", 0, last_line_idx)
         title = "Anonymous"
+        # What stands above the first `##` is the manuscript's front matter — its
+        # title and the notes kept with it — and not a section of the story, so
+        # the first section is the one the first heading opens.
+        opened: Section | None = None
         for index, line in enumerate(lines):
             if line.startswith(TITLE_PREFIX):
                 title = line[len(TITLE_PREFIX) :].strip()
             if line.startswith(SECTION_SEPARATOR):
-                section.end = index - 1
-                sections.append(section)
-                section = Section(
+                if opened is not None:
+                    opened.end = index - 1
+                    sections.append(opened)
+                opened = Section(
                     self, line[len(SECTION_SEPARATOR) :].strip(), index + 1, last_line_idx
                 )
-        sections.append(section)
+        if opened is not None:
+            sections.append(opened)
         return title, sections
 
     @classmethod
@@ -152,14 +163,11 @@ class Manuscript:
         self.title, self.sections = self._parse_manuscript(self.lines)
 
     def __str__(self) -> str:
-        # The title is a line of the first section rather than something held
-        # apart, so writing the sections out writes the whole manuscript.
+        # The front matter belongs to no section, so it is written from the lines
+        # themselves; each section carries its own heading down with it.
+        opens_at = self.sections[0].start - 1 if self.sections else len(self.lines)
         written = "\n".join(
-            str(section)
-            for section in self.sections
-            # A manuscript opening on a heading has no first section, only the
-            # empty stretch the parse always begins with.
-            if section.start <= section.end or section.start > 0
+            self.lines[:opens_at] + [str(section) for section in self.sections]
         )
         return written + "\n" if self.text.endswith("\n") else written
 

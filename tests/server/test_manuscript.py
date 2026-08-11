@@ -56,17 +56,9 @@ class ManuscriptTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ("one section", MANUSCRIPT_1, ["First anonymous section", "Section 1"]),
-            (
-                "one section, notes throughout",
-                MANUSCRIPT_2,
-                ["First anonymous section", "Section 1"],
-            ),
-            (
-                "two sections",
-                MANUSCRIPT_3,
-                ["First anonymous section", "Section 1", "Section 2"],
-            ),
+            ("one section", MANUSCRIPT_1, ["Section 1"]),
+            ("one section, notes throughout", MANUSCRIPT_2, ["Section 1"]),
+            ("two sections", MANUSCRIPT_3, ["Section 1", "Section 2"]),
         ]
     )
     def test_the_section_titles(
@@ -78,11 +70,11 @@ class ManuscriptTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ("one section", MANUSCRIPT_1, [[(0, 2)], [(4, 6)]]),
-            # Line 2 is a note on its own, and lines 6 to 9 are a note spanning
-            # several lines; both drop out, breaking the runs around them.
-            ("one section, notes throughout", MANUSCRIPT_2, [[(0, 1)], [(4, 5), (10, 10)]]),
-            ("two sections", MANUSCRIPT_3, [[(0, 0)], [(2, 5)], [(7, 9)]]),
+            ("one section", MANUSCRIPT_1, [[(4, 6)]]),
+            # Lines 6 to 9 are a note spanning several lines, and it drops out,
+            # breaking the run around it.
+            ("one section, notes throughout", MANUSCRIPT_2, [[(4, 5), (10, 10)]]),
+            ("two sections", MANUSCRIPT_3, [[(2, 5)], [(7, 9)]]),
         ]
     )
     def test_the_lines_each_section_holds(
@@ -130,12 +122,7 @@ class ManuscriptTests(unittest.TestCase):
         self, _name: str, document: str, expected: list[list[str]]
     ) -> None:
         self.assertEqual(
-            [
-                story
-                for section in Manuscript(document).sections
-                if (story := list(section.lines))
-            ],
-            expected,
+            [list(section.lines) for section in Manuscript(document).sections], expected
         )
 
     @parameterized.expand(
@@ -187,16 +174,15 @@ Another line in section 1
     def test_deleting_a_comment_changes_the_lines_its_section_holds(self):
         manuscript = Manuscript(MANUSCRIPT_2)
         self.assertEqual(
-            manuscript.sections[1].line_ranges_in_manuscript, [(4, 5), (10, 10)]
+            manuscript.sections[0].line_ranges_in_manuscript, [(4, 5), (10, 10)]
         )
 
         manuscript.delete(6, 9)
 
         self.assertEqual(
-            [section.title for section in manuscript.sections],
-            ["First anonymous section", "Section 1"],
+            [section.title for section in manuscript.sections], ["Section 1"]
         )
-        self.assertEqual(manuscript.sections[1].line_ranges_in_manuscript, [(4, 6)])
+        self.assertEqual(manuscript.sections[0].line_ranges_in_manuscript, [(4, 6)])
         self.assertEqual(
             str(manuscript),
             "\n# Title 1\n<!-- comment -->\n## Section 1\n\n"
@@ -207,7 +193,9 @@ Another line in section 1
         manuscript = Manuscript(MANUSCRIPT_2)
         section = manuscript.sections[0]
 
-        self.assertEqual(section.reference(line=0, phrase="Text in section 1"), (0, 20))
+        self.assertEqual(section.reference(line=0, phrase="Text in section 1"), (0, 16))
+        self.assertEqual(section.reference(line=0, phrase="in section"), (5, 14))
+        self.assertEqual(section.reference(line=1, phrase="line in"), (8, 14))
 
 
 
