@@ -78,9 +78,9 @@ class CorrectSpan(unittest.TestCase):
         )
 
     def test_a_manuscript_ending_without_a_newline_gains_none(self) -> None:
-        manuscript = Manuscript("teh cat.")
-        correct_span(Uppercase(), manuscript, 0, 0)
-        self.assertEqual(str(manuscript), "TEH CAT.")
+        manuscript = Manuscript("## One\nteh cat.")
+        correct_span(Uppercase(), manuscript, 1, 1)
+        self.assertEqual(str(manuscript), "## One\nTEH CAT.")
 
     def test_each_paragraph_is_asked_for_on_its_own(self) -> None:
         model = Recording()
@@ -148,11 +148,12 @@ class Notes(unittest.TestCase):
         )
 
     def test_a_note_never_closed_silences_the_rest_of_the_span(self) -> None:
-        noted = "teh cat sat.\n\n<!-- from here on, notes\nteh dog.\n"
+        noted = "## One\n\nteh cat sat.\n\n<!-- from here on, notes\nteh dog.\n"
         manuscript = Manuscript(noted)
-        correct_span(Uppercase(), manuscript, 0, 3)
+        correct_span(Uppercase(), manuscript, 2, 5)
         self.assertEqual(
-            str(manuscript), "TEH CAT SAT.\n\n<!-- from here on, notes\nteh dog.\n"
+            str(manuscript),
+            "## One\n\nTEH CAT SAT.\n\n<!-- from here on, notes\nteh dog.\n",
         )
 
 

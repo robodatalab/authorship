@@ -39,7 +39,8 @@
       "Bash(git -C ~/GitHub/roost remote -v)",
       "Bash(git -C ~/GitHub/servery log --oneline -3)",
       "Bash(git -C ~/GitHub/servery status --short)",
-      "Bash(echo \"--- exit $? ---\")"
+      "Bash(echo \"--- exit $? ---\")",
+      "Bash(git log *)"
     ],
     "additionalDirectories": [
       "/Users/piotrtrochim/GitHub/servery/src/servery",

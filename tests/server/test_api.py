@@ -320,7 +320,7 @@ class Jobs(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+        self.manuscript.write_text("## One\n\nteh cat.\n", encoding="utf-8")
 
         def _restore_model():
             app.state.grammar_model = None
@@ -409,10 +409,11 @@ def wait_for_indexing(client: TestClient, timeout: float = 5.0) -> None:
 
 
 class Search(unittest.TestCase):
-    STORY = "the gate swung shut\n\nshe poured the tea\n"
+    STORY = "## One\n\nthe gate swung shut\n\nshe poured the tea\n"
     VECTORS = {
         "the gate swung shut": [1.0, 0.0],
         "she poured the tea": [0.0, 1.0],
+        "the gate": [1.0, 0.0],
     }
 
     def setUp(self) -> None:
@@ -429,7 +430,6 @@ class Search(unittest.TestCase):
 
         model = mock.MagicMock()
         model.encode.side_effect = lambda texts: [self.VECTORS[text] for text in texts]
-        model.encode.return_value = [1.0, 0.0]
 
         app.state.encoder_model = model
         app.state.search_index = SearchIndex()
@@ -457,8 +457,8 @@ class Search(unittest.TestCase):
             {
                 "hits": [
                     {
-                        "start": 0,
-                        "end": 0,
+                        "start": 2,
+                        "end": 2,
                         "score": 1.0,
                         "text": "the gate swung shut",
                     }
