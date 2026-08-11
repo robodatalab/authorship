@@ -7,7 +7,7 @@ A story of matriarchy, female domination, submission, obedience and a broken hea
 
 Beyond the veil, there exists a different reality.
 
-It is a world of abundance, beauty, and peace—blessings granted exclusively to the women who rule it. For men, that reality is defined by a singular choice: freedom or safety.
+It is a world of abundance, beauty, and peace — blessings granted exclusively to the women who rule it. For men, that reality is defined by a singular choice: freedom or safety.
 
 That choice is demanded the moment a man comes of age. He can walk away to the outer lands, choosing a life of humble poverty in a patriarchal society shaken by conflict and uncertainty. Or, he can enter the Matriarchy, enveloped in safety and luxury for the rest of his days. But to stay, he must accept one absolute law: Women rule, men serve.
 
