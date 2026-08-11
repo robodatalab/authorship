@@ -112,16 +112,46 @@ class RangeDictTests(unittest.TestCase):
         ranges = RangeDict()
         ranges[0, 5] = 1
         ranges[1, 2] = 2
-        self.assertEqual(
-            list(ranges), [((0, 1), [1]), ((1, 2), [1, 2]), ((2, 5), [1])]
-        )
+        self.assertEqual(list(ranges), [(0, 1), (1, 2), (2, 5)])
+        self.assertEqual(list(ranges.keys()), [(0, 1), (1, 2), (2, 5)])
         self.assertEqual(len(ranges), 3)
+
+    def test_walking_the_values(self):
+        ranges = RangeDict()
+        ranges[0, 5] = 1
+        ranges[1, 2] = 2
+        self.assertEqual(list(ranges.values()), [1, 1, 2, 1])
+
+    def test_walking_a_range_and_a_value_at_a_time(self):
+        ranges = RangeDict()
+        ranges[0, 5] = 1
+        ranges[1, 2] = 2
+        self.assertEqual(
+            list(ranges.items()),
+            [((0, 1), 1), ((1, 2), 1), ((1, 2), 2), ((2, 5), 1)],
+        )
+
+    def test_values_that_are_not_integers(self):
+        ranges = RangeDict()
+        ranges[0, 5] = (1, "a")
+        ranges[1, 2] = (2, "b")
+        self.assertEqual(ranges[0, 5], [(1, "a"), (2, "b")])
+        self.assertEqual(
+            list(ranges.items()),
+            [
+                ((0, 1), (1, "a")),
+                ((1, 2), (1, "a")),
+                ((1, 2), (2, "b")),
+                ((2, 5), (1, "a")),
+            ],
+        )
 
     def test_an_empty_dict(self):
         ranges = RangeDict()
         self.assertEqual(repr(ranges), "")
         self.assertEqual(len(ranges), 0)
         self.assertEqual(list(ranges), [])
+        self.assertEqual(list(ranges.items()), [])
         self.assertEqual(ranges[0, 5], [])
 
     @parameterized.expand(
