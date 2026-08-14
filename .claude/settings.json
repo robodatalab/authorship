@@ -40,7 +40,15 @@
       "Bash(git -C ~/GitHub/servery log --oneline -3)",
       "Bash(git -C ~/GitHub/servery status --short)",
       "Bash(echo \"--- exit $? ---\")",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(grep -nP '[ \\\\t]+$' /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/ab233de4-dab1-4a17-be16-d53b5c08d30b/scratchpad/cell.py)",
+      "Bash(jq -r '.cells[] | select\\(.id==\"7d30f9ef\"\\) | if \\(.source|type\\)==\"array\" then \\(.source|join\\(\"\"\\)\\) else .source end' /Users/piotrtrochim/GitHub/writer/experiments.ipynb)",
+      "Bash(tail -n +5 cell.py)",
+      "Bash(sed -n '/^@dataclass\\(frozen=True\\)$/,$p' new.py)",
+      "Bash(git -C /Users/piotrtrochim/GitHub/writer status --short)",
+      "Bash(awk '{printf \"%3d  %5d  %s\\\\n\", NR, length\\($0\\), substr\\($0,1,44\\)}' /Users/piotrtrochim/GitHub/writer/data/story_2.md)",
+      "Bash(awk 'NR>=22 && length\\($0\\)>0 {print length\\($0\\)}' /Users/piotrtrochim/GitHub/writer/data/story_2.md)",
+      "Bash(awk '{n++; s+=$1; if\\($1>m\\) m=$1} END {printf \"lines=%d  total=%d  longest=%d\\\\n\", n, s+n-1, m}')"
     ],
     "additionalDirectories": [
       "/Users/piotrtrochim/GitHub/servery/src/servery",
