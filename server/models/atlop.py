@@ -261,6 +261,21 @@ def _relate(text, mentions, model, tokenizer):
     with torch.no_grad():
         pairs, logits = model(ids, [where for _, where in grounded])
 
+    # How far the threshold outranks the best relation on each pair. A model certain
+    # there is nothing here and a model returning nothing at all both answer with no
+    # edges, and only this tells them apart.
+    if pairs:
+        margin = logits[:, 0] - logits[:, 1:].max(1).values
+        _log.info(
+            "%d entities, %d pairs, threshold ahead by %.2f to %.2f (median %.2f), %d NaN",
+            len(grounded),
+            len(pairs),
+            float(margin.min()),
+            float(margin.max()),
+            float(margin.median()),
+            int(margin.isnan().sum()),
+        )
+
     return [
         (grounded[pairs[pair][0]][0], grounded[pairs[pair][1]][0], relation)
         for pair, relation in (logits > logits[:, :1]).nonzero().tolist()
