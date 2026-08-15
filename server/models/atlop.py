@@ -5,10 +5,6 @@ https://arxiv.org/abs/2010.11304. An entity is pooled from the mentions it was g
 an ordered pair of entities is read against the part of the document the two attend to
 together, and the pair carries whichever relations outscore the threshold it is
 classified alongside.
-
-A model kind cannot be declared where it is used: the serving process is spawned rather
-than forked, so it re-imports the class by name and would not find one declared in a
-notebook or under `__main__`.
 """
 
 from collections import Counter, defaultdict
@@ -18,7 +14,7 @@ from pathlib import Path
 import shutil
 from urllib.request import urlopen
 
-from roost.resource_manager import ModelKind, ModelNotAvailable
+from roost.resource_manager import InferenceModelResourceManager, ModelKind, ModelNotAvailable
 import torch
 from torch import nn
 from transformers import AutoModel, AutoTokenizer
@@ -42,12 +38,10 @@ PAIRS = 256
 
 # What the paper trained, keyed by what it was trained on: the architecture and the
 # weights are one choice, not two.
-RELEASED = {
-    "roberta-large": "https://github.com/wzhouad/ATLOP/releases/download/1.0/atlop-roberta",
-    "bert-base-cased": "https://github.com/wzhouad/ATLOP/releases/download/1.0/atlop-bert-base",
-}
+_DOWNLOAD_URL = "https://github.com/wzhouad/ATLOP/releases/download/1.0/atlop-roberta"
 CACHE = Path.home() / ".cache" / "atlop"
-
+_BASE_MODEL_ID = "roberta-large"
+_BASE_MODEL_MEM_REQUIRED_GB = 3
 
 class _Atlop(nn.Module):
     """One logit per relation for an ordered pair of entities, and one for the threshold.
@@ -193,9 +187,6 @@ def _weights(model_id: str) -> Path:
     than to the hub, so it is fetched here — a model kind that leaves it to be put in
     place by hand is not ready to serve when the manager deploys it.
     """
-    if model_id not in RELEASED:
-        raise ModelNotAvailable(f"no ATLOP weights were released for {model_id}")
-
     kept = CACHE / model_id
     if kept.exists():
         return kept
@@ -205,7 +196,7 @@ def _weights(model_id: str) -> Path:
     # Written beside its destination and moved into place, so a fetch that is interrupted
     # leaves nothing behind that a later load would mistake for a complete download.
     partial = kept.with_suffix(".partial")
-    with urlopen(RELEASED[model_id]) as source, partial.open("wb") as sink:
+    with urlopen(_DOWNLOAD_URL) as source, partial.open("wb") as sink:
         shutil.copyfileobj(source, sink)
     partial.rename(kept)
 
@@ -215,6 +206,9 @@ def _weights(model_id: str) -> Path:
 
 class AtlopModel(ModelKind):
     """The relations a document holds between the entities it is handed."""
+
+    def __init__(self, resource_manager: InferenceModelResourceManager) -> None:
+        super().__init__(_BASE_MODEL_ID, resource_manager, _BASE_MODEL_MEM_REQUIRED_GB)
 
     def load(self):
         encoder = AutoModel.from_pretrained(
