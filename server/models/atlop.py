@@ -70,8 +70,8 @@ class _Atlop(nn.Module):
         self, ids: list[int], mentions: Sequence[Sequence[int]]
     ) -> tuple[list[tuple[int, int]], torch.Tensor]:
         """Every ordered pair of entities, and how each of them scores on every relation."""
-        hidden, attention = self._read(ids)
-        vectors, profiles = self._pooled(hidden, attention, mentions)
+        hidden, attention = self._encode(ids)
+        per_entity_hidden, per_entity_attention = self._pool_per_entity(hidden, attention, mentions)
 
         pairs = [
             (head, tail)
@@ -89,17 +89,18 @@ class _Atlop(nn.Module):
             tail = torch.tensor([t for _, t in batch], device=hidden.device)
             scored.append(
                 self._scored(
-                    vectors[head], vectors[tail], self._focus(hidden, profiles, head, tail)
+                    per_entity_hidden[head], 
+                    per_entity_hidden[tail], 
+                    self._focus(hidden, per_entity_attention, head, tail)
                 )
             )
         return pairs, torch.cat(scored)
 
-    def _read(self, ids: list[int]) -> tuple[torch.Tensor, torch.Tensor]:
-        """Hidden states and last-layer attention for a document longer than the encoder.
+    def _encode(self, ids: list[int]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Divides the ids into a set of overlapping windows
+        and runs the encoder model over them.
 
-        Every window is a document in its own right, with its own `<s>` and `</s>`. Where
-        two of them overlap the states are averaged and the attention summed and then
-        renormalised, so a row of it is still a distribution over the whole document.
+        Returns the pooled hidden layers and the attention results.
         """
         device = next(self.parameters()).device
         inner, length = WINDOW - 2, len(ids)
@@ -108,12 +109,12 @@ class _Atlop(nn.Module):
             [0] if length <= WINDOW
             else list(range(0, len(body) - inner, STRIDE)) + [len(body) - inner]
         )
+        seen = torch.zeros(length, device=device)
 
         hidden = torch.zeros(length, self.model.config.hidden_size, device=device)
         attention = torch.zeros(
             self.model.config.num_attention_heads, length, length, device=device
         )
-        seen = torch.zeros(length, device=device)
 
         for start in starts:
             window = body[start:start + inner]
@@ -134,7 +135,7 @@ class _Atlop(nn.Module):
             attention / (attention.sum(-1, keepdim=True) + 1e-10),
         )
 
-    def _pooled(
+    def _pool_per_entity(
         self, hidden: torch.Tensor, attention: torch.Tensor, mentions: Sequence[Sequence[int]]
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """A vector and an attention profile per entity, gathered over its mentions.
@@ -142,17 +143,17 @@ class _Atlop(nn.Module):
         logsumexp is the smooth maximum: one telling mention carries the entity, where a
         mean would let the rest of them dilute it.
         """
-        vectors, profiles = [], []
+        per_entity_hidden, per_entity_attention = [], []
         for fenced in mentions:
             where = torch.tensor(fenced, device=hidden.device)
-            vectors.append(torch.logsumexp(hidden[where], dim=0))
-            profiles.append(attention[:, where].mean(1))
-        return torch.stack(vectors), torch.stack(profiles)
+            per_entity_hidden.append(torch.logsumexp(hidden[where], dim=0))
+            per_entity_attention.append(attention[:, where].mean(1))
+        return torch.stack(per_entity_hidden), torch.stack(per_entity_attention)
 
     def _focus(
         self,
         hidden: torch.Tensor,
-        profiles: torch.Tensor,
+        per_entity_attention: torch.Tensor,
         head: torch.Tensor,
         tail: torch.Tensor,
     ) -> torch.Tensor:
@@ -162,7 +163,7 @@ class _Atlop(nn.Module):
         every pair is what leaves distant pairs looking alike. The product of the two
         attention profiles keeps only what they attend to together.
         """
-        shared = (profiles[head] * profiles[tail]).mean(1)
+        shared = (per_entity_attention[head] * per_entity_attention[tail]).mean(1)
         return (shared / (shared.sum(-1, keepdim=True) + 1e-5)) @ hidden
 
     def _scored(
