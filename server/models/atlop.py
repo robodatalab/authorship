@@ -244,16 +244,21 @@ class AtlopModel(ModelKind):
         return found
 
 
-# Module level for the same reason the class is: the request is pickled onto a queue
-# and unpickled on the other side of a process boundary.
-def _relate(text, mentions, model, tokenizer):
-    ids, fenced = _fences(text, mentions, tokenizer)
-    # An entity whose every mention fell outside the tokenised document has nothing to be
-    # pooled from, and one the encoder never saw cannot be related to one it did.
-    grounded = [(entity, where) for entity, where in enumerate(fenced) if where]
+def _relate(text, mentions, model, tokenizer) -> list[tuple[int, int]]:
+    input_ids_with_mention_fences, mention_start_offsets = _fences(text, mentions, tokenizer)
+    # mention_start_offsets are the indices of * tokens that open a mention
+
+    mention_start_offsets_with_entity_indices = [
+        (entity, offsets) for entity, offsets in enumerate(mention_start_offsets) if len(offsets)]
 
     with torch.no_grad():
-        pairs, logits = model(ids, [where for _, where in grounded])
+        pairs, logits = model(
+            input_ids_with_mention_fences, 
+            [
+                mention_start_offset 
+                for _, mention_start_offset in mention_start_offsets_with_entity_indices
+            ]
+        )
 
     # How far the threshold outranks the best relation on each pair. A model certain
     # there is nothing here and a model returning nothing at all both answer with no
@@ -262,7 +267,7 @@ def _relate(text, mentions, model, tokenizer):
         margin = logits[:, 0] - logits[:, 1:].max(1).values
         _log.info(
             "%d entities, %d pairs, threshold ahead by %.2f to %.2f (median %.2f), %d NaN",
-            len(grounded),
+            len(mention_start_offsets_with_entity_indices),
             len(pairs),
             float(margin.min()),
             float(margin.max()),
@@ -270,10 +275,17 @@ def _relate(text, mentions, model, tokenizer):
             int(margin.isnan().sum()),
         )
 
-    return [
-        (grounded[pairs[pair][0]][0], grounded[pairs[pair][1]][0], relation)
-        for pair, relation in (logits > logits[:, :1]).nonzero().tolist()
-    ]
+    relationships: list[tuple[int, int]] = []
+    for pair, relation in (logits > logits[:, :1]).nonzero().tolist():
+        source_entity_idx = pairs[pair][0]
+        target_entity_idx = pairs[pair][1]
+
+        source_entity_id = mention_start_offsets_with_entity_indices[source_entity_idx][0] 
+        target_entity_id = mention_start_offsets_with_entity_indices[target_entity_idx][0]
+
+        relationships.append((source_entity_id, target_entity_id))
+
+    return relationships
 
 
 def _fences(text, mentions, tokenizer):
@@ -312,7 +324,7 @@ def _fences(text, mentions, tokenizer):
         [tokenizer.bos_token_id] + ids + [tokenizer.eos_token_id],
         [
             [at[(entity, mention)] + 1
-             for mention in range(len(spans)) if (entity, mention) in at]
+            for mention in range(len(spans)) if (entity, mention) in at]
             for entity, spans in enumerate(mentions)
         ],
     )
