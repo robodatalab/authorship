@@ -39,7 +39,7 @@ PAIRS = 256
 # What the paper trained, keyed by what it was trained on: the architecture and the
 # weights are one choice, not two.
 _DOWNLOAD_URL = "https://github.com/wzhouad/ATLOP/releases/download/1.0/atlop-roberta"
-CACHE = Path.home() / ".cache" / "atlop"
+_CACHE = Path.home() / ".cache" / "atlop"
 _BASE_MODEL_ID = "roberta-large"
 _BASE_MODEL_MEM_REQUIRED_GB = 3
 
@@ -187,12 +187,12 @@ def _weights(model_id: str) -> Path:
     than to the hub, so it is fetched here — a model kind that leaves it to be put in
     place by hand is not ready to serve when the manager deploys it.
     """
-    kept = CACHE / model_id
+    kept = _CACHE / model_id
     if kept.exists():
         return kept
 
     _log.info("fetching ATLOP weights for %s", model_id)
-    CACHE.mkdir(parents=True, exist_ok=True)
+    _CACHE.mkdir(parents=True, exist_ok=True)
     # Written beside its destination and moved into place, so a fetch that is interrupted
     # leaves nothing behind that a later load would mistake for a complete download.
     partial = kept.with_suffix(".partial")
