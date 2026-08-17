@@ -14,6 +14,7 @@
             "node",
             "mocha"
         ],
+		"skipLibCheck": true,
 		"sourceMap": true,
 		// The tests live outside the sources they import, so the root of the
 		// program is the repo root rather than either directory.

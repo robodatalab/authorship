@@ -2,7 +2,7 @@ import re
 from collections.abc import Callable
 
 from roost import Seq2SeqModel
-from server.manuscript import Manuscript, StoryLines
+from server.storydoc import Document
 
 
 GRAMMAR_INSTRUCTION = "Fix the grammar"
@@ -13,7 +13,7 @@ _LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 
 def correct_span(
     model: Seq2SeqModel,
-    manuscript: Manuscript,
+    document: Document,
     start: int,
     end: int,
     cancelled: Callable[[], bool] = lambda: False,
@@ -24,7 +24,7 @@ def correct_span(
     Raises `ValueError` if those lines hold no prose: a correction pass over a
     run of blank lines asks the model to invent some.
     """
-    blocks = _prose_blocks(manuscript, start, end)
+    blocks = _prose_blocks(document, start, end)
     if not blocks:
         raise ValueError("There is no prose there to correct.")
 
@@ -33,7 +33,7 @@ def correct_span(
     for first, last in reversed(blocks):
         if cancelled():
             return
-        block = "\n".join(manuscript.lines[first : last + 1])
+        block = "\n".join(document.lines[first : last + 1])
         if not _LETTER.search(block):
             continue
         # The corrected block should come back about as long as it went in; a
@@ -41,12 +41,12 @@ def correct_span(
         corrected = model.complete(
             GRAMMAR_INSTRUCTION, block, max_new_tokens=max(64, len(block))
         )
-        manuscript.delete(first, last)
-        manuscript.insert(first, corrected.strip("\n"))
+        document.delete(first, last)
+        document.insert(first, corrected.strip("\n"))
 
 
 def _prose_blocks(
-    manuscript: Manuscript, start: int, end: int
+    document: Document, start: int, end: int
 ) -> list[tuple[int, int]]:
     """The paragraphs of prose those lines cover.
 
@@ -57,7 +57,7 @@ def _prose_blocks(
     blocks: list[tuple[int, int]] = []
     paragraph: list[int] = []
 
-    for index, _ in StoryLines(manuscript, start, end):
+    for index, _ in document.story_lines(start, end):
         if paragraph and index != paragraph[-1] + 1:
             blocks.append((paragraph[0], paragraph[-1]))
             paragraph = []

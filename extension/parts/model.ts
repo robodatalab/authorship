@@ -1,40 +1,24 @@
-// The pure logic behind dividing a manuscript: where its sections begin, how much
-// each one weighs, which of them travel together, and what a part reads like once
-// they do.
+// Dividing a story into parts: which chapters travel together, and what each
+// part is once they do.
+//
+// A part is an `.author` document like the story it was cut from — the book's
+// furniture carried over, its title page renumbered, and its share of the
+// chapters. That is the whole point of cutting into this format rather than into
+// markdown: everything that works on a story works on a part. It opens in the
+// same editor, exports to the same EPUB, and nothing here has to know how either
+// of those is done.
 //
 // Deliberately free of the `vscode` module, so a division can be read and tested
-// without launching an editor. Everything here deals in plain strings and counts;
+// without launching an editor. Everything here deals in cells and counts;
 // divide.ts turns the parts into files.
-//
-// A section is a `##` heading and the lines under it — the same section the
-// server reads (server/representations/utils.py), down to taking headings off the
-// prose with comments removed, so a stretch commented out for now does not go on
-// dividing the manuscript.
-//
-// Notes to self are not the story, and a part is the story handed on: the
-// comments come out on the way in, so nothing downstream has to remember they
-// were ever there.
 
-const SECTION_SEPARATOR = '##';
-const TITLE_PREFIX = '# ';
+import { isMatter, isUnpublished } from '../author_editor/model';
+import { CHAPTER, COVER, EXTENSION, TITLE_PAGE, type Cell } from '../storydoc/model';
 
-const COMMENT_OPEN = '<!--';
-const COMMENT_CLOSE = '-->';
-
-/** A `##` heading and the lines beneath it, the author's notes taken out. */
+/** A chapter and the cells written under it, with what a reader counts in them. */
 export interface Section {
-	/** The heading line, or null for whatever opens the manuscript before one. */
-	heading: string | null;
-	lines: string[];
-	/** What a reader counts here, the heading included. */
+	cells: Cell[];
 	words: number;
-}
-
-/** A manuscript as a division sees it: what to call the parts, and what to cut. */
-export interface Manuscript {
-	/** The `# ` heading, or empty when the manuscript carries none. */
-	title: string;
-	sections: Section[];
 }
 
 /** Whole sections, gathered into one part. */
@@ -43,50 +27,67 @@ export interface Part {
 	words: number;
 }
 
-/** A part as its file holds it, once one has been written. */
-export interface WrittenPart {
-	number: number;
-	text: string;
+/**
+ * What every part carries besides its own chapters.
+ *
+ * Split at the story rather than listed by kind, so a disclaimer the author put
+ * after the last chapter is still after the last chapter in every part.
+ */
+export interface Furniture {
+	front: Cell[];
+	back: Cell[];
 }
 
-/** The length a part is asked to be, absent an answer from the author. */
+/** The length a part is asked to be. */
 export const DEFAULT_PART_WORDS = 5000;
 
 /**
- * Read a manuscript into the sections a division cuts along.
+ * The story, as the sections a division cuts along.
  *
- * The notes are gone before anything else is asked of the manuscript, so a
- * heading that was commented out opens nothing and a section weighs only what a
- * reader would count in it.
+ * A chapter cell opens a section and the prose under it belongs to that section
+ * until the next chapter opens. Which cells those are is the document's to say,
+ * so a heading someone wrote in their prose stays prose — the one thing cutting
+ * along `##` in flattened markdown could never get right.
  *
- * The title is taken out of the section holding it: it names the whole
- * manuscript, and every part opens by naming itself. An opening stretch left with
- * nothing in it is not a section — a manuscript may begin at its first heading.
+ * The book's furniture is not the story and belongs to every part rather than to
+ * one; what the author keeps beside the story and publishes nowhere belongs to
+ * neither.
  */
-export function readManuscript(markdown: string): Manuscript {
-	const lines = withoutComments(markdown.split(/\r?\n/));
-
-	const titleAt = lines.findIndex((line) => line.startsWith(TITLE_PREFIX));
-	const title = titleAt < 0 ? '' : lines[titleAt].slice(TITLE_PREFIX.length).trim();
-
+export function sectionsOf(cells: readonly Cell[]): Section[] {
 	const sections: Section[] = [];
-	let current: Section = { heading: null, lines: [], words: 0 };
 
-	lines.forEach((line, index) => {
-		if (line.startsWith(SECTION_SEPARATOR)) {
-			sections.push(current);
-			current = { heading: line, lines: [], words: countWords(line) };
-		} else if (index !== titleAt) {
-			current.lines.push(line);
-			current.words += countWords(line);
+	for (const cell of cells) {
+		if (cell.kind === CHAPTER) {
+			sections.push({
+				cells: [cell],
+				words: countWords(cell.attrs.title ?? ''),
+			});
+			continue;
+		}
+		const holding = sections[sections.length - 1];
+		if (!holding || isMatter(cell.kind) || isUnpublished(cell.kind)) {
+			continue;
+		}
+		holding.cells.push(cell);
+		holding.words += countWords(cell.source);
+	}
+	return sections;
+}
+
+/** What stands before the story and what stands after it. */
+export function furnitureOf(cells: readonly Cell[]): Furniture {
+	const opens = cells.findIndex((cell) => cell.kind === CHAPTER);
+	// A story with no chapters has nothing for furniture to stand behind.
+	const story = opens < 0 ? cells.length : opens;
+	const front: Cell[] = [];
+	const back: Cell[] = [];
+
+	cells.forEach((cell, at) => {
+		if (isMatter(cell.kind)) {
+			(at < story ? front : back).push(cell);
 		}
 	});
-	sections.push(current);
-
-	return {
-		title,
-		sections: sections.filter((section) => section.heading !== null || section.words > 0),
-	};
+	return { front, back };
 }
 
 /**
@@ -125,108 +126,108 @@ function nearer(words: number, adding: number, quota: number): boolean {
 	return over <= 0 || over < quota - words;
 }
 
-/** A part as its file reads: its own title, then the sections it holds. */
-export function renderPart(title: string, number: number, part: Part): string {
-	const body = part.sections.flatMap((section) =>
-		section.heading === null ? section.lines : [section.heading, ...section.lines]
-	);
-	return renderDocument(partTitle(title, number), body);
+/** A part as a document of its own: the furniture, then its share of the story. */
+export function partCells(
+	furniture: Furniture,
+	number: number,
+	part: Part
+): Cell[] {
+	return [
+		...furniture.front.map((cell) => carried(cell, number)),
+		...part.sections.flatMap((section) => section.cells),
+		...furniture.back.map((cell) => carried(cell, number)),
+	];
 }
 
-/** A file of prose under a title, or under none when there is no title to give. */
-function renderDocument(title: string, lines: readonly string[]): string {
-	const opening = title === '' ? [] : [`${TITLE_PREFIX}${title}`, ''];
-	return [...trimBlank([...opening, ...trimBlank(lines)]), ''].join('\n');
+/**
+ * A furniture cell as a part carries it.
+ *
+ * Two things change on the way. The title page is renumbered, because a reader
+ * holding part four has to be able to see what it is part four *of*. And a cover
+ * names its art relative to the file naming it, so a part — which sits a folder
+ * deeper than the story — has to name it from where it now stands.
+ */
+function carried(cell: Cell, number: number): Cell {
+	if (cell.kind === TITLE_PAGE) {
+		return {
+			...cell,
+			attrs: {
+				...cell.attrs,
+				title: partTitle(cell.attrs.title ?? '', number),
+			},
+		};
+	}
+	return cell.kind === COVER ? fromTheFolder(cell) : cell;
 }
 
-/** What separates a manuscript's title from the part number after it. */
+/**
+ * A markdown image, split at the path so the path alone can be replaced.
+ *
+ * The same reading `_first_image` does in `server/publishing/epub_exporter.py`,
+ * which is what will go looking for the file this points at.
+ */
+const IMAGE = /(!\[[^\]]*\]\(\s*)([^)\s]+)/;
+
+function firstImage(source: string): string {
+	return IMAGE.exec(source)?.[2] ?? '';
+}
+
+/**
+ * `cover.jpg` beside the story is `../cover.jpg` from inside `parts/`.
+ *
+ * The art does not move when the parts are written, so the path has to. Both
+ * places the file is named are moved: the attribute, and the markdown image
+ * under it — a cover written by hand may carry only the second, which is what
+ * the exporter falls back to reading.
+ *
+ * A path that already climbs out of the folder is climbed one further, which is
+ * right for the same reason: it was written from where the story stands.
+ */
+function fromTheFolder(cell: Cell): Cell {
+	const src = cell.attrs.src || firstImage(cell.source);
+	// An absolute path and a URL both already say where they are from.
+	if (src === '' || src.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(src)) {
+		return cell;
+	}
+	const moved = `../${src}`;
+	return {
+		...cell,
+		source: cell.source.replace(IMAGE, (_whole, opening) => `${opening}${moved}`),
+		attrs: cell.attrs.src ? { ...cell.attrs, src: moved } : cell.attrs,
+	};
+}
+
+/** What separates a story's title from the part number after it. */
 const PART_MARKER = ' — Part ';
 
-/** What a part is called — the manuscript's title, and which part this is. */
+/** What a part is called — the story's title, and which part this is. */
 export function partTitle(title: string, number: number): string {
 	return title ? `${title}${PART_MARKER}${number}` : `Part ${number}`;
 }
 
-/**
- * The manuscript's title, read back off a part's own — the inverse of
- * `partTitle`.
- *
- * A heading saying neither of the things `partTitle` writes is one the author
- * named themselves, and is taken at its word rather than second-guessed.
- */
-export function titleWithoutPart(heading: string, number: number): string {
-	const marker = `${PART_MARKER}${number}`;
-	if (heading.endsWith(marker)) {
-		return heading.slice(0, -marker.length);
-	}
-	return heading === partTitle('', number) ? '' : heading;
-}
-
-/**
- * The manuscript the parts make when they are put back together — the inverse of
- * dividing one.
- *
- * A part's title is what the division gave it rather than anything the story
- * says, so it comes off again and the manuscript takes back the title they were
- * all named for. Everything else in a part is carried over exactly as it stands.
- * These files are where the writing has been happening: a section the author
- * added is a section of the manuscript, and a note they left themselves in one is
- * theirs to keep.
- */
-export function mergeParts(parts: readonly WrittenPart[]): string {
-	let title = '';
-	const body: string[] = [];
-
-	for (const part of parts) {
-		const lines = part.text.split(/\r?\n/);
-		const titleAt = lines.findIndex((line) => line.startsWith(TITLE_PREFIX));
-		if (titleAt >= 0 && title === '') {
-			const heading = lines[titleAt].slice(TITLE_PREFIX.length).trim();
-			title = titleWithoutPart(heading, part.number);
-		}
-		const kept = trimBlank(
-			titleAt < 0
-				? lines
-				: [...lines.slice(0, titleAt), ...lines.slice(titleAt + 1)]
-		);
-		if (kept.length === 0) {
-			continue;
-		}
-		// The blank line that stands between any two stretches of prose.
-		if (body.length > 0) {
-			body.push('');
-		}
-		body.push(...kept);
-	}
-
-	return renderDocument(title, body);
-}
-
-/** `story.md` divides into `parts/` beside it. */
+/** A story divides into `parts/` beside it. */
 export const PARTS_FOLDER = 'parts';
 
 export function partFileName(number: number): string {
-	return `part_${number}.md`;
+	return `part_${number}${EXTENSION}`;
 }
 
 /**
  * Which part a file in the folder holds, or null if no division wrote it.
  *
- * Asked in both directions. Before writing, so a manuscript that now makes four
- * parts does not sit in a folder still holding a fifth from when it made five —
- * and nothing else in the folder is a division's to remove. Before merging, so
- * the parts go back together in the order they were cut rather than the order the
- * folder happens to list them, which puts a tenth part after a first.
+ * Asked before writing, so a story that now makes four parts does not sit in a
+ * folder still holding a fifth from when it made five — and nothing else in the
+ * folder is a division's to remove.
  */
 export function partNumber(name: string): number | null {
-	const match = /^part_(\d+)\.md$/i.exec(name);
+	const match = new RegExp(`^part_(\\d+)\\${EXTENSION}$`, 'i').exec(name);
 	return match === null ? null : Number(match[1]);
 }
 
 /**
  * Whatever the form reported, as a quota.
  *
- * A quota of nothing divides a manuscript into nothing, so anything unusable —
+ * A quota of nothing divides a story into nothing, so anything unusable —
  * blank, negative, not a number — falls back to the default rather than being
  * acted on.
  */
@@ -241,101 +242,4 @@ export function quotaOf(raw: unknown): number {
  */
 export function countWords(text: string): number {
 	return (text.match(/\S+/g) ?? []).filter((run) => /[\p{L}\p{N}]/u.test(run)).length;
-}
-
-/**
- * The manuscript with the author's notes taken out.
- *
- * A line with prose beside a note keeps the prose. A line that was nothing but a
- * note goes altogether rather than being left behind as a blank one — and if
- * blank lines were setting the note apart, the ones after it go too. The gap the
- * author left was around the note, not in the prose, so taking the note out
- * leaves the spacing they had rather than a wider one where it used to be.
- */
-function withoutComments(lines: readonly string[]): string[] {
-	const visible = visibleLines(lines);
-	const isNote = (at: number) => visible[at].commented && visible[at].text.trim() === '';
-	const isBlank = (at: number) => !visible[at].commented && visible[at].text.trim() === '';
-
-	const kept: string[] = [];
-	let index = 0;
-
-	while (index < visible.length) {
-		if (!isNote(index)) {
-			const { text, commented } = visible[index];
-			// Trailing space a note left behind is two keystrokes from a hard line
-			// break in markdown; a line nobody wrote in is left exactly as it is.
-			kept.push(commented ? text.trimEnd() : text);
-			index += 1;
-			continue;
-		}
-		const spaced = kept.length > 0 && kept[kept.length - 1].trim() === '';
-		while (index < visible.length && isNote(index)) {
-			index += 1;
-		}
-		while (spaced && index < visible.length && isBlank(index)) {
-			index += 1;
-		}
-	}
-
-	return kept;
-}
-
-/** A line with its comments taken out, and whether any of it was one. */
-interface Visible {
-	text: string;
-	commented: boolean;
-}
-
-/**
- * Mirrors `split_comments` in server/representations/utils.py, which is where
- * the server keeps the same reading: a comment may span several lines, and one
- * never closed runs to the end of the file — which is how the tail of a draft
- * gets silenced. Dividing a manuscript asks nothing of a model and so never
- * leaves the editor, which is the one reason there are two of these.
- *
- * A line wholly inside a comment counts as commented even though it carries no
- * marker of its own, so the blank lines within a note are known to belong to it.
- */
-function visibleLines(lines: readonly string[]): Visible[] {
-	let inside = false;
-	return lines.map((line) => {
-		const kept: string[] = [];
-		let commented = inside;
-		let rest = line;
-		while (rest) {
-			if (inside) {
-				const close = rest.indexOf(COMMENT_CLOSE);
-				if (close < 0) {
-					break;
-				}
-				inside = false;
-				rest = rest.slice(close + COMMENT_CLOSE.length);
-			} else {
-				const opened = rest.indexOf(COMMENT_OPEN);
-				if (opened < 0) {
-					kept.push(rest);
-					break;
-				}
-				kept.push(rest.slice(0, opened));
-				inside = true;
-				commented = true;
-				rest = rest.slice(opened + COMMENT_OPEN.length);
-			}
-		}
-		return { text: kept.join(''), commented };
-	});
-}
-
-/** The blank lines a cut leaves at either end of a part. */
-function trimBlank(lines: readonly string[]): string[] {
-	let start = 0;
-	let end = lines.length;
-	while (start < end && lines[start].trim() === '') {
-		start += 1;
-	}
-	while (end > start && lines[end - 1].trim() === '') {
-		end -= 1;
-	}
-	return lines.slice(start, end);
 }

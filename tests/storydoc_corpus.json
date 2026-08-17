@@ -1,0 +1,233 @@
+{
+  "comment": "Documents both storydoc libraries must read AND write identically. Each case is run by tests/server/test_storydoc.py and tests/extension/storydoc/model.test.ts: `text` must parse to `cells`, and re-serialising must produce `dumped` byte for byte. Add a case here and both languages are held to it.",
+  "cases": [
+    {
+      "name": "plain markdown with no markers is one markdown cell",
+      "text": "# A Story\n\nIt began badly.\n",
+      "cells": [
+        {
+          "kind": "markdown",
+          "source": "# A Story\n\nIt began badly.",
+          "attrs": {}
+        }
+      ],
+      "dumped": "<!-- cell: markdown -->\n\n# A Story\n\nIt began badly.\n"
+    },
+    {
+      "name": "an empty document has no cells",
+      "text": "",
+      "cells": [],
+      "dumped": ""
+    },
+    {
+      "name": "a document of only blank lines has no cells",
+      "text": "\n\n\n",
+      "cells": [],
+      "dumped": ""
+    },
+    {
+      "name": "a marker opens a cell and the text below it is the source",
+      "text": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "The lantern had gone out.",
+          "attrs": {
+            "title": "The First Night"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n"
+    },
+    {
+      "name": "text above the first marker is a markdown cell of its own",
+      "text": "Front matter.\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n",
+      "cells": [
+        {
+          "kind": "markdown",
+          "source": "Front matter.",
+          "attrs": {}
+        },
+        {
+          "kind": "chapter",
+          "source": "Prose.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: markdown -->\n\nFront matter.\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+    },
+    {
+      "name": "a document opening with a marker has no empty leading cell",
+      "text": "<!-- cell: contents -->\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n",
+      "cells": [
+        {
+          "kind": "contents",
+          "source": "",
+          "attrs": {}
+        },
+        {
+          "kind": "chapter",
+          "source": "Prose.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: contents -->\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+    },
+    {
+      "name": "a cell with no body is kept, because its kind is the point",
+      "text": "<!-- cell: contents -->\n",
+      "cells": [
+        {
+          "kind": "contents",
+          "source": "",
+          "attrs": {}
+        }
+      ],
+      "dumped": "<!-- cell: contents -->\n"
+    },
+    {
+      "name": "an unknown kind is carried through untouched",
+      "text": "<!-- cell: epigraph attribution=\"Anon\" -->\n\nA line of verse.\n",
+      "cells": [
+        {
+          "kind": "epigraph",
+          "source": "A line of verse.",
+          "attrs": {
+            "attribution": "Anon"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: epigraph attribution=\"Anon\" -->\n\nA line of verse.\n"
+    },
+    {
+      "name": "several attributes are read in order",
+      "text": "<!-- cell: cover src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n",
+      "cells": [
+        {
+          "kind": "cover",
+          "source": "![The cover](art/cover.jpg)",
+          "attrs": {
+            "src": "art/cover.jpg",
+            "alt": "The cover"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: cover src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n"
+    },
+    {
+      "name": "a quote inside an attribute survives escaping",
+      "text": "<!-- cell: chapter title=\"She said \\\"no\\\"\" -->\n\nProse.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "Prose.",
+          "attrs": {
+            "title": "She said \"no\""
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"She said \\\"no\\\"\" -->\n\nProse.\n"
+    },
+    {
+      "name": "a backslash inside an attribute survives escaping",
+      "text": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n",
+      "cells": [
+        {
+          "kind": "cover",
+          "source": "![Cover](art/cover.jpg)",
+          "attrs": {
+            "src": "art\\cover.jpg"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n"
+    },
+    {
+      "name": "a marker is read whatever spacing it was written with",
+      "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "Prose.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+    },
+    {
+      "name": "blank lines inside a cell are the author's and are kept",
+      "text": "<!-- cell: chapter title=\"One\" -->\n\nFirst.\n\n\nSecond.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "First.\n\n\nSecond.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nFirst.\n\n\nSecond.\n"
+    },
+    {
+      "name": "an ordinary html comment is not a marker",
+      "text": "<!-- cell: chapter title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "<!-- a note to myself -->\nProse.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n"
+    },
+    {
+      "name": "a full publishing layout",
+      "text": "<!-- cell: cover src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about -->\n\n[My website](https://example.com)\n",
+      "cells": [
+        {
+          "kind": "cover",
+          "source": "![Cover](cover.jpg)",
+          "attrs": {
+            "src": "cover.jpg"
+          }
+        },
+        {
+          "kind": "title-page",
+          "source": "# The Lantern of Small Hours",
+          "attrs": {}
+        },
+        {
+          "kind": "contents",
+          "source": "",
+          "attrs": {}
+        },
+        {
+          "kind": "chapter",
+          "source": "It began badly.",
+          "attrs": {
+            "title": "The First Night"
+          }
+        },
+        {
+          "kind": "disclaimer",
+          "source": "Any resemblance is coincidental.",
+          "attrs": {}
+        },
+        {
+          "kind": "about",
+          "source": "[My website](https://example.com)",
+          "attrs": {}
+        }
+      ],
+      "dumped": "<!-- cell: cover src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about -->\n\n[My website](https://example.com)\n"
+    }
+  ]
+}
