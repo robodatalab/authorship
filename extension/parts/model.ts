@@ -161,6 +161,18 @@ function carried(cell: Cell, number: number): Cell {
 }
 
 /**
+ * A markdown image, split at the path so the path alone can be replaced.
+ *
+ * The same reading `_first_image` does in `server/publishing/epub_exporter.py`,
+ * which is what will go looking for the file this points at.
+ */
+const IMAGE = /(!\[[^\]]*\]\(\s*)([^)\s]+)/;
+
+function firstImage(source: string): string {
+	return IMAGE.exec(source)?.[2] ?? '';
+}
+
+/**
  * `cover.jpg` beside the story is `../cover.jpg` from inside `parts/`.
  *
  * The art does not move when the parts are written, so the path has to. Both
@@ -183,13 +195,6 @@ function fromTheFolder(cell: Cell): Cell {
 		source: cell.source.replace(IMAGE, (_whole, opening) => `${opening}${moved}`),
 		attrs: cell.attrs.src ? { ...cell.attrs, src: moved } : cell.attrs,
 	};
-}
-
-/** A markdown image, split at the path so the path alone can be replaced. */
-const IMAGE = /(!\[[^\]]*\]\(\s*)([^)\s]+)/;
-
-function firstImage(source: string): string {
-	return IMAGE.exec(source)?.[2] ?? '';
 }
 
 /** What separates a story's title from the part number after it. */

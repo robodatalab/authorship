@@ -199,11 +199,50 @@ describe('partCells — a part as a document of its own', () => {
 	});
 
 	it('leaves a cover that already says where its art is from', () => {
-		const cells = [cover('https://art.example/c.jpg'), chapter('One'), markdown('a')];
+		for (const src of ['https://art.example/c.jpg', '/shared/art/c.jpg']) {
+			const cells = [cover(src), chapter('One'), markdown('a')];
+			const parts = intoParts(sectionsOf(cells), 5000);
+			const only = partCells(furnitureOf(cells), 1, parts[0]);
+
+			expect(only[0].attrs.src, src).toBe(src);
+			expect(only[0].source, src).toBe(`![Cover](${src})`);
+		}
+	});
+
+	it('moves a cover that names its art only in the markdown', () => {
+		// What a cover written by hand looks like, and what the exporter falls back
+		// to reading when there is no attribute to read.
+		const cells = [
+			{ kind: 'cover', source: '![Cover](art/c.jpg)', attrs: {} },
+			chapter('One'),
+			markdown('alpha'),
+		];
 		const parts = intoParts(sectionsOf(cells), 5000);
 		const only = partCells(furnitureOf(cells), 1, parts[0]);
 
-		expect(only[0].attrs.src).toBe('https://art.example/c.jpg');
+		expect(only[0].source).toBe('![Cover](../art/c.jpg)');
+		expect(only[0].attrs).toEqual({});
+	});
+
+	it('climbs one further out of a path that already climbs', () => {
+		// Written from where the story stands, so a part stands one folder deeper.
+		const cells = [cover('../shared/c.jpg'), chapter('One'), markdown('a')];
+		const parts = intoParts(sectionsOf(cells), 5000);
+		const only = partCells(furnitureOf(cells), 1, parts[0]);
+
+		expect(only[0].attrs.src).toBe('../../shared/c.jpg');
+	});
+
+	it('moves the path and not an alt text that happens to match it', () => {
+		const cells = [
+			{ kind: 'cover', source: '![c.jpg](c.jpg)', attrs: { src: 'c.jpg' } },
+			chapter('One'),
+			markdown('a'),
+		];
+		const parts = intoParts(sectionsOf(cells), 5000);
+		const only = partCells(furnitureOf(cells), 1, parts[0]);
+
+		expect(only[0].source).toBe('![c.jpg](../c.jpg)');
 	});
 
 	it('a story with no furniture is a part of nothing but chapters', () => {
