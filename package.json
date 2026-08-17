@@ -12,6 +12,14 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "markdown",
+        "extensions": [
+          ".author"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "authorship.fixGrammar",
