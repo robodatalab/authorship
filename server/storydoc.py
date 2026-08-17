@@ -150,8 +150,13 @@ def markdown(source: str) -> Cell:
     return Cell(MARKDOWN, source)
 
 
-def chapter(title: str, source: str = "") -> Cell:
-    return Cell(CHAPTER, source, {"title": title})
+def chapter(title: str) -> Cell:
+    """A named place in the book and nothing else.
+
+    The prose beneath a chapter is markdown cells, as prose is everywhere else,
+    so a chapter carries a title and no source of its own.
+    """
+    return Cell(CHAPTER, "", {"title": title})
 
 
 def cover(src: str, alt: str = "Cover") -> Cell:

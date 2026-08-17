@@ -81,4 +81,18 @@ const publishViewConfig = {
   },
 };
 
-module.exports = [ extensionConfig, publishViewConfig ];
+/**
+ * The .author editor's cell surface, in its own webview and so its own bundle.
+ *
+ * @type WebpackConfig
+ */
+const authorViewConfig = {
+  ...publishViewConfig,
+  entry: './extension/author_editor/view.ts',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'author_view.js'
+  },
+};
+
+module.exports = [ extensionConfig, publishViewConfig, authorViewConfig ];

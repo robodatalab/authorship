@@ -135,8 +135,15 @@ export function markdown(source: string): Cell {
 	return { kind: MARKDOWN, source, attrs: {} };
 }
 
-export function chapter(title: string, source = ''): Cell {
-	return { kind: CHAPTER, source, attrs: { title } };
+/**
+ * A chapter is a named place in the book and nothing else.
+ *
+ * The prose beneath it is markdown cells, as prose is everywhere else — so a
+ * chapter carries a title and no source. Moving one moves the name, and the two
+ * responsibilities never sit in the same cell.
+ */
+export function chapter(title: string): Cell {
+	return { kind: CHAPTER, source: '', attrs: { title } };
 }
 
 export function cover(src: string, alt = 'Cover'): Cell {

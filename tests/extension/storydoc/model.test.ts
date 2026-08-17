@@ -17,6 +17,7 @@ import {
 	cover,
 	dumps,
 	has,
+	markdown,
 	parse,
 	titleOf,
 	type Cell,
@@ -61,9 +62,13 @@ describe('the shared corpus — the same documents server/storydoc.py reads', ()
 
 describe('writing', () => {
 	it('writes a cell as a marker and its text', () => {
-		expect(dumps([chapter('One', 'Prose.')])).toBe(
-			'<!-- cell: chapter title="One" -->\n\nProse.\n'
+		expect(dumps([markdown('Prose.')])).toBe(
+			'<!-- cell: markdown -->\n\nProse.\n'
 		);
+	});
+
+	it('writes a chapter as its marker alone, since it is only a name', () => {
+		expect(dumps([chapter('One')])).toBe('<!-- cell: chapter title="One" -->\n');
 	});
 
 	it('writes a cell with no text as its marker alone', () => {

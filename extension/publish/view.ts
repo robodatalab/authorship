@@ -1,20 +1,14 @@
-// The Publish form, running inside the webview. Everything here is DOM and the
-// message channel; the files it drives live host-side in publish/panel.ts.
+// The Authorship sidebar, running inside the webview. Everything here is DOM and
+// the message channel; the polling that feeds it lives host-side in
+// publish/panel.ts.
 //
-// The host owns the truth. There is nothing here to fill in: what the book says
-// about itself is written in its own document, so this view asks for actions and
-// repaints what the host sends back.
+// Three readings and nothing to fill in: what is loaded, what it is holding, and
+// what work is queued. The book itself is edited in the .author editor.
 
 interface VsCodeApi {
 	postMessage(message: unknown): void;
 }
 declare function acquireVsCodeApi(): VsCodeApi;
-
-interface StateMessage {
-	manuscript: string | null;
-	/** The quota the authorship file records; the host read it for us. */
-	wordsPerPart: number;
-}
 
 interface ModelStatus {
 	model: string;
@@ -26,23 +20,6 @@ interface JobStatus {
 	kind: string;
 	path: string;
 	status: string;
-}
-
-/** A passage, already turned into what a row says by the host. */
-interface HitRow {
-	label: string;
-	where: string;
-	text: string;
-}
-
-interface SearchMessage {
-	manuscript: string;
-	phrase: string;
-	searching: boolean;
-	error: string | null;
-	/** What is left to encode, or empty once nothing is. */
-	progress: string;
-	hits: HitRow[];
 }
 
 interface Memory {
@@ -61,91 +38,9 @@ interface Sample {
 
 const vscode = acquireVsCodeApi();
 
-const manuscriptName = document.getElementById('manuscript-name') as HTMLElement;
-const chooseButton = document.getElementById('choose') as HTMLButtonElement;
-const partWords = document.getElementById('f-part-words') as HTMLInputElement;
-const divideButton = document.getElementById('divide') as HTMLButtonElement;
-const mergeButton = document.getElementById('merge') as HTMLButtonElement;
-const partsStatus = document.getElementById('parts-status') as HTMLElement;
-const exportButton = document.getElementById('export') as HTMLButtonElement;
-const editAuthorship = document.getElementById('edit-authorship') as HTMLButtonElement;
-const status = document.getElementById('status') as HTMLElement;
-const searchPhrase = document.getElementById('search-phrase') as HTMLInputElement;
-const searchClear = document.getElementById('search-clear') as HTMLButtonElement;
-const searchNote = document.getElementById('search-note') as HTMLElement;
-const searchHits = document.getElementById('search-hits') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
-
-divideButton.addEventListener('click', () => {
-	setStatus(partsStatus, 'Dividing…', false);
-	// The quota travels with the request rather than being read back from the
-	// settings, so a click that lands before the field's own change has been
-	// written still divides by the number the author is looking at.
-	vscode.postMessage({ type: 'divide', words: partWords.value });
-});
-mergeButton.addEventListener('click', () => {
-	setStatus(partsStatus, 'Merging…', false);
-	vscode.postMessage({ type: 'merge' });
-});
-
-chooseButton.addEventListener('click', () => vscode.postMessage({ type: 'choose' }));
-exportButton.addEventListener('click', () => {
-	setStatus(status, 'Exporting…', false);
-	vscode.postMessage({ type: 'export' });
-});
-editAuthorship.addEventListener('click', () =>
-	vscode.postMessage({ type: 'editAuthorship' })
-);
-// The phrase is asked on Enter rather than as it is typed: a search is a forward
-// pass on the server, and half a phrase asks half a question.
-searchPhrase.addEventListener('keydown', (event) => {
-	if (event.key === 'Enter') {
-		vscode.postMessage({ type: 'search', phrase: searchPhrase.value });
-	}
-});
-searchClear.addEventListener('click', () => {
-	searchPhrase.value = '';
-	vscode.postMessage({ type: 'clearSearch' });
-});
-
-/**
- * With no story chosen there is nothing to publish, so the form is inert.
- *
- * Search is deliberately not among them: it acts on whatever the cursor is in,
- * so a story having been chosen here says nothing about whether there is
- * anything for it to do.
- */
-function setEnabled(enabled: boolean): void {
-	const controls = [
-		partWords,
-		divideButton,
-		mergeButton,
-		exportButton,
-		editAuthorship,
-	];
-	for (const el of controls) {
-		el.disabled = !enabled;
-	}
-}
-
-function setStatus(el: HTMLElement, message: string, error: boolean): void {
-	el.textContent = message;
-	el.classList.toggle('error', error);
-	el.hidden = message === '';
-}
-
-function renderState(state: StateMessage): void {
-	const hasStory = state.manuscript !== null;
-	manuscriptName.textContent = state.manuscript ?? 'No story selected';
-	// The name is ellipsized when the path is long; the tooltip keeps it legible.
-	manuscriptName.title = state.manuscript ?? '';
-	partWords.value = String(state.wordsPerPart);
-	setEnabled(hasStory);
-	setStatus(status, '', false);
-	setStatus(partsStatus, '', false);
-}
 
 /** null means the server did not answer; a list is its models and which is resident. */
 function renderModels(models: ModelStatus[] | null): void {
@@ -380,71 +275,9 @@ function renderJobs(jobs: JobStatus[] | null): void {
 	}
 }
 
-/**
- * The search, or null once it has been put away.
- *
- * The rows say what the host decided they say; nothing here reads a passage or a
- * line number. A row carries its position, and clicking it asks the host to send
- * the cursor there — the host is what holds the manuscript and the highlights.
- */
-function renderSearch(search: SearchMessage | null): void {
-	searchHits.textContent = '';
-	searchClear.hidden = search === null;
-
-	if (search === null) {
-		setStatus(searchNote, '', false);
-		return;
-	}
-
-	if (search.error) {
-		setStatus(searchNote, search.error, true);
-	} else if (search.searching) {
-		setStatus(searchNote, `Searching ${search.manuscript}…`, false);
-	} else if (search.progress) {
-		// An empty list reads as a manuscript that holds no answer, which is a
-		// different thing from one the server has not finished reading.
-		setStatus(searchNote, search.progress, false);
-	} else if (search.hits.length === 0) {
-		setStatus(searchNote, `Nothing in ${search.manuscript} answers that.`, false);
-	} else {
-		setStatus(searchNote, search.manuscript, false);
-	}
-
-	search.hits.forEach((hit, index) => {
-		const row = document.createElement('button');
-		row.type = 'button';
-		row.className = 'hit';
-		// The passage is cut to a row's width; the whole of it is worth having on
-		// hover, since a line number alone says nothing about what is there.
-		row.title = hit.text;
-		row.addEventListener('click', () =>
-			vscode.postMessage({ type: 'revealHit', index })
-		);
-
-		const passage = document.createElement('span');
-		passage.className = 'passage';
-		passage.textContent = hit.label;
-
-		const where = document.createElement('span');
-		where.className = 'where';
-		where.textContent = hit.where;
-
-		row.append(passage, where);
-		searchHits.append(row);
-	});
-}
-
 window.addEventListener('message', (event) => {
 	const message = event.data;
-	if (message?.type === 'search') {
-		renderSearch(message.search as SearchMessage | null);
-	} else if (message?.type === 'state') {
-		renderState(message as StateMessage);
-	} else if (message?.type === 'status') {
-		setStatus(status, String(message.message ?? ''), Boolean(message.error));
-	} else if (message?.type === 'partsStatus') {
-		setStatus(partsStatus, String(message.message ?? ''), Boolean(message.error));
-	} else if (message?.type === 'models') {
+	if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
 	} else if (message?.type === 'memory') {
 		renderMemory(message.memory as Memory | null);

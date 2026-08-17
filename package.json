@@ -20,18 +20,24 @@
         ]
       }
     ],
+    "customEditors": [
+      {
+        "viewType": "authorship.authorEditor",
+        "displayName": "Author",
+        "selector": [
+          {
+            "filenamePattern": "*.author"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "commands": [
       {
         "command": "authorship.fixGrammar",
         "title": "Fix Grammar",
         "category": "Authorship",
         "icon": "$(wand)"
-      },
-      {
-        "command": "authorship.searchManuscript",
-        "title": "Search Manuscript",
-        "category": "Authorship",
-        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -40,11 +46,6 @@
           "command": "authorship.fixGrammar",
           "when": "resourceExtname == .md",
           "group": "navigation@1"
-        },
-        {
-          "command": "authorship.searchManuscript",
-          "when": "resourceExtname == .md",
-          "group": "navigation@2"
         }
       ]
     },
@@ -84,6 +85,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "^1.125.0",
+    "@vscode/codicons": "^0.0.46-24",
     "eslint": "^10.5.0",
     "ts-loader": "^9.6.2",
     "typescript": "^6.0.3",

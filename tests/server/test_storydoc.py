@@ -40,8 +40,13 @@ class Corpus(unittest.TestCase):
 
 class Writing(unittest.TestCase):
     def test_a_cell_is_written_as_a_marker_and_its_text(self) -> None:
-        written = storydoc.dumps([storydoc.chapter("One", "Prose.")])
-        self.assertEqual(written, '<!-- cell: chapter title="One" -->\n\nProse.\n')
+        written = storydoc.dumps([storydoc.markdown("Prose.")])
+        self.assertEqual(written, "<!-- cell: markdown -->\n\nProse.\n")
+
+    def test_a_chapter_is_written_as_its_marker_alone(self) -> None:
+        # A chapter names a place in the book; the prose under it is its own cell.
+        written = storydoc.dumps([storydoc.chapter("One")])
+        self.assertEqual(written, '<!-- cell: chapter title="One" -->\n')
 
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
         self.assertEqual(storydoc.dumps([storydoc.contents()]), "<!-- cell: contents -->\n")
@@ -99,7 +104,7 @@ class Preparing(unittest.TestCase):
 
 class OnDisk(unittest.TestCase):
     def test_a_document_survives_being_saved_and_loaded(self) -> None:
-        cells = [storydoc.cover("c.jpg"), storydoc.chapter("One", "Prose.")]
+        cells = [storydoc.cover("c.jpg"), storydoc.chapter("One")]
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / f"story{storydoc.EXTENSION}"
             storydoc.save(path, cells)

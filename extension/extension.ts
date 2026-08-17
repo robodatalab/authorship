@@ -1,11 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { AuthorEditorProvider } from './author_editor/panel';
 import { PublishView } from './publish/panel';
-import { Highlights } from './highlight/orchestrator';
 import { ModelHealth } from './llm/health';
 import { GrammarFix } from './llm/grammar';
-import { ManuscriptSearch } from './search/results';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -15,15 +14,21 @@ export function activate(context: vscode.ExtensionContext) {
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "authorship" is now active!');
 
-	// The one thing that lights up lines of a manuscript — the search sends the
-	// reader to passages, and the marks it leaves belong to one owner.
-	const highlights = new Highlights();
-	context.subscriptions.push(highlights);
-
-	// The search a manuscript is under. It outlives the Authorship view, which
-	// only draws it — hiding the panel does not put the answer away.
-	const search = new ManuscriptSearch(8765, highlights);
-	context.subscriptions.push(search);
+	// The editor a `.author` file opens in. Declared in package.json under
+	// contributes.customEditors as the default for the extension, so opening one
+	// lands here rather than in the text editor.
+	context.subscriptions.push(
+		vscode.window.registerCustomEditorProvider(
+			AuthorEditorProvider.viewType,
+			new AuthorEditorProvider(context, 8765),
+			{
+				webviewOptions: { retainContextWhenHidden: true },
+				// Two views of one document would each repaint the other; the
+				// document is the shared truth, so one view per document.
+				supportsMultipleEditorsPerDocument: false,
+			}
+		)
+	);
 
 	// The view container and view are declared in package.json under
 	// contributes.viewsContainers / contributes.views. Registering the provider
@@ -32,9 +37,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			'authorship.manuscript',
-			new PublishView(context, 8765, search),
-			// Keep the form's state while the view is hidden, so switching away and
-			// back doesn't reset an edit in progress.
+			new PublishView(context, 8765),
+			// Keep the readings while the view is hidden, so switching away and
+			// back doesn't blank the plot.
 			{ webviewOptions: { retainContextWhenHidden: true } }
 		)
 	);
@@ -62,13 +67,6 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	// The results live in the Search drawer, so the command's job is to put the
-	// author in front of it rather than to ask anything itself.
-	context.subscriptions.push(
-		vscode.commands.registerCommand('authorship.searchManuscript', () =>
-			void vscode.commands.executeCommand('authorship.manuscript.focus')
-		)
-	);
 }
 
 /**
