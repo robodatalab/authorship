@@ -8,6 +8,8 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from server.manuscript import Manuscript, StoryLines
+
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)")
@@ -70,45 +72,25 @@ class Chapter:
         return blocks_to_xhtml(self.body_lines)
 
 
-def parse_manuscript(md: str) -> tuple[str, list[Chapter]]:
-    lines = md.splitlines()
-    title = "Untitled"
-    for line in lines:
-        if line.startswith("# ") and not line.startswith("## "):
-            title = line[2:].strip()
-            break
-
+def chapters_of(manuscript: Manuscript) -> list[Chapter]:
+    """A chapter per section, carrying what the section says rather than what is
+    written on the page — the author's notes are not published."""
     chapters: list[Chapter] = []
-    front: list[str] = []
-    current_title: str | None = None
-    current: list[str] = []
-    idx = 0
-
-    def close() -> None:
-        nonlocal idx
-        if current_title is not None:
-            chapters.append(Chapter(idx, current_title, list(current)))
-            idx += 1
-
-    for line in lines:
-        if line.startswith("## "):
-            if current_title is None and front:
-                chapters.append(Chapter(idx, title, list(front)))
-                idx += 1
-                front.clear()
-            close()
-            current_title = line[3:].strip()
-            current = []
-        elif current_title is None:
-            front.append(line)
-        else:
-            current.append(line)
-    close()
-
-    # No '## ' headings at all -> whole doc is one chapter.
-    if not chapters:
-        chapters.append(Chapter(0, title, front or lines))
-    return title, chapters
+    for section in manuscript.sections:
+        body: list[str] = []
+        previous: int | None = None
+        for index, said in StoryLines(manuscript, section.start, section.end):
+            # A gap in the numbers is the blank line or the note that was there;
+            # either way it is where one paragraph ends and the next begins.
+            if previous is not None and index != previous + 1:
+                body.append("")
+            body.append(said)
+            previous = index
+        if not body:
+            continue
+        title = manuscript.title if section.start == 0 else section.title
+        chapters.append(Chapter(len(chapters), title, body))
+    return chapters
 
 
 CONTAINER_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -250,16 +232,15 @@ def build_ncx(book_id, title, chapters):
 
 
 def build_epub(
-    md_path: Path,
+    manuscript: Manuscript,
     out_path: Path,
     cover: Path | None,
     title: str | None,
     author: str,
     lang: str,
 ) -> None:
-    md = md_path.read_text(encoding="utf-8")
-    detected_title, chapters = parse_manuscript(md)
-    title = title or detected_title
+    chapters = chapters_of(manuscript)
+    title = title or manuscript.title
     book_id = uuid.uuid4()
     modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
