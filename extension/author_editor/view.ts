@@ -6,6 +6,10 @@
 // floating at the top right of whichever cell has focus, and what the cell is
 // named quietly in its bottom corner.
 //
+// There is no toolbar here. The document's own tools are commands in the editor
+// title bar, drawn by VS Code with its own icons and tooltips — a toolbar built
+// in here would have to reinvent both, and did.
+//
 // The host owns the truth. A cell being typed into is the one exception — it
 // holds its own text until it settles, because a repaint mid-keystroke would
 // take the caret with it. Everything else is drawn from what the host last sent.
@@ -36,15 +40,6 @@ const vscode = acquireVsCodeApi();
 
 const cellsEl = document.getElementById('cells') as HTMLElement;
 const menuEl = document.getElementById('menu') as HTMLElement;
-const toolbarEl = document.getElementById('toolbar') as HTMLElement;
-const runAllButton = document.getElementById('run-all') as HTMLButtonElement;
-const spellButton = document.getElementById('spell') as HTMLButtonElement;
-const asTextButton = document.getElementById('as-text') as HTMLButtonElement;
-const exportEpubButton = document.getElementById('export-epub') as HTMLButtonElement;
-const exportMarkdownButton = document.getElementById('export-markdown') as HTMLButtonElement;
-const importMarkdownButton = document.getElementById('import-markdown') as HTMLButtonElement;
-const partitionButton = document.getElementById('partition') as HTMLButtonElement;
-const statusEl = document.getElementById('doc-status') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -54,7 +49,7 @@ let cells: Cell[] = [];
 let base = '';
 /** The cell the caret is in, or null when none is open for editing. */
 let editing: number | null = null;
-/** The cell the toolbar acts on. */
+/** The cell the title-bar commands act on. */
 let selected = 0;
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
 /** What the page was last drawn from, so an unchanged document is not redrawn. */
@@ -69,11 +64,9 @@ function commit(next: Cell[]): void {
 	vscode.postMessage({ type: 'cells', cells });
 }
 
-// --- the toolbar ---
-
-runAllButton.addEventListener('click', () => vscode.postMessage({ type: 'compile' }));
-
-spellButton.addEventListener('click', () => {
+// The title bar asks which cell to check, because only this view knows which
+// one is selected.
+function answerSpellCheck(): void {
 	const where = sourceLinesOf(cells, selected);
 	if (!where) {
 		return;
@@ -84,18 +77,7 @@ spellButton.addEventListener('click', () => {
 		start: where.start,
 		end: where.end,
 	});
-});
-
-for (const [button, type] of [
-	[exportEpubButton, 'exportEpub'],
-	[exportMarkdownButton, 'exportMarkdown'],
-	[importMarkdownButton, 'importMarkdown'],
-	[partitionButton, 'partition'],
-] as const) {
-	button.addEventListener('click', () => vscode.postMessage({ type }));
 }
-
-asTextButton.addEventListener('click', () => vscode.postMessage({ type: 'openAsText' }));
 
 // --- cells ---
 
@@ -113,7 +95,6 @@ function render(): void {
 		cellsEl.append(cellElement(cell, index));
 		cellsEl.append(insertBarFor(index));
 	});
-	statusEl.textContent = documentStatus();
 	drawn = signatureOf(cells);
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
@@ -127,15 +108,7 @@ function redrawCell(index: number): void {
 		return;
 	}
 	existing.replaceWith(cellElement(cells[index], index));
-	statusEl.textContent = documentStatus();
 	drawn = signatureOf(cells);
-}
-
-function documentStatus(): string {
-	const chapters = cells.filter((cell) => cell.kind === 'chapter').length;
-	const stale = cells.filter((_cell, index) => isStale(cells, index)).length;
-	const counted = `${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`;
-	return stale > 0 ? `${counted} · ${stale} to run` : counted;
 }
 
 function cellElement(cell: Cell, index: number): HTMLElement {
@@ -186,7 +159,7 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	const run = document.createElement('button');
 	run.type = 'button';
 	run.className = 'run';
-	run.title = `Build this ${labelOf(cell.kind).toLowerCase()} from the document`;
+	run.dataset.tip = `Build this ${labelOf(cell.kind).toLowerCase()} from the document`;
 	const glyph = document.createElement('i');
 	glyph.className = 'codicon codicon-play';
 	run.append(glyph);
@@ -200,7 +173,7 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	state.className = stale
 		? 'state stale codicon codicon-circle-large-outline'
 		: 'state fresh codicon codicon-pass-filled';
-	state.title = stale
+	state.dataset.tip = stale
 		? 'Out of date — the document has moved on since this was built'
 		: 'Up to date with the document';
 
@@ -236,13 +209,25 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	return body;
 }
 
+/**
+ * Grow the box to its text.
+ *
+ * Counting newlines is not enough — a paragraph wraps into as many lines as the
+ * width allows, and a box sized to the logical lines gets a scrollbar of its own.
+ * One document, one scrollbar.
+ */
+function autosize(input: HTMLTextAreaElement): void {
+	input.style.height = 'auto';
+	input.style.height = `${input.scrollHeight}px`;
+}
+
 function sourceFor(cell: Cell, index: number): HTMLElement {
 	const input = document.createElement('textarea');
 	input.className = 'source';
 	input.value = cell.source;
-	input.rows = Math.max(3, cell.source.split('\n').length + 1);
+	input.rows = 1;
 	input.addEventListener('input', () => {
-		input.rows = Math.max(3, input.value.split('\n').length + 1);
+		autosize(input);
 		if (typingTimer !== undefined) {
 			clearTimeout(typingTimer);
 		}
@@ -257,8 +242,12 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 		}
 	});
 	input.addEventListener('blur', () => accept(index, input.value));
-	// `preventScroll`, because focusing is what was yanking the page around.
-	queueMicrotask(() => input.focus({ preventScroll: true }));
+	// Both once the box is on the page: `scrollHeight` needs a laid-out element,
+	// and `preventScroll` because focusing is what was yanking the page around.
+	queueMicrotask(() => {
+		autosize(input);
+		input.focus({ preventScroll: true });
+	});
 	return input;
 }
 
@@ -332,7 +321,7 @@ function insertButton(
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.className = label ? 'insert' : 'insert icon-only';
-	button.title = title ?? `Add a ${label.toLowerCase()} section here`;
+	button.dataset.tip = title ?? `Add a ${label.toLowerCase()} section here`;
 	const glyph = document.createElement('i');
 	glyph.className = `codicon codicon-${icon}`;
 	button.append(glyph);
@@ -424,7 +413,8 @@ function iconButton(
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.className = 'icon';
-	button.title = title;
+	button.setAttribute('aria-label', title);
+	button.dataset.tip = title;
 	const glyph = document.createElement('i');
 	glyph.className = `codicon codicon-${icon}`;
 	button.append(glyph);
@@ -526,7 +516,9 @@ document.addEventListener('keydown', (event) => {
 
 window.addEventListener('message', (event) => {
 	const message = event.data;
-	if (message?.type === 'cells') {
+	if (message?.type === 'askSpellCheck') {
+		answerSpellCheck();
+	} else if (message?.type === 'cells') {
 		cells = withDefaultCell(message.cells as Cell[]);
 		base = String(message.base ?? '');
 		selected = Math.min(selected, Math.max(0, cells.length - 1));
@@ -538,9 +530,6 @@ window.addEventListener('message', (event) => {
 		}
 	}
 });
-
-// Keep the toolbar from swallowing a click meant to dismiss the menu.
-toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
 
 // The host has nothing to push until we ask: a message it posted before this
 // script ran would simply be gone.

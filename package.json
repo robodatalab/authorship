@@ -20,6 +20,36 @@
         ]
       }
     ],
+    "icons": {
+      "authorship-import-markdown": {
+        "description": "Import a markdown manuscript",
+        "default": {
+          "fontPath": "media/authorship-icons.woff",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "authorship-export-markdown": {
+        "description": "Export as one markdown manuscript",
+        "default": {
+          "fontPath": "media/authorship-icons.woff",
+          "fontCharacter": "\\E002"
+        }
+      },
+      "authorship-export-epub": {
+        "description": "Export as an EPUB",
+        "default": {
+          "fontPath": "media/authorship-icons.woff",
+          "fontCharacter": "\\E003"
+        }
+      },
+      "authorship-export-parts": {
+        "description": "Export as markdown parts",
+        "default": {
+          "fontPath": "media/authorship-icons.woff",
+          "fontCharacter": "\\E004"
+        }
+      }
+    },
     "customEditors": [
       {
         "viewType": "authorship.authorEditor",
@@ -38,6 +68,48 @@
         "title": "Fix Grammar",
         "category": "Authorship",
         "icon": "$(wand)"
+      },
+      {
+        "command": "authorship.author.runAll",
+        "title": "Run All",
+        "category": "Authorship",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "authorship.author.spellCheck",
+        "title": "Spell Check",
+        "category": "Authorship",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "authorship.author.importMarkdown",
+        "title": "Import Markdown",
+        "category": "Authorship",
+        "icon": "$(authorship-import-markdown)"
+      },
+      {
+        "command": "authorship.author.exportMarkdown",
+        "title": "Export Markdown",
+        "category": "Authorship",
+        "icon": "$(authorship-export-markdown)"
+      },
+      {
+        "command": "authorship.author.exportEpub",
+        "title": "Export EPUB",
+        "category": "Authorship",
+        "icon": "$(authorship-export-epub)"
+      },
+      {
+        "command": "authorship.author.partition",
+        "title": "Export as Parts",
+        "category": "Authorship",
+        "icon": "$(authorship-export-parts)"
+      },
+      {
+        "command": "authorship.author.viewSource",
+        "title": "View Source",
+        "category": "Authorship",
+        "icon": "$(file-code)"
       }
     ],
     "menus": {
@@ -46,6 +118,41 @@
           "command": "authorship.fixGrammar",
           "when": "resourceExtname == .md",
           "group": "navigation@1"
+        },
+        {
+          "command": "authorship.author.runAll",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "authorship.author.spellCheck",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "authorship.author.importMarkdown",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@3"
+        },
+        {
+          "command": "authorship.author.exportMarkdown",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@4"
+        },
+        {
+          "command": "authorship.author.exportEpub",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@5"
+        },
+        {
+          "command": "authorship.author.partition",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "authorship.author.viewSource",
+          "when": "activeCustomEditorId == 'authorship.authorEditor'",
+          "group": "authorship@1"
         }
       ]
     },

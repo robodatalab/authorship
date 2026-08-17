@@ -12,18 +12,75 @@
 
 import * as vscode from 'vscode';
 
-import { compile, fromMarkdown, toMarkdown } from './model';
+import { compile, fromMarkdown, isStale, toMarkdown } from './model';
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { dumps, parse, type Cell } from '../storydoc/model';
+import { CHAPTER, dumps, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
 
+	/**
+	 * The editor the title-bar buttons act on.
+	 *
+	 * The toolbar is VS Code's own — commands in `contributes.menus`, drawn by
+	 * the workbench with its own icons, tooltips and overflow — so the buttons
+	 * arrive here knowing nothing about which document they were pressed over.
+	 */
+	private active?: { document: vscode.TextDocument; panel: vscode.WebviewPanel };
+
+	/** What the document holds, in the status bar where a reading belongs. */
+	private readonly status: vscode.StatusBarItem;
+
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly port: number
-	) {}
+	) {
+		this.status = vscode.window.createStatusBarItem(
+			vscode.StatusBarAlignment.Right,
+			100
+		);
+		context.subscriptions.push(this.status);
+	}
+
+	/** The commands the editor title bar shows, by the name they are bound to. */
+	get commands(): Record<string, () => void> {
+		return {
+			runAll: () => this.onActive((d) => this.write(d, compile(parse(d.getText())))),
+			// The cell to check is the one the view has selected, and only the view
+			// knows which that is — so the command asks it rather than guessing.
+			spellCheck: () => this.active?.panel.webview.postMessage({ type: 'askSpellCheck' }),
+			importMarkdown: () => this.onActive((d) => this.importMarkdown(d)),
+			exportMarkdown: () =>
+				this.onActive(async (d) => {
+					const { uri } = await this.exportMarkdown(d);
+					void vscode.window.showInformationMessage(
+						`Exported ${basename(uri)}`
+					);
+				}),
+			exportEpub: () => this.onActive((d) => this.exportEpub(d)),
+			partition: () => this.onActive((d) => this.partition(d)),
+			viewSource: () =>
+				this.onActive(async (d) => {
+					await vscode.commands.executeCommand('vscode.openWith', d.uri, 'default');
+				}),
+		};
+	}
+
+	/**
+	 * Run something on the editor in front of the author, and say so when it
+	 * fails. Without this every handler was a `void` promise, and a failure was
+	 * indistinguishable from a button that did nothing.
+	 */
+	private onActive(work: (document: vscode.TextDocument) => unknown): void {
+		const document = this.active?.document;
+		if (!document) {
+			return;
+		}
+		void Promise.resolve(work(document)).catch((err: unknown) =>
+			vscode.window.showErrorMessage(describe(err))
+		);
+	}
 
 	resolveCustomTextEditor(
 		document: vscode.TextDocument,
@@ -41,6 +98,20 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		};
 		panel.webview.html = this.html(panel.webview);
 
+		const becomeActive = (): void => {
+			this.active = { document, panel };
+			this.showStatus(document);
+		};
+		becomeActive();
+		const focusing = panel.onDidChangeViewState(() => {
+			if (panel.active) {
+				becomeActive();
+			} else if (this.active?.panel === panel) {
+				this.active = undefined;
+				this.status.hide();
+			}
+		});
+
 		const send = (): void =>
 			void panel.webview.postMessage({
 				type: 'cells',
@@ -57,6 +128,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// tool — is the same news, and the view is repainted from the document.
 			if (event.document.uri.toString() === document.uri.toString()) {
 				send();
+				if (this.active?.document === document) {
+					this.showStatus(document);
+				}
 			}
 		});
 
@@ -99,7 +173,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			}
 		});
 
-		panel.onDidDispose(() => watching.dispose());
+		panel.onDidDispose(() => {
+			watching.dispose();
+			focusing.dispose();
+			if (this.active?.panel === panel) {
+				this.active = undefined;
+				this.status.hide();
+			}
+		});
 	}
 
 	/**
@@ -169,6 +250,19 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		}
 	}
 
+	/** What the toolbar's right-hand side used to say, in the status bar instead. */
+	private showStatus(document: vscode.TextDocument): void {
+		const cells = parse(document.getText());
+		const chapters = cells.filter((cell) => cell.kind === CHAPTER).length;
+		const stale = cells.filter((_cell, index) => isStale(cells, index)).length;
+		this.status.text = `$(book) ${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`;
+		this.status.tooltip = stale > 0
+			? `${stale} built ${stale === 1 ? 'section is' : 'sections are'} out of date — Run All rebuilds them`
+			: 'Every built section is up to date';
+		this.status.command = stale > 0 ? 'authorship.author.runAll' : undefined;
+		this.status.show();
+	}
+
 	// --- leaving the format ---
 
 	/**
@@ -194,9 +288,17 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private async importMarkdown(document: vscode.TextDocument): Promise<void> {
 		const picked = await vscode.window.showOpenDialog({
-			canSelectMany: false,
+			title: 'Import Markdown',
 			openLabel: 'Import',
-			filters: { Markdown: ['md', 'markdown'] },
+			// Opened where the story lives, so the manuscript is usually already
+			// on screen rather than several folders away.
+			defaultUri: vscode.Uri.joinPath(document.uri, '..'),
+			canSelectFiles: true,
+			canSelectFolders: false,
+			canSelectMany: false,
+			// `All Files` last, as a way out: a filter is a convenience, and a
+			// manuscript saved under some other extension should still be openable.
+			filters: { Markdown: ['md', 'markdown', 'mdown', 'txt'], 'All Files': ['*'] },
 		});
 		if (!picked || picked.length === 0) {
 			return;
@@ -223,7 +325,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private async partition(document: vscode.TextDocument): Promise<void> {
 		const asked = await vscode.window.showInputBox({
-			title: 'Partitioned Markdown',
+			title: 'Export as Parts',
 			prompt: 'About how many words should a part be?',
 			value: String(DEFAULT_PART_WORDS),
 			validateInput: (raw) =>
@@ -300,26 +402,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	<title>Author</title>
 </head>
 <body>
-	<header class="toolbar" id="toolbar">
-		<button class="tool" id="run-all" type="button"
-			title="Build every section that is built rather than written"><i class="codicon codicon-run-all"></i> Run All</button>
-		<button class="tool" id="spell" type="button"
-			title="Correct the prose of the selected section"><i class="codicon codicon-check-all"></i> Spell Check</button>
-		<span class="divider"></span>
-		<button class="tool" id="export-epub" type="button"
-			title="Build the book beside this document"><i class="codicon codicon-book"></i> Export EPUB</button>
-		<button class="tool" id="export-markdown" type="button"
-			title="Write this document out as one plain markdown manuscript"><i class="codicon codicon-markdown"></i> Export Markdown</button>
-		<button class="tool" id="import-markdown" type="button"
-			title="Replace this document with an existing markdown manuscript"><i class="codicon codicon-desktop-download"></i> Import Markdown</button>
-		<button class="tool" id="partition" type="button"
-			title="Cut this document into markdown parts of about a given length"><i class="codicon codicon-split-horizontal"></i> Partitioned Markdown</button>
-		<span class="divider"></span>
-		<button class="tool" id="as-text" type="button"
-			title="Open the same file as plain text"><i class="codicon codicon-file-code"></i> View Source</button>
-		<span class="spacer"></span>
-		<span class="doc-status" id="doc-status"></span>
-	</header>
 	<main id="cells" class="cells"></main>
 	<div id="menu" class="menu" hidden></div>
 	<script nonce="${nonce}" src="${script}"></script>

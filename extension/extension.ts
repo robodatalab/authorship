@@ -17,10 +17,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// The editor a `.author` file opens in. Declared in package.json under
 	// contributes.customEditors as the default for the extension, so opening one
 	// lands here rather than in the text editor.
+	const authorEditor = new AuthorEditorProvider(context, 8765);
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			AuthorEditorProvider.viewType,
-			new AuthorEditorProvider(context, 8765),
+			authorEditor,
 			{
 				webviewOptions: { retainContextWhenHidden: true },
 				// Two views of one document would each repaint the other; the
@@ -29,6 +30,16 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		)
 	);
+
+	// Its tools are VS Code's own buttons, contributed to the editor title bar in
+	// package.json and shown only over a `.author` editor. Being commands, they
+	// are in the Command Palette and bindable to keys for free — which a toolbar
+	// drawn inside the webview could never be.
+	for (const [name, run] of Object.entries(authorEditor.commands)) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand(`authorship.author.${name}`, run)
+		);
+	}
 
 	// The view container and view are declared in package.json under
 	// contributes.viewsContainers / contributes.views. Registering the provider
