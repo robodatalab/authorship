@@ -118,41 +118,6 @@
           "command": "authorship.fixGrammar",
           "when": "resourceExtname == .md",
           "group": "navigation@1"
-        },
-        {
-          "command": "authorship.author.runAll",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@1"
-        },
-        {
-          "command": "authorship.author.spellCheck",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@2"
-        },
-        {
-          "command": "authorship.author.importMarkdown",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@3"
-        },
-        {
-          "command": "authorship.author.exportMarkdown",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@4"
-        },
-        {
-          "command": "authorship.author.exportEpub",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@5"
-        },
-        {
-          "command": "authorship.author.partition",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "navigation@6"
-        },
-        {
-          "command": "authorship.author.viewSource",
-          "when": "activeCustomEditorId == 'authorship.authorEditor'",
-          "group": "authorship@1"
         }
       ]
     },

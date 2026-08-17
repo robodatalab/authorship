@@ -6,9 +6,10 @@
 // floating at the top right of whichever cell has focus, and what the cell is
 // named quietly in its bottom corner.
 //
-// There is no toolbar here. The document's own tools are commands in the editor
-// title bar, drawn by VS Code with its own icons and tooltips — a toolbar built
-// in here would have to reinvent both, and did.
+// The toolbar is in here, above the cells, the way a notebook's is. It was in
+// the editor title bar for a while, where VS Code drew it — but that bar is
+// shared with every other extension and with VS Code's own buttons, so what got
+// shown was not ours to decide, and tools kept disappearing into an overflow.
 //
 // The host owns the truth. A cell being typed into is the one exception — it
 // holds its own text until it settles, because a repaint mid-keystroke would
@@ -41,6 +42,8 @@ const vscode = acquireVsCodeApi();
 
 const cellsEl = document.getElementById('cells') as HTMLElement;
 const menuEl = document.getElementById('menu') as HTMLElement;
+const toolbarEl = document.getElementById('toolbar') as HTMLElement;
+const statusEl = document.getElementById('doc-status') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -65,8 +68,26 @@ function commit(next: Cell[]): void {
 	vscode.postMessage({ type: 'cells', cells });
 }
 
-// The title bar asks which cell to check, because only this view knows which
-// one is selected.
+// --- the toolbar ---
+
+for (const [id, type] of [
+	['run-all', 'compile'],
+	['import-markdown', 'importMarkdown'],
+	['export-markdown', 'exportMarkdown'],
+	['export-epub', 'exportEpub'],
+	['export-parts', 'partition'],
+	['as-text', 'openAsText'],
+] as const) {
+	document
+		.getElementById(id)!
+		.addEventListener('click', () => vscode.postMessage({ type }));
+}
+
+document.getElementById('spell')!.addEventListener('click', answerSpellCheck);
+
+// Keep a click on the toolbar from also being the click that dismisses a menu.
+toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
+
 function answerSpellCheck(): void {
 	const where = sourceLinesOf(cells, selected);
 	if (!where) {
@@ -96,6 +117,7 @@ function render(): void {
 		cellsEl.append(cellElement(cell, index));
 		cellsEl.append(insertBarFor(index));
 	});
+	statusEl.textContent = documentStatus();
 	drawn = signatureOf(cells);
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
@@ -109,7 +131,15 @@ function redrawCell(index: number): void {
 		return;
 	}
 	existing.replaceWith(cellElement(cells[index], index));
+	statusEl.textContent = documentStatus();
 	drawn = signatureOf(cells);
+}
+
+function documentStatus(): string {
+	const chapters = cells.filter((cell) => cell.kind === 'chapter').length;
+	const stale = cells.filter((_cell, index) => isStale(cells, index)).length;
+	const counted = `${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`;
+	return stale > 0 ? `${counted} · ${stale} to run` : counted;
 }
 
 function cellElement(cell: Cell, index: number): HTMLElement {

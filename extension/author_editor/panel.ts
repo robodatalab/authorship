@@ -12,10 +12,10 @@
 
 import * as vscode from 'vscode';
 
-import { compile, fromMarkdown, isStale, toMarkdown } from './model';
+import { compile, fromMarkdown, toMarkdown } from './model';
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { CHAPTER, dumps, parse, type Cell } from '../storydoc/model';
+import { dumps, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -29,19 +29,10 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private active?: { document: vscode.TextDocument; panel: vscode.WebviewPanel };
 
-	/** What the document holds, in the status bar where a reading belongs. */
-	private readonly status: vscode.StatusBarItem;
-
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly port: number
-	) {
-		this.status = vscode.window.createStatusBarItem(
-			vscode.StatusBarAlignment.Right,
-			100
-		);
-		context.subscriptions.push(this.status);
-	}
+	) {}
 
 	/** The commands the editor title bar shows, by the name they are bound to. */
 	get commands(): Record<string, () => void> {
@@ -100,7 +91,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 		const becomeActive = (): void => {
 			this.active = { document, panel };
-			this.showStatus(document);
 		};
 		becomeActive();
 		const focusing = panel.onDidChangeViewState(() => {
@@ -108,7 +98,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				becomeActive();
 			} else if (this.active?.panel === panel) {
 				this.active = undefined;
-				this.status.hide();
 			}
 		});
 
@@ -128,9 +117,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// tool — is the same news, and the view is repainted from the document.
 			if (event.document.uri.toString() === document.uri.toString()) {
 				send();
-				if (this.active?.document === document) {
-					this.showStatus(document);
-				}
 			}
 		});
 
@@ -178,7 +164,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			focusing.dispose();
 			if (this.active?.panel === panel) {
 				this.active = undefined;
-				this.status.hide();
 			}
 		});
 	}
@@ -248,19 +233,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				`Could not check that cell — is the model server running? (${describe(err)})`
 			);
 		}
-	}
-
-	/** What the toolbar's right-hand side used to say, in the status bar instead. */
-	private showStatus(document: vscode.TextDocument): void {
-		const cells = parse(document.getText());
-		const chapters = cells.filter((cell) => cell.kind === CHAPTER).length;
-		const stale = cells.filter((_cell, index) => isStale(cells, index)).length;
-		this.status.text = `$(book) ${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`;
-		this.status.tooltip = stale > 0
-			? `${stale} built ${stale === 1 ? 'section is' : 'sections are'} out of date — Run All rebuilds them`
-			: 'Every built section is up to date';
-		this.status.command = stale > 0 ? 'authorship.author.runAll' : undefined;
-		this.status.show();
 	}
 
 	// --- leaving the format ---
@@ -402,6 +374,26 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	<title>Author</title>
 </head>
 <body>
+	<header class="toolbar" id="toolbar">
+		<button class="tool" id="run-all" type="button"
+			data-tip="Run All — build every section that is built rather than written"><i class="codicon codicon-run-all"></i></button>
+		<button class="tool" id="spell" type="button"
+			data-tip="Spell Check — correct the prose of the selected section"><i class="codicon codicon-check-all"></i></button>
+		<span class="divider"></span>
+		<button class="tool" id="import-markdown" type="button"
+			data-tip="Import Markdown — replace this document with an existing markdown manuscript"><i class="aicon aicon-import-markdown"></i></button>
+		<button class="tool" id="export-markdown" type="button"
+			data-tip="Export Markdown — write this document out as one plain markdown manuscript"><i class="aicon aicon-export-markdown"></i></button>
+		<button class="tool" id="export-epub" type="button"
+			data-tip="Export EPUB — build the book beside this document"><i class="aicon aicon-export-epub"></i></button>
+		<button class="tool" id="export-parts" type="button"
+			data-tip="Export as Parts — cut this document into markdown parts of about a given length"><i class="aicon aicon-export-parts"></i></button>
+		<span class="divider"></span>
+		<button class="tool" id="as-text" type="button"
+			data-tip="View Source — open the same file as plain text"><i class="codicon codicon-file-code"></i></button>
+		<span class="spacer"></span>
+		<span class="doc-status" id="doc-status"></span>
+	</header>
 	<main id="cells" class="cells"></main>
 	<div id="menu" class="menu" hidden></div>
 	<script nonce="${nonce}" src="${script}"></script>

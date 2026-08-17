@@ -1,3 +1,69 @@
+@font-face {
+	font-family: 'authorship-icons';
+	font-display: block;
+	src: url('authorship-icons.woff') format('woff');
+}
+
+/* The icons drawn for this extension, beside the codicons, in one weight. */
+.aicon {
+	font-family: 'authorship-icons';
+	font-size: 16px;
+	line-height: 1;
+	display: inline-block;
+}
+
+.aicon-import-markdown::before { content: '\E001'; }
+.aicon-export-markdown::before { content: '\E002'; }
+.aicon-export-epub::before { content: '\E003'; }
+.aicon-export-parts::before { content: '\E004'; }
+
+/* --- the toolbar --- */
+
+.toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	display: flex;
+	gap: 2px;
+	align-items: center;
+	padding: 5px 12px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+}
+
+.toolbar .divider {
+	width: 1px;
+	height: 16px;
+	margin: 0 6px;
+	background: var(--vscode-widget-border, var(--vscode-panel-border, currentColor));
+	opacity: 0.5;
+}
+
+.toolbar .spacer {
+	flex: 1;
+}
+
+.tool {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 7px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.tool:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.doc-status {
+	font-size: 0.9em;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+
 :root {
 	/* The run column: wide enough for the button and the state under it, and
 	   reserved on every cell so the bodies line up down the page. */
