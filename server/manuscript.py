@@ -182,14 +182,6 @@ class Manuscript:
         return None
 
     @property
-    def graph_path(self) -> Path:
-        return self._beside(".graph.yaml")
-
-    @property
-    def attribution_path(self) -> Path:
-        return self._beside(".attribution.yaml")
-
-    @property
     def epub_path(self) -> Path:
         return self._beside(".epub")
 

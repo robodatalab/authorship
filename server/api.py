@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-import tenacity
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -14,33 +13,23 @@ from server.publishing.epub_exporter import build_epub
 from server.writing_tools.grammar import correct_span
 from roost import (
     InferenceModelResourceManager,
-    ModelNotAvailable,
-    CausalModel, EncoderModel, Seq2SeqModel,
-    coedit_prompt, machine_memory, qwen_chat_prompt
+    EncoderModel, Seq2SeqModel,
+    coedit_prompt, machine_memory
 )
 from server.jobs import Job, ParallelJobsManager
-from server.representations.line_contribution import line_contribution, write_attribution
 from server.manuscript import Manuscript
-from server.representations import (
-    build_character_representation,
-    build_plot_representation,
-    build_scene_representation,
-)
 from server.representations.semantic_search import SearchIndex
-from server.representations.story_graph import to_yaml
 
 _log = log.logger(__name__)
 
 
-CLASSIFIER_MODEL = "Qwen/Qwen3.5-4B"
 GRAMMAR_MODEL = "grammarly/coedit-xl"
 ENCODER_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 
 # What each model was measured holding over a single batch, and what the models
-# are allowed between them. The quota holds both large models and the encoder at
-# once: the encoder answers while the cursor moves, and evicting a 5GB model to
-# seat 1GB of it would make every section cost a reload.
-CLASSIFIER_MODEL_GB = 5.0
+# are allowed between them. The quota holds both at once: the encoder answers
+# while the cursor moves, and evicting the 5GB model to seat 1GB of it would make
+# every section cost a reload.
 GRAMMAR_MODEL_GB = 5.0
 ENCODER_MODEL_GB = 1.0
 MEMORY_QUOTA_GB = 11.0
@@ -49,9 +38,6 @@ MEMORY_QUOTA_GB = 11.0
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager(MEMORY_QUOTA_GB)
-    app.state.completion_model = CausalModel(
-        CLASSIFIER_MODEL, qwen_chat_prompt, app.state.models, CLASSIFIER_MODEL_GB
-    )
     app.state.grammar_model = Seq2SeqModel(
         GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
     )
@@ -59,7 +45,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         ENCODER_MODEL, app.state.models, ENCODER_MODEL_GB
     )
     app.state.inference_models = [
-        app.state.completion_model,
         app.state.grammar_model,
         app.state.encoder_model,
     ]
@@ -127,59 +112,6 @@ def _manuscript(path: str) -> Manuscript:
     return Manuscript.load(document)
 
 
-class RepresentationBuildRequest(BaseModel):
-    # Path of the document
-    path: str
-
-
-@tenacity.retry(
-    retry=tenacity.retry_if_exception_type((ValueError, ModelNotAvailable)),
-    wait=tenacity.wait_exponential_jitter(initial=1, max=30),
-    stop=tenacity.stop_after_attempt(5),
-    reraise=True,
-)
-def _build_representations(model, markdown):
-    return [
-        build_scene_representation(model, markdown),
-        build_plot_representation(model, markdown),
-        build_character_representation(model, markdown),
-    ]
-
-
-
-class RepresentationBuildJob(Job):
-    kind = "representation build"
-
-    def __init__(self, model: CausalModel, manuscript: Manuscript) -> None:
-        super().__init__(str(manuscript.graph_path))
-        self._model = model
-        self._manuscript = manuscript
-
-    def execute(self) -> None:
-        graphs = _build_representations(self._model, self._manuscript)
-        if not self.cancelled:
-            self._manuscript.graph_path.write_text(to_yaml(graphs))
-
-
-class LineContributionJob(Job):
-    kind = "line contribution"
-
-    def __init__(self, model: EncoderModel, manuscript: Manuscript, line: int) -> None:
-        # Keyed by the file it writes, like every other job — so scoring a section
-        # of a manuscript never supersedes a grammar pass on the manuscript itself.
-        super().__init__(str(manuscript.attribution_path))
-        self._model = model
-        self._manuscript = manuscript
-        self._line = line
-
-    def execute(self) -> None:
-        contribution = line_contribution(self._model, self._manuscript, self._line)
-        if contribution is None:
-            raise ValueError(f"no section covers line {self._line}")
-        if not self.cancelled:
-            write_attribution(Path(self.target), contribution)
-
-
 class SearchIndexJob(Job):
     kind = "search index"
 
@@ -236,21 +168,6 @@ def jobs() -> dict[str, Any]:
     }
 
 
-@app.post("/build", status_code=202)
-def build(request: RepresentationBuildRequest) -> dict[str, Any]:
-    """Generate representations of a manuscript."""
-    job = RepresentationBuildJob(
-        app.state.completion_model, _manuscript(request.path)
-    )
-    app.state.jobs.start(job)
-    return {"id": job.target, "path": job.target}
-
-
-@app.get("/build/status")
-def build_status(id: str) -> dict[str, Any]:
-    return {"running": app.state.jobs.is_running(id)}
-
-
 class EpubExportRequest(BaseModel):
     # Path of the manuscript to publish. What the book says about itself is read
     # from `<name>.authorship.md` beside it, which the author edits directly.
@@ -292,38 +209,6 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     out_path = manuscript.epub_path
     build_epub(manuscript, out_path, book, cover)
     return {"path": str(out_path), "authorship": str(authorship_path)}
-
-
-class LineContributionRequest(BaseModel):
-    # Path of the manuscript.
-    path: str
-    # 0-based line the cursor is on. The section covering it is the one measured.
-    line: int
-
-
-@app.post("/line_contribution", status_code=202)
-def line_contribution_endpoint(request: LineContributionRequest) -> dict[str, Any]:
-    """Start scoring the section the cursor is in; the scores land beside the
-    manuscript as `<name>.attribution.yaml`.
-
-    A forward pass per line of a section outlives an HTTP request often enough
-    that it runs as a job, and the job is followed through /jobs like the rest of
-    the work the server has in hand.
-    """
-    manuscript = _manuscript(request.path)
-
-    job = LineContributionJob(app.state.encoder_model, manuscript, request.line)
-    app.state.jobs.start(job)
-    return {"id": job.target, "path": job.target}
-
-
-@app.get("/line_contribution/status")
-def line_contribution_status(id: str) -> dict[str, Any]:
-    """Whether the scoring job is still running; the file it writes is its result."""
-    job = app.state.jobs.get(id)
-    if not isinstance(job, LineContributionJob):
-        raise HTTPException(status_code=404, detail=f"No scoring job for {id}")
-    return {"running": not job.done, "error": job.error}
 
 
 class SearchIndexRequest(BaseModel):

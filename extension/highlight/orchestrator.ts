@@ -4,10 +4,6 @@
 // each layer looks like, and repaints whenever the visible editors change. No
 // feature makes a decoration type of its own for this, so no feature can paint
 // over another or clear marks it did not make.
-//
-// The attribution column is deliberately not here. It draws in the margin rather
-// than on the prose, it is per-line rather than per-span, and it competes with
-// nothing — it stays where it is, in line_contribution/gutter.ts.
 
 import * as vscode from 'vscode';
 

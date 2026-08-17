@@ -46,44 +46,8 @@ const extensionConfig = {
   },
 };
 /**
- * The graph view runs inside the webview, which is a browser context rather than
- * Node, so it needs its own bundle. The panel loads it from dist/ by URI.
- *
- * @type WebpackConfig
- */
-const webviewConfig = {
-  target: 'web',
-  mode: 'none',
-  entry: './extension/story_graph/view.ts',
-  output: {
-    path: path.resolve(__dirname, 'dist'),
-    filename: 'story_graph_view.js'
-  },
-  resolve: {
-    extensions: ['.ts', '.js']
-  },
-  module: {
-    rules: [
-      {
-        test: /\.ts$/,
-        exclude: /node_modules/,
-        use: [
-          {
-            loader: 'ts-loader'
-          }
-        ]
-      }
-    ]
-  },
-  devtool: 'nosources-source-map',
-  infrastructureLogging: {
-    level: "log",
-  },
-};
-
-/**
- * The Publish sidebar runs inside its own webview, so like the graph view it
- * needs a browser-context bundle of its own, loaded from dist/ by URI.
+ * The Publish sidebar runs inside a webview, which is a browser context rather
+ * than Node, so it needs a bundle of its own, loaded from dist/ by URI.
  *
  * @type WebpackConfig
  */
@@ -117,4 +81,4 @@ const publishViewConfig = {
   },
 };
 
-module.exports = [ extensionConfig, webviewConfig, publishViewConfig ];
+module.exports = [ extensionConfig, publishViewConfig ];

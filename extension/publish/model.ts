@@ -10,7 +10,7 @@
 //
 // Deliberately free of the `vscode` module, so it can be unit tested without
 // launching an editor. panel.ts wraps these paths in vscode.Uri at the call
-// sites — the same split story_graph/model.ts keeps.
+// sites.
 
 /** `story.md` sits next to `story.authorship.md`, as `story.graph.yaml` does. */
 export function authorshipPathFor(mdPath: string): string {
