@@ -86,13 +86,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	): void {
 		panel.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [
-				vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-				vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
-				// Covers and figures are named relative to the document, so the
-				// folder it sits in is what the view is allowed to load from.
-				vscode.Uri.joinPath(document.uri, '..'),
-			],
+			localResourceRoots: assetRoots(this.context.extensionUri, document.uri),
 		};
 		panel.webview.html = this.html(panel.webview);
 
@@ -502,6 +496,27 @@ interface JobStatus {
 	running: boolean;
 	error: string | null;
 	blurb?: string;
+}
+
+/**
+ * The folders a document's webview is allowed to load pictures out of.
+ *
+ * Covers and figures are named relative to the document, so the folder it sits
+ * in has to be one of them. But a part names its cover `../cover.jpg` — it lives
+ * in `parts/` and the art stayed with the story — so the folder alone is not
+ * enough, and the boundary is the project the story is in.
+ *
+ * A file opened from outside any workspace has no project to be in, and falls
+ * back to its own folder rather than to the whole disk.
+ */
+function assetRoots(extension: vscode.Uri, document: vscode.Uri): vscode.Uri[] {
+	const project = vscode.workspace.getWorkspaceFolder(document);
+	return [
+		vscode.Uri.joinPath(extension, 'media'),
+		vscode.Uri.joinPath(extension, 'dist'),
+		vscode.Uri.joinPath(document, '..'),
+		...(project ? [project.uri] : []),
+	];
 }
 
 /** `story.author` is exported beside itself as `story.md`. */
