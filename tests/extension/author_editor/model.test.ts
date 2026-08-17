@@ -75,6 +75,18 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('title-page')).toBe(false);
 	});
 
+	it('hints at the shape of every field that has one', () => {
+		const hints = Object.fromEntries(
+			fieldsOf('title-page').map((f) => [f.name, f.hint])
+		);
+		expect(hints.date).toBe('YYYY-MM-DD');
+		expect(hints.version).toBe('1.0');
+		expect(hints.isbn).toBeTruthy();
+		// A title is a title; there is nothing a hint would add.
+		expect(hints.title).toBeUndefined();
+		expect(hints.author).toBeUndefined();
+	});
+
 	it('marks only the ISBN optional', () => {
 		expect(fieldsOf('title-page').filter((f) => f.optional).map((f) => f.name)).toEqual([
 			'isbn',

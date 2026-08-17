@@ -21,6 +21,14 @@ import {
 export interface CellField {
 	name: string;
 	label: string;
+	/**
+	 * What a well-formed value looks like, shown in the empty box.
+	 *
+	 * For a field whose label already says everything — a title is a title —
+	 * there is nothing to add. For one with a shape to it, the label names the
+	 * field and the hint says how to write it.
+	 */
+	hint?: string;
 	/** Shown, but a book is complete without it. */
 	optional?: boolean;
 }
@@ -82,9 +90,9 @@ export const KINDS: CellKind[] = [
 			{ name: 'subtitle', label: 'Subtitle' },
 			{ name: 'author', label: 'Author' },
 			{ name: 'publisher', label: 'Publisher' },
-			{ name: 'date', label: 'Date' },
-			{ name: 'version', label: 'Version' },
-			{ name: 'isbn', label: 'ISBN', optional: true },
+			{ name: 'date', label: 'Date', hint: 'YYYY-MM-DD' },
+			{ name: 'version', label: 'Version', hint: '1.0' },
+			{ name: 'isbn', label: 'ISBN', hint: '978-0-000-00000-0', optional: true },
 		],
 		primary: false,
 		blank: () => ({ kind: TITLE_PAGE, source: '', attrs: { title: 'Untitled' } }),

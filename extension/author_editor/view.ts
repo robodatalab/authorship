@@ -259,7 +259,10 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 		const input = document.createElement('input');
 		input.className = position === 0 ? 'cell-title' : 'cell-field';
 		input.value = cell.attrs[field.name] ?? '';
-		input.placeholder = field.optional ? `${field.label} (optional)` : field.label;
+		// The label is already beside the box, so an empty box is free to say what
+		// a good value looks like instead of repeating the name.
+		input.placeholder =
+			field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
 		input.addEventListener('change', () => {
 			const next = [...cells];
 			const attrs = { ...cell.attrs, [field.name]: input.value };
