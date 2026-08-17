@@ -140,9 +140,8 @@ export const KINDS: CellKind[] = [
 	{
 		kind: DISCLAIMER,
 		prose: true,
-		// Named as well as written: a disclaimer is a page the reader turns to,
-		// so it carries a heading of its own like any other — and "Heads Up!"
-		// serves a book better than "Disclaimer" when the author says so.
+		// Named as well as written: a disclaimer is a page the reader turns to, so
+		// it carries a heading of its own like any other.
 		fields: [{ name: 'title', label: 'Title' }],
 		label: 'Disclaimer',
 		automated: false,
@@ -150,7 +149,7 @@ export const KINDS: CellKind[] = [
 		blank: () => ({
 			kind: DISCLAIMER,
 			source: DISCLAIMER_TEXT,
-			attrs: { title: 'Heads Up!' },
+			attrs: { title: 'Disclaimer' },
 		}),
 	},
 	{

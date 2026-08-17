@@ -94,7 +94,7 @@ describe('the kinds a section can be', () => {
 
 	it('starts a disclaimer with something worth keeping', () => {
 		const blank = KINDS.find((k) => k.kind === 'disclaimer')!.blank();
-		expect(blank.attrs.title).toBeTruthy();
+		expect(blank.attrs.title).toBe('Disclaimer');
 		expect(blank.source).toContain('work of fiction');
 		expect(blank.source).toContain('consent');
 	});
