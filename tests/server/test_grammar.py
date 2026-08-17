@@ -4,16 +4,21 @@ No model. `correct_span` takes its corrector by injection and only ever asks it
 to `complete`, so a stand-in that uppercases what it is given drives the whole
 path — what is under test is which prose reaches the model and how the answer is
 put back, not the correcting itself.
+
+The documents are built through `dumps` rather than written out by hand, so a
+change to how the format is written cannot leave these testing a layout that no
+longer exists.
 """
 
 import unittest
 
+from server import storydoc
+from server.storydoc import Document
 from server.writing_tools.grammar import _prose_blocks, correct_span
-from server.manuscript import Manuscript
 
 
 class Uppercase:
-    """A corrector whose answer is unmistakable in the manuscript."""
+    """A corrector whose answer is unmistakable in the document."""
 
     def complete(self, instruction: str, text: str, max_new_tokens: int = 0) -> str:
         return text.upper()
@@ -30,131 +35,144 @@ class Recording:
         return text.upper()
 
 
-MANUSCRIPT = "## One\n\nteh cat sat.\n\nit purred.\n\n## Two\n\nteh dog.\n"
+# Laid out as:  0 chapter   2 markdown  4 'teh cat sat.'  6 'it purred.'
+#               8 chapter  10 markdown 12 'teh dog.'
+DOCUMENT = storydoc.dumps(
+    [
+        storydoc.chapter("One"),
+        storydoc.markdown("teh cat sat.\n\nit purred."),
+        storydoc.chapter("Two"),
+        storydoc.markdown("teh dog."),
+    ]
+)
+WHOLE = len(Document(DOCUMENT).lines) - 1
 
 
 class ProseBlocks(unittest.TestCase):
-    """A paragraph at a time, and never a note."""
+    """A paragraph at a time, and never a marker or a note."""
 
     def test_a_blank_line_ends_a_paragraph(self) -> None:
-        manuscript = Manuscript(MANUSCRIPT)
-        self.assertEqual(_prose_blocks(manuscript, 0, 8), [(2, 2), (4, 4), (8, 8)])
+        document = Document(DOCUMENT)
+        self.assertEqual(
+            _prose_blocks(document, 0, WHOLE), [(4, 4), (6, 6), (12, 12)]
+        )
 
     def test_lines_running_together_are_one_paragraph(self) -> None:
-        manuscript = Manuscript("## One\n\nteh cat sat.\nit purred.\n")
-        self.assertEqual(_prose_blocks(manuscript, 0, 3), [(2, 3)])
+        document = Document(
+            storydoc.dumps([storydoc.markdown("teh cat sat.\nit purred.")])
+        )
+        self.assertEqual(_prose_blocks(document, 0, 4), [(2, 3)])
 
     def test_a_note_is_not_a_paragraph(self) -> None:
-        manuscript = Manuscript("## One\n\nteh cat sat.\n<!-- check -->\nteh dog.\n")
-        self.assertEqual(_prose_blocks(manuscript, 0, 4), [(2, 2), (4, 4)])
+        document = Document(
+            storydoc.dumps(
+                [storydoc.markdown("teh cat.\n\n<!-- fix later -->\n\nit sat.")]
+            )
+        )
+        self.assertEqual(_prose_blocks(document, 0, 8), [(2, 2), (6, 6)])
+
+    def test_a_cell_marker_is_never_a_paragraph(self) -> None:
+        # The markers are what the structure is written in. A pass that corrected
+        # one would be asking the model to rewrite the document's shape.
+        document = Document(DOCUMENT)
+        covered = {
+            line
+            for first, last in _prose_blocks(document, 0, WHOLE)
+            for line in range(first, last + 1)
+        }
+        self.assertEqual(covered, {4, 6, 12})
 
     def test_only_the_lines_asked_for_are_covered(self) -> None:
-        manuscript = Manuscript(MANUSCRIPT)
-        self.assertEqual(_prose_blocks(manuscript, 4, 8), [(4, 4), (8, 8)])
+        document = Document(DOCUMENT)
+        self.assertEqual(_prose_blocks(document, 6, WHOLE), [(6, 6), (12, 12)])
 
-    def test_a_section_heading_is_never_a_paragraph(self) -> None:
-        manuscript = Manuscript(MANUSCRIPT)
-        self.assertNotIn((6, 6), _prose_blocks(manuscript, 0, 8))
+    def test_a_built_cell_is_never_corrected(self) -> None:
+        # A table of contents disagreeing with the chapters is the one thing it
+        # must not do, and a model asked to improve it would see to that.
+        document = Document(
+            storydoc.dumps(
+                [storydoc.Cell("contents", "1. One"), storydoc.markdown("a b.")]
+            )
+        )
+        blocks = _prose_blocks(document, 0, len(document.lines) - 1)
+        self.assertEqual([document.lines[first] for first, _ in blocks], ["a b."])
 
 
 class CorrectSpan(unittest.TestCase):
+    def test_corrects_the_span_and_leaves_the_rest_alone(self) -> None:
+        document = Document(DOCUMENT)
+        correct_span(Uppercase(), document, 4, 6)
+        self.assertIn("TEH CAT SAT.", str(document))
+        self.assertIn("IT PURRED.", str(document))
+        self.assertIn("teh dog.", str(document))
 
-    def test_corrects_the_span_and_leaves_the_rest_of_the_manuscript_alone(
-        self,
-    ) -> None:
-        manuscript = Manuscript(MANUSCRIPT)
-        correct_span(Uppercase(), manuscript, 8, 8)
+    def test_leaves_every_cell_marker_where_it_was(self) -> None:
+        document = Document(DOCUMENT)
+        correct_span(Uppercase(), document, 0, WHOLE)
+        self.assertIn('<!-- cell: chapter title="One" -->', str(document))
+        self.assertIn('<!-- cell: chapter title="Two" -->', str(document))
+        self.assertIn("<!-- cell: markdown -->", str(document))
+
+    def test_the_document_still_reads_as_the_same_cells(self) -> None:
+        document = Document(DOCUMENT)
+        correct_span(Uppercase(), document, 0, WHOLE)
         self.assertEqual(
-            str(manuscript),
-            "## One\n\nteh cat sat.\n\nit purred.\n\n## Two\n\nTEH DOG.\n",
+            [(cell.kind, cell.title) for cell in document.cells],
+            [
+                ("chapter", "One"),
+                ("markdown", ""),
+                ("chapter", "Two"),
+                ("markdown", ""),
+            ],
         )
 
     def test_keeps_the_blank_line_between_the_paragraphs_it_corrects(self) -> None:
-        manuscript = Manuscript(MANUSCRIPT)
-        correct_span(Uppercase(), manuscript, 2, 4)
-        self.assertEqual(
-            str(manuscript),
-            "## One\n\nTEH CAT SAT.\n\nIT PURRED.\n\n## Two\n\nteh dog.\n",
-        )
-
-    def test_a_manuscript_ending_without_a_newline_gains_none(self) -> None:
-        manuscript = Manuscript("## One\nteh cat.")
-        correct_span(Uppercase(), manuscript, 1, 1)
-        self.assertEqual(str(manuscript), "## One\nTEH CAT.")
+        document = Document(DOCUMENT)
+        correct_span(Uppercase(), document, 4, 6)
+        self.assertIn("TEH CAT SAT.\n\nIT PURRED.", str(document))
 
     def test_each_paragraph_is_asked_for_on_its_own(self) -> None:
         model = Recording()
-        correct_span(model, Manuscript(MANUSCRIPT), 0, 8)
-        self.assertEqual(
-            sorted(model.asked), ["it purred.", "teh cat sat.", "teh dog."]
-        )
+        correct_span(model, Document(DOCUMENT), 0, WHOLE)
+        self.assertEqual(sorted(model.asked), ["it purred.", "teh cat sat.", "teh dog."])
 
-    def test_lines_holding_no_prose_are_nothing_to_correct(self) -> None:
-        with self.assertRaises(ValueError):
-            correct_span(Uppercase(), Manuscript(MANUSCRIPT), 3, 3)
-
-    def test_a_cancelled_pass_stops_asking(self) -> None:
+    def test_a_note_is_never_handed_to_the_model(self) -> None:
         model = Recording()
-        correct_span(model, Manuscript(MANUSCRIPT), 2, 4, lambda: True)
-        self.assertEqual(model.asked, [])
+        document = Document(
+            storydoc.dumps(
+                [storydoc.markdown("teh cat.\n\n<!-- fix later -->\n\nit sat.")]
+            )
+        )
+        correct_span(model, document, 0, len(document.lines) - 1)
+        self.assertEqual(sorted(model.asked), ["it sat.", "teh cat."])
+        self.assertIn("<!-- fix later -->", str(document))
 
     def test_a_correction_that_runs_long_does_not_disturb_what_is_left(self) -> None:
-        # Blocks are corrected back to front, so a paragraph coming back as more
-        # lines than it went in as cannot move the ones still to be corrected.
         class Doubling:
             def complete(
                 self, instruction: str, text: str, max_new_tokens: int = 0
             ) -> str:
-                return text.upper() + "\n" + text.upper()
+                return f"{text.upper()}\n{text.upper()}"
 
-        manuscript = Manuscript(MANUSCRIPT)
-        correct_span(Doubling(), manuscript, 2, 4)
-        self.assertEqual(
-            str(manuscript),
-            "## One\n\nTEH CAT SAT.\nTEH CAT SAT.\n\nIT PURRED.\nIT PURRED.\n"
-            "\n## Two\n\nteh dog.\n",
-        )
+        document = Document(DOCUMENT)
+        correct_span(Doubling(), document, 4, 6)
+        self.assertIn("TEH CAT SAT.\nTEH CAT SAT.", str(document))
+        self.assertIn("IT PURRED.\nIT PURRED.", str(document))
 
-
-class Notes(unittest.TestCase):
-    """A note to self is not the story, and a correction leaves it alone.
-
-    The model answers whatever it is given with a sentence, so a note that
-    reached it would come back as prose the author never wrote.
-    """
-
-    def test_a_note_between_paragraphs_comes_back_exactly_as_it_was(self) -> None:
-        noted = "## One\n\nteh cat sat.\n\n<!-- check this -->\n\nit purred.\n"
-        manuscript = Manuscript(noted)
-        correct_span(Uppercase(), manuscript, 2, 6)
-        self.assertEqual(
-            str(manuscript),
-            "## One\n\nTEH CAT SAT.\n\n<!-- check this -->\n\nIT PURRED.\n",
-        )
-
-    def test_a_note_spanning_lines_is_never_handed_over_in_halves(self) -> None:
-        noted = (
-            "## One\n\nteh cat sat.\n\n"
-            "<!--\nnot yet:\n\nteh dog barked.\n-->\n\nit purred.\n"
-        )
+    def test_a_cancelled_pass_stops_asking(self) -> None:
         model = Recording()
-        manuscript = Manuscript(noted)
-        correct_span(model, manuscript, 2, 10)
-        self.assertEqual(sorted(model.asked), ["it purred.", "teh cat sat."])
-        self.assertEqual(
-            str(manuscript),
-            "## One\n\nTEH CAT SAT.\n\n"
-            "<!--\nnot yet:\n\nteh dog barked.\n-->\n\nIT PURRED.\n",
-        )
+        correct_span(model, Document(DOCUMENT), 4, 6, lambda: True)
+        self.assertEqual(model.asked, [])
 
-    def test_a_note_never_closed_silences_the_rest_of_the_span(self) -> None:
-        noted = "## One\n\nteh cat sat.\n\n<!-- from here on, notes\nteh dog.\n"
-        manuscript = Manuscript(noted)
-        correct_span(Uppercase(), manuscript, 2, 5)
-        self.assertEqual(
-            str(manuscript),
-            "## One\n\nTEH CAT SAT.\n\n<!-- from here on, notes\nteh dog.\n",
-        )
+    def test_a_document_with_no_prose_at_all_is_refused(self) -> None:
+        document = Document(storydoc.dumps([storydoc.chapter("One")]))
+        with self.assertRaises(ValueError):
+            correct_span(Uppercase(), document, 0, len(document.lines) - 1)
+
+    def test_a_document_ending_without_a_newline_gains_none(self) -> None:
+        document = Document(DOCUMENT.rstrip("\n"))
+        correct_span(Uppercase(), document, 4, 4)
+        self.assertFalse(str(document).endswith("\n"))
 
 
 if __name__ == "__main__":

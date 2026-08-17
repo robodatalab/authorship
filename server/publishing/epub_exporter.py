@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from server.manuscript import Manuscript, StoryLines
+from server.storydoc import Document
 from server.publishing.authorship import Authorship
 
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
@@ -79,24 +79,16 @@ class Chapter:
         return f"<h2>{_inline(self.name)}</h2>\n{blocks_to_xhtml(self.body_lines)}"
 
 
-def chapters_of(manuscript: Manuscript) -> list[Chapter]:
-    """A chapter per section, carrying what the section says rather than what is
-    written on the page — the author's notes are not published."""
-    chapters: list[Chapter] = []
-    for section in manuscript.sections:
-        body: list[str] = []
-        previous: int | None = None
-        for index, said in StoryLines(manuscript, section.start, section.end):
-            # A gap in the numbers is the blank line or the note that was there;
-            # either way it is where one paragraph ends and the next begins.
-            if previous is not None and index != previous + 1:
-                body.append("")
-            body.append(said)
-            previous = index
-        if not body:
-            continue
-        chapters.append(Chapter(len(chapters), section.title, body))
-    return chapters
+def chapters_of(document: Document) -> list[Chapter]:
+    """A chapter per chapter cell, carrying the prose written under it.
+
+    Which cells those are is the document's to say — a chapter is a cell that
+    says it is one, so a heading someone wrote in their prose stays prose.
+    """
+    return [
+        Chapter(index, title, body)
+        for index, (title, body) in enumerate(document.chapters())
+    ]
 
 
 CONTAINER_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -314,19 +306,19 @@ def build_ncx(book_id, title, chapters):
 
 
 def build_epub(
-    manuscript: Manuscript,
+    document: Document,
     out_path: Path,
     book: Authorship,
     cover: Path | None,
 ) -> None:
     """Write the manuscript as an EPUB, dressed in what `book` says about it.
 
-    The manuscript names the book and names its chapters; the authorship carries
+    The document names the book and names its chapters; the authorship carries
     what publishing needs and the story never says. The two are never asked the
     same question, so there is nothing here to reconcile.
     """
-    chapters = chapters_of(manuscript)
-    title = manuscript.title
+    chapters = chapters_of(document)
+    title = document.title
     lang = book.language
     front = [
         page

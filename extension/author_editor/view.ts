@@ -89,17 +89,15 @@ document.getElementById('spell')!.addEventListener('click', answerSpellCheck);
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
 
+/**
+ * Which lines the host should have corrected, or null when there are none.
+ *
+ * Null is reported rather than swallowed: a selected chapter has no prose in it
+ * and a button that quietly does nothing is indistinguishable from one that is
+ * broken.
+ */
 function answerSpellCheck(): void {
-	const where = sourceLinesOf(cells, selected);
-	if (!where) {
-		return;
-	}
-	vscode.postMessage({
-		type: 'spellCheck',
-		line: where.start,
-		start: where.start,
-		end: where.end,
-	});
+	vscode.postMessage({ type: 'spellCheck', where: sourceLinesOf(cells, selected) });
 }
 
 // --- cells ---

@@ -10,7 +10,17 @@ from server.publishing.epub_exporter import (
     build_epub,
     chapters_of,
 )
-from server.manuscript import Manuscript
+from server import storydoc
+from server.storydoc import Cell, Document
+
+
+def document(*cells: Cell) -> Document:
+    """A document written the way the format writes one."""
+    return Document(storydoc.dumps(list(cells)))
+
+
+def titled(name: str) -> Cell:
+    return Cell(storydoc.TITLE_PAGE, "", {"title": name})
 
 
 class Inline(unittest.TestCase):
@@ -54,20 +64,41 @@ class Blocks(unittest.TestCase):
 
 class Chapters(unittest.TestCase):
     def test_a_chapter_per_heading(self) -> None:
-        chapters = chapters_of(Manuscript("## One\n\na\n\n## Two\n\nb\n"))
+        chapters = chapters_of(
+            document(
+                storydoc.chapter("One"),
+                storydoc.markdown("a"),
+                storydoc.chapter("Two"),
+                storydoc.markdown("b"),
+            )
+        )
         self.assertEqual([c.title for c in chapters], ["One", "Two"])
 
     def test_front_matter_before_the_first_heading_is_not_a_chapter(self) -> None:
-        chapters = chapters_of(Manuscript("# Book\n\nintro\n\n## One\n\nprose\n"))
+        chapters = chapters_of(
+            document(
+                titled("Book"),
+                storydoc.markdown("intro"),
+                storydoc.chapter("One"),
+                storydoc.markdown("prose"),
+            )
+        )
         # The book's title opens the title page, not a chapter of its own.
         self.assertEqual([c.title for c in chapters], ["One"])
 
     def test_a_manuscript_with_no_headings_has_no_chapters(self) -> None:
-        chapters = chapters_of(Manuscript("just some prose\nand more\n"))
+        chapters = chapters_of(document(storydoc.markdown("just some prose\nand more")))
         self.assertEqual(chapters, [])
 
     def test_chapters_are_numbered_in_order(self) -> None:
-        chapters = chapters_of(Manuscript("## A\n\nx\n\n## B\n\ny\n"))
+        chapters = chapters_of(
+            document(
+                storydoc.chapter("A"),
+                storydoc.markdown("x"),
+                storydoc.chapter("B"),
+                storydoc.markdown("y"),
+            )
+        )
         self.assertEqual(
             [c.filename for c in chapters],
             ["chap_000.xhtml", "chap_001.xhtml"],
@@ -84,24 +115,30 @@ class BuildEpub(unittest.TestCase):
 
     def _build(
         self,
-        md_text: str,
-        *,
+        *cells: Cell,
         cover: Path | None = None,
         name: str = "story",
+        book: Authorship | None = None,
     ) -> Path:
-        md_path = self.root / f"{name}.md"
-        md_path.write_text(md_text, encoding="utf-8")
+        path = self.root / f"{name}{storydoc.EXTENSION}"
+        storydoc.save(path, list(cells))
         out_path = self.root / f"{name}.epub"
         build_epub(
-            Manuscript.load(md_path),
+            Document.load(path),
             out_path,
-            Authorship(author="A. Writer"),
+            book or Authorship(author="A. Writer"),
             cover,
         )
         return out_path
 
     def test_writes_a_zip_with_the_epub_skeleton(self) -> None:
-        out = self._build("# Book\n\n## One\n\nprose\n\n## Two\n\nmore\n")
+        out = self._build(
+            titled("Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("more"),
+        )
 
         self.assertTrue(zipfile.is_zipfile(out))
         with zipfile.ZipFile(out) as z:
@@ -118,7 +155,7 @@ class BuildEpub(unittest.TestCase):
             self.assertEqual(z.read("mimetype"), b"application/epub+zip")
 
     def test_mimetype_is_first_and_stored_uncompressed(self) -> None:
-        out = self._build("## One\n\nprose\n")
+        out = self._build(storydoc.chapter("One"), storydoc.markdown("prose"))
 
         with zipfile.ZipFile(out) as z:
             first = z.infolist()[0]
@@ -128,31 +165,44 @@ class BuildEpub(unittest.TestCase):
             self.assertEqual(first.compress_type, zipfile.ZIP_STORED)
 
     def test_one_xhtml_per_chapter(self) -> None:
-        out = self._build("## One\n\na\n\n## Two\n\nb\n\n## Three\n\nc\n")
+        out = self._build(
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("b"),
+            storydoc.chapter("Three"),
+            storydoc.markdown("c"),
+        )
 
         with zipfile.ZipFile(out) as z:
             chapters = [n for n in z.namelist() if n.startswith("OEBPS/chap_")]
         self.assertEqual(len(chapters), 3)
 
     def test_a_cover_is_embedded_only_when_one_is_given(self) -> None:
-        without = self._build("## One\n\nprose\n", name="plain")
+        without = self._build(storydoc.chapter("One"), storydoc.markdown("prose"), name="plain")
         with zipfile.ZipFile(without) as z:
             self.assertNotIn("OEBPS/cover.xhtml", z.namelist())
 
         cover = self.root / "cover.png"
         cover.write_bytes(b"\x89PNG\r\n\x1a\n not really a png")
-        with_cover = self._build("## One\n\nprose\n", cover=cover, name="dressed")
+        with_cover = self._build(
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            cover=cover,
+            name="dressed",
+        )
         with zipfile.ZipFile(with_cover) as z:
             names = z.namelist()
             self.assertIn("OEBPS/cover.xhtml", names)
             self.assertIn("OEBPS/cover.png", names)
 
     def test_the_title_page_carries_the_book_title_and_the_author(self) -> None:
-        md_path = self.root / "titled.md"
-        md_path.write_text("# My Book\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "titled.epub"
-        build_epub(
-            Manuscript.load(md_path), out_path, Authorship(author="A. Writer"), None
+        out_path = self._build(
+            titled("My Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="titled",
+            book=Authorship(author="A. Writer"),
         )
 
         with zipfile.ZipFile(out_path) as z:
@@ -163,10 +213,13 @@ class BuildEpub(unittest.TestCase):
 
     def test_the_manuscript_is_what_names_the_book(self) -> None:
         # The authorship file has no title of its own to disagree with this one.
-        md_path = self.root / "named.md"
-        md_path.write_text("# The Only Title\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "named.epub"
-        build_epub(Manuscript.load(md_path), out_path, Authorship(), None)
+        out_path = self._build(
+            titled("The Only Title"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="named",
+            book=Authorship(),
+        )
 
         with zipfile.ZipFile(out_path) as z:
             page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
@@ -176,14 +229,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<dc:title>The Only Title</dc:title>", opf)
 
     def test_the_title_page_carries_the_subtitle_and_publisher(self) -> None:
-        md_path = self.root / "dressed.md"
-        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "dressed.epub"
-        build_epub(
-            Manuscript.load(md_path),
-            out_path,
-            Authorship(subtitle="A Novel", publisher="Riverlight Press"),
-            None,
+        out_path = self._build(
+            titled("Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="dressed",
+            book=Authorship(subtitle="A Novel", publisher="Riverlight Press"),
         )
 
         with zipfile.ZipFile(out_path) as z:
@@ -195,14 +246,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<dc:publisher>Riverlight Press</dc:publisher>", opf)
 
     def test_the_blurb_travels_as_the_books_description(self) -> None:
-        md_path = self.root / "blurbed.md"
-        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "blurbed.epub"
-        build_epub(
-            Manuscript.load(md_path),
-            out_path,
-            Authorship(blurb="A woman loses her name."),
-            None,
+        out_path = self._build(
+            titled("Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="blurbed",
+            book=Authorship(blurb="A woman loses her name."),
         )
 
         with zipfile.ZipFile(out_path) as z:
@@ -211,14 +260,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<dc:description>A woman loses her name.</dc:description>", opf)
 
     def test_a_disclaimer_gets_a_page_of_its_own(self) -> None:
-        md_path = self.root / "careful.md"
-        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "careful.epub"
-        build_epub(
-            Manuscript.load(md_path),
-            out_path,
-            Authorship(disclaimer="Any resemblance is coincidental."),
-            None,
+        out_path = self._build(
+            titled("Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="careful",
+            book=Authorship(disclaimer="Any resemblance is coincidental."),
         )
 
         with zipfile.ZipFile(out_path) as z:
@@ -228,24 +275,24 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("Any resemblance is coincidental.", page)
 
     def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
-        out = self._build("## One\n\nprose\n", name="bare")
+        out = self._build(
+            storydoc.chapter("One"), storydoc.markdown("prose"), name="bare"
+        )
 
         with zipfile.ZipFile(out) as z:
             self.assertNotIn("OEBPS/disclaimer.xhtml", z.namelist())
 
     def test_the_authors_links_close_the_book(self) -> None:
-        md_path = self.root / "linked.md"
-        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
-        out_path = self.root / "linked.epub"
-        build_epub(
-            Manuscript.load(md_path),
-            out_path,
-            Authorship(
+        out_path = self._build(
+            titled("Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            name="linked",
+            book=Authorship(
                 author="A. Writer",
                 kindle=Link("Buy on Kindle", "https://amazon.example/dp/1"),
                 author_page=Link("My website", "https://writer.example"),
             ),
-            None,
         )
 
         with zipfile.ZipFile(out_path) as z:

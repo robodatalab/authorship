@@ -14,6 +14,12 @@ import * as vscode from 'vscode';
 
 import { compile, fromMarkdown, toMarkdown } from './model';
 import { BODY } from './page';
+
+/** How often a running correction is asked whether it has finished. */
+const GRAMMAR_POLL_MS = 400;
+
+/** Long enough for a model that has to load first, short enough to give up. */
+const GRAMMAR_TIMEOUT_MS = 180_000;
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
 import { dumps, parse, type Cell } from '../storydoc/model';
@@ -133,10 +139,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					void this.write(document, compile(parse(document.getText())));
 					break;
 				case 'spellCheck':
-					void this.spellCheck(document, Number(message.line), {
-						start: Number(message.start),
-						end: Number(message.end),
-					});
+					this.onActive((d) => this.spellCheck(d, message.where));
 					break;
 				case 'exportEpub':
 					void this.exportEpub(document);
@@ -200,13 +203,19 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * The server works on files and line spans, and a `.author` file is a file
 	 * like any other — so a cell asks for the lines it is on and the correction
 	 * arrives back as a change to the document, which repaints the view.
+	 *
+	 * The pass runs as a job on the server, so this waits on it rather than
+	 * firing and returning: a correction that takes ten seconds to arrive is
+	 * indistinguishable from one that never started.
 	 */
 	private async spellCheck(
 		document: vscode.TextDocument,
-		line: number,
-		selection: { start: number; end: number }
+		where: { start: number; end: number } | null
 	): Promise<void> {
-		if (!Number.isFinite(selection.start) || !Number.isFinite(selection.end)) {
+		if (!where) {
+			void vscode.window.showInformationMessage(
+				'That section has no prose to correct — select one that does.'
+			);
 			return;
 		}
 		if (document.isDirty) {
@@ -214,26 +223,56 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// what it will read.
 			await document.save();
 		}
-		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/fix/grammar`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					path: document.uri.fsPath,
-					line,
-					selection,
-				}),
-			});
-			if (!response.ok) {
-				void vscode.window.showErrorMessage(
-					`Could not check that cell: ${response.statusText}`
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Correcting ${basename(document.uri)}…`,
+			},
+			async () => {
+				const started = await fetch(
+					`http://127.0.0.1:${this.port}/fix/grammar`,
+					{
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({
+							path: document.uri.fsPath,
+							line: where.start,
+							selection: where,
+						}),
+					}
 				);
+				if (!started.ok) {
+					throw new Error(await detailOf(started));
+				}
+				const { id } = (await started.json()) as { id: string };
+				await this.awaitJob(id);
 			}
-		} catch (err) {
-			void vscode.window.showErrorMessage(
-				`Could not check that cell — is the model server running? (${describe(err)})`
+		);
+	}
+
+	/** Wait for a grammar job to finish, or for it to have gone wrong. */
+	private async awaitJob(id: string): Promise<void> {
+		const deadline = Date.now() + GRAMMAR_TIMEOUT_MS;
+		while (Date.now() < deadline) {
+			await new Promise((wake) => setTimeout(wake, GRAMMAR_POLL_MS));
+			const response = await fetch(
+				`http://127.0.0.1:${this.port}/fix/grammar/status?id=${encodeURIComponent(id)}`
 			);
+			if (!response.ok) {
+				throw new Error(await detailOf(response));
+			}
+            const { running, error } = (await response.json()) as {
+				running: boolean;
+				error: string | null;
+			};
+			if (error) {
+				throw new Error(error);
+			}
+			if (!running) {
+				return;
+			}
 		}
+		throw new Error('the correction is taking longer than expected');
 	}
 
 	// --- leaving the format ---
@@ -397,6 +436,16 @@ interface Markdown {
 /** `story.author` is exported beside itself as `story.md`. */
 function markdownBeside(document: vscode.Uri): vscode.Uri {
 	return document.with({ path: document.path.replace(/\.author$/i, '') + '.md' });
+}
+
+/** What the server said went wrong, or failing that what HTTP said. */
+async function detailOf(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { detail?: string };
+		return body.detail ?? response.statusText;
+	} catch {
+		return response.statusText;
+	}
 }
 
 function basename(uri: vscode.Uri): string {

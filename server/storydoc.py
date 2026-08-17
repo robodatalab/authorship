@@ -35,6 +35,7 @@ marker opens a new cell. Markdown has the same bargain with fences.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -50,6 +51,9 @@ ABOUT = "about"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
+
+_COMMENT_OPEN = "<!--"
+_COMMENT_CLOSE = "-->"
 
 
 @dataclass(frozen=True)
@@ -166,6 +170,214 @@ def cover(src: str, alt: str = "Cover") -> Cell:
 def contents() -> Cell:
     """The table of contents, built at export from the chapters around it."""
     return Cell(CONTENTS)
+
+
+def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
+    """The stretches of those lines that are not the author's notes.
+
+    A note is `<!-- -->`, which is also what a cell marker is written as — so
+    this is the same rule keeping the structure out of the story and keeping the
+    author's asides out of it. Given indices as well as lines, so it can answer
+    about a stretch of a file rather than only about a whole one."""
+    ranges: list[tuple[int, int]] = []
+    kept_indices: list[int] = []
+    inside = False
+
+    for line, index in zip(lines, line_indices):
+        # A comment may open on one line and close on another, and one never
+        # closed runs to the end, so a line is only known by what came above it.
+        commented = inside
+        remainder: list[str] = []
+        rest = line
+
+        while rest:
+            if inside:
+                close = rest.find(_COMMENT_CLOSE)
+                if close < 0:
+                    break
+                inside = False
+                rest = rest[close + len(_COMMENT_CLOSE) :]
+            else:
+                opened = rest.find(_COMMENT_OPEN)
+                if opened < 0:
+                    remainder.append(rest)
+                    break
+                remainder.append(rest[:opened])
+                commented = True
+                inside = True
+                rest = rest[opened + len(_COMMENT_OPEN) :]
+
+        # Prose standing beside a comment is still prose; only a line the comment
+        # left nothing of is a comment line. A blank line the author wrote is not.
+        if commented and not "".join(remainder).strip():
+            if kept_indices:
+                ranges.append((kept_indices[0], kept_indices[-1]))
+                kept_indices = []
+        else:
+            kept_indices.append(index)
+
+    if kept_indices:
+        ranges.append((kept_indices[0], kept_indices[-1]))
+
+    return ranges
+
+
+# Built from the rest of the document rather than written, so never prose anyone
+# corrects or searches. Mirrors `automated` in the editor's own model.
+BUILT_KINDS = frozenset({CONTENTS})
+
+
+@dataclass(frozen=True)
+class Placed:
+    """A cell and where its text sits in the file, 0-based and inclusive.
+
+    The server works in line numbers — correcting a passage means naming the
+    lines it is on, and a search result is a run of them — so a cell has to be
+    able to say where it is. `at` is None for a cell with no text of its own.
+    """
+
+    cell: Cell
+    at: tuple[int, int] | None
+
+
+def place(text: str) -> list[Placed]:
+    """Every cell, with the lines its text occupies."""
+    placed: list[Placed] = []
+    kind, attrs, body, first = MARKDOWN, {}, [], 0
+
+    def close() -> None:
+        # `dumps` strips blank lines off both ends of a cell's text, so the lines
+        # it occupies are the ones between the outermost non-blank ones.
+        written = [i for i, line in enumerate(body) if line != ""]
+        source = "\n".join(body).strip("\n")
+        if not (source or placed or attrs or kind != MARKDOWN):
+            return
+        at = (first + written[0], first + written[-1]) if written else None
+        placed.append(Placed(Cell(kind, source, dict(attrs)), at))
+
+    for index, line in enumerate(text.splitlines()):
+        marker = _MARKER.match(line)
+        if not marker:
+            body.append(line)
+            continue
+        close()
+        kind, attrs, body, first = marker.group(1), _read_attrs(marker.group(2)), [], index + 1
+    close()
+    return placed
+
+
+class Document:
+    """A story document, and the file it is written in.
+
+    Everything the server does to a story it does through this: the prose it can
+    correct, the lines it can search, the chapters it can bind into a book. The
+    structure comes from the cells, so a heading in the prose is prose — which is
+    the whole reason the format marks its structure rather than inferring it.
+    """
+
+    def __init__(self, text: str, path: Path | None = None) -> None:
+        self.path = path
+        self._read(text)
+
+    def _read(self, text: str) -> None:
+        self.text = text
+        self.lines = text.splitlines()
+        self.placed = place(text)
+        self.cells = [p.cell for p in self.placed]
+
+    @classmethod
+    def load(cls, path: Path) -> "Document":
+        return cls(path.read_text(encoding="utf-8"), path)
+
+    def save(self, path: Path | None = None) -> None:
+        target = path or self.path
+        assert target is not None
+        target.write_text(self.text, encoding="utf-8")
+
+    @property
+    def title(self) -> str:
+        """What the book is called, which only the title page says."""
+        for cell in self.cells:
+            if cell.kind == TITLE_PAGE and cell.title:
+                return cell.title
+        return "Anonymous"
+
+    def story_lines(
+        self, start: int = 0, end: int | None = None
+    ) -> Iterator[tuple[int, str]]:
+        """The lines that are prose, by their number in the file.
+
+        The markers are not among them, nor is anything in a cell the document
+        writes for itself — asking a model to correct a table of contents would
+        be asking it to disagree with the chapters.
+        """
+        last = len(self.lines) - 1 if end is None else end
+        for placed in self.placed:
+            if placed.at is None or placed.cell.kind in BUILT_KINDS:
+                continue
+            first, final = placed.at
+            covered = list(range(first, final + 1))
+            # A cell's prose may carry the author's own notes, and those are no
+            # more story than the markers around them.
+            for kept_first, kept_last in _split_comments(
+                [self.lines[i] for i in covered], covered
+            ):
+                for index in range(max(kept_first, start), min(kept_last, last) + 1):
+                    said = self.lines[index].strip()
+                    if said:
+                        yield index, said
+
+    def chapters(self) -> list[tuple[str, list[str]]]:
+        """Each chapter and the prose written under it.
+
+        A chapter cell opens one; the prose cells after it belong to it until the
+        next chapter opens. What stands before the first chapter is front matter
+        and belongs to no chapter at all.
+        """
+        found: list[tuple[str, list[str]]] = []
+        for cell in self.cells:
+            if cell.kind == CHAPTER:
+                found.append((cell.title or f"Chapter {len(found) + 1}", []))
+            elif found and cell.source and cell.kind not in BUILT_KINDS:
+                body = found[-1][1]
+                if body:
+                    body.append("")
+                body.extend(cell.source.splitlines())
+        return found
+
+    def __str__(self) -> str:
+        return self.text
+
+    def lines_at(self, line: int) -> tuple[int, int] | None:
+        """The lines of the cell that `line` falls in — what to correct when the
+        author names a cursor rather than a selection."""
+        for placed in self.placed:
+            if placed.at and placed.at[0] <= line <= placed.at[1]:
+                return placed.at
+        return None
+
+    def beside(self, suffix: str) -> Path:
+        """A file named after this one — `story.author` gives `story.epub`."""
+        assert self.path is not None
+        return self.path.with_suffix(suffix)
+
+    def delete(self, start: int, end: int) -> None:
+        """Take out lines `start` to `end`, both included."""
+        lines = list(self.lines)
+        del lines[start : end + 1]
+        self._rewrite(lines)
+
+    def insert(self, at: int, text: str) -> None:
+        """Put `text` in as whole lines, the first landing on line `at`."""
+        lines = list(self.lines)
+        lines[at:at] = text.splitlines()
+        self._rewrite(lines)
+
+    def _rewrite(self, lines: list[str]) -> None:
+        # Where the cells fall is a reading of the lines, so a document that has
+        # been written in is read again rather than adjusted.
+        ends_with_newline = self.text.endswith("\n")
+        self._read("\n".join(lines) + ("\n" if ends_with_newline else ""))
 
 
 def _read_attrs(text: str) -> dict[str, str]:

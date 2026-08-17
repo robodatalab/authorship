@@ -92,8 +92,21 @@ describe('the toolbar', () => {
 	it('spell check reports the selected cell by the lines it occupies', async () => {
 		await mount([markdown('one'), markdown('two')]);
 		document.getElementById('spell')!.dispatchEvent(new MouseEvent('click'));
-		const asked = posted.find((m) => m.type === 'spellCheck');
-		expect(asked).toMatchObject({ start: 2, end: 2 });
+		expect(posted.find((m) => m.type === 'spellCheck')).toEqual({
+			type: 'spellCheck',
+			where: { start: 2, end: 2 },
+		});
+	});
+
+	it('spell check says so when the selected section has no prose', async () => {
+		// It used to report nothing at all, which looked exactly like a button
+		// that was never wired up.
+		await mount([chapter('One')]);
+		document.getElementById('spell')!.dispatchEvent(new MouseEvent('click'));
+		expect(posted.find((m) => m.type === 'spellCheck')).toEqual({
+			type: 'spellCheck',
+			where: null,
+		});
 	});
 
 	it('counts the chapters for the status', async () => {

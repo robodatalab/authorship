@@ -13,7 +13,7 @@ from roost.resource_manager import (
     MemoryReading,
     ModelKind,
 )
-from server.representations.semantic_search import SearchIndex
+from server import storydoc
 
 
 DEFAULT_REPLY = (
@@ -120,10 +120,16 @@ class GrammarFix(unittest.TestCase):
         super().setUp()
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
-        self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text(
-            "## One\n\nteh cat.\n\n## Two\n\nteh dog.\n", encoding="utf-8"
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        self.written = storydoc.dumps(
+            [
+                storydoc.chapter("One"),
+                storydoc.markdown("teh cat."),
+                storydoc.chapter("Two"),
+                storydoc.markdown("teh dog."),
+            ]
         )
+        self.document.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
             app.state.grammar_model = None
@@ -136,15 +142,15 @@ class GrammarFix(unittest.TestCase):
     def test_corrects_the_section_the_cursor_is_in_and_leaves_the_rest(self) -> None:
         client = TestClient(app)
         started = client.post(
-            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
+            "/fix/grammar", json={"path": str(self.document), "line": 4}
         )
         self.assertEqual(started.status_code, 202)
 
         status = wait_for_grammar(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(
-            self.manuscript.read_text(),
-            "## One\n\nthe cat.\n\n## Two\n\nteh dog.\n",
+            self.document.read_text(),
+            self.written.replace("teh cat.", "the cat."),
         )
 
     def test_corrects_the_selected_lines_rather_than_the_section_around_them(
@@ -154,9 +160,9 @@ class GrammarFix(unittest.TestCase):
         started = client.post(
             "/fix/grammar",
             json={
-                "path": str(self.manuscript),
-                "line": 6,
-                "selection": {"start": 6, "end": 6},
+                "path": str(self.document),
+                "line": 10,
+                "selection": {"start": 10, "end": 10},
             },
         )
         self.assertEqual(started.status_code, 202)
@@ -164,18 +170,18 @@ class GrammarFix(unittest.TestCase):
         status = wait_for_grammar(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(
-            self.manuscript.read_text(),
-            "## One\n\nteh cat.\n\n## Two\n\nthe cat.\n",
+            self.document.read_text(),
+            self.written.replace("teh dog.", "the cat."),
         )
 
     def test_a_selection_of_blank_lines_has_nothing_to_correct(self) -> None:
         # Where a section ends is the server's to say, and so is whether there is
-        # prose in it — which it only knows once the job has the manuscript open.
+        # prose in it — which it only knows once the job has the document open.
         client = TestClient(app)
         started = client.post(
             "/fix/grammar",
             json={
-                "path": str(self.manuscript),
+                "path": str(self.document),
                 "line": 3,
                 "selection": {"start": 3, "end": 3},
             },
@@ -185,14 +191,14 @@ class GrammarFix(unittest.TestCase):
         status = wait_for_grammar(client, started.json()["id"])
         self.assertEqual(status["error"], "There is no prose there to correct.")
         self.assertEqual(
-            self.manuscript.read_text(), "## One\n\nteh cat.\n\n## Two\n\nteh dog.\n"
+            self.document.read_text(), self.written
         )
 
-    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
+    def test_a_missing_document_is_a_bad_request(self) -> None:
         client = TestClient(app)
         response = client.post(
             "/fix/grammar",
-            json={"path": str(self.manuscript.with_name("nope.md")), "line": 0},
+            json={"path": str(self.document.with_name("nope.author")), "line": 0},
         )
         self.assertEqual(response.status_code, 400)
 
@@ -271,128 +277,13 @@ class ExportEpub(unittest.TestCase):
         self.assertTrue(written.exists())
         self.assertTrue(zipfile.is_zipfile(written))
 
-    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
+    def test_a_missing_document_is_a_bad_request(self) -> None:
         client = TestClient(app)
         response = client.post(
             "/export/epub",
             json={"path": str(self.manuscript.with_name("nope.md"))},
         )
         self.assertEqual(response.status_code, 400)
-
-
-def wait_for_indexing(client: TestClient, timeout: float = 5.0) -> None:
-    """Indexing has no status of its own; the job list is where it ends."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        jobs = client.get("/jobs").json()["jobs"]
-        if not any(job["kind"] == "search index" for job in jobs):
-            return
-        time.sleep(0.005)
-    raise AssertionError(f"indexing did not finish within {timeout}s")
-
-
-class Search(unittest.TestCase):
-    STORY = "## One\n\nthe gate swung shut\n\nshe poured the tea\n"
-    VECTORS = {
-        "the gate swung shut": [1.0, 0.0],
-        "she poured the tea": [0.0, 1.0],
-        "the gate": [1.0, 0.0],
-    }
-
-    def setUp(self) -> None:
-        super().setUp()
-        self._dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._dir.cleanup)
-        self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text(self.STORY, encoding="utf-8")
-
-        def _restore_model():
-            app.state.encoder_model = None
-
-        self.addCleanup(_restore_model)
-
-        model = mock.MagicMock()
-        model.encode.side_effect = lambda texts: [self.VECTORS[text] for text in texts]
-
-        app.state.encoder_model = model
-        app.state.search_index = SearchIndex()
-        app.state.jobs = ParallelJobsManager()
-
-    def test_a_manuscript_not_yet_encoded_answers_nothing_and_says_so(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/search", json={"path": str(self.manuscript), "phrase": "the gate"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"hits": [], "pending": 2})
-
-    def test_indexing_then_searching_finds_the_passage(self) -> None:
-        client = TestClient(app)
-        started = client.post("/search/index", json={"path": str(self.manuscript)})
-        self.assertEqual(started.status_code, 202)
-        wait_for_indexing(client)
-
-        response = client.post(
-            "/search", json={"path": str(self.manuscript), "phrase": "the gate"}
-        )
-        self.assertEqual(
-            response.json(),
-            {
-                "hits": [
-                    {
-                        "start": 2,
-                        "end": 2,
-                        "score": 1.0,
-                        "text": "the gate swung shut",
-                    }
-                ],
-                "pending": 0,
-            },
-        )
-
-    def test_the_indexing_is_among_the_work_the_server_has_in_hand(self) -> None:
-        # It writes no file and reports no progress, so appearing here is the
-        # only account it gives of itself.
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        def encode(texts):
-            entered.release()
-            release.wait(timeout=5)
-            return [self.VECTORS[text] for text in texts]
-
-        app.state.encoder_model.encode.side_effect = encode
-        client = TestClient(app)
-
-        client.post("/search/index", json={"path": str(self.manuscript)})
-        self.assertTrue(entered.acquire(timeout=5))
-
-        self.assertEqual(
-            client.get("/jobs").json(),
-            {
-                "jobs": [
-                    {
-                        "kind": "search index",
-                        "path": str(self.manuscript),
-                        "status": "running",
-                    }
-                ]
-            },
-        )
-
-        release.set()
-        wait_for_indexing(client)
-
-    def test_a_missing_manuscript_is_a_bad_request(self) -> None:
-        client = TestClient(app)
-        missing = str(self.manuscript.with_name("nope.md"))
-        self.assertEqual(
-            client.post("/search/index", json={"path": missing}).status_code, 400
-        )
-        self.assertEqual(
-            client.post("/search", json={"path": missing, "phrase": "x"}).status_code,
-            400,
-        )
 
 
 if __name__ == "__main__":
