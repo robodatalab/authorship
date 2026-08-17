@@ -8,6 +8,7 @@
 
 import {
 	ABOUT,
+	BLURB,
 	CHAPTER,
 	CONTENTS,
 	COVER,
@@ -39,6 +40,33 @@ export interface CellKind {
 	label: string;
 	/** Built by running it, from the rest of the document, not typed by the author. */
 	automated: boolean;
+	/**
+	 * Written by the server when the author asks, and by the author the rest of
+	 * the time.
+	 *
+	 * Distinct from `automated`, which means the document writes the cell and the
+	 * author never does. A generated cell has a run button *and* opens for
+	 * editing: asking for a blurb is asking for a first draft, not for something
+	 * that will be overwritten from under you.
+	 */
+	generated?: boolean;
+	/**
+	 * Kept in the working document and printed in no book.
+	 *
+	 * What the author writes *about* the story is not part of it. Mirrors
+	 * `PRIVATE_KINDS` in `server/storydoc.py`, which keeps the same cells out of
+	 * the EPUB.
+	 */
+	unpublished?: boolean;
+	/**
+	 * A page of the book rather than part of the story.
+	 *
+	 * The cover, the title page, the contents, the disclaimer, the author's page:
+	 * a reader meets these on the way in or on the way out. They are printed once,
+	 * where they stand, and never travel with a chapter — which is what keeps them
+	 * out of the parts a division cuts.
+	 */
+	matter?: boolean;
 	/**
 	 * What the cell records apart from prose.
 	 *
@@ -120,6 +148,7 @@ export const KINDS: CellKind[] = [
 			{ name: 'version', label: 'Version', hint: '1.0' },
 			{ name: 'isbn', label: 'ISBN', hint: '978-0-000-00000-0', optional: true },
 		],
+		matter: true,
 		primary: false,
 		blank: () => ({ kind: TITLE_PAGE, source: '', attrs: { title: 'Untitled' } }),
 	},
@@ -129,6 +158,7 @@ export const KINDS: CellKind[] = [
 		fields: [],
 		label: 'Cover',
 		automated: false,
+		matter: true,
 		primary: false,
 		blank: () => ({
 			kind: COVER,
@@ -142,6 +172,7 @@ export const KINDS: CellKind[] = [
 		fields: [],
 		label: 'Table of Contents',
 		automated: true,
+		matter: true,
 		primary: false,
 		blank: () => ({ kind: CONTENTS, source: '', attrs: {} }),
 	},
@@ -153,6 +184,7 @@ export const KINDS: CellKind[] = [
 		fields: [{ name: 'title', label: 'Title' }],
 		label: 'Disclaimer',
 		automated: false,
+		matter: true,
 		primary: false,
 		blank: () => ({
 			kind: DISCLAIMER,
@@ -179,8 +211,23 @@ export const KINDS: CellKind[] = [
 		label: 'About the Author',
 		automated: false,
 		named: true,
+		matter: true,
 		primary: false,
 		blank: () => ({ kind: ABOUT, source: '', attrs: {} }),
+	},
+	{
+		kind: BLURB,
+		// The copy that sells the book, which is not in the book. It is written
+		// here because it is written from the story and nowhere else has it.
+		prose: true,
+		fields: [],
+		label: 'Blurb',
+		automated: false,
+		generated: true,
+		unpublished: true,
+		named: true,
+		primary: false,
+		blank: () => ({ kind: BLURB, source: '', attrs: {} }),
 	},
 ];
 
@@ -197,6 +244,31 @@ export function isAutomated(kind: string): boolean {
 /** Whether this kind's label is printed as the section's heading. */
 export function isNamed(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.named ?? false;
+}
+
+/** Whether the server writes this kind on request. */
+export function isGenerated(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.generated ?? false;
+}
+
+/**
+ * Whether this kind is a page of the book rather than part of the story.
+ *
+ * A kind nobody has heard of is not: an unrecognised cell holds text the author
+ * put in the document, and the safe reading of it is the story.
+ */
+export function isMatter(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.matter ?? false;
+}
+
+/**
+ * Whether this kind stays in the working document and reaches no book.
+ *
+ * A kind nobody has heard of is published: an unrecognised cell is text the
+ * author put in the document, and dropping it on the way out would lose writing.
+ */
+export function isUnpublished(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.unpublished ?? false;
 }
 
 /** What this kind records apart from prose; empty for a kind that is only prose. */
@@ -361,6 +433,11 @@ export function fromMarkdown(text: string): Cell[] {
 export function toMarkdown(cells: Cell[]): string {
 	const out: string[] = [];
 	for (const cell of cells) {
+		// Leaving the format loses which cell a passage came from; it must not also
+		// leak what was never part of the book.
+		if (isUnpublished(cell.kind)) {
+			continue;
+		}
 		if (cell.kind === TITLE_PAGE) {
 			out.push(...titlePageMarkdown(cell));
 			continue;

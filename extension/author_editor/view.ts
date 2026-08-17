@@ -21,6 +21,7 @@ import {
 	withDefaultCell,
 	hasProse,
 	isAutomated,
+	isGenerated,
 	isNamed,
 	isStale,
 	fieldsOf,
@@ -58,11 +59,14 @@ let editing: number | null = null;
 let selected = 0;
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
 /**
- * What the view believes the document says.
+ * What is on the page right now.
  *
- * Set both when the page is drawn and when an edit is sent, so the edit's own
- * echo can be told apart from a change that came from somewhere else — a revert,
- * a correction the server wrote, an edit in a text editor alongside.
+ * The document comes back after every edit, and this is how the view tells an
+ * echo it has already drawn from news it has not: a revert, a correction the
+ * server wrote, an edit in a text editor alongside. Only the cell being typed in
+ * is ahead of the document — the box on screen already says what was typed — so
+ * only typing records what it sent. Everything else waits to be told and draws
+ * what arrives.
  */
 let drawn = '';
 
@@ -81,8 +85,6 @@ function signatureOf(list: Cell[]): string {
 
 function commit(next: Cell[]): void {
 	cells = next;
-	// Recorded before it goes, so the change coming back is recognised as ours.
-	drawn = signatureOf(next);
 	vscode.postMessage({ type: 'cells', cells });
 }
 
@@ -130,9 +132,13 @@ function render(): void {
 	const wasAt = window.scrollY;
 	cellsEl.textContent = '';
 	cells.forEach((cell, index) => {
-		cellsEl.append(cellElement(cell, index));
 		cellsEl.append(insertBarFor(index));
+		cellsEl.append(cellElement(cell, index));
 	});
+	// The bar below the last cell. With one above every cell as well, every gap in
+	// the document has one — including the gap above the first cell, which is the
+	// only way a cover gets in front of a title page that is already written.
+	cellsEl.append(insertBarFor(cells.length));
 	statusEl.textContent = documentStatus();
 	drawn = signatureOf(cells);
 	// Rebuilding resets the scroll; the author was reading somewhere.
@@ -190,8 +196,13 @@ function select(index: number): void {
 }
 
 /**
- * The narrow column down the left: the run button for a cell that is built, and
+ * The narrow column down the left: the run button for a cell that is run, and
  * under it whether what it holds is still what it would build to.
+ *
+ * Two kinds of cell have a run button and they run differently. A built one — a
+ * table of contents — is made here from the cells around it, in an instant. A
+ * generated one is written by the server from the whole story, and takes as long
+ * as that takes, so the host runs it and shows the progress.
  *
  * Reserved even for a cell nobody runs, so the bodies line up down the page.
  */
@@ -199,32 +210,46 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	const column = document.createElement('div');
 	column.className = 'run-column';
 
-	if (!isAutomated(cell.kind)) {
+	const built = isAutomated(cell.kind);
+	const generated = isGenerated(cell.kind);
+	if (!built && !generated) {
 		return column;
 	}
 
+	const named = labelOf(cell.kind).toLowerCase();
 	const run = document.createElement('button');
 	run.type = 'button';
 	run.className = 'run';
-	run.dataset.tip = `Build this ${labelOf(cell.kind).toLowerCase()} from the document`;
+	run.dataset.tip = built
+		? `Build this ${named} from the document`
+		: `Write this ${named} from the story`;
 	const glyph = document.createElement('i');
 	glyph.className = 'codicon codicon-play';
 	run.append(glyph);
 	run.addEventListener('click', (event) => {
 		event.stopPropagation();
-		commit(runCell(cells, index));
+		if (built) {
+			commit(runCell(cells, index));
+		} else {
+			vscode.postMessage({ type: 'generate', at: index });
+		}
 	});
+	column.append(run);
 
-	const stale = isStale(cells, index);
-	const state = document.createElement('i');
-	state.className = stale
-		? 'state stale codicon codicon-circle-large-outline'
-		: 'state fresh codicon codicon-pass-filled';
-	state.dataset.tip = stale
-		? 'Out of date — the document has moved on since this was built'
-		: 'Up to date with the document';
-
-	column.append(run, state);
+	// Only a cell built from the document can be out of step with it. What a model
+	// wrote has nothing to disagree with, and a draft the author has since edited
+	// is not out of date — it is theirs.
+	if (built) {
+		const stale = isStale(cells, index);
+		const state = document.createElement('i');
+		state.className = stale
+			? 'state stale codicon codicon-circle-large-outline'
+			: 'state fresh codicon codicon-pass-filled';
+		state.dataset.tip = stale
+			? 'Out of date — the document has moved on since this was built'
+			: 'Up to date with the document';
+		column.append(state);
+	}
 	return column;
 }
 
@@ -390,35 +415,47 @@ function kindLabelFor(cell: Cell): HTMLElement {
 }
 
 /**
- * The strip under a cell where the next one is added.
+ * The strip in a gap between cells, where a cell is added at `at`.
  *
  * Insertion belongs here rather than in the toolbar: what an author means by
  * "add a chapter" is nearly always "add one *here*", and a toolbar button has to
  * be told where here is. The bar is where the cursor already was.
  */
-function insertBarFor(index: number): HTMLElement {
+function insertBarFor(at: number): HTMLElement {
 	const bar = document.createElement('div');
 	bar.className = 'insert-bar';
 
 	for (const kind of KINDS.filter((k) => k.primary)) {
-		bar.append(
-			insertButton(kind.label, () =>
-				commit(insertAt(cells, index + 1, kind.blank()))
-			)
-		);
+		bar.append(insertButton(kind.label, () => insertCell(at, kind.blank())));
 	}
 	bar.append(
 		insertButton(
 			'',
 			(event) => {
 				const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-				openInsertMenu(box.left, box.bottom + 2, index);
+				openInsertMenu(box.left, box.bottom + 2, at);
 			},
 			'ellipsis',
 			'Add any kind of section here'
 		)
 	);
 	return bar;
+}
+
+/** Add a cell, and select it — it is the one the author is about to write in. */
+function insertCell(at: number, cell: Cell): void {
+	selected = at;
+	commit(insertAt(cells, at, cell));
+}
+
+/** Move a cell, keeping the selection on it rather than on where it used to be. */
+function moveCell(index: number, by: number): void {
+	const next = moveBy(cells, index, by);
+	if (next === cells) {
+		return;
+	}
+	selected = index + by;
+	commit(next);
 }
 
 function insertButton(
@@ -449,8 +486,8 @@ function actionsFor(index: number): HTMLElement {
 	const actions = document.createElement('div');
 	actions.className = 'actions';
 	actions.append(
-		iconButton('chevron-up', 'Move up', () => commit(moveBy(cells, index, -1))),
-		iconButton('chevron-down', 'Move down', () => commit(moveBy(cells, index, 1))),
+		iconButton('chevron-up', 'Move up', () => moveCell(index, -1)),
+		iconButton('chevron-down', 'Move down', () => moveCell(index, 1)),
 		iconButton('trash', 'Delete this section', () => {
 			selected = Math.max(0, index - 1);
 			commit(removeAt(cells, index));
@@ -480,6 +517,10 @@ function settle(index: number, source: string): void {
 	if (cells[index] && cells[index].source !== source) {
 		const next = [...cells];
 		next[index] = { ...cells[index], source };
+		// The box the author is typing in already says this, so what comes back is
+		// not news — recorded before it goes, or the echo would repaint the cell
+		// out from under the caret.
+		drawn = signatureOf(next);
 		commit(next);
 	}
 }
@@ -543,12 +584,10 @@ function iconButton(
  * again would be two ways to click the same thing. Between the buttons and this,
  * every kind is one click from the bar and none of them twice.
  */
-function openInsertMenu(x: number, y: number, index: number): void {
+function openInsertMenu(x: number, y: number, at: number): void {
 	menuEl.textContent = '';
 	for (const kind of KINDS.filter((k) => !k.primary)) {
-		menuEl.append(
-			menuItem(kind.label, () => commit(insertAt(cells, index + 1, kind.blank())))
-		);
+		menuEl.append(menuItem(kind.label, () => insertCell(at, kind.blank())));
 	}
 	placeMenu(x, y);
 }
@@ -556,13 +595,18 @@ function openInsertMenu(x: number, y: number, index: number): void {
 /** What can be done to this cell. Adding one is the insert bar's question. */
 function openCellMenu(x: number, y: number, index: number): void {
 	menuEl.textContent = '';
-	menuEl.append(menuHeading(labelOf(cells[index]?.kind ?? '')));
-	if (isAutomated(cells[index]?.kind ?? '')) {
+	const kind = cells[index]?.kind ?? '';
+	menuEl.append(menuHeading(labelOf(kind)));
+	if (isAutomated(kind)) {
 		menuEl.append(menuItem('Run', () => commit(runCell(cells, index))));
+	} else if (isGenerated(kind)) {
+		menuEl.append(
+			menuItem('Write', () => vscode.postMessage({ type: 'generate', at: index }))
+		);
 	}
 	menuEl.append(
-		menuItem('Move up', () => commit(moveBy(cells, index, -1))),
-		menuItem('Move down', () => commit(moveBy(cells, index, 1))),
+		menuItem('Move up', () => moveCell(index, -1)),
+		menuItem('Move down', () => moveCell(index, 1)),
 		menuItem('Delete', () => {
 			selected = Math.max(0, index - 1);
 			commit(removeAt(cells, index));

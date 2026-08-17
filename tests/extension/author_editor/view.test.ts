@@ -14,6 +14,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BODY } from '../../../extension/author_editor/page';
 import { chapter, contents, markdown, type Cell } from '../../../extension/storydoc/model';
 
+function blurb(source = ''): Cell {
+	return { kind: 'blurb', source, attrs: {} };
+}
+
 let posted: { type: string; [key: string]: unknown }[] = [];
 
 /** Mount the page and load the view against it, as the webview does. */
@@ -39,6 +43,11 @@ function send(cells: Cell[]): void {
 
 function shown(): Element[] {
 	return [...document.querySelectorAll('.cell')];
+}
+
+/** The strips between the cells, in the order the gaps come. */
+function bars(): Element[] {
+	return [...document.querySelectorAll('.insert-bar')];
 }
 
 function lastCells(): Cell[] {
@@ -203,6 +212,16 @@ describe('opening a cell', () => {
 		expect(shown()[0].querySelector('textarea')).toBeNull();
 	});
 
+	it('opens a cell the server writes, which is still the author’s', async () => {
+		// A blurb has a run button like a table of contents, and unlike one it is
+		// a draft — asking for it again is the author's choice, not the document's.
+		await mount([blurb('A woman loses her name.')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).not.toBeNull();
+	});
+
 	it('leaves the open cell alone when the document comes back', async () => {
 		// The bug this replaces: the echo of the view's own edit repainted the
 		// page, tore out the textarea, and the blur that fired closed the cell.
@@ -213,6 +232,25 @@ describe('opening a cell', () => {
 		const open = shown()[0].querySelector('textarea');
 		send([markdown('a')]);
 		expect(shown()[0].querySelector('textarea')).toBe(open);
+	});
+
+	it('keeps the cell open when what was typed in it comes back', async () => {
+		// The other half of the rule the move regression came from: typing is the
+		// one edit the view has drawn before it sends it, so this echo — and only
+		// this one — has to be dismissed rather than repainted.
+		await mount([markdown('a')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const open = shown()[0].querySelector('textarea')!;
+		open.value = 'a and then some';
+		open.dispatchEvent(new Event('input'));
+		await new Promise((wake) => setTimeout(wake, 450));
+
+		send(lastCells());
+
+		expect(shown()[0].querySelector('textarea')).toBe(open);
+		expect(open.value).toBe('a and then some');
 	});
 
 	it('does not redraw when the document has not changed', async () => {
@@ -259,15 +297,32 @@ describe('opening a cell', () => {
 });
 
 describe('changing the document', () => {
-	it('adds a section from the bar beneath a cell', async () => {
-		await mount([markdown('a')]);
-		document.querySelector<HTMLElement>('.insert-bar .insert')!.click();
-		expect(lastCells().map((c) => c.kind)).toEqual(['markdown', 'markdown']);
+	it('puts a bar in every gap, the one above the first cell included', async () => {
+		// Without the leading one there is no way to put anything in front of what
+		// is already written, and a cover has to come before the title page.
+		await mount([markdown('a'), markdown('b')]);
+		expect(bars()).toHaveLength(3);
 	});
 
-	it('adds a chapter from the bar beneath a cell', async () => {
+	it('adds a section above the first cell', async () => {
 		await mount([markdown('a')]);
-		[...document.querySelectorAll<HTMLElement>('.insert-bar .insert')][1].click();
+		bars()[0].querySelectorAll<HTMLElement>('.insert')[1].click();
+		expect(lastCells().map((c) => c.kind)).toEqual(['chapter', 'markdown']);
+	});
+
+	it('adds a section in the gap its bar belongs to', async () => {
+		await mount([markdown('a'), markdown('b')]);
+		bars()[1].querySelectorAll<HTMLElement>('.insert')[1].click();
+		expect(lastCells().map((c) => c.kind)).toEqual([
+			'markdown',
+			'chapter',
+			'markdown',
+		]);
+	});
+
+	it('adds a section below the last cell', async () => {
+		await mount([markdown('a')]);
+		bars().at(-1)!.querySelectorAll<HTMLElement>('.insert')[1].click();
 		expect(lastCells().map((c) => c.kind)).toEqual(['markdown', 'chapter']);
 	});
 
@@ -281,6 +336,19 @@ describe('changing the document', () => {
 		await mount([markdown('a'), markdown('b')]);
 		shown()[0].querySelectorAll<HTMLElement>('.actions .icon')[1].click();
 		expect(lastCells().map((c) => c.source)).toEqual(['b', 'a']);
+	});
+
+	it('draws the move once the document comes back', async () => {
+		// The regression this replaces: the view recorded everything it sent as
+		// already drawn, so the document coming back was taken for the view's own
+		// echo and dismissed. The cells moved in the file and never on screen.
+		await mount([markdown('a'), markdown('b')]);
+		shown()[0].querySelectorAll<HTMLElement>('.actions .icon')[1].click();
+		send(lastCells());
+		expect(shown().map((c) => c.querySelector('.rendered')!.textContent)).toEqual([
+			'b',
+			'a',
+		]);
 	});
 
 	it('records a chapter title as the author types it', async () => {
@@ -304,6 +372,22 @@ describe('changing the document', () => {
 		shown()[1].querySelector<HTMLElement>('.run')!.click();
 		expect(lastCells()[1].source).toBe('1. One');
 		expect(lastCells()[2].source).toBe('');
+	});
+
+	it('asks the host to write a cell the server writes', async () => {
+		// A built cell is made here in an instant; a generated one takes as long as
+		// a model takes, so the host runs it and shows the progress.
+		await mount([chapter('One'), blurb()]);
+		shown()[1].querySelector<HTMLElement>('.run')!.click();
+		expect(posted.at(-1)).toEqual({ type: 'generate', at: 1 });
+	});
+
+	it('gives a generated cell no freshness of its own', async () => {
+		// Only a cell built from the document can disagree with it. A draft the
+		// author has edited is not out of date — it is theirs.
+		await mount([blurb()]);
+		expect(shown()[0].querySelector('.run')).not.toBeNull();
+		expect(shown()[0].querySelector('.state')).toBeNull();
 	});
 });
 
@@ -336,5 +420,24 @@ describe('the menus', () => {
 			(item) => item.textContent
 		);
 		expect(listed).toContain('Run');
+	});
+
+	it('offers Write on a cell the server writes', async () => {
+		await mount([blurb()]);
+		shown()[0].dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+		const listed = [...document.querySelectorAll('#menu .menu-item')].map(
+			(item) => item.textContent
+		);
+		expect(listed).toContain('Write');
+		expect(listed).not.toContain('Run');
+	});
+
+	it('lists the blurb among the kinds a section can be', async () => {
+		await mount([markdown('a')]);
+		document.querySelector<HTMLElement>('.insert-bar .insert.icon-only')!.click();
+		const listed = [...document.querySelectorAll('#menu .menu-item')].map(
+			(item) => item.textContent
+		);
+		expect(listed).toContain('Blurb');
 	});
 });

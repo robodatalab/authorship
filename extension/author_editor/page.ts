@@ -18,7 +18,7 @@ export const BODY = `	<header class="toolbar" id="toolbar">
 		<button class="tool" id="export-epub" type="button"
 			data-tip="Export EPUB — build the book beside this document"><i class="aicon aicon-export-epub"></i></button>
 		<button class="tool" id="export-parts" type="button"
-			data-tip="Export as Parts — cut this document into markdown parts of about a given length"><i class="aicon aicon-export-parts"></i></button>
+			data-tip="Divide into Parts — cut the story into part_1.author, part_2.author… beside it"><i class="aicon aicon-export-parts"></i></button>
 		<span class="divider"></span>
 		<button class="tool" id="as-text" type="button"
 			data-tip="View Source — open the same file as plain text"><i class="codicon codicon-file-code"></i></button>

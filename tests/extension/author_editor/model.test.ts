@@ -8,8 +8,11 @@ import {
 	insertAt,
 	hasProse,
 	isAutomated,
+	isGenerated,
+	isMatter,
 	isNamed,
 	isStale,
+	isUnpublished,
 	fieldsOf,
 	labelOf,
 	moveBy,
@@ -44,6 +47,34 @@ describe('the kinds a section can be', () => {
 		expect(isAutomated('contents')).toBe(true);
 		expect(isAutomated('chapter')).toBe(false);
 		expect(isAutomated('epigraph')).toBe(false);
+	});
+
+	it('knows the blurb is written by the server but still the author’s to edit', () => {
+		// Not `automated`: that would be the document writing the cell and the
+		// author never touching it. Asking for a blurb asks for a first draft.
+		expect(isGenerated('blurb')).toBe(true);
+		expect(isAutomated('blurb')).toBe(false);
+		expect(hasProse('blurb')).toBe(true);
+		expect(isGenerated('contents')).toBe(false);
+		expect(isGenerated('epigraph')).toBe(false);
+	});
+
+	it('knows the blurb belongs to the working document and to no book', () => {
+		expect(isUnpublished('blurb')).toBe(true);
+		expect(isUnpublished('chapter')).toBe(false);
+		// An unrecognised cell is writing the author put there; it is published.
+		expect(isUnpublished('epigraph')).toBe(false);
+	});
+
+	it('knows which kinds are pages of the book rather than the story', () => {
+		// What a reader meets on the way in or on the way out. This is what keeps
+		// the cover and the author's page out of the parts a division cuts.
+		for (const kind of ['title-page', 'cover', 'contents', 'disclaimer', 'about']) {
+			expect(isMatter(kind), kind).toBe(true);
+		}
+		for (const kind of ['markdown', 'chapter', 'epigraph']) {
+			expect(isMatter(kind), kind).toBe(false);
+		}
 	});
 
 	it('knows a chapter records a title and markdown records nothing', () => {
@@ -505,6 +536,16 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 
 	it('writes an empty document as nothing at all', () => {
 		expect(toMarkdown([])).toBe('');
+	});
+
+	it('leaves the blurb out — it belongs to the working document', () => {
+		const written = toMarkdown([
+			{ kind: 'blurb', source: 'A woman loses her name.', attrs: {} },
+			chapter('One'),
+			markdown('a'),
+		]);
+		expect(written).not.toContain('A woman loses her name.');
+		expect(written).toBe('## One\n\na\n');
 	});
 
 	it('round-trips a manuscript back to the cells it was read from', () => {

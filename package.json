@@ -101,7 +101,7 @@
       },
       {
         "command": "authorship.author.partition",
-        "title": "Export as Parts",
+        "title": "Divide into Parts",
         "category": "Authorship",
         "icon": "$(authorship-export-parts)"
       },

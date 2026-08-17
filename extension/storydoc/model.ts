@@ -39,6 +39,7 @@ export const COVER = 'cover';
 export const CONTENTS = 'contents';
 export const DISCLAIMER = 'disclaimer';
 export const ABOUT = 'about';
+export const BLURB = 'blurb';
 
 /**
  * One thing the document is made of, and what it says it is.

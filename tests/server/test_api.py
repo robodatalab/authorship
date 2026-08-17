@@ -256,24 +256,92 @@ class Jobs(unittest.TestCase):
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
 
 
+def wait_for_blurb(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get("/generate/blurb/status", params={"id": job_id})
+        if response.status_code == 200 and not response.json()["running"]:
+            return response.json()
+        time.sleep(0.005)
+    raise AssertionError(f"blurb job {job_id} did not finish within {timeout}s")
+
+
+class GenerateBlurb(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        self.written = storydoc.dumps(
+            [
+                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
+                storydoc.chapter("One"),
+                storydoc.markdown("prose"),
+                storydoc.Cell(storydoc.BLURB, "", {}),
+            ]
+        )
+        self.document.write_text(self.written, encoding="utf-8")
+        app.state.jobs = ParallelJobsManager()
+
+    def test_runs_as_a_job_and_hands_the_blurb_back(self) -> None:
+        client = TestClient(app)
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_blurb(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertIn("Veriona", status["blurb"])
+
+    def test_leaves_the_document_alone(self) -> None:
+        # The blurb comes back for the editor to place; a job that wrote it into
+        # the file would be writing a cell the editor owns.
+        client = TestClient(app)
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        wait_for_blurb(client, started.json()["id"])
+        self.assertEqual(self.document.read_text(), self.written)
+
+    def test_is_dropped_from_the_work_in_hand_once_it_has_finished(self) -> None:
+        client = TestClient(app)
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        wait_for_blurb(client, started.json()["id"])
+        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+
+    def test_a_missing_document_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document.with_name("nope.author"))},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
+        client = TestClient(app)
+        response = client.get("/generate/blurb/status", params={"id": "nothing"})
+        self.assertEqual(response.status_code, 404)
+
+
 class ExportEpub(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
-        self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
-
-    def test_writes_the_epub_beside_the_manuscript(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/export/epub",
-            json={"path": str(self.manuscript), "author": "A. Writer"},
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        storydoc.save(
+            self.document,
+            [
+                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Book"}),
+                storydoc.chapter("One"),
+                storydoc.markdown("prose"),
+            ],
         )
+
+    def test_writes_the_epub_beside_the_document(self) -> None:
+        client = TestClient(app)
+        response = client.post("/export/epub", json={"path": str(self.document)})
         self.assertEqual(response.status_code, 200)
 
         written = Path(response.json()["path"])
-        self.assertEqual(written, self.manuscript.with_suffix(".epub"))
+        self.assertEqual(written, self.document.with_suffix(".epub"))
         self.assertTrue(written.exists())
         self.assertTrue(zipfile.is_zipfile(written))
 
@@ -281,7 +349,7 @@ class ExportEpub(unittest.TestCase):
         client = TestClient(app)
         response = client.post(
             "/export/epub",
-            json={"path": str(self.manuscript.with_name("nope.md"))},
+            json={"path": str(self.document.with_name("nope.author"))},
         )
         self.assertEqual(response.status_code, 400)
 

@@ -15,11 +15,11 @@ import * as vscode from 'vscode';
 import { compile, fromMarkdown, toMarkdown } from './model';
 import { BODY } from './page';
 
-/** How often a running correction is asked whether it has finished. */
-const GRAMMAR_POLL_MS = 400;
+/** How often a running job is asked whether it has finished. */
+const JOB_POLL_MS = 400;
 
 /** Long enough for a model that has to load first, short enough to give up. */
-const GRAMMAR_TIMEOUT_MS = 180_000;
+const JOB_TIMEOUT_MS = 180_000;
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
 import { dumps, parse, type Cell } from '../storydoc/model';
@@ -141,6 +141,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'spellCheck':
 					this.onActive((d) => this.spellCheck(d, message.where));
 					break;
+				case 'generate':
+					this.onActive((d) => this.generate(d, message.at as number));
+					break;
 				case 'exportEpub':
 					void this.exportEpub(document);
 					break;
@@ -245,34 +248,78 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					throw new Error(await detailOf(started));
 				}
 				const { id } = (await started.json()) as { id: string };
-				await this.awaitJob(id);
+				await this.awaitJob('/fix/grammar/status', id);
 			}
 		);
 	}
 
-	/** Wait for a grammar job to finish, or for it to have gone wrong. */
-	private async awaitJob(id: string): Promise<void> {
-		const deadline = Date.now() + GRAMMAR_TIMEOUT_MS;
+	/**
+	 * Write the blurb, and put it in the cell that asked for it.
+	 *
+	 * The blurb comes back rather than being written into the file: a cell's text
+	 * is the editor's to write, and an empty cell occupies no lines for the server
+	 * to replace. So this lands the same way any other edit does, and undo walks
+	 * it back like any other.
+	 */
+	private async generate(
+		document: vscode.TextDocument,
+		at: number
+	): Promise<void> {
+		if (document.isDirty) {
+			// It is written from the story, so what is on screen has to be on disk.
+			await document.save();
+		}
+		const blurb = await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Writing the blurb for ${basename(document.uri)}…`,
+			},
+			async () => {
+				const started = await fetch(
+					`http://127.0.0.1:${this.port}/generate/blurb`,
+					{
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ path: document.uri.fsPath }),
+					}
+				);
+				if (!started.ok) {
+					throw new Error(await detailOf(started));
+				}
+				const { id } = (await started.json()) as { id: string };
+				const done = await this.awaitJob('/generate/blurb/status', id);
+				return done.blurb ?? '';
+			}
+		);
+
+		const cells = parse(document.getText());
+		if (!cells[at] || !blurb) {
+			return;
+		}
+		cells[at] = { ...cells[at], source: blurb };
+		await this.write(document, cells);
+	}
+
+	/** Wait for a job to finish, or for it to have gone wrong, and hand back what it says. */
+	private async awaitJob(status: string, id: string): Promise<JobStatus> {
+		const deadline = Date.now() + JOB_TIMEOUT_MS;
 		while (Date.now() < deadline) {
-			await new Promise((wake) => setTimeout(wake, GRAMMAR_POLL_MS));
+			await new Promise((wake) => setTimeout(wake, JOB_POLL_MS));
 			const response = await fetch(
-				`http://127.0.0.1:${this.port}/fix/grammar/status?id=${encodeURIComponent(id)}`
+				`http://127.0.0.1:${this.port}${status}?id=${encodeURIComponent(id)}`
 			);
 			if (!response.ok) {
 				throw new Error(await detailOf(response));
 			}
-            const { running, error } = (await response.json()) as {
-				running: boolean;
-				error: string | null;
-			};
-			if (error) {
-				throw new Error(error);
+			const body = (await response.json()) as JobStatus;
+			if (body.error) {
+				throw new Error(body.error);
 			}
-			if (!running) {
-				return;
+			if (!body.running) {
+				return body;
 			}
 		}
-		throw new Error('the correction is taking longer than expected');
+		throw new Error('the job is taking longer than expected');
 	}
 
 	// --- leaving the format ---
@@ -337,47 +384,59 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	}
 
 	/**
-	 * Cut the document into markdown parts of about the asked-for length.
+	 * Cut the story into `parts/part_1.author`, `part_2.author`… beside it.
 	 *
-	 * The division works on a manuscript, so the document is written out as one
-	 * first — and the cuts fall between chapters, so a part never opens mid-scene
-	 * and the lengths land near the quota rather than on it.
+	 * The one thing asked is how long a part should be — where they go and what
+	 * they are called follow from the document's own name. The cuts fall between
+	 * chapters, so a part never opens mid-scene and the lengths land near the
+	 * quota rather than on it.
+	 *
+	 * A part is a story document like any other, so exporting one to an EPUB or to
+	 * markdown is the export that already exists.
 	 */
 	private async partition(document: vscode.TextDocument): Promise<void> {
 		const asked = await vscode.window.showInputBox({
-			title: 'Export as Parts',
+			title: 'Divide into Parts',
 			prompt: 'About how many words should a part be?',
 			value: String(DEFAULT_PART_WORDS),
 			validateInput: (raw) =>
 				Number(raw) > 0 ? null : 'A part is some positive number of words.',
 		});
+		// Dismissed rather than answered: the author changed their mind, and a
+		// division they did not ask for is a folder of files they have to delete.
 		if (asked === undefined) {
 			return;
 		}
-		try {
-			const { uri } = await this.exportMarkdown(document);
-			const { folder, parts } = await divideManuscript(uri, quotaOf(asked));
-			void vscode.window.showInformationMessage(
-				parts === 0
-					? 'Nothing to divide — the document has no prose.'
-					: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`
-			);
-		} catch (err) {
-			void vscode.window.showErrorMessage(`Could not divide: ${describe(err)}`);
-		}
+		const { folder, parts } = await divideManuscript(
+			document.uri,
+			parse(document.getText()),
+			quotaOf(asked)
+		);
+		void vscode.window.showInformationMessage(
+			parts === 0
+				? 'Nothing to divide — the document has no chapters.'
+				: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`
+		);
 	}
 
 	/**
-	 * Build the book. The server is the one place that knows how, and it builds
-	 * from a manuscript, so the document is written out as one on the way.
+	 * Build the book, from the document itself.
+	 *
+	 * Never by way of markdown: the cells are what say which section is which, and
+	 * markdown has no way to carry that — a title page flattened to a `#` line is
+	 * a book with no title, no cover and no chapters, only one long page.
 	 */
 	private async exportEpub(document: vscode.TextDocument): Promise<void> {
 		try {
-			const { uri } = await this.exportMarkdown(document);
+			if (document.isDirty) {
+				// The server reads the file from disk, so what is on screen has to
+				// be what it binds.
+				await document.save();
+			}
 			const response = await fetch(`http://127.0.0.1:${this.port}/export/epub`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: uri.fsPath }),
+				body: JSON.stringify({ path: document.uri.fsPath }),
 			});
 			if (!response.ok) {
 				void vscode.window.showErrorMessage(
@@ -431,6 +490,18 @@ ${BODY}
 
 interface Markdown {
 	uri: vscode.Uri;
+}
+
+/**
+ * What a job's status endpoint answers, whichever job it is.
+ *
+ * A grammar pass leaves its result in the file and has nothing to hand back; a
+ * blurb is handed back for the editor to place. Both are polled the same way.
+ */
+interface JobStatus {
+	running: boolean;
+	error: string | null;
+	blurb?: string;
 }
 
 /** `story.author` is exported beside itself as `story.md`. */

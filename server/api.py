@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from server import log
 from server.publishing import authorship
 from server.publishing.epub_exporter import build_epub
+from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
 from roost import (
     InferenceModelResourceManager,
@@ -134,8 +135,9 @@ def jobs() -> dict[str, Any]:
 
 
 class EpubExportRequest(BaseModel):
-    # Path of the document to publish. What the book says about itself is read
-    # from `<name>.authorship.md` beside it, which the author edits directly.
+    # Path of the document to publish. What the book says about itself — its
+    # title page, its cover, its disclaimer, where to find the author — is in
+    # the document's own cells.
     path: str
 
 
@@ -156,24 +158,14 @@ def read_authorship(path: str) -> dict[str, Any]:
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     """Export a document to an EPUB written beside it, as `<name>.epub`.
 
-    The authorship file is written from the template when it is not there yet,
-    so an author who has never opened it still gets a book, and has something to
-    edit the next time they want a better one.
+    The document is the whole of the book, so there is nothing to fetch from
+    beside it and nothing that can disagree with it. A document missing a
+    section simply publishes without that section.
     """
     document = _document(request.path)
-    assert document.path is not None
-
-    authorship_path = authorship.path_beside(document.path)
-    if not authorship_path.exists():
-        authorship_path.write_text(authorship.TEMPLATE, encoding="utf-8")
-    book = authorship.load(authorship_path)
-
-    # A cover is named relative to the file that names it.
-    cover = (authorship_path.parent / book.cover) if book.cover else None
-
     out_path = document.beside(".epub")
-    build_epub(document, out_path, book, cover)
-    return {"path": str(out_path), "authorship": str(authorship_path)}
+    build_epub(document, out_path)
+    return {"path": str(out_path)}
 
 
 class LineSelection(BaseModel):
@@ -222,3 +214,42 @@ def fix_grammar_status(id: str) -> dict[str, Any]:
     if not isinstance(job, GrammarFixJob):
         raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
     return {"running": not job.done, "error": job.error}
+
+
+class BlurbRequest(BaseModel):
+    # Path of the document to write a blurb for.
+    path: str
+
+
+class BlurbJob(Job):
+    kind = "blurb"
+
+    def __init__(self, document: Document) -> None:
+        super().__init__(str(document.path))
+        self._document = document
+        self.blurb = ""
+
+    def execute(self) -> None:
+        self.blurb = write_blurb(self._document, lambda: self.cancelled)
+
+
+@app.post("/generate/blurb", status_code=202)
+def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
+    """Start writing the story's blurb; poll /generate/blurb/status for it.
+
+    Unlike a grammar pass this does not touch the document — the blurb is handed
+    back and the editor puts it in the cell that asked, because a cell's text is
+    the editor's to write and a line span is a poor way to name an empty cell.
+    """
+    job = BlurbJob(_document(request.path))
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+@app.get("/generate/blurb/status")
+def generate_blurb_status(id: str) -> dict[str, Any]:
+    """Whether the blurb job is still running, and the blurb once it is not."""
+    job = app.state.jobs.get(id)
+    if not isinstance(job, BlurbJob):
+        raise HTTPException(status_code=404, detail=f"No blurb job for {id}")
+    return {"running": not job.done, "error": job.error, "blurb": job.blurb}
