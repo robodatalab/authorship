@@ -17,14 +17,30 @@ import {
 	type Cell,
 } from '../storydoc/model';
 
+/** One thing a cell records apart from prose, and what the author calls it. */
+export interface CellField {
+	name: string;
+	label: string;
+	/** Shown, but a book is complete without it. */
+	optional?: boolean;
+}
+
 export interface CellKind {
 	kind: string;
 	/** What the cell is called in the menus and in its own gutter. */
 	label: string;
 	/** Built by running it, from the rest of the document, not typed by the author. */
 	automated: boolean;
-	/** Carries a title of its own, which is not part of any prose. */
-	titled: boolean;
+	/**
+	 * What the cell records apart from prose.
+	 *
+	 * A chapter is a name; a title page is a name and everything printed under
+	 * it. Both are facts about the book rather than writing, so both are typed
+	 * into fields — the alternative is a cell whose prose has to be parsed back
+	 * into facts, which is the arrangement `.authorship.md` had and this format
+	 * replaced.
+	 */
+	fields: CellField[];
 	/**
 	 * Holds prose. A kind that does not is only what its attributes say it is —
 	 * a chapter names a place in the book, and the writing under it is markdown
@@ -43,7 +59,7 @@ export const KINDS: CellKind[] = [
 		prose: true,
 		label: 'Markdown',
 		automated: false,
-		titled: false,
+		fields: [],
 		primary: true,
 		blank: () => ({ kind: MARKDOWN, source: '', attrs: {} }),
 	},
@@ -52,25 +68,33 @@ export const KINDS: CellKind[] = [
 		prose: false,
 		label: 'Chapter',
 		automated: false,
-		titled: true,
+		fields: [{ name: 'title', label: 'Title' }],
 		primary: true,
 		blank: () => ({ kind: CHAPTER, source: '', attrs: { title: 'Untitled' } }),
 	},
 	{
 		kind: TITLE_PAGE,
-		prose: true,
+		prose: false,
 		label: 'Title Page',
 		automated: false,
-		titled: false,
+		fields: [
+			{ name: 'title', label: 'Title' },
+			{ name: 'subtitle', label: 'Subtitle' },
+			{ name: 'author', label: 'Author' },
+			{ name: 'publisher', label: 'Publisher' },
+			{ name: 'date', label: 'Date' },
+			{ name: 'version', label: 'Version' },
+			{ name: 'isbn', label: 'ISBN', optional: true },
+		],
 		primary: false,
-		blank: () => ({ kind: TITLE_PAGE, source: '# Title\n\nAuthor', attrs: {} }),
+		blank: () => ({ kind: TITLE_PAGE, source: '', attrs: { title: 'Untitled' } }),
 	},
 	{
 		kind: COVER,
 		prose: true,
+		fields: [],
 		label: 'Cover',
 		automated: false,
-		titled: false,
 		primary: false,
 		blank: () => ({
 			kind: COVER,
@@ -81,18 +105,18 @@ export const KINDS: CellKind[] = [
 	{
 		kind: CONTENTS,
 		prose: true,
+		fields: [],
 		label: 'Table of Contents',
 		automated: true,
-		titled: false,
 		primary: false,
 		blank: () => ({ kind: CONTENTS, source: '', attrs: {} }),
 	},
 	{
 		kind: DISCLAIMER,
 		prose: true,
+		fields: [],
 		label: 'Disclaimer',
 		automated: false,
-		titled: false,
 		primary: false,
 		blank: () => ({
 			kind: DISCLAIMER,
@@ -103,9 +127,9 @@ export const KINDS: CellKind[] = [
 	{
 		kind: ABOUT,
 		prose: true,
+		fields: [],
 		label: 'About the Author',
 		automated: false,
-		titled: false,
 		primary: false,
 		blank: () => ({ kind: ABOUT, source: '', attrs: {} }),
 	},
@@ -121,9 +145,9 @@ export function isAutomated(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.automated ?? false;
 }
 
-/** Whether this kind carries a title apart from any prose. */
-export function isTitled(kind: string): boolean {
-	return KINDS.find((k) => k.kind === kind)?.titled ?? false;
+/** What this kind records apart from prose; empty for a kind that is only prose. */
+export function fieldsOf(kind: string): CellField[] {
+	return KINDS.find((k) => k.kind === kind)?.fields ?? [];
 }
 
 /**
@@ -260,8 +284,8 @@ export function fromMarkdown(text: string): Cell[] {
 			flush();
 			cells.push({
 				kind: TITLE_PAGE,
-				source: `# ${bookTitle[1].trim()}`,
-				attrs: {},
+				source: '',
+				attrs: { title: bookTitle[1].trim() },
 			});
 		} else {
 			prose.push(line);
@@ -283,13 +307,37 @@ export function fromMarkdown(text: string): Cell[] {
 export function toMarkdown(cells: Cell[]): string {
 	const out: string[] = [];
 	for (const cell of cells) {
-		if (cell.kind === CHAPTER) {
+		if (cell.kind === TITLE_PAGE) {
+			out.push(...titlePageMarkdown(cell));
+		} else if (cell.kind === CHAPTER) {
 			out.push(`## ${cell.attrs.title || 'Untitled'}`);
 		} else if (cell.source) {
 			out.push(cell.source);
 		}
 	}
 	return out.join('\n\n') + (out.length > 0 ? '\n' : '');
+}
+
+/**
+ * The title page as markdown can carry.
+ *
+ * Only the title survives as structure — markdown has one way to say "this is
+ * the name of the thing" and no way at all to say "this is the publisher". The
+ * rest goes out as a byline so that exporting loses none of it to the reader,
+ * even though importing cannot put it back in its fields.
+ */
+function titlePageMarkdown(cell: Cell): string[] {
+	const out = [`# ${cell.attrs.title || 'Untitled'}`];
+	if (cell.attrs.subtitle) {
+		out.push(`*${cell.attrs.subtitle}*`);
+	}
+	const credits = ['author', 'publisher', 'date', 'version', 'isbn']
+		.map((name) => cell.attrs[name])
+		.filter(Boolean);
+	if (credits.length > 0) {
+		out.push(credits.join(' · '));
+	}
+	return out;
 }
 
 export function insertAt(cells: Cell[], index: number, cell: Cell): Cell[] {

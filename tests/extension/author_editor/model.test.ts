@@ -9,7 +9,7 @@ import {
 	hasProse,
 	isAutomated,
 	isStale,
-	isTitled,
+	fieldsOf,
 	labelOf,
 	moveBy,
 	removeAt,
@@ -45,19 +45,40 @@ describe('the kinds a section can be', () => {
 		expect(isAutomated('epigraph')).toBe(false);
 	});
 
-	it('knows a chapter carries a title and the others do not', () => {
-		expect(isTitled('chapter')).toBe(true);
-		expect(isTitled('markdown')).toBe(false);
-		expect(isTitled('epigraph')).toBe(false);
+	it('knows a chapter records a title and markdown records nothing', () => {
+		expect(fieldsOf('chapter').map((f) => f.name)).toEqual(['title']);
+		expect(fieldsOf('markdown')).toEqual([]);
+		expect(fieldsOf('epigraph')).toEqual([]);
 	});
 
-	it('keeps the title and the prose in separate kinds', () => {
+	it('keeps the facts and the prose in separate kinds', () => {
 		// The one responsibility split the two everyday kinds exist to make: a
 		// chapter names a place in the book, markdown holds the writing.
-		expect(isTitled('chapter')).toBe(true);
+		expect(fieldsOf('chapter')).not.toHaveLength(0);
 		expect(hasProse('chapter')).toBe(false);
-		expect(isTitled('markdown')).toBe(false);
+		expect(fieldsOf('markdown')).toHaveLength(0);
 		expect(hasProse('markdown')).toBe(true);
+	});
+
+	it('records the whole title page in fields, not in prose', () => {
+		// Everything printed on a title page is a fact about the book, so none of
+		// it is typed as markdown that something would have to parse back.
+		expect(fieldsOf('title-page').map((f) => f.name)).toEqual([
+			'title',
+			'subtitle',
+			'author',
+			'publisher',
+			'date',
+			'version',
+			'isbn',
+		]);
+		expect(hasProse('title-page')).toBe(false);
+	});
+
+	it('marks only the ISBN optional', () => {
+		expect(fieldsOf('title-page').filter((f) => f.optional).map((f) => f.name)).toEqual([
+			'isbn',
+		]);
 	});
 
 	it('starts a new chapter with no prose to hold', () => {
@@ -349,10 +370,10 @@ describe('fromMarkdown — reading a plain manuscript in', () => {
 		]);
 	});
 
-	it('reads `#` as the book title, on a title page', () => {
+	it('reads `#` as the book title, into the title page\u2019s field', () => {
 		const cells = fromMarkdown('# The Lantern\n');
 		expect(cells).toEqual([
-			{ kind: 'title-page', source: '# The Lantern', attrs: {} },
+			{ kind: 'title-page', source: '', attrs: { title: 'The Lantern' } },
 		]);
 	});
 
@@ -414,5 +435,39 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 		const source = '# Book\n\nintro\n\n## One\n\na\n\n## Two\n\nb\n';
 		const cells = fromMarkdown(source);
 		expect(fromMarkdown(toMarkdown(cells))).toEqual(cells);
+	});
+
+	it('writes the title page out as a heading and a byline', () => {
+		const written = toMarkdown([
+			{
+				kind: 'title-page',
+				source: '',
+				attrs: {
+					title: 'The Lantern',
+					subtitle: 'A Novel',
+					author: 'A. Writer',
+					publisher: 'Riverlight',
+					date: '2026',
+				},
+			},
+		]);
+		expect(written).toBe(
+			'# The Lantern\n\n*A Novel*\n\nA. Writer \u00b7 Riverlight \u00b7 2026\n'
+		);
+	});
+
+	it('carries every title-page field into the export, losing none to the reader', () => {
+		// Markdown has nowhere to put a publisher, so importing cannot put these
+		// back in their fields — but exporting must not silently drop them.
+		const written = toMarkdown([
+			{
+				kind: 'title-page',
+				source: '',
+				attrs: { title: 'T', author: 'A', publisher: 'P', date: 'D', version: 'V', isbn: 'I' },
+			},
+		]);
+		for (const value of ['T', 'A', 'P', 'D', 'V', 'I']) {
+			expect(written).toContain(value);
+		}
 	});
 });

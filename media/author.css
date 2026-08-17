@@ -144,6 +144,11 @@ body {
 	padding: 4px 10px 2px 0;
 }
 
+.cell-fields {
+	display: block;
+	margin-bottom: 2px;
+}
+
 /* A chapter is a landmark in a long document — it has to be findable while
    scrolling past, not merely legible when you stop on it. */
 .cell-title {
@@ -170,6 +175,51 @@ body {
 	outline: none;
 	background: var(--vscode-input-background);
 	border-color: var(--vscode-focusBorder);
+}
+
+/* Everything a title page records besides its name. Labelled, because a column
+   of identical boxes says nothing about which one is the publisher. */
+.cell-field-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 1px;
+}
+
+.cell-field-label {
+	flex: 0 0 5.5em;
+	font-size: 0.82em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--vscode-descriptionForeground);
+}
+
+.cell-field {
+	flex: 1;
+	min-width: 0;
+	font-family: inherit;
+	font-size: inherit;
+	padding: 1px 4px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: 1px solid transparent;
+	border-radius: 2px;
+}
+
+.cell-field:hover {
+	border-color: var(--vscode-input-border, var(--vscode-widget-border, transparent));
+}
+
+.cell-field:focus {
+	outline: none;
+	background: var(--vscode-input-background);
+	border-color: var(--vscode-focusBorder);
+}
+
+.cell-field::placeholder,
+.cell-title::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+	font-style: italic;
 }
 
 .source {

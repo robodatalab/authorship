@@ -21,7 +21,7 @@ import {
 	hasProse,
 	isAutomated,
 	isStale,
-	isTitled,
+	fieldsOf,
 	labelOf,
 	moveBy,
 	removeAt,
@@ -29,6 +29,7 @@ import {
 	runCell,
 	sourceLinesOf,
 } from './model';
+import type { CellField } from './model';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -185,17 +186,9 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	const body = document.createElement('div');
 	body.className = 'body';
 
-	if (isTitled(cell.kind)) {
-		const title = document.createElement('input');
-		title.className = 'cell-title';
-		title.value = cell.attrs.title ?? '';
-		title.placeholder = 'Untitled';
-		title.addEventListener('change', () => {
-			const next = [...cells];
-			next[index] = { ...cell, attrs: { ...cell.attrs, title: title.value } };
-			commit(next);
-		});
-		body.append(title);
+	const fields = fieldsOf(cell.kind);
+	if (fields.length > 0) {
+		body.append(fieldsFor(cell, index, fields));
 	}
 
 	// A chapter is its title and nothing else — there is no prose in it to show,
@@ -219,6 +212,49 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 function autosize(input: HTMLTextAreaElement): void {
 	input.style.height = 'auto';
 	input.style.height = `${input.scrollHeight}px`;
+}
+
+/**
+ * The facts a cell records, as fields rather than prose.
+ *
+ * The first one is the cell's name and is shown as a heading — it is what the
+ * author looks for when scrolling. The rest are a labelled list, because a bare
+ * row of boxes says nothing about which is the publisher and which is the date.
+ */
+function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement {
+	const holder = document.createElement('div');
+	holder.className = 'cell-fields';
+
+	fields.forEach((field, position) => {
+		const input = document.createElement('input');
+		input.className = position === 0 ? 'cell-title' : 'cell-field';
+		input.value = cell.attrs[field.name] ?? '';
+		input.placeholder = field.optional ? `${field.label} (optional)` : field.label;
+		input.addEventListener('change', () => {
+			const next = [...cells];
+			const attrs = { ...cell.attrs, [field.name]: input.value };
+			// An empty field is one the author has not filled in, not one they
+			// have filled in with nothing — so it leaves no attribute behind.
+			if (!input.value) {
+				delete attrs[field.name];
+			}
+			next[index] = { ...cell, attrs };
+			commit(next);
+		});
+
+		if (position === 0) {
+			holder.append(input);
+			return;
+		}
+		const row = document.createElement('label');
+		row.className = 'cell-field-row';
+		const label = document.createElement('span');
+		label.className = 'cell-field-label';
+		label.textContent = field.label;
+		row.append(label, input);
+		holder.append(row);
+	});
+	return holder;
 }
 
 function sourceFor(cell: Cell, index: number): HTMLElement {
