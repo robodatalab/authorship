@@ -8,6 +8,7 @@ import {
 	insertAt,
 	hasProse,
 	isAutomated,
+	isNamed,
 	isStale,
 	fieldsOf,
 	labelOf,
@@ -97,6 +98,21 @@ describe('the kinds a section can be', () => {
 		expect(blank.attrs.title).toBe('Disclaimer');
 		expect(blank.source).toContain('work of fiction');
 		expect(blank.source).toContain('consent');
+	});
+
+	it('records where the author can be found, all of it optional', () => {
+		const fields = fieldsOf('about');
+		expect(fields.map((f) => f.name)).toEqual(['kdp', 'website', 'substack']);
+		expect(fields.every((f) => f.optional)).toBe(true);
+		// The blurb about the author is prose, so it is written not typed in.
+		expect(hasProse('about')).toBe(true);
+	});
+
+	it('names the sections the reader meets by name and no others', () => {
+		expect(isNamed('about')).toBe(true);
+		// A chapter is named by its author, not by its kind.
+		expect(isNamed('chapter')).toBe(false);
+		expect(isNamed('markdown')).toBe(false);
 	});
 
 	it('marks only the ISBN optional', () => {
@@ -451,6 +467,36 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 		expect(
 			toMarkdown([{ kind: 'disclaimer', source: 'Careful.', attrs: { title: 'Heads Up!' } }])
 		).toBe('## Heads Up!\n\nCareful.\n');
+	});
+
+	it('prints nothing at all when the author has filled nothing in', () => {
+		expect(toMarkdown([{ kind: 'about', source: '', attrs: {} }])).toBe('');
+	});
+
+	it('prints the author page for a single link', () => {
+		expect(
+			toMarkdown([{ kind: 'about', source: '', attrs: { substack: 'https://s.example' } }])
+		).toBe('## About the Author\n\n[Substack](https://s.example)\n');
+	});
+
+	it('prints the blurb above the links', () => {
+		const written = toMarkdown([
+			{
+				kind: 'about',
+				source: 'A. Writer lives by the sea.',
+				attrs: { kdp: 'https://a.example', website: 'https://w.example' },
+			},
+		]);
+		expect(written).toBe(
+			'## About the Author\n\nA. Writer lives by the sea.\n\n' +
+				'[Books on Amazon](https://a.example) \u00b7 [Website](https://w.example)\n'
+		);
+	});
+
+	it('prints the author page for a blurb with no links at all', () => {
+		expect(
+			toMarkdown([{ kind: 'about', source: 'A. Writer lives by the sea.', attrs: {} }])
+		).toContain('A. Writer lives by the sea.');
 	});
 
 	it('leaves out a cell that holds nothing', () => {

@@ -21,6 +21,7 @@ import {
 	withDefaultCell,
 	hasProse,
 	isAutomated,
+	isNamed,
 	isStale,
 	fieldsOf,
 	labelOf,
@@ -216,6 +217,15 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	const body = document.createElement('div');
 	body.className = 'body';
 
+	// A section the reader meets by name says its name, even when the author has
+	// no say in what that name is.
+	if (isNamed(cell.kind)) {
+		const name = document.createElement('div');
+		name.className = 'cell-name';
+		name.textContent = labelOf(cell.kind);
+		body.append(name);
+	}
+
 	const fields = fieldsOf(cell.kind);
 	if (fields.length > 0) {
 		body.append(fieldsFor(cell, index, fields));
@@ -247,17 +257,19 @@ function autosize(input: HTMLTextAreaElement): void {
 /**
  * The facts a cell records, as fields rather than prose.
  *
- * The first one is the cell's name and is shown as a heading — it is what the
- * author looks for when scrolling. The rest are a labelled list, because a bare
- * row of boxes says nothing about which is the publisher and which is the date.
+ * A field called `title` is the cell's name and is shown as a heading — it is
+ * what the author looks for when scrolling. The rest are a labelled list,
+ * because a bare row of boxes says nothing about which is the publisher and
+ * which is the date. A cell with no title, like the author's links, is all list.
  */
 function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement {
 	const holder = document.createElement('div');
 	holder.className = 'cell-fields';
 
-	fields.forEach((field, position) => {
+	for (const field of fields) {
+		const heading = field.name === 'title';
 		const input = document.createElement('input');
-		input.className = position === 0 ? 'cell-title' : 'cell-field';
+		input.className = heading ? 'cell-title' : 'cell-field';
 		input.value = cell.attrs[field.name] ?? '';
 		// The label is already beside the box, so an empty box is free to say what
 		// a good value looks like instead of repeating the name.
@@ -275,9 +287,9 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 			commit(next);
 		});
 
-		if (position === 0) {
+		if (heading) {
 			holder.append(input);
-			return;
+			continue;
 		}
 		const row = document.createElement('label');
 		row.className = 'cell-field-row';
@@ -286,7 +298,7 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 		label.textContent = field.label;
 		row.append(label, input);
 		holder.append(row);
-	});
+	}
 	return holder;
 }
 

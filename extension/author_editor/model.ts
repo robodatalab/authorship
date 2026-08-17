@@ -55,6 +55,14 @@ export interface CellKind {
 	 * like writing anywhere else.
 	 */
 	prose: boolean;
+	/**
+	 * Prints its label as the section's heading.
+	 *
+	 * For a section the reader meets by name but the author does not get to
+	 * rename — a chapter's title is the author's, "About the Author" is what that
+	 * page is called.
+	 */
+	named?: boolean;
 	/** Offered in the toolbar itself rather than behind the overflow menu. */
 	primary: boolean;
 	/** What a cell of this kind starts life as. */
@@ -154,10 +162,23 @@ export const KINDS: CellKind[] = [
 	},
 	{
 		kind: ABOUT,
+		// The blurb about the author, in their own words.
 		prose: true,
-		fields: [],
+		// Every one optional: a book with nowhere to send the reader is a book
+		// that simply does not print this page. See `aboutMarkdown`.
+		fields: [
+			{ name: 'kdp', label: 'KDP', hint: 'https://amazon.com/author/…', optional: true },
+			{ name: 'website', label: 'Website', hint: 'https://…', optional: true },
+			{
+				name: 'substack',
+				label: 'Substack',
+				hint: 'https://….substack.com',
+				optional: true,
+			},
+		],
 		label: 'About the Author',
 		automated: false,
+		named: true,
 		primary: false,
 		blank: () => ({ kind: ABOUT, source: '', attrs: {} }),
 	},
@@ -171,6 +192,11 @@ export function labelOf(kind: string): string {
 /** Whether running this cell writes it, in which case the author does not. */
 export function isAutomated(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.automated ?? false;
+}
+
+/** Whether this kind's label is printed as the section's heading. */
+export function isNamed(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.named ?? false;
 }
 
 /** What this kind records apart from prose; empty for a kind that is only prose. */
@@ -343,6 +369,10 @@ export function toMarkdown(cells: Cell[]): string {
 			out.push(`## ${cell.attrs.title || 'Untitled'}`);
 			continue;
 		}
+		if (cell.kind === ABOUT) {
+			out.push(...aboutMarkdown(cell));
+			continue;
+		}
 		// Any other cell that carries a name is headed by it — a disclaimer is a
 		// page with a title and prose, and reads as one in markdown too.
 		if (cell.attrs.title) {
@@ -363,6 +393,29 @@ export function toMarkdown(cells: Cell[]): string {
  * rest goes out as a byline so that exporting loses none of it to the reader,
  * even though importing cannot put it back in its fields.
  */
+/** Where the reader is sent once the story has let them go, or nothing at all. */
+const AUTHOR_LINKS: [string, string][] = [
+	['kdp', 'Books on Amazon'],
+	['website', 'Website'],
+	['substack', 'Substack'],
+];
+
+function aboutMarkdown(cell: Cell): string[] {
+	const said: string[] = [];
+	if (cell.source) {
+		said.push(cell.source);
+	}
+	const links = AUTHOR_LINKS.filter(([name]) => cell.attrs[name]).map(
+		([name, label]) => `[${label}](${cell.attrs[name]})`
+	);
+	if (links.length > 0) {
+		said.push(links.join(' · '));
+	}
+	// Nothing written and nowhere to send anyone: the page is not printed. An
+	// empty "About the Author" is worse than no page at all.
+	return said.length > 0 ? ['## About the Author', ...said] : [];
+}
+
 function titlePageMarkdown(cell: Cell): string[] {
 	const out = [`# ${cell.attrs.title || 'Untitled'}`];
 	if (cell.attrs.subtitle) {

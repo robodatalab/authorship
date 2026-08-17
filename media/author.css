@@ -243,6 +243,17 @@ body {
 	border-color: var(--vscode-focusBorder);
 }
 
+/* A heading the author does not type: the section's own name. Sized as a title
+   is, but plainly not a box to write in. */
+.cell-name {
+	font-size: 1.7em;
+	font-weight: 600;
+	line-height: 1.3;
+	padding: 3px 5px;
+	margin-bottom: 2px;
+	color: var(--vscode-foreground);
+}
+
 /* Everything a title page records besides its name. Labelled, because a column
    of identical boxes says nothing about which one is the publisher. */
 .cell-field-row {

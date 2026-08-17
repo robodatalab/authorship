@@ -140,6 +140,21 @@ describe('drawing cells', () => {
 		expect(cell.querySelector('.rendered')!.textContent).toContain('Careful.');
 	});
 
+	it('gives the author page three link boxes, a blurb, and its own name', async () => {
+		await mount([{ kind: 'about', source: '', attrs: {} }]);
+		const cell = shown()[0];
+		expect(cell.querySelector('.cell-name')!.textContent).toBe('About the Author');
+		expect(cell.querySelectorAll('.cell-field-row')).toHaveLength(3);
+		// The name is the section's, not a box the author types in.
+		expect(cell.querySelector('.cell-title')).toBeNull();
+		expect(cell.querySelector('.rendered')).not.toBeNull();
+	});
+
+	it('does not put a fixed name on a section the author names', async () => {
+		await mount([chapter('One')]);
+		expect(shown()[0].querySelector('.cell-name')).toBeNull();
+	});
+
 	it('renders prose as markdown rather than as its source', async () => {
 		await mount([markdown('# Heading')]);
 		expect(shown()[0].querySelector('.rendered')!.innerHTML).toContain('<h1>');
