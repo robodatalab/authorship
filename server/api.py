@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
+from server.publishing import authorship
 from server.publishing.epub_exporter import build_epub
 from server.writing_tools.grammar import correct_span
 from roost import (
@@ -251,32 +252,46 @@ def build_status(id: str) -> dict[str, Any]:
 
 
 class EpubExportRequest(BaseModel):
-    # Path of the manuscript to publish.
+    # Path of the manuscript to publish. What the book says about itself is read
+    # from `<name>.authorship.md` beside it, which the author edits directly.
     path: str
-    # Falls back to the title detected in the manuscript when omitted.
-    title: str | None = None
-    author: str = ""
-    language: str = "en"
-    # Path of a cover image, or None for a coverless book.
-    cover: str | None = None
+
+
+@app.get("/authorship")
+def read_authorship(path: str) -> dict[str, Any]:
+    """What the book beside `path` says about itself.
+
+    The panel asks rather than parsing: the format is the server's, and a second
+    reader of it is a second thing to keep in step.
+    """
+    manuscript = _manuscript(path)
+    assert manuscript.path is not None
+    book = authorship.load(authorship.path_beside(manuscript.path))
+    return {"wordsPerPart": book.words_per_part}
 
 
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
-    """Export a manuscript to an EPUB written beside it, as `<name>.epub`."""
+    """Export a manuscript to an EPUB written beside it, as `<name>.epub`.
+
+    The authorship file is written from the template when it is not there yet,
+    so an author who has never opened it still gets a book, and has something to
+    edit the next time they want a better one.
+    """
     manuscript = _manuscript(request.path)
+    assert manuscript.path is not None
+
+    authorship_path = authorship.path_beside(manuscript.path)
+    if not authorship_path.exists():
+        authorship_path.write_text(authorship.TEMPLATE, encoding="utf-8")
+    book = authorship.load(authorship_path)
+
+    # A cover is named relative to the file that names it.
+    cover = (authorship_path.parent / book.cover) if book.cover else None
 
     out_path = manuscript.epub_path
-    cover = Path(request.cover) if request.cover else None
-    build_epub(
-        manuscript,
-        out_path,
-        cover,
-        request.title,
-        request.author,
-        request.language,
-    )
-    return {"path": str(out_path)}
+    build_epub(manuscript, out_path, book, cover)
+    return {"path": str(out_path), "authorship": str(authorship_path)}
 
 
 class LineContributionRequest(BaseModel):

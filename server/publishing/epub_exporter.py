@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from server.manuscript import Manuscript, StoryLines
+from server.publishing.authorship import Authorship
 
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
@@ -124,8 +125,16 @@ hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 .cover { text-align: center; margin: 0; padding: 0; }
 .cover img { max-width: 100%; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
-.title-page h1.book-title { font-size: 2.4em; margin: 0 0 1.5em; }
-.title-page p.author { text-indent: 0; font-size: 1.2em; font-style: italic; }
+.title-page h1.book-title { font-size: 2.4em; margin: 0 0 0.4em; }
+.title-page p { text-indent: 0; }
+.title-page p.subtitle { font-size: 1.3em; font-style: italic; margin: 0 0 2.5em; }
+.title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
+.title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
+                          text-transform: uppercase; }
+.disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }
+.disclaimer p { text-indent: 0; margin: 0 0 0.8em; }
+.about { text-align: center; margin-top: 12%; }
+.about p.link { text-indent: 0; margin: 0 0 0.8em; }
 """
 
 XHTML_DOC = """<?xml version="1.0" encoding="UTF-8"?>
@@ -147,16 +156,56 @@ def xhtml_page(lang: str, title: str, body: str) -> str:
     return XHTML_DOC.format(lang=lang, title=html.escape(title), body=body)
 
 
-def build_title_page(title: str, author: str) -> str:
-    return (
-        '<div class="title-page">\n'
-        f'  <h1 class="book-title">{_inline(title)}</h1>\n'
-        f'  <p class="author">{_inline(author)}</p>\n'
-        "</div>"
+class Page:
+    """A document in the book that is not a chapter of the story.
+
+    Front and back matter sit in the spine like chapters but are not what the
+    table of contents is for, so they are kept apart from `Chapter` rather than
+    made a kind of it.
+    """
+
+    def __init__(self, id: str, title: str, body: str):
+        self.id = id
+        self.title = title
+        self.body = body
+        self.filename = f"{id}.xhtml"
+
+
+def build_title_page(title: str, book: Authorship) -> Page:
+    said = [f'  <h1 class="book-title">{_inline(title)}</h1>']
+    if book.subtitle:
+        said.append(f'  <p class="subtitle">{_inline(book.subtitle)}</p>')
+    if book.author:
+        said.append(f'  <p class="author">{_inline(book.author)}</p>')
+    if book.publisher:
+        said.append(f'  <p class="publisher">{_inline(book.publisher)}</p>')
+    return Page(
+        "titlepage", title, '<div class="title-page">\n' + "\n".join(said) + "\n</div>"
     )
 
 
-def build_content_opf(book_id, title, author, lang, chapters, cover_item, modified):
+def build_disclaimer_page(book: Authorship) -> Page | None:
+    if not book.disclaimer:
+        return None
+    body = blocks_to_xhtml(book.disclaimer.splitlines())
+    return Page("disclaimer", "Disclaimer", f'<div class="disclaimer">\n{body}\n</div>')
+
+
+def build_about_page(book: Authorship) -> Page | None:
+    """Where the reader is sent once the story has let them go."""
+    sent = [link for link in (book.author_page, book.kindle) if link]
+    if not sent:
+        return None
+    said = [f'  <h2>{_inline(book.author or "The author")}</h2>'] if book.author else []
+    said += [
+        f'  <p class="link"><a href="{html.escape(link.url, quote=True)}">'
+        f"{_inline(link.label)}</a></p>"
+        for link in sent
+    ]
+    return Page("about", "About", '<div class="about">\n' + "\n".join(said) + "\n</div>")
+
+
+def build_content_opf(book_id, title, book, chapters, front, back, cover_item, modified):
     manifest = [
         '<item id="css" href="style.css" media-type="text/css"/>',
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
@@ -176,24 +225,33 @@ def build_content_opf(book_id, title, author, lang, chapters, cover_item, modifi
         spine.append('<itemref idref="cover" linear="yes"/>')
         meta_cover = '<meta name="cover" content="cover-image"/>'
 
-    manifest.append(
-        '<item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>'
-    )
-    spine.append('<itemref idref="titlepage"/>')
-
-    for ch in chapters:
+    # The reading order is the order of a book: what opens it, the story, then
+    # what the reader is left with.
+    for document in [*front, *chapters, *back]:
+        item_id = getattr(document, "id", None) or document.filename[:-6]
         manifest.append(
-            f'<item id="{ch.filename[:-6]}" href="{ch.filename}" media-type="application/xhtml+xml"/>'
+            f'<item id="{item_id}" href="{document.filename}" media-type="application/xhtml+xml"/>'
         )
-        spine.append(f'<itemref idref="{ch.filename[:-6]}"/>')
+        spine.append(f'<itemref idref="{item_id}"/>')
+
+    described = (
+        f"\n    <dc:description>{html.escape(book.blurb)}</dc:description>"
+        if book.blurb
+        else ""
+    )
+    published = (
+        f"\n    <dc:publisher>{html.escape(book.publisher)}</dc:publisher>"
+        if book.publisher
+        else ""
+    )
 
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="book-id">urn:uuid:{book_id}</dc:identifier>
     <dc:title>{html.escape(title)}</dc:title>
-    <dc:creator>{html.escape(author)}</dc:creator>
-    <dc:language>{lang}</dc:language>
+    <dc:creator>{html.escape(book.author)}</dc:creator>
+    <dc:language>{book.language}</dc:language>{published}{described}
     <meta property="dcterms:modified">{modified}</meta>
     {meta_cover}
   </metadata>
@@ -258,13 +316,24 @@ def build_ncx(book_id, title, chapters):
 def build_epub(
     manuscript: Manuscript,
     out_path: Path,
+    book: Authorship,
     cover: Path | None,
-    title: str | None,
-    author: str,
-    lang: str,
 ) -> None:
+    """Write the manuscript as an EPUB, dressed in what `book` says about it.
+
+    The manuscript names the book and names its chapters; the authorship carries
+    what publishing needs and the story never says. The two are never asked the
+    same question, so there is nothing here to reconcile.
+    """
     chapters = chapters_of(manuscript)
-    title = title or manuscript.title
+    title = manuscript.title
+    lang = book.language
+    front = [
+        page
+        for page in (build_title_page(title, book), build_disclaimer_page(book))
+        if page is not None
+    ]
+    back = [page for page in (build_about_page(book),) if page is not None]
     book_id = uuid.uuid4()
     modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -285,7 +354,7 @@ def build_epub(
         z.writestr(
             "OEBPS/content.opf",
             build_content_opf(
-                book_id, title, author, lang, chapters, cover_item, modified
+                book_id, title, book, chapters, front, back, cover_item, modified
             ),
         )
         z.writestr("OEBPS/nav.xhtml", build_nav(lang, title, chapters))
@@ -297,10 +366,10 @@ def build_epub(
             cover_body = f'<div class="cover"><img src="{cover_href}" alt="{html.escape(title)}"/></div>'
             z.writestr("OEBPS/cover.xhtml", xhtml_page(lang, title, cover_body))
 
-        z.writestr(
-            "OEBPS/titlepage.xhtml",
-            xhtml_page(lang, title, build_title_page(title, author)),
-        )
+        for page in [*front, *back]:
+            z.writestr(
+                f"OEBPS/{page.filename}", xhtml_page(lang, page.title, page.body)
+            )
 
         for ch in chapters:
             z.writestr(

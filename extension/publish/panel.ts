@@ -7,26 +7,22 @@
 // its grammar, scoring a section — are not here: they act on the file being
 // edited, so they are buttons in its title bar and commands in extension.ts.
 //
-// The publication settings live in `<name>.pub.yaml` and the blurb in
-// `<name>.blurb.md`, both sitting next to the manuscript exactly as
-// `<name>.graph.yaml` does. This module owns those files; the webview is only
-// the form. Exporting hands the manuscript and its settings to the server, which
-// writes `<name>.epub` and is the one place that knows how to build the book.
+// Everything the book says about itself — its title, its author, its blurb, the
+// disclaimer it prints — lives in `<name>.authorship.md` beside the manuscript,
+// as `<name>.graph.yaml` does. The author edits that file directly, so there is
+// no form here to keep in step with it: Publishing is a button, and the document
+// is the interface.
+//
+// The server owns that file. It writes the template when there is none, reads it
+// when exporting, and is the one place that knows how to build the book.
 
 import * as vscode from "vscode";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { divideManuscript, mergeManuscript } from "../parts/divide";
-import { quotaOf } from "../parts/model";
+import { DEFAULT_PART_WORDS, quotaOf } from "../parts/model";
 import { progress, rowDescription, rowLabel } from "../search/model";
 import type { ManuscriptSearch, Results } from "../search/results";
-import {
-    DEFAULT_SETTINGS,
-    blurbPathFor,
-    pubPathFor,
-    readFields,
-    type PubSettings,
-} from "./model";
+import { authorshipPathFor } from "./model";
 
 /** Where the chosen manuscript is remembered between sessions. */
 const MANUSCRIPT_KEY = "authorship.publish.manuscript";
@@ -81,28 +77,14 @@ export class PublishView implements vscode.WebviewViewProvider {
                 case "choose":
                     void this.choose();
                     break;
-                case "chooseCover":
-                    void this.chooseCover();
-                    break;
-                case "clearCover":
-                    void this.setCover("");
-                    break;
-                case "settings":
-                    void this.writeSettings(readFields(message.settings));
-                    break;
-                case "partWords":
-                    void this.writeSettings({
-                        partWords: quotaOf(message.words),
-                    });
+                case "editAuthorship":
+                    void this.editAuthorship();
                     break;
                 case "divide":
                     void this.divide(quotaOf(message.words));
                     break;
                 case "merge":
                     void this.merge();
-                    break;
-                case "blurb":
-                    void this.saveBlurb(String(message.text ?? ""));
                     break;
                 case "export":
                     void this.export();
@@ -156,21 +138,36 @@ export class PublishView implements vscode.WebviewViewProvider {
             MANUSCRIPT_KEY,
             this.manuscript.fsPath,
         );
-        // A blurb the panel can display from the moment a manuscript is chosen.
-        await this.ensureBlurb();
         await this.send();
     }
 
-    private async chooseCover(): Promise<void> {
-        const picked = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            openLabel: "Use as cover",
-            filters: { Images: ["png", "jpg", "jpeg", "gif", "webp"] },
-        });
-        if (!picked || picked.length === 0) {
+    // --- authorship (<name>.authorship.md) ---
+
+    /**
+     * Open the file the book is described in, exporting first if it isn't there.
+     *
+     * The template is the server's to write, since it is the server that reads
+     * it back — so the way to get one is to ask for the book. An author with
+     * nothing written yet gets both: a book built from the defaults, and the
+     * document to say something better in.
+     */
+    private async editAuthorship(): Promise<void> {
+        if (!this.manuscript) {
             return;
         }
-        await this.setCover(picked[0].fsPath);
+        const uri = authorshipUriFor(this.manuscript);
+        try {
+            await vscode.workspace.fs.stat(uri);
+        } catch {
+            await this.export();
+        }
+        try {
+            await vscode.window.showTextDocument(
+                await vscode.workspace.openTextDocument(uri),
+            );
+        } catch (err) {
+            await this.status(`Could not open: ${describe(err)}`, true);
+        }
     }
 
     // --- parts (parts/part_N.md) ---
@@ -187,7 +184,6 @@ export class PublishView implements vscode.WebviewViewProvider {
         if (!this.manuscript) {
             return;
         }
-        await this.writeSettings({ partWords: quota });
         try {
             const { folder, parts } = await divideManuscript(
                 this.manuscript,
@@ -229,110 +225,22 @@ export class PublishView implements vscode.WebviewViewProvider {
         }
     }
 
-    // --- settings (<name>.pub.yaml) ---
-
-    private async readSettings(): Promise<PubSettings> {
-        if (!this.manuscript) {
-            return { ...DEFAULT_SETTINGS };
-        }
-        try {
-            const bytes = await vscode.workspace.fs.readFile(
-                pubUriFor(this.manuscript),
-            );
-            const parsed = parseYaml(
-                new TextDecoder().decode(bytes),
-            ) as Partial<PubSettings> | null;
-            return { ...DEFAULT_SETTINGS, ...(parsed ?? {}) };
-        } catch {
-            // No file yet, or an unreadable one — start from the defaults either way.
-            return { ...DEFAULT_SETTINGS };
-        }
-    }
-
-    /** Merge a change into `<name>.pub.yaml`, creating it on first edit. */
-    private async writeSettings(patch: Partial<PubSettings>): Promise<void> {
-        if (!this.manuscript) {
-            return;
-        }
-        const merged = { ...(await this.readSettings()), ...patch };
-        const text = stringifyYaml(merged, { lineWidth: 0 });
-        await vscode.workspace.fs.writeFile(
-            pubUriFor(this.manuscript),
-            new TextEncoder().encode(text),
-        );
-    }
-
-    /**
-     * Set the cover and tell the view — but only about the cover. A full state
-     * push would overwrite whatever the author is mid-way through typing in the
-     * blurb, so the cover carries on its own narrow message.
-     */
-    private async setCover(cover: string): Promise<void> {
-        await this.writeSettings({ cover });
-        void this.view?.webview.postMessage({ type: "cover", cover });
-    }
-
-    // --- blurb (<name>.blurb.md) ---
-
-    private async readBlurb(): Promise<string> {
-        if (!this.manuscript) {
-            return "";
-        }
-        try {
-            const bytes = await vscode.workspace.fs.readFile(
-                blurbUriFor(this.manuscript),
-            );
-            return new TextDecoder().decode(bytes);
-        } catch {
-            return "";
-        }
-    }
-
-    private async ensureBlurb(): Promise<void> {
-        if (!this.manuscript) {
-            return;
-        }
-        const uri = blurbUriFor(this.manuscript);
-        try {
-            await vscode.workspace.fs.stat(uri);
-        } catch {
-            await vscode.workspace.fs.writeFile(
-                uri,
-                new TextEncoder().encode(""),
-            );
-        }
-    }
-
-    private async saveBlurb(text: string): Promise<void> {
-        if (!this.manuscript) {
-            return;
-        }
-        await vscode.workspace.fs.writeFile(
-            blurbUriFor(this.manuscript),
-            new TextEncoder().encode(text),
-        );
-    }
-
     // --- export ---
 
     private async export(): Promise<void> {
         if (!this.manuscript) {
             return;
         }
-        const settings = await this.readSettings();
         try {
             const response = await fetch(
                 `http://127.0.0.1:${this.port}/export/epub`,
                 {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                        path: this.manuscript.fsPath,
-                        title: settings.title || null,
-                        author: settings.author,
-                        language: settings.language || "en",
-                        cover: settings.cover || null,
-                    }),
+                    // The manuscript is the whole request: what the book says
+                    // about itself is read from the file beside it, so the panel
+                    // never holds a second copy to send.
+                    body: JSON.stringify({ path: this.manuscript.fsPath }),
                 },
             );
             if (!response.ok) {
@@ -400,9 +308,31 @@ export class PublishView implements vscode.WebviewViewProvider {
             manuscript: this.manuscript
                 ? vscode.workspace.asRelativePath(this.manuscript)
                 : null,
-            settings: await this.readSettings(),
-            blurb: await this.readBlurb(),
+            wordsPerPart: await this.wordsPerPart(),
         });
+    }
+
+    /**
+     * The quota the authorship file records, or the default while the server is
+     * not there to read it — a division the author asks for is worth doing on a
+     * sensible number rather than refusing over a status endpoint.
+     */
+    private async wordsPerPart(): Promise<number> {
+        if (!this.manuscript) {
+            return DEFAULT_PART_WORDS;
+        }
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:${this.port}/authorship?path=${encodeURIComponent(
+                    this.manuscript.fsPath,
+                )}`,
+                { signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS) },
+            );
+            const body = (await response.json()) as { wordsPerPart?: unknown };
+            return quotaOf(body.wordsPerPart);
+        } catch {
+            return DEFAULT_PART_WORDS;
+        }
     }
 
     /** A status line under the Publishing drawer, which is what raises them. */
@@ -565,27 +495,10 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<details class="drawer" id="publishing" open>
 		<summary>Publishing</summary>
 		<div class="body">
-			<label>Title
-				<input id="f-title" type="text" placeholder="From the manuscript">
-			</label>
-			<label>Author
-				<input id="f-author" type="text">
-			</label>
-			<label>Language
-				<input id="f-language" type="text" placeholder="en">
-			</label>
-			<div class="cover">
-				<span class="label">Cover</span>
-				<span id="cover-name" class="name">None</span>
-				<button id="choose-cover" type="button">Choose…</button>
-				<button id="clear-cover" type="button" hidden>Clear</button>
-			</div>
-			<label class="blurb">Blurb
-				<textarea id="f-blurb" rows="6"
-					placeholder="Back-cover copy — shown here and saved beside the manuscript."></textarea>
-			</label>
 			<div class="actions">
 				<button id="export" type="button" class="primary">Export as EPUB</button>
+				<button id="edit-authorship" type="button"
+					title="Subtitle, author, cover, blurb, disclaimer — everything but the title, which the manuscript names">Edit details…</button>
 			</div>
 			<div id="status" class="status" hidden></div>
 		</div>
@@ -656,13 +569,9 @@ async function detailOf(response: Response): Promise<string> {
     }
 }
 
-/** The publication files live beside the manuscript; model.ts knows their names. */
-function pubUriFor(md: vscode.Uri): vscode.Uri {
-    return md.with({ path: pubPathFor(md.path) });
-}
-
-function blurbUriFor(md: vscode.Uri): vscode.Uri {
-    return md.with({ path: blurbPathFor(md.path) });
+/** The authorship file lives beside the manuscript; model.ts knows its name. */
+function authorshipUriFor(md: vscode.Uri): vscode.Uri {
+    return md.with({ path: authorshipPathFor(md.path) });
 }
 
 function basename(uri: vscode.Uri): string {

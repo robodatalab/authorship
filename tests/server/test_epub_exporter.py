@@ -3,6 +3,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
+from server.publishing.authorship import Authorship, Link
 from server.publishing.epub_exporter import (
     _inline,
     blocks_to_xhtml,
@@ -91,7 +92,12 @@ class BuildEpub(unittest.TestCase):
         md_path = self.root / f"{name}.md"
         md_path.write_text(md_text, encoding="utf-8")
         out_path = self.root / f"{name}.epub"
-        build_epub(Manuscript.load(md_path), out_path, cover, None, "A. Writer", "en")
+        build_epub(
+            Manuscript.load(md_path),
+            out_path,
+            Authorship(author="A. Writer"),
+            cover,
+        )
         return out_path
 
     def test_writes_a_zip_with_the_epub_skeleton(self) -> None:
@@ -145,13 +151,111 @@ class BuildEpub(unittest.TestCase):
         md_path = self.root / "titled.md"
         md_path.write_text("# My Book\n\n## One\n\nprose\n", encoding="utf-8")
         out_path = self.root / "titled.epub"
-        build_epub(Manuscript.load(md_path), out_path, None, None, "A. Writer", "en")
+        build_epub(
+            Manuscript.load(md_path), out_path, Authorship(author="A. Writer"), None
+        )
 
         with zipfile.ZipFile(out_path) as z:
             page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
 
         self.assertIn("My Book", page)
         self.assertIn("A. Writer", page)
+
+    def test_the_manuscript_is_what_names_the_book(self) -> None:
+        # The authorship file has no title of its own to disagree with this one.
+        md_path = self.root / "named.md"
+        md_path.write_text("# The Only Title\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "named.epub"
+        build_epub(Manuscript.load(md_path), out_path, Authorship(), None)
+
+        with zipfile.ZipFile(out_path) as z:
+            page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        self.assertIn("The Only Title", page)
+        self.assertIn("<dc:title>The Only Title</dc:title>", opf)
+
+    def test_the_title_page_carries_the_subtitle_and_publisher(self) -> None:
+        md_path = self.root / "dressed.md"
+        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "dressed.epub"
+        build_epub(
+            Manuscript.load(md_path),
+            out_path,
+            Authorship(subtitle="A Novel", publisher="Riverlight Press"),
+            None,
+        )
+
+        with zipfile.ZipFile(out_path) as z:
+            page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        self.assertIn("A Novel", page)
+        self.assertIn("Riverlight Press", page)
+        self.assertIn("<dc:publisher>Riverlight Press</dc:publisher>", opf)
+
+    def test_the_blurb_travels_as_the_books_description(self) -> None:
+        md_path = self.root / "blurbed.md"
+        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "blurbed.epub"
+        build_epub(
+            Manuscript.load(md_path),
+            out_path,
+            Authorship(blurb="A woman loses her name."),
+            None,
+        )
+
+        with zipfile.ZipFile(out_path) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        self.assertIn("<dc:description>A woman loses her name.</dc:description>", opf)
+
+    def test_a_disclaimer_gets_a_page_of_its_own(self) -> None:
+        md_path = self.root / "careful.md"
+        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "careful.epub"
+        build_epub(
+            Manuscript.load(md_path),
+            out_path,
+            Authorship(disclaimer="Any resemblance is coincidental."),
+            None,
+        )
+
+        with zipfile.ZipFile(out_path) as z:
+            self.assertIn("OEBPS/disclaimer.xhtml", z.namelist())
+            page = z.read("OEBPS/disclaimer.xhtml").decode("utf-8")
+
+        self.assertIn("Any resemblance is coincidental.", page)
+
+    def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
+        out = self._build("## One\n\nprose\n", name="bare")
+
+        with zipfile.ZipFile(out) as z:
+            self.assertNotIn("OEBPS/disclaimer.xhtml", z.namelist())
+
+    def test_the_authors_links_close_the_book(self) -> None:
+        md_path = self.root / "linked.md"
+        md_path.write_text("# Book\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "linked.epub"
+        build_epub(
+            Manuscript.load(md_path),
+            out_path,
+            Authorship(
+                author="A. Writer",
+                kindle=Link("Buy on Kindle", "https://amazon.example/dp/1"),
+                author_page=Link("My website", "https://writer.example"),
+            ),
+            None,
+        )
+
+        with zipfile.ZipFile(out_path) as z:
+            page = z.read("OEBPS/about.xhtml").decode("utf-8")
+            spine = z.read("OEBPS/content.opf").decode("utf-8")
+
+        self.assertIn("https://amazon.example/dp/1", page)
+        self.assertIn("My website", page)
+        # The back matter comes after the story, not before it.
+        self.assertLess(spine.index('idref="chap_000"'), spine.index('idref="about"'))
 
 
 if __name__ == "__main__":

@@ -1,28 +1,19 @@
 // The Publish form, running inside the webview. Everything here is DOM and the
 // message channel; the files it drives live host-side in publish/panel.ts.
 //
-// The host owns the truth. The form only reports edits and repaints itself from
-// what the host sends back — so free-text fields report on `change` (once the
-// value has settled), and the blurb also settles on a short debounce as it is
-// typed.
+// The host owns the truth. There is nothing here to fill in: what the book says
+// about itself is written in its own document, so this view asks for actions and
+// repaints what the host sends back.
 
 interface VsCodeApi {
 	postMessage(message: unknown): void;
 }
 declare function acquireVsCodeApi(): VsCodeApi;
 
-interface PubSettings {
-	title: string;
-	author: string;
-	language: string;
-	cover: string;
-	partWords: number;
-}
-
 interface StateMessage {
 	manuscript: string | null;
-	settings: PubSettings;
-	blurb: string;
+	/** The quota the authorship file records; the host read it for us. */
+	wordsPerPart: number;
 }
 
 interface ModelStatus {
@@ -76,14 +67,8 @@ const partWords = document.getElementById('f-part-words') as HTMLInputElement;
 const divideButton = document.getElementById('divide') as HTMLButtonElement;
 const mergeButton = document.getElementById('merge') as HTMLButtonElement;
 const partsStatus = document.getElementById('parts-status') as HTMLElement;
-const title = document.getElementById('f-title') as HTMLInputElement;
-const author = document.getElementById('f-author') as HTMLInputElement;
-const language = document.getElementById('f-language') as HTMLInputElement;
-const coverName = document.getElementById('cover-name') as HTMLElement;
-const chooseCover = document.getElementById('choose-cover') as HTMLButtonElement;
-const clearCover = document.getElementById('clear-cover') as HTMLButtonElement;
-const blurb = document.getElementById('f-blurb') as HTMLTextAreaElement;
 const exportButton = document.getElementById('export') as HTMLButtonElement;
+const editAuthorship = document.getElementById('edit-authorship') as HTMLButtonElement;
 const status = document.getElementById('status') as HTMLElement;
 const searchPhrase = document.getElementById('search-phrase') as HTMLInputElement;
 const searchClear = document.getElementById('search-clear') as HTMLButtonElement;
@@ -93,42 +78,6 @@ const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
 
-/** How long after the last keystroke the blurb is written. */
-const BLURB_DEBOUNCE_MS = 400;
-
-function sendSettings(): void {
-	vscode.postMessage({
-		type: 'settings',
-		settings: { title: title.value, author: author.value, language: language.value },
-	});
-}
-
-for (const field of [title, author, language]) {
-	field.addEventListener('change', sendSettings);
-}
-
-let blurbTimer: ReturnType<typeof setTimeout> | undefined;
-
-function commitBlurb(): void {
-	if (blurbTimer !== undefined) {
-		clearTimeout(blurbTimer);
-		blurbTimer = undefined;
-	}
-	vscode.postMessage({ type: 'blurb', text: blurb.value });
-}
-
-blurb.addEventListener('input', () => {
-	if (blurbTimer !== undefined) {
-		clearTimeout(blurbTimer);
-	}
-	blurbTimer = setTimeout(commitBlurb, BLURB_DEBOUNCE_MS);
-});
-// Leaving the field shouldn't wait out the debounce.
-blurb.addEventListener('change', commitBlurb);
-
-partWords.addEventListener('change', () =>
-	vscode.postMessage({ type: 'partWords', words: partWords.value })
-);
 divideButton.addEventListener('click', () => {
 	setStatus(partsStatus, 'Dividing…', false);
 	// The quota travels with the request rather than being read back from the
@@ -142,12 +91,13 @@ mergeButton.addEventListener('click', () => {
 });
 
 chooseButton.addEventListener('click', () => vscode.postMessage({ type: 'choose' }));
-chooseCover.addEventListener('click', () => vscode.postMessage({ type: 'chooseCover' }));
-clearCover.addEventListener('click', () => vscode.postMessage({ type: 'clearCover' }));
 exportButton.addEventListener('click', () => {
 	setStatus(status, 'Exporting…', false);
 	vscode.postMessage({ type: 'export' });
 });
+editAuthorship.addEventListener('click', () =>
+	vscode.postMessage({ type: 'editAuthorship' })
+);
 // The phrase is asked on Enter rather than as it is typed: a search is a forward
 // pass on the server, and half a phrase asks half a question.
 searchPhrase.addEventListener('keydown', (event) => {
@@ -172,13 +122,8 @@ function setEnabled(enabled: boolean): void {
 		partWords,
 		divideButton,
 		mergeButton,
-		title,
-		author,
-		language,
-		chooseCover,
-		clearCover,
-		blurb,
 		exportButton,
+		editAuthorship,
 	];
 	for (const el of controls) {
 		el.disabled = !enabled;
@@ -191,29 +136,15 @@ function setStatus(el: HTMLElement, message: string, error: boolean): void {
 	el.hidden = message === '';
 }
 
-function showCover(cover: string): void {
-	coverName.textContent = cover ? baseName(cover) : 'None';
-	clearCover.hidden = cover === '';
-}
-
 function renderState(state: StateMessage): void {
 	const hasStory = state.manuscript !== null;
 	manuscriptName.textContent = state.manuscript ?? 'No story selected';
 	// The name is ellipsized when the path is long; the tooltip keeps it legible.
 	manuscriptName.title = state.manuscript ?? '';
-	partWords.value = String(state.settings.partWords);
-	title.value = state.settings.title;
-	author.value = state.settings.author;
-	language.value = state.settings.language;
-	showCover(state.settings.cover);
-	blurb.value = state.blurb;
+	partWords.value = String(state.wordsPerPart);
 	setEnabled(hasStory);
 	setStatus(status, '', false);
 	setStatus(partsStatus, '', false);
-}
-
-function baseName(p: string): string {
-	return p.split(/[\\/]/).pop() ?? p;
 }
 
 /** null means the server did not answer; a list is its models and which is resident. */
@@ -509,8 +440,6 @@ window.addEventListener('message', (event) => {
 		renderSearch(message.search as SearchMessage | null);
 	} else if (message?.type === 'state') {
 		renderState(message as StateMessage);
-	} else if (message?.type === 'cover') {
-		showCover(String(message.cover ?? ''));
 	} else if (message?.type === 'status') {
 		setStatus(status, String(message.message ?? ''), Boolean(message.error));
 	} else if (message?.type === 'partsStatus') {
