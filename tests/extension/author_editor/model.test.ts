@@ -87,6 +87,18 @@ describe('the kinds a section can be', () => {
 		expect(hints.author).toBeUndefined();
 	});
 
+	it('gives a disclaimer a heading and prose, the way a chapter page reads', () => {
+		expect(fieldsOf('disclaimer').map((f) => f.name)).toEqual(['title']);
+		expect(hasProse('disclaimer')).toBe(true);
+	});
+
+	it('starts a disclaimer with something worth keeping', () => {
+		const blank = KINDS.find((k) => k.kind === 'disclaimer')!.blank();
+		expect(blank.attrs.title).toBeTruthy();
+		expect(blank.source).toContain('work of fiction');
+		expect(blank.source).toContain('consent');
+	});
+
 	it('marks only the ISBN optional', () => {
 		expect(fieldsOf('title-page').filter((f) => f.optional).map((f) => f.name)).toEqual([
 			'isbn',
@@ -433,6 +445,12 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 		expect(toMarkdown([chapter('One'), markdown('a'), chapter('Two')])).toBe(
 			'## One\n\na\n\n## Two\n'
 		);
+	});
+
+	it('heads a disclaimer with its title, like any other page', () => {
+		expect(
+			toMarkdown([{ kind: 'disclaimer', source: 'Careful.', attrs: { title: 'Heads Up!' } }])
+		).toBe('## Heads Up!\n\nCareful.\n');
 	});
 
 	it('leaves out a cell that holds nothing', () => {

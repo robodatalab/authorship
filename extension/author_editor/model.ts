@@ -61,6 +61,24 @@ export interface CellKind {
 	blank: () => Cell;
 }
 
+/**
+ * What a disclaimer says before anyone has written one.
+ *
+ * The shape is the one these take in practice: what the story contains, that it
+ * is fiction whatever happens in it, and where the author stands. What a
+ * particular book needs warning about is the author's to write, so the first
+ * line is the one to replace.
+ */
+const DISCLAIMER_TEXT = [
+	'This story is intended for adult readers and contains themes and scenes',
+	'that may not appeal to everyone.',
+	'',
+	'This story is a work of fiction and, regardless of the story\u2019s events,',
+	'the author strongly believes in consent, equality, and inclusivity.',
+	'',
+	'Enjoy!',
+].join('\n');
+
 export const KINDS: CellKind[] = [
 	{
 		kind: MARKDOWN,
@@ -122,14 +140,17 @@ export const KINDS: CellKind[] = [
 	{
 		kind: DISCLAIMER,
 		prose: true,
-		fields: [],
+		// Named as well as written: a disclaimer is a page the reader turns to,
+		// so it carries a heading of its own like any other — and "Heads Up!"
+		// serves a book better than "Disclaimer" when the author says so.
+		fields: [{ name: 'title', label: 'Title' }],
 		label: 'Disclaimer',
 		automated: false,
 		primary: false,
 		blank: () => ({
 			kind: DISCLAIMER,
-			source: 'Any resemblance to real persons is coincidental.',
-			attrs: {},
+			source: DISCLAIMER_TEXT,
+			attrs: { title: 'Heads Up!' },
 		}),
 	},
 	{
@@ -317,9 +338,18 @@ export function toMarkdown(cells: Cell[]): string {
 	for (const cell of cells) {
 		if (cell.kind === TITLE_PAGE) {
 			out.push(...titlePageMarkdown(cell));
-		} else if (cell.kind === CHAPTER) {
+			continue;
+		}
+		if (cell.kind === CHAPTER) {
 			out.push(`## ${cell.attrs.title || 'Untitled'}`);
-		} else if (cell.source) {
+			continue;
+		}
+		// Any other cell that carries a name is headed by it — a disclaimer is a
+		// page with a title and prose, and reads as one in markdown too.
+		if (cell.attrs.title) {
+			out.push(`## ${cell.attrs.title}`);
+		}
+		if (cell.source) {
 			out.push(cell.source);
 		}
 	}

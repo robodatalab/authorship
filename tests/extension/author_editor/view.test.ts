@@ -133,6 +133,13 @@ describe('drawing cells', () => {
 		expect(cell.querySelector('.rendered')).toBeNull();
 	});
 
+	it('gives a disclaimer both a heading and a prose body', async () => {
+		await mount([{ kind: 'disclaimer', source: 'Careful.', attrs: { title: 'Heads Up!' } }]);
+		const cell = shown()[0];
+		expect(cell.querySelector<HTMLInputElement>('.cell-title')!.value).toBe('Heads Up!');
+		expect(cell.querySelector('.rendered')!.textContent).toContain('Careful.');
+	});
+
 	it('renders prose as markdown rather than as its source', async () => {
 		await mount([markdown('# Heading')]);
 		expect(shown()[0].querySelector('.rendered')!.innerHTML).toContain('<h1>');
@@ -255,6 +262,7 @@ describe('the menus', () => {
 		expect(listed).not.toContain('Markdown');
 		expect(listed).not.toContain('Chapter');
 		expect(listed).toContain('Table of Contents');
+		expect(listed).toContain('Disclaimer');
 	});
 
 	it('offers what can be done to a cell, and nothing about adding one', async () => {
