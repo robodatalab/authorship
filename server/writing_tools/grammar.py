@@ -1,7 +1,7 @@
 import re
 from collections.abc import Callable
 
-from roost import Seq2SeqModel
+from vramen import Seq2SeqModel
 from server.storydoc import Document
 
 

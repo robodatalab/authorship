@@ -14,7 +14,7 @@ from pathlib import Path
 import shutil
 from urllib.request import urlopen
 
-from roost.resource_manager import InferenceModelResourceManager, ModelKind, ModelNotAvailable
+from vramen.resource_manager import InferenceModelResourceManager, ModelKind, ModelNotAvailable
 import torch
 from torch import nn
 from transformers import AutoModel, AutoTokenizer

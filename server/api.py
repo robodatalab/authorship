@@ -12,7 +12,7 @@ from server.publishing import authorship
 from server.publishing.epub_exporter import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
-from roost import (
+from vramen import (
     InferenceModelResourceManager,
     Seq2SeqModel,
     coedit_prompt, machine_memory

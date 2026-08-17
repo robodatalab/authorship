@@ -9,7 +9,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from roost.resource_manager import (
+from vramen.resource_manager import (
     MemoryReading,
     ModelKind,
 )
