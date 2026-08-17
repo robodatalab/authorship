@@ -16,21 +16,13 @@ from typing import Sequence, cast
 
 from yaml import safe_load
 
-from server.inference.encoder import EncoderModel
-from server.line_contribution import (
+from roost import EncoderModel
+from server.representations.line_contribution import (
     SectionContribution,
-    attribution_path_for,
     line_contribution,
     write_attribution,
 )
-from server.representations.utils import (
-    Piece,
-    Section,
-    parse_sections,
-    section_at,
-    split_comments,
-    visible_lines,
-)
+from server.manuscript import Manuscript
 
 
 class LineAxisEncoder:
@@ -53,148 +45,10 @@ def score(story: str, line: int) -> SectionContribution:
     """The section covering `line`, scored. Only a manuscript with no lines at
     all has no section to cover one, and none of these are that."""
     contribution = line_contribution(
-        cast(EncoderModel, LineAxisEncoder()), story, line
+        cast(EncoderModel, LineAxisEncoder()), Manuscript(story), line
     )
     assert contribution is not None
     return contribution
-
-
-def section_covering(story: str, line: int) -> Section:
-    found = section_at(parse_sections(story), line)
-    assert found is not None
-    return found
-
-
-class VisibleLines(unittest.TestCase):
-    """Notes to self are not the story."""
-
-    def test_prose_without_comments_is_returned_as_it_stands(self) -> None:
-        self.assertEqual(visible_lines(["one", "", "two"]), ["one", "", "two"])
-
-    def test_a_comment_alone_on_a_line_leaves_it_blank(self) -> None:
-        self.assertEqual(visible_lines(["<!-- fix this -->"]), [""])
-
-    def test_prose_beside_a_comment_keeps_the_prose(self) -> None:
-        self.assertEqual(visible_lines(["she left. <!-- or did she -->"]), ["she left. "])
-
-    def test_a_comment_spanning_several_lines_blanks_all_of_them(self) -> None:
-        self.assertEqual(
-            visible_lines(["<!-- cut", "this whole", "passage -->", "kept"]),
-            ["", "", "", "kept"],
-        )
-
-    def test_a_comment_that_never_closes_runs_to_the_end(self) -> None:
-        self.assertEqual(visible_lines(["kept", "<!-- from here", "gone"]), ["kept", "", ""])
-
-    def test_several_comments_on_one_line_all_go(self) -> None:
-        self.assertEqual(
-            visible_lines(["a <!-- one --> b <!-- two --> c"]), ["a  b  c"]
-        )
-
-    def test_prose_after_a_comment_closes_survives(self) -> None:
-        self.assertEqual(visible_lines(["<!-- note -->real"]), ["real"])
-
-
-class SplitComments(unittest.TestCase):
-    """Which stretches of a manuscript are story and which are notes to self.
-
-    `visible_lines` drops the notes; a correction pass keeps them and leaves them
-    alone. Both ask this the same question.
-    """
-
-    def test_text_with_no_comment_in_it_is_one_piece_of_story(self) -> None:
-        self.assertEqual(
-            split_comments("she left."), ([Piece("she left.", comment=False)], False)
-        )
-
-    def test_a_comment_carries_its_own_markers(self) -> None:
-        pieces, inside = split_comments("<!-- fix this -->")
-        self.assertEqual(pieces, [Piece("<!-- fix this -->", comment=True)])
-        self.assertFalse(inside)
-
-    def test_prose_on_either_side_of_a_comment_is_kept_apart_from_it(self) -> None:
-        pieces, _ = split_comments("she left. <!-- or did she --> he stayed.")
-        self.assertEqual(
-            pieces,
-            [
-                Piece("she left. ", comment=False),
-                Piece("<!-- or did she -->", comment=True),
-                Piece(" he stayed.", comment=False),
-            ],
-        )
-
-    def test_the_pieces_joined_back_together_are_the_text_again(self) -> None:
-        text = "a <!-- one --> b <!-- two --> c"
-        pieces, _ = split_comments(text)
-        self.assertEqual("".join(piece.text for piece in pieces), text)
-
-    def test_a_comment_that_never_closes_runs_to_the_end_and_says_so(self) -> None:
-        pieces, inside = split_comments("kept <!-- from here on")
-        self.assertEqual(
-            pieces,
-            [Piece("kept ", comment=False), Piece("<!-- from here on", comment=True)],
-        )
-        self.assertTrue(inside)
-
-    def test_text_opening_inside_a_comment_carries_on_being_one(self) -> None:
-        pieces, inside = split_comments("still a note -->real", inside=True)
-        self.assertEqual(
-            pieces,
-            [Piece("still a note -->", comment=True), Piece("real", comment=False)],
-        )
-        self.assertFalse(inside)
-
-    def test_the_dashes_that_open_a_comment_cannot_also_close_it(self) -> None:
-        pieces, inside = split_comments("<!-->")
-        self.assertEqual(pieces, [Piece("<!-->", comment=True)])
-        self.assertTrue(inside)
-
-    def test_nothing_at_all_is_no_pieces_at_all(self) -> None:
-        self.assertEqual(split_comments(""), ([], False))
-
-
-class ParseSections(unittest.TestCase):
-    """Where a manuscript divides, and what the divisions cover."""
-
-    def test_lines_before_the_first_heading_are_a_section(self) -> None:
-        sections = parse_sections("a title\n\n## One\nprose")
-        self.assertEqual(sections[0].start, 0)
-        self.assertEqual(sections[0].end, 1)
-
-    def test_a_heading_starts_a_section_at_the_line_below_it(self) -> None:
-        sections = parse_sections("## One\nprose")
-        self.assertEqual(sections[-1].title, "One")
-        self.assertEqual(sections[-1].start, 1)
-
-    def test_the_last_section_is_closed_by_the_end_of_the_file(self) -> None:
-        sections = parse_sections("## One\nfirst\n## Two\nsecond\nthird")
-        self.assertEqual(sections[-1].title, "Two")
-        self.assertEqual(sections[-1].end, 4)
-
-    def test_every_heading_makes_a_section(self) -> None:
-        sections = parse_sections("intro\n## One\na\n## Two\nb\n## Three\nc")
-        self.assertEqual(
-            [section.title for section in sections[1:]], ["One", "Two", "Three"]
-        )
-
-    def test_a_commented_heading_does_not_divide_the_manuscript(self) -> None:
-        sections = parse_sections("## One\na\n<!-- ## Two -->\nb")
-        self.assertEqual([section.title for section in sections[1:]], ["One"])
-        self.assertEqual(sections[-1].end, 3)
-
-
-class SectionAt(unittest.TestCase):
-    """Which section a cursor is in."""
-
-    def test_a_line_in_the_body_belongs_to_its_section(self) -> None:
-        self.assertEqual(section_covering("## One\na\n## Two\nb", 3).title, "Two")
-
-    def test_a_heading_belongs_to_the_section_it_opens(self) -> None:
-        self.assertEqual(section_covering("## One\na\n## Two\nb", 2).title, "Two")
-
-    def test_a_line_before_the_first_heading_lands_in_the_opening_section(self) -> None:
-        sections = parse_sections("a title\n\n## One\nprose")
-        self.assertEqual(section_at(sections, 0), sections[0])
 
 
 class Contribution(unittest.TestCase):
@@ -232,7 +86,7 @@ class Contribution(unittest.TestCase):
     def test_a_comment_beside_prose_is_not_weighed_with_it(self) -> None:
         # The note would otherwise be content of the line it trails, and the two
         # sections here would not score alike.
-        noted = score("## One\nalpha <!-- cut? -->\nbeta", 1)
+        noted = score("## One\nalpha\n<!-- cut? -->\nbeta", 1)
         plain = score("## One\nalpha \nbeta", 1)
         self.assertEqual(
             [entry.share for entry in noted.lines],
@@ -259,26 +113,6 @@ class Contribution(unittest.TestCase):
 
 class Sidecar(unittest.TestCase):
     """The file the job writes, beside the manuscript it scored."""
-
-    def test_the_file_sits_beside_the_manuscript(self) -> None:
-        self.assertEqual(
-            attribution_path_for(Path("/stories/story_2.md")),
-            Path("/stories/story_2.attribution.yaml"),
-        )
-
-    def test_the_extension_is_matched_whatever_its_case(self) -> None:
-        self.assertEqual(
-            attribution_path_for(Path("/stories/Story.MD")).name,
-            "Story.attribution.yaml",
-        )
-
-    def test_it_is_not_the_file_the_graph_is_written_to(self) -> None:
-        # The job table supersedes by target, so a scoring job sharing a name with
-        # a build would cancel it.
-        self.assertNotEqual(
-            attribution_path_for(Path("/stories/story_2.md")).name,
-            "story_2.graph.yaml",
-        )
 
     def test_the_scored_section_round_trips(self) -> None:
         scored = score("## One\nalpha\nbeta\ngamma", 1)

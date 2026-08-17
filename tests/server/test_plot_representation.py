@@ -2,9 +2,10 @@ import unittest
 from typing import cast
 from unittest.mock import create_autospec
 
-from server.inference.causal import CausalModel
+from roost import CausalModel
+from server.manuscript import Manuscript
 from server.representations.plot_representation import build_plot_representation
-from server.story_graph import Edge, Node
+from server.representations.story_graph import Edge, Node
 
 STORY = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten"
 
@@ -23,19 +24,19 @@ class InvalidReplies(unittest.TestCase):
             reply="I could not find any plots in this story."
         )
         with self.assertRaises(ValueError):
-            build_plot_representation(model, STORY)
+            build_plot_representation(model, Manuscript(STORY))
 
     def test_object_never_closes(self) -> None:
         model = build_completion_model_mock(
             reply='{"nodes": [{"id": 1, "title": "x", "start": 0, "end": 1, "group": 1}'
         )
         with self.assertRaises(ValueError):
-            build_plot_representation(model, STORY)
+            build_plot_representation(model, Manuscript(STORY))
 
     def test_reply_is_an_array_not_an_object(self) -> None:
         model = build_completion_model_mock(reply="[1, 2, 3]")
         with self.assertRaises(ValueError):
-            build_plot_representation(model, STORY)
+            build_plot_representation(model, Manuscript(STORY))
 
 
 class GroupedGraphs(unittest.TestCase):
@@ -55,7 +56,7 @@ class GroupedGraphs(unittest.TestCase):
                 "]}"
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -82,7 +83,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": [{"from": 1, "to": 2}]}'
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -99,7 +100,7 @@ class GroupedGraphs(unittest.TestCase):
                 ' "edges": []}'
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(graph.nodes, (Node(id=1, title="a", start=1, end=3, group=3),))
 
     def test_alternate_key_names_are_accepted(self) -> None:
@@ -111,7 +112,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": [{"source": 1, "target": 2, "group": 1}]}'
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -130,7 +131,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": []}'
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -151,7 +152,7 @@ class GroupedGraphs(unittest.TestCase):
                 '], "edges": []}'
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -173,7 +174,7 @@ class GroupedGraphs(unittest.TestCase):
                 "]}"
             )
         )
-        graph = build_plot_representation(model, STORY)
+        graph = build_plot_representation(model, Manuscript(STORY))
         self.assertEqual(graph.edges, (Edge(source=1, target=2, group=1),))
 
 

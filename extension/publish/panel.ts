@@ -13,23 +13,23 @@
 // the form. Exporting hands the manuscript and its settings to the server, which
 // writes `<name>.epub` and is the one place that knows how to build the book.
 
-import * as vscode from 'vscode';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import * as vscode from "vscode";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
-import { divideManuscript } from '../parts/divide';
-import { quotaOf } from '../parts/model';
-import { progress, rowDescription, rowLabel } from '../search/model';
-import type { ManuscriptSearch, Results } from '../search/results';
+import { divideManuscript, mergeManuscript } from "../parts/divide";
+import { quotaOf } from "../parts/model";
+import { progress, rowDescription, rowLabel } from "../search/model";
+import type { ManuscriptSearch, Results } from "../search/results";
 import {
-	DEFAULT_SETTINGS,
-	blurbPathFor,
-	pubPathFor,
-	readFields,
-	type PubSettings,
-} from './model';
+    DEFAULT_SETTINGS,
+    blurbPathFor,
+    pubPathFor,
+    readFields,
+    type PubSettings,
+} from "./model";
 
 /** Where the chosen manuscript is remembered between sessions. */
-const MANUSCRIPT_KEY = 'authorship.publish.manuscript';
+const MANUSCRIPT_KEY = "authorship.publish.manuscript";
 
 /** How often the status drawers refresh. */
 const STATUS_POLL_MS = 1500;
@@ -38,405 +38,497 @@ const STATUS_POLL_MS = 1500;
 const STATUS_REQUEST_TIMEOUT_MS = 10_000;
 
 export class PublishView implements vscode.WebviewViewProvider {
-	private view?: vscode.WebviewView;
+    private view?: vscode.WebviewView;
 
-	/** The manuscript being published, if one has been chosen. */
-	private manuscript?: vscode.Uri;
+    /** The manuscript being published, if one has been chosen. */
+    private manuscript?: vscode.Uri;
 
-	/** Refreshes the status drawers while the view is alive. */
-	private pollTimer?: ReturnType<typeof setInterval>;
+    /** Refreshes the status drawers while the view is alive. */
+    private pollTimer?: ReturnType<typeof setInterval>;
 
-	constructor(
-		private readonly context: vscode.ExtensionContext,
-		private readonly port: number,
-		private readonly search: ManuscriptSearch
-	) {
-		// Pick up where we left off, or fall back to whatever markdown is open, so
-		// the panel has something to publish the first time it is shown.
-		const remembered = context.workspaceState.get<string>(MANUSCRIPT_KEY);
-		this.manuscript = remembered
-			? vscode.Uri.file(remembered)
-			: activeMarkdown();
-	}
+    constructor(
+        private readonly context: vscode.ExtensionContext,
+        private readonly port: number,
+        private readonly search: ManuscriptSearch,
+    ) {
+        // Pick up where we left off, or fall back to whatever markdown is open, so
+        // the panel has something to publish the first time it is shown.
+        const remembered = context.workspaceState.get<string>(MANUSCRIPT_KEY);
+        this.manuscript = remembered
+            ? vscode.Uri.file(remembered)
+            : activeMarkdown();
+    }
 
-	resolveWebviewView(view: vscode.WebviewView): void {
-		this.view = view;
-		view.webview.options = {
-			enableScripts: true,
-			localResourceRoots: [
-				vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-				vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
-			],
-		};
-		view.webview.html = this.html(view.webview);
+    resolveWebviewView(view: vscode.WebviewView): void {
+        this.view = view;
+        view.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(this.context.extensionUri, "media"),
+                vscode.Uri.joinPath(this.context.extensionUri, "dist"),
+            ],
+        };
+        view.webview.html = this.html(view.webview);
 
-		view.webview.onDidReceiveMessage((message) => {
-			switch (message?.type) {
-				case 'ready':
-					void this.send();
-					// A search made before the view was ever shown, or before it was
-					// hidden and brought back, is still the search in force.
-					this.sendSearch(this.search.current());
-					break;
-				case 'choose':
-					void this.choose();
-					break;
-				case 'chooseCover':
-					void this.chooseCover();
-					break;
-				case 'clearCover':
-					void this.setCover('');
-					break;
-				case 'settings':
-					void this.writeSettings(readFields(message.settings));
-					break;
-				case 'partWords':
-					void this.writeSettings({ partWords: quotaOf(message.words) });
-					break;
-				case 'divide':
-					void this.divide(quotaOf(message.words));
-					break;
-				case 'blurb':
-					void this.saveBlurb(String(message.text ?? ''));
-					break;
-				case 'export':
-					void this.export();
-					break;
-				case 'search':
-					void this.search.search(String(message.phrase ?? ''));
-					break;
-				case 'revealHit':
-					void this.search.reveal(Number(message.index));
-					break;
-				case 'clearSearch':
-					this.search.clear();
-					break;
-			}
-		});
+        view.webview.onDidReceiveMessage((message) => {
+            switch (message?.type) {
+                case "ready":
+                    void this.send();
+                    // A search made before the view was ever shown, or before it was
+                    // hidden and brought back, is still the search in force.
+                    this.sendSearch(this.search.current());
+                    break;
+                case "choose":
+                    void this.choose();
+                    break;
+                case "chooseCover":
+                    void this.chooseCover();
+                    break;
+                case "clearCover":
+                    void this.setCover("");
+                    break;
+                case "settings":
+                    void this.writeSettings(readFields(message.settings));
+                    break;
+                case "partWords":
+                    void this.writeSettings({
+                        partWords: quotaOf(message.words),
+                    });
+                    break;
+                case "divide":
+                    void this.divide(quotaOf(message.words));
+                    break;
+                case "merge":
+                    void this.merge();
+                    break;
+                case "blurb":
+                    void this.saveBlurb(String(message.text ?? ""));
+                    break;
+                case "export":
+                    void this.export();
+                    break;
+                case "search":
+                    void this.search.search(String(message.phrase ?? ""));
+                    break;
+                case "revealHit":
+                    void this.search.reveal(Number(message.index));
+                    break;
+                case "clearSearch":
+                    this.search.clear();
+                    break;
+            }
+        });
 
-		void this.poll();
-		this.pollTimer = setInterval(() => void this.poll(), STATUS_POLL_MS);
+        void this.poll();
+        this.pollTimer = setInterval(() => void this.poll(), STATUS_POLL_MS);
 
-		// The search is owned elsewhere and moves on its own — an indexing pass
-		// finishing, an edit shifting the passages — so the drawer follows it
-		// rather than asking.
-		const following = this.search.onChange((results) => this.sendSearch(results));
+        // The search is owned elsewhere and moves on its own — an indexing pass
+        // finishing, an edit shifting the passages — so the drawer follows it
+        // rather than asking.
+        const following = this.search.onChange((results) =>
+            this.sendSearch(results),
+        );
 
-		view.onDidDispose(() => {
-			if (this.pollTimer !== undefined) {
-				clearInterval(this.pollTimer);
-				this.pollTimer = undefined;
-			}
-			following.dispose();
-			this.view = undefined;
-		});
-	}
+        view.onDidDispose(() => {
+            if (this.pollTimer !== undefined) {
+                clearInterval(this.pollTimer);
+                this.pollTimer = undefined;
+            }
+            following.dispose();
+            this.view = undefined;
+        });
+    }
 
-	// --- manuscript selection ---
+    // --- manuscript selection ---
 
-	/**
-	 * Take the manuscript being edited, and only fall back to the file dialog
-	 * when there is nothing to take — the story the author means is nearly
-	 * always the one they are looking at.
-	 */
-	private async choose(): Promise<void> {
-		const chosen = activeMarkdown() ?? (await pickMarkdown());
-		if (!chosen) {
-			return;
-		}
-		this.manuscript = chosen;
-		await this.context.workspaceState.update(MANUSCRIPT_KEY, this.manuscript.fsPath);
-		// A blurb the panel can display from the moment a manuscript is chosen.
-		await this.ensureBlurb();
-		await this.send();
-	}
+    /**
+     * Take the manuscript being edited, and only fall back to the file dialog
+     * when there is nothing to take — the story the author means is nearly
+     * always the one they are looking at.
+     */
+    private async choose(): Promise<void> {
+        const chosen = activeMarkdown() ?? (await pickMarkdown());
+        if (!chosen) {
+            return;
+        }
+        this.manuscript = chosen;
+        await this.context.workspaceState.update(
+            MANUSCRIPT_KEY,
+            this.manuscript.fsPath,
+        );
+        // A blurb the panel can display from the moment a manuscript is chosen.
+        await this.ensureBlurb();
+        await this.send();
+    }
 
-	private async chooseCover(): Promise<void> {
-		const picked = await vscode.window.showOpenDialog({
-			canSelectMany: false,
-			openLabel: 'Use as cover',
-			filters: { Images: ['png', 'jpg', 'jpeg', 'gif', 'webp'] },
-		});
-		if (!picked || picked.length === 0) {
-			return;
-		}
-		await this.setCover(picked[0].fsPath);
-	}
+    private async chooseCover(): Promise<void> {
+        const picked = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            openLabel: "Use as cover",
+            filters: { Images: ["png", "jpg", "jpeg", "gif", "webp"] },
+        });
+        if (!picked || picked.length === 0) {
+            return;
+        }
+        await this.setCover(picked[0].fsPath);
+    }
 
-	// --- parts (parts/part_N.md) ---
+    // --- parts (parts/part_N.md) ---
 
-	/**
-	 * Cut the manuscript into parts of about the asked-for length.
-	 *
-	 * The cuts fall between sections, so a part never opens mid-scene and the
-	 * lengths land near the quota rather than on it. How near is worth saying: a
-	 * division that made three parts out of a quota meant to make ten is the
-	 * author's cue that their sections are longer than they thought.
-	 */
-	private async divide(quota: number): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		await this.writeSettings({ partWords: quota });
-		try {
-			const { folder, parts } = await divideManuscript(this.manuscript, quota);
-			await this.partsStatus(
-				parts === 0
-					? 'Nothing to divide — the manuscript has no prose.'
-					: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`,
-				false
-			);
-		} catch (err) {
-			await this.partsStatus(`Could not divide: ${describe(err)}`, true);
-		}
-	}
+    /**
+     * Cut the manuscript into parts of about the asked-for length.
+     *
+     * The cuts fall between sections, so a part never opens mid-scene and the
+     * lengths land near the quota rather than on it. How near is worth saying: a
+     * division that made three parts out of a quota meant to make ten is the
+     * author's cue that their sections are longer than they thought.
+     */
+    private async divide(quota: number): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        await this.writeSettings({ partWords: quota });
+        try {
+            const { folder, parts } = await divideManuscript(
+                this.manuscript,
+                quota,
+            );
+            await this.partsStatus(
+                parts === 0
+                    ? "Nothing to divide — the manuscript has no prose."
+                    : `Wrote ${parts} ${parts === 1 ? "part" : "parts"} to ${vscode.workspace.asRelativePath(folder)}`,
+                false,
+            );
+        } catch (err) {
+            await this.partsStatus(`Could not divide: ${describe(err)}`, true);
+        }
+    }
 
-	// --- settings (<name>.pub.yaml) ---
+    /**
+     * Put the parts back over the manuscript they were cut from.
+     *
+     * The writing since the division happened in the parts, so they are what
+     * survives — this replaces the manuscript rather than reconciling it against
+     * them. What it replaces is a file under version control, which is where an
+     * author who meant something else gets it back.
+     */
+    private async merge(): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        try {
+            const { folder, parts } = await mergeManuscript(this.manuscript);
+            await this.partsStatus(
+                parts === 0
+                    ? `Nothing to merge — no parts in ${vscode.workspace.asRelativePath(folder)}`
+                    : `Merged ${parts} ${parts === 1 ? "part" : "parts"} into ${vscode.workspace.asRelativePath(this.manuscript)}`,
+                false,
+            );
+        } catch (err) {
+            await this.partsStatus(`Could not merge: ${describe(err)}`, true);
+        }
+    }
 
-	private async readSettings(): Promise<PubSettings> {
-		if (!this.manuscript) {
-			return { ...DEFAULT_SETTINGS };
-		}
-		try {
-			const bytes = await vscode.workspace.fs.readFile(pubUriFor(this.manuscript));
-			const parsed = parseYaml(new TextDecoder().decode(bytes)) as Partial<PubSettings> | null;
-			return { ...DEFAULT_SETTINGS, ...(parsed ?? {}) };
-		} catch {
-			// No file yet, or an unreadable one — start from the defaults either way.
-			return { ...DEFAULT_SETTINGS };
-		}
-	}
+    // --- settings (<name>.pub.yaml) ---
 
-	/** Merge a change into `<name>.pub.yaml`, creating it on first edit. */
-	private async writeSettings(patch: Partial<PubSettings>): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		const merged = { ...(await this.readSettings()), ...patch };
-		const text = stringifyYaml(merged, { lineWidth: 0 });
-		await vscode.workspace.fs.writeFile(
-			pubUriFor(this.manuscript),
-			new TextEncoder().encode(text)
-		);
-	}
+    private async readSettings(): Promise<PubSettings> {
+        if (!this.manuscript) {
+            return { ...DEFAULT_SETTINGS };
+        }
+        try {
+            const bytes = await vscode.workspace.fs.readFile(
+                pubUriFor(this.manuscript),
+            );
+            const parsed = parseYaml(
+                new TextDecoder().decode(bytes),
+            ) as Partial<PubSettings> | null;
+            return { ...DEFAULT_SETTINGS, ...(parsed ?? {}) };
+        } catch {
+            // No file yet, or an unreadable one — start from the defaults either way.
+            return { ...DEFAULT_SETTINGS };
+        }
+    }
 
-	/**
-	 * Set the cover and tell the view — but only about the cover. A full state
-	 * push would overwrite whatever the author is mid-way through typing in the
-	 * blurb, so the cover carries on its own narrow message.
-	 */
-	private async setCover(cover: string): Promise<void> {
-		await this.writeSettings({ cover });
-		void this.view?.webview.postMessage({ type: 'cover', cover });
-	}
+    /** Merge a change into `<name>.pub.yaml`, creating it on first edit. */
+    private async writeSettings(patch: Partial<PubSettings>): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        const merged = { ...(await this.readSettings()), ...patch };
+        const text = stringifyYaml(merged, { lineWidth: 0 });
+        await vscode.workspace.fs.writeFile(
+            pubUriFor(this.manuscript),
+            new TextEncoder().encode(text),
+        );
+    }
 
-	// --- blurb (<name>.blurb.md) ---
+    /**
+     * Set the cover and tell the view — but only about the cover. A full state
+     * push would overwrite whatever the author is mid-way through typing in the
+     * blurb, so the cover carries on its own narrow message.
+     */
+    private async setCover(cover: string): Promise<void> {
+        await this.writeSettings({ cover });
+        void this.view?.webview.postMessage({ type: "cover", cover });
+    }
 
-	private async readBlurb(): Promise<string> {
-		if (!this.manuscript) {
-			return '';
-		}
-		try {
-			const bytes = await vscode.workspace.fs.readFile(blurbUriFor(this.manuscript));
-			return new TextDecoder().decode(bytes);
-		} catch {
-			return '';
-		}
-	}
+    // --- blurb (<name>.blurb.md) ---
 
-	private async ensureBlurb(): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		const uri = blurbUriFor(this.manuscript);
-		try {
-			await vscode.workspace.fs.stat(uri);
-		} catch {
-			await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(''));
-		}
-	}
+    private async readBlurb(): Promise<string> {
+        if (!this.manuscript) {
+            return "";
+        }
+        try {
+            const bytes = await vscode.workspace.fs.readFile(
+                blurbUriFor(this.manuscript),
+            );
+            return new TextDecoder().decode(bytes);
+        } catch {
+            return "";
+        }
+    }
 
-	private async saveBlurb(text: string): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		await vscode.workspace.fs.writeFile(
-			blurbUriFor(this.manuscript),
-			new TextEncoder().encode(text)
-		);
-	}
+    private async ensureBlurb(): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        const uri = blurbUriFor(this.manuscript);
+        try {
+            await vscode.workspace.fs.stat(uri);
+        } catch {
+            await vscode.workspace.fs.writeFile(
+                uri,
+                new TextEncoder().encode(""),
+            );
+        }
+    }
 
-	// --- export ---
+    private async saveBlurb(text: string): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        await vscode.workspace.fs.writeFile(
+            blurbUriFor(this.manuscript),
+            new TextEncoder().encode(text),
+        );
+    }
 
-	private async export(): Promise<void> {
-		if (!this.manuscript) {
-			return;
-		}
-		const settings = await this.readSettings();
-		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/export/epub`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					path: this.manuscript.fsPath,
-					title: settings.title || null,
-					author: settings.author,
-					language: settings.language || 'en',
-					cover: settings.cover || null,
-				}),
-			});
-			if (!response.ok) {
-				await this.status(`Export failed: ${await detailOf(response)}`, true);
-				return;
-			}
-			const { path } = (await response.json()) as { path: string };
-			// The file lands beside the manuscript and shows up in the explorer on
-			// its own; opening a Finder window on top of that is just noise.
-			await this.status(`Exported ${basename(vscode.Uri.file(path))}`, false);
-		} catch (err) {
-			// The server is what builds the book; a refused connection is the likely
-			// cause, and it is the one thing the author can act on.
-			await this.status(
-				`Export failed — is the model server running? (${describe(err)})`,
-				true
-			);
-		}
-	}
+    // --- export ---
 
-	// --- search ---
+    private async export(): Promise<void> {
+        if (!this.manuscript) {
+            return;
+        }
+        const settings = await this.readSettings();
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:${this.port}/export/epub`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                        path: this.manuscript.fsPath,
+                        title: settings.title || null,
+                        author: settings.author,
+                        language: settings.language || "en",
+                        cover: settings.cover || null,
+                    }),
+                },
+            );
+            if (!response.ok) {
+                await this.status(
+                    `Export failed: ${await detailOf(response)}`,
+                    true,
+                );
+                return;
+            }
+            const { path } = (await response.json()) as { path: string };
+            // The file lands beside the manuscript and shows up in the explorer on
+            // its own; opening a Finder window on top of that is just noise.
+            await this.status(
+                `Exported ${basename(vscode.Uri.file(path))}`,
+                false,
+            );
+        } catch (err) {
+            // The server is what builds the book; a refused connection is the likely
+            // cause, and it is the one thing the author can act on.
+            await this.status(
+                `Export failed — is the model server running? (${describe(err)})`,
+                true,
+            );
+        }
+    }
 
-	/**
-	 * Hand the drawer the search as it stands.
-	 *
-	 * The rows are built here rather than in the view: what a row says about a
-	 * passage is the same question whichever way it is displayed, and it is
-	 * answered in search/model.ts where it can be read without a webview.
-	 */
-	private sendSearch(results: Results | null): void {
-		void this.view?.webview.postMessage({
-			type: 'search',
-			search: results && {
-				manuscript: results.manuscript,
-				phrase: results.phrase,
-				searching: results.searching,
-				error: results.error,
-				progress: progress(results.pending),
-				hits: results.hits.map((hit) => ({
-					label: rowLabel(hit),
-					where: rowDescription(hit),
-					text: hit.text,
-				})),
-			},
-		});
-	}
+    // --- search ---
 
-	// --- view plumbing ---
+    /**
+     * Hand the drawer the search as it stands.
+     *
+     * The rows are built here rather than in the view: what a row says about a
+     * passage is the same question whichever way it is displayed, and it is
+     * answered in search/model.ts where it can be read without a webview.
+     */
+    private sendSearch(results: Results | null): void {
+        void this.view?.webview.postMessage({
+            type: "search",
+            search: results && {
+                manuscript: results.manuscript,
+                phrase: results.phrase,
+                searching: results.searching,
+                error: results.error,
+                progress: progress(results.pending),
+                hits: results.hits.map((hit) => ({
+                    label: rowLabel(hit),
+                    where: rowDescription(hit),
+                    text: hit.text,
+                })),
+            },
+        });
+    }
 
-	/** Read the files and hand the whole state to the view. */
-	private async send(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
-		await this.view.webview.postMessage({
-			type: 'state',
-			// Shown root-relative, so a story nested in the workspace reads as its
-			// path rather than a bare filename shared with every other story.md.
-			manuscript: this.manuscript
-				? vscode.workspace.asRelativePath(this.manuscript)
-				: null,
-			settings: await this.readSettings(),
-			blurb: await this.readBlurb(),
-		});
-	}
+    // --- view plumbing ---
 
-	/** A status line under the Publishing drawer, which is what raises them. */
-	private async status(message: string, error: boolean): Promise<void> {
-		await this.view?.webview.postMessage({ type: 'status', message, error });
-	}
+    /** Read the files and hand the whole state to the view. */
+    private async send(): Promise<void> {
+        if (!this.view) {
+            return;
+        }
+        await this.view.webview.postMessage({
+            type: "state",
+            // Shown root-relative, so a story nested in the workspace reads as its
+            // path rather than a bare filename shared with every other story.md.
+            manuscript: this.manuscript
+                ? vscode.workspace.asRelativePath(this.manuscript)
+                : null,
+            settings: await this.readSettings(),
+            blurb: await this.readBlurb(),
+        });
+    }
 
-	/** The same, under the Parts drawer — a division says nothing about an export. */
-	private async partsStatus(message: string, error: boolean): Promise<void> {
-		await this.view?.webview.postMessage({ type: 'partsStatus', message, error });
-	}
+    /** A status line under the Publishing drawer, which is what raises them. */
+    private async status(message: string, error: boolean): Promise<void> {
+        await this.view?.webview.postMessage({
+            type: "status",
+            message,
+            error,
+        });
+    }
 
-	/** Repaint the status drawers from the server. */
-	private async poll(): Promise<void> {
-		await Promise.all([this.pollModels(), this.pollMemory(), this.pollJobs()]);
-	}
+    /** The same, under the Parts drawer — a division says nothing about an export. */
+    private async partsStatus(message: string, error: boolean): Promise<void> {
+        await this.view?.webview.postMessage({
+            type: "partsStatus",
+            message,
+            error,
+        });
+    }
 
-	/** Poll the server for what is loaded, and paint the Serving Status drawer. */
-	private async pollModels(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
-		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/models`, {
-				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
-			});
-			const body = (await response.json()) as { models: unknown };
-			void this.view.webview.postMessage({ type: 'models', models: body.models });
-		} catch (err) {
-			// A timeout means the server is busy loading, not gone — leave the last
-			// reading up. Only a refused connection reads as offline.
-			if (!isTimeout(err)) {
-				void this.view.webview.postMessage({ type: 'models', models: null });
-			}
-		}
-	}
+    /** Repaint the status drawers from the server. */
+    private async poll(): Promise<void> {
+        await Promise.all([
+            this.pollModels(),
+            this.pollMemory(),
+            this.pollJobs(),
+        ]);
+    }
 
-	/** Poll what the model is holding, and paint the Memory drawer. */
-	private async pollMemory(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
-		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/memory`, {
-				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
-			});
-			const memory = await response.json();
-			void this.view.webview.postMessage({ type: 'memory', memory });
-		} catch (err) {
-			if (!isTimeout(err)) {
-				void this.view.webview.postMessage({ type: 'memory', memory: null });
-			}
-		}
-	}
+    /** Poll the server for what is loaded, and paint the Serving Status drawer. */
+    private async pollModels(): Promise<void> {
+        if (!this.view) {
+            return;
+        }
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:${this.port}/models`,
+                {
+                    signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+                },
+            );
+            const body = (await response.json()) as { models: unknown };
+            void this.view.webview.postMessage({
+                type: "models",
+                models: body.models,
+            });
+        } catch (err) {
+            // A timeout means the server is busy loading, not gone — leave the last
+            // reading up. Only a refused connection reads as offline.
+            if (!isTimeout(err)) {
+                void this.view.webview.postMessage({
+                    type: "models",
+                    models: null,
+                });
+            }
+        }
+    }
 
-	/** Poll the server for the work it has in hand, and paint the Jobs Status drawer. */
-	private async pollJobs(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
-		try {
-			const response = await fetch(`http://127.0.0.1:${this.port}/jobs`, {
-				signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
-			});
-			const body = (await response.json()) as {
-				jobs: { kind: string; path: string; status: string }[];
-			};
-			const jobs = body.jobs.map((job) => ({
-				kind: job.kind,
-				// Shown root-relative, like the manuscript name: the panel is narrow,
-				// and the end of the path is the part that names the file.
-				path: vscode.workspace.asRelativePath(vscode.Uri.file(job.path)),
-				status: job.status,
-			}));
-			void this.view.webview.postMessage({ type: 'jobs', jobs });
-		} catch (err) {
-			if (!isTimeout(err)) {
-				void this.view.webview.postMessage({ type: 'jobs', jobs: null });
-			}
-		}
-	}
+    /** Poll what the model is holding, and paint the Memory drawer. */
+    private async pollMemory(): Promise<void> {
+        if (!this.view) {
+            return;
+        }
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:${this.port}/memory`,
+                {
+                    signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+                },
+            );
+            const memory = await response.json();
+            void this.view.webview.postMessage({ type: "memory", memory });
+        } catch (err) {
+            if (!isTimeout(err)) {
+                void this.view.webview.postMessage({
+                    type: "memory",
+                    memory: null,
+                });
+            }
+        }
+    }
 
-	private html(webview: vscode.Webview): string {
-		const media = vscode.Uri.joinPath(this.context.extensionUri, 'media');
-		const dist = vscode.Uri.joinPath(this.context.extensionUri, 'dist');
-		const script = webview.asWebviewUri(vscode.Uri.joinPath(dist, 'publish_view.js'));
-		const style = webview.asWebviewUri(vscode.Uri.joinPath(media, 'publish.css'));
-		const nonce = nonceString();
+    /** Poll the server for the work it has in hand, and paint the Jobs Status drawer. */
+    private async pollJobs(): Promise<void> {
+        if (!this.view) {
+            return;
+        }
+        try {
+            const response = await fetch(`http://127.0.0.1:${this.port}/jobs`, {
+                signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+            });
+            const body = (await response.json()) as {
+                jobs: { kind: string; path: string; status: string }[];
+            };
+            const jobs = body.jobs.map((job) => ({
+                kind: job.kind,
+                // Shown root-relative, like the manuscript name: the panel is narrow,
+                // and the end of the path is the part that names the file.
+                path: vscode.workspace.asRelativePath(
+                    vscode.Uri.file(job.path),
+                ),
+                status: job.status,
+            }));
+            void this.view.webview.postMessage({ type: "jobs", jobs });
+        } catch (err) {
+            if (!isTimeout(err)) {
+                void this.view.webview.postMessage({
+                    type: "jobs",
+                    jobs: null,
+                });
+            }
+        }
+    }
 
-		return `<!DOCTYPE html>
+    private html(webview: vscode.Webview): string {
+        const media = vscode.Uri.joinPath(this.context.extensionUri, "media");
+        const dist = vscode.Uri.joinPath(this.context.extensionUri, "dist");
+        const script = webview.asWebviewUri(
+            vscode.Uri.joinPath(dist, "publish_view.js"),
+        );
+        const style = webview.asWebviewUri(
+            vscode.Uri.joinPath(media, "publish.css"),
+        );
+        const nonce = nonceString();
+
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -463,7 +555,9 @@ export class PublishView implements vscode.WebviewViewProvider {
 				<input id="f-part-words" type="number" min="1" step="100">
 			</label>
 			<div class="actions">
-				<button id="divide" type="button">Divide into parts</button>
+				<button id="divide" type="button">Partition</button>
+				<button id="merge" type="button"
+					title="Put the parts back over the manuscript, replacing it">Merge</button>
 			</div>
 			<div id="parts-status" class="status" hidden></div>
 		</div>
@@ -529,67 +623,68 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
-	}
+    }
 }
 
 /** The markdown file in the active editor, if that is what is open. */
 function activeMarkdown(): vscode.Uri | undefined {
-	const active = vscode.window.activeTextEditor;
-	if (
-		active?.document.languageId === 'markdown' &&
-		active.document.uri.scheme === 'file'
-	) {
-		return active.document.uri;
-	}
-	return undefined;
+    const active = vscode.window.activeTextEditor;
+    if (
+        active?.document.languageId === "markdown" &&
+        active.document.uri.scheme === "file"
+    ) {
+        return active.document.uri;
+    }
+    return undefined;
 }
 
 async function pickMarkdown(): Promise<vscode.Uri | undefined> {
-	const picked = await vscode.window.showOpenDialog({
-		canSelectMany: false,
-		openLabel: 'Select story',
-		filters: { Markdown: ['md'] },
-	});
-	return picked?.[0];
+    const picked = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        openLabel: "Select story",
+        filters: { Markdown: ["md"] },
+    });
+    return picked?.[0];
 }
 
 async function detailOf(response: Response): Promise<string> {
-	try {
-		const body = (await response.json()) as { detail?: string };
-		return body.detail ?? response.statusText;
-	} catch {
-		return response.statusText;
-	}
+    try {
+        const body = (await response.json()) as { detail?: string };
+        return body.detail ?? response.statusText;
+    } catch {
+        return response.statusText;
+    }
 }
 
 /** The publication files live beside the manuscript; model.ts knows their names. */
 function pubUriFor(md: vscode.Uri): vscode.Uri {
-	return md.with({ path: pubPathFor(md.path) });
+    return md.with({ path: pubPathFor(md.path) });
 }
 
 function blurbUriFor(md: vscode.Uri): vscode.Uri {
-	return md.with({ path: blurbPathFor(md.path) });
+    return md.with({ path: blurbPathFor(md.path) });
 }
 
 function basename(uri: vscode.Uri): string {
-	return uri.path.split('/').pop() ?? uri.path;
+    return uri.path.split("/").pop() ?? uri.path;
 }
 
 function describe(err: unknown): string {
-	const message = (err as { message?: unknown } | null)?.message;
-	return typeof message === 'string' ? message : String(err);
+    const message = (err as { message?: unknown } | null)?.message;
+    return typeof message === "string" ? message : String(err);
 }
 
 /** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
 function isTimeout(err: unknown): boolean {
-	return err instanceof Error && err.name === 'TimeoutError';
+    return err instanceof Error && err.name === "TimeoutError";
 }
 
 function nonceString(): string {
-	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	let out = '';
-	for (let i = 0; i < 32; i++) {
-		out += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return out;
+    const chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let out = "";
+    for (let i = 0; i < 32; i++) {
+        out += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return out;
 }

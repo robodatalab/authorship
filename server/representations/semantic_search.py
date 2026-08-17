@@ -2,11 +2,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from server import log
-from server.inference.encoder import EncoderModel
-from server.representations.utils import visible_lines
+from roost import EncoderModel
+from server.manuscript import Manuscript, StoryLines
 
 _log = log.logger(__name__)
 
+# A line too short to say much drags a search off course more than it helps it.
 MIN_WORDS_PER_SEARCHABLE_LINE = 3
 
 MIN_SIMILARITY_AS_FRACTION_OF_BEST = 0.5
@@ -35,14 +36,18 @@ class SearchIndex:
     def encode_manuscript(
         self,
         encoder: EncoderModel,
-        manuscript_path: str,
-        story_markdown: str,
+        manuscript: Manuscript,
         should_stop: Callable[[], bool] = lambda: False,
     ) -> None:
+        manuscript_path = str(manuscript.path)
         vectors_by_line_text = self._vectors_by_manuscript.setdefault(
             manuscript_path, {}
         )
-        searchable = _searchable_lines(visible_lines(story_markdown.splitlines()))
+        searchable = [
+            (number, said)
+            for number, said in StoryLines(manuscript)
+            if len(said.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
+        ]
         not_yet_encoded = sorted(
             {text for _, text in searchable if text not in vectors_by_line_text}
         )
@@ -61,14 +66,17 @@ class SearchIndex:
     def search(
         self,
         encoder: EncoderModel,
-        manuscript_path: str,
-        story_markdown: str,
+        manuscript: Manuscript,
         phrase: str,
         max_matching_lines: int,
     ) -> SearchResults:
-        visible = visible_lines(story_markdown.splitlines())
+        manuscript_path = str(manuscript.path)
         vectors_by_line_text = self._vectors_by_manuscript.get(manuscript_path, {})
-        searchable = _searchable_lines(visible)
+        searchable = [
+            (number, said)
+            for number, said in StoryLines(manuscript)
+            if len(said.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
+        ]
         already_encoded = [
             (line_number, text)
             for line_number, text in searchable
@@ -79,7 +87,7 @@ class SearchIndex:
         if not already_encoded or not phrase.strip():
             return SearchResults(passages=[], lines_awaiting_encoding=awaiting_encoding)
 
-        phrase_vector = encoder.encode_query(phrase)
+        phrase_vector = encoder.encode([phrase])[0]
         similarity_by_line = {
             line_number: _cosine_of_unit_vectors(
                 vectors_by_line_text[text], phrase_vector
@@ -109,7 +117,7 @@ class SearchIndex:
             passages=_join_adjacent_lines_into_passages(
                 matching_lines,
                 similarity_by_line,
-                visible,
+                manuscript.lines,
                 [line_number for line_number, _ in already_encoded],
             ),
             lines_awaiting_encoding=awaiting_encoding,
@@ -124,26 +132,10 @@ class SearchIndex:
         }
 
 
-def _searchable_lines(visible: list[str]) -> list[tuple[int, str]]:
-    return [
-        (line_number, text.strip())
-        for line_number, text in enumerate(visible)
-        if not _is_heading(text) and _says_enough_to_search(text)
-    ]
-
-
-def _is_heading(text: str) -> bool:
-    return text.lstrip().startswith("#")
-
-
-def _says_enough_to_search(text: str) -> bool:
-    return len(text.split()) >= MIN_WORDS_PER_SEARCHABLE_LINE
-
-
 def _join_adjacent_lines_into_passages(
     matching_lines: list[int],
     similarity_by_line: dict[int, float],
-    visible: list[str],
+    lines: list[str],
     searchable_line_numbers: list[int],
 ) -> list[MatchedPassage]:
     rank_among_searchable = {
@@ -171,7 +163,7 @@ def _join_adjacent_lines_into_passages(
             first_line=run[0],
             last_line=run[-1],
             similarity=max(similarity_by_line[line_number] for line_number in run),
-            text="\n".join(visible[run[0] : run[-1] + 1]).strip(),
+            text="\n".join(lines[run[0] : run[-1] + 1]).strip(),
         )
         for run in adjacent_runs
     ]

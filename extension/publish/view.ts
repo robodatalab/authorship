@@ -74,6 +74,7 @@ const manuscriptName = document.getElementById('manuscript-name') as HTMLElement
 const chooseButton = document.getElementById('choose') as HTMLButtonElement;
 const partWords = document.getElementById('f-part-words') as HTMLInputElement;
 const divideButton = document.getElementById('divide') as HTMLButtonElement;
+const mergeButton = document.getElementById('merge') as HTMLButtonElement;
 const partsStatus = document.getElementById('parts-status') as HTMLElement;
 const title = document.getElementById('f-title') as HTMLInputElement;
 const author = document.getElementById('f-author') as HTMLInputElement;
@@ -135,6 +136,10 @@ divideButton.addEventListener('click', () => {
 	// written still divides by the number the author is looking at.
 	vscode.postMessage({ type: 'divide', words: partWords.value });
 });
+mergeButton.addEventListener('click', () => {
+	setStatus(partsStatus, 'Merging…', false);
+	vscode.postMessage({ type: 'merge' });
+});
 
 chooseButton.addEventListener('click', () => vscode.postMessage({ type: 'choose' }));
 chooseCover.addEventListener('click', () => vscode.postMessage({ type: 'chooseCover' }));
@@ -166,6 +171,7 @@ function setEnabled(enabled: boolean): void {
 	const controls = [
 		partWords,
 		divideButton,
+		mergeButton,
 		title,
 		author,
 		language,

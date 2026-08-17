@@ -7,13 +7,13 @@ A story of matriarchy, female domination, submission, obedience and a broken hea
 
 Beyond the veil, there exists a different reality.
 
-It is a world of abundance, beauty, and peace—blessings granted exclusively to the women who rule it. For men, that reality is defined by a singular choice: freedom or safety.
+It is a world of abundance, beauty, and peace — blessings granted exclusively to the women who rule it. For men, that reality is defined by a singular choice: freedom or safety.
 
 That choice is demanded the moment a man comes of age. He can walk away to the outer lands, choosing a life of humble poverty in a patriarchal society shaken by conflict and uncertainty. Or, he can enter the Matriarchy, enveloped in safety and luxury for the rest of his days. But to stay, he must accept one absolute law: Women rule, men serve.
 
-To choose the Society is to willingly forfeit your sovereignty—to pledge your existence to a woman’s comfort, anticipate her every command, and bow before her without question. Disobedience is not tolerated; the punishments are harsh. The men who surrender to this life are divided by their devotion. *Drones* perform the heavy lifting, while *Companions* are kept as personal maids, bound to their Mistresses' private quarters.
+To choose the Society is to willingly forfeit your sovereignty — to pledge your existence to a woman’s comfort, anticipate her every command, and bow before her without question. Disobedience is not tolerated; the punishments are harsh. The men who surrender to this life are divided by their devotion. *Drones* perform the heavy lifting, while *Companions* are kept as personal maids, bound to their Mistresses' private quarters.
 
-This society has flourished and evolved because of the strict rules that govern it—laws that extend far beyond controlling basic male instincts. There are boundaries that apply to the ruling class as well. One in particular is held sacred above all others: no woman may ever make a man her equal. He is a subject, never a partner.
+This society has flourished and evolved because of the strict rules that govern it — laws that extend far beyond controlling basic male instincts. There are boundaries that apply to the ruling class as well. One in particular is held sacred above all others: no woman may ever make a man her equal. He is a subject, never a partner.
 
 This is the story of a woman who broke that rule, and the consequences it carried for her and everyone she loved.
 
@@ -27,7 +27,7 @@ As he strained against his confinement, the little bell attached to his caged ge
 
 She bit into the delicious pastry while making a lazy, whirlpool gesture in the air with her other hand. Her Companion obeyed the silent cue instantly, turning around. 
 
-The chastity belt held him aching and snug, exactly the way she liked to keep him—a Companion always serves sharpest when kept slightly starved. The small gauge set into the metal read full; he was due for his milking, a routine he would see to later in the day. He held the pose without complaint, honoring the vow he had made when he first knelt for her collar.
+The chastity belt held him aching and snug, exactly the way she liked to keep him — a Companion always serves sharpest when kept slightly starved. The small gauge set into the metal read full; he was due for his milking, a routine he would see to later in the day. He held the pose without complaint, honoring the vow he had made when he first knelt for her collar.
 
 Anabelle ran a slow finger along his hip, smiling as a delicious shiver passed through his skin under her touch. She loved having that absolute effect on him. Taking another bite, she washed the pastry down with a solid swig of juice, entirely in no hurry.
 
@@ -35,13 +35,13 @@ When she finished, she swung her feet over the edge of the mattress and watched 
 
 It was a day she had long anticipated. She had just accepted an offer from a prestigious law firm; the years spent devouring endless books and memorizing complex regulations were finally about to pay off.
 
-Giddy with happiness, she twirled on her heel and glided toward the wardrobe to find something appropriate—sexy, yet professional and understated. She was meeting Sophia shortly to celebrate with a reckless shopping spree, which would be followed by a proper hot date.
+Giddy with happiness, she twirled on her heel and glided toward the wardrobe to find something appropriate — sexy, yet professional and understated. She was meeting Sophia shortly to celebrate with a reckless shopping spree, which would be followed by a proper hot date.
 
-Finding nothing suitable—which was the entire excuse for the shopping trip—she finally selected an outfit for the morning: a form-fitting black sequined dress that highlighted her legs, a matching blazer, and a jade necklace on a fine gold chain to draw Sophia's gaze exactly where she wanted it.
+Finding nothing suitable — which was the entire excuse for the shopping trip — she finally selected an outfit for the morning: a form-fitting black sequined dress that highlighted her legs, a matching blazer, and a jade necklace on a fine gold chain to draw Sophia's gaze exactly where she wanted it.
 
 She draped the clothes on the bed and flicked her fingers. Her Companion approached, and she pressed the release button on his collar, letting the armbinder on his back click open. 
 
-He stretched his stiff arms and knelt before her, his hands working quickly through a routine trained deep into his muscles. Panties slid up her thighs, followed by her hosiery and skirt. Her bra was clasped behind her back, her shirt meticulously buttoned, and her tie knotted with expert precision. His eyes never once rose to her face. On other mornings she might have caught his gaze to challenge him, but she had no time for such games today.
+He stretched his stiff arms and knelt before her, his hands working quickly through a routine trained deep into his muscles. Panties slid up her thighs, followed by her hosiery and skirt. Her dress zipped with expert precision. His eyes never once rose to her face. On other mornings she might have caught his gaze to challenge him, but she had no time for such games today.
 
 Her Companion slid the stilettos onto her feet and planted a reverent kiss on her instep, signaling his task was complete. His arms swept back behind him, and the armbinder locked shut over his wrists once more.
 
@@ -57,9 +57,9 @@ She unlatched the service compartment beneath the seat, and her Companion folded
 
 Admittedly, she wasn't the most seasoned driver, simply because her university grounds were right across the street and she rarely needed the carriage. Looking toward the gates, the bustling traffic of the main avenue seemed to invite her out. 
 
-She raised her hand and cracked the crop through the air above the Drones—a clear signal, not a blow—and the carriage rolled forward to the rhythmic clacking of their boots and the light chiming of the small bells at their collars. She navigated the gate, pressed the pedal to steady her pace, and gracefully merged into the morning traffic. The sunny day carried a delightful breeze thick with the scent of blossoming trees and freshly cut flowers, making her smile widely.
+She raised her hand and cracked the crop through the air above the Drones — a clear signal, not a blow — and the carriage rolled forward to the rhythmic clacking of their boots and the light chiming of the small bells at their collars. She navigated the gate, pressed the pedal to steady her pace, and gracefully merged into the morning traffic. The sunny day carried a delightful breeze thick with the scent of blossoming trees and freshly cut flowers, making her smile widely.
 
-All around her, the Society was in full swing. Elegant carriages carried wealthy aristocrats and merchants, ladies walked hand in hand along the promenades, and vendors opened their storefronts. Everywhere she looked, Drones scurried about—the true lifeblood of the economy—moving precisely where their Mistresses directed them, carrying goods and the citizens who owned them.
+All around her, the Society was in full swing. Elegant carriages carried wealthy aristocrats and merchants, ladies walked hand in hand along the promenades, and vendors opened their storefronts. Everywhere she looked, Drones scurried about — the true lifeblood of the economy — moving precisely where their Mistresses directed them, carrying goods and the citizens who owned them.
 
 Turning the corner, Anabelle pressed the brakes and brought the carriage to a smooth halt in front of a grand townhouse. Sophia was already waiting on the steps. Anabelle admired her blonde hair cascading down her shoulders, perfectly framing her figure. Standing rigidly behind her was Sophia's Companion, wearing a tall posture-collar that held his chin high and entirely motionless. Anabelle had always admired his striking look and had half a mind to find a similar model for her own household.
 
@@ -87,11 +87,11 @@ The store manager welcomed them warmly at the entrance. "Welcome to Harrows," sh
 
 "We are looking for a completely new wardrobe," Anabelle said with a bright smile.
 
-The manager—an elegant woman clad in a minimalist, mid-thigh black dress that flattered her buxom figure—appraised them. If not for their distinct features, they might have passed for sisters. The Matria educational system was easily the finest in the world, though it kept a remarkably tight leash on personal expression during youth.
+The manager — an elegant woman clad in a minimalist, mid-thigh black dress that flattered her buxom figure — appraised them. If not for their distinct features, they might have passed for sisters. The Matria educational system was easily the finest in the world, though it kept a remarkably tight leash on personal expression during youth.
 
 "Follow me, ladies. I believe I have just the thing. Your Companions are welcome to carry your selections as we browse," she noted, beckoning a store attendant to prepare them. 
 
-The attendants brought out two light porter's harnesses—padded shoulder frames equipped with wide front trays for smaller items—and fitted them onto the Companions. It ensured they could bear the day's purchases without ever leaving their Mistresses' sides.
+The attendants brought out two light porter's harnesses — padded shoulder frames equipped with wide front trays for smaller items — and fitted them onto the Companions. It ensured they could bear the day's purchases without ever leaving their Mistresses' sides.
 
 "Would madam like any services attended to while you shop?" the clerk inquired of Anabelle. "A grooming or a freshening? We can easily attend to your Companion between the racks."
 
@@ -115,7 +115,7 @@ The manager bowed her head gracefully, leading the way. Anabelle studied her fri
 
 "If you're experiencing any financial strain, Sophia, you really should tell me. After all, I practically dragged you out today," she whispered, keeping her eyes on their hostess, who was patiently waiting at the end of the corridor.
 
-"It's not that, really. Don't worry about it—let's just enjoy the shopping," Sophia answered carelessly, hooking her arm through Anabelle's.
+"It's not that, really. Don't worry about it — let's just enjoy the shopping," Sophia answered carelessly, hooking her arm through Anabelle's.
 
 With their Companions carrying their burdens behind them, the ladies followed the manager deeper into the luxurious depths of the store.
 
@@ -123,7 +123,7 @@ With their Companions carrying their burdens behind them, the ladies followed th
 
 The ladies spent the next three hours, champagne flutes in hand, sampling an extensive array of designs. Their Companions dutifully carried the spoils; the porter harnesses across their shoulders were soon draped with dozens of dresses, while the front trays filled with delicate accessories, jewelry, and intimates. Throughout it all, their anatomy remained tucked securely behind their snug chastity devices, held close to the body and entirely out of the way.
 
-Encumbered by a substantial harvest of gowns, blouses, tailored trousers, silk stockings, and exquisite shoes—giddy from the thrill of the spree and pleasantly lightheaded from the champagne—the ladies finally paused for a brief respite. Their Companions were dismissed to the packing counter to process the morning's selections, leaving the two friends to relax in a private alcove.
+Encumbered by a substantial harvest of gowns, blouses, tailored trousers, silk stockings, and exquisite shoes — giddy from the thrill of the spree and pleasantly lightheaded from the champagne — the ladies finally paused for a brief respite. Their Companions were dismissed to the packing counter to process the morning's selections, leaving the two friends to relax in a private alcove.
 
 The manager discreetly withdrew, granting them perfect privacy to confer over afternoon tea and delicate pastries.
 
@@ -155,7 +155,7 @@ The entrance to the secure wing required a keycard, which the manager wore on a 
 
 The only difference was the nature of the trade. 
 
-Instead of racks of silks and wools, oiled and impeccably conditioned men stood upon low display pedestals, exhibiting themselves with an easy, practiced grace. These were men who had entered the market of their own volition, eager to be contracted into a lady's household. Nearby, instead of standard belts and bracelets, shelves displayed beautifully crafted whips, leather paddles, and heavy plugs of varying dimensions—the fine instruments of the domestic arrangements that might be struck today.
+Instead of racks of silks and wools, oiled and impeccably conditioned men stood upon low display pedestals, exhibiting themselves with an easy, practiced grace. These were men who had entered the market of their own volition, eager to be contracted into a lady's household. Nearby, instead of standard belts and bracelets, shelves displayed beautifully crafted whips, leather paddles, and heavy plugs of varying dimensions — the fine instruments of the domestic arrangements that might be struck today.
 
 Anabelle felt a surge of genuine excitement, her legal mind automatically categorizing the department's offerings while imagining how to seamlessly weave them into her and Sophia's intimate routines.
 
@@ -167,7 +167,7 @@ The manager quickly explained the distinction. "These are pleasure men, not labo
 
 "Would you ladies care to evaluate one in a private setting?" the manager asked with a polite smile.
 
-Anabelle glanced at the elegant data card affixed to the base of the nearest pedestal. *4,000 keshels*—the premium commission just to secure his contract, nearly equivalent to the cost of a brand-new carriage. The manager caught her brief hesitation and added smoothly, "An evaluation places you under no obligation to contract him, madam. We only ask that you respect the boundaries he has legally agreed to—which, I assure you, are remarkably generous."
+Anabelle glanced at the elegant data card affixed to the base of the nearest pedestal. *4,000 keshels* — the premium commission just to secure his contract, nearly equivalent to the cost of a brand-new carriage. The manager caught her brief hesitation and added smoothly, "An evaluation places you under no obligation to contract him, madam. We only ask that you respect the boundaries he has legally agreed to — which, I assure you, are remarkably generous."
 
 The two friends exchanged a thrilled look. "We would like to evaluate this one," Sophia took the initiative.
 
@@ -209,19 +209,19 @@ Sophia smiled against the kiss. "You always know precisely what to say. But toni
 
 She stepped up to the bound man and slowly, almost casually, pressed her palm deep into his hairless armpit. He drew a sharp, sudden breath, his torso jerking away from the touch as far as the silver chains allowed.
 
-Anabelle watched, utterly transfixed. The domestic Companions she maintained in her own home were trained to receive any touch—whether an intimate caress or a disciplinary strike—with absolute stoicism and silent endurance. A disciplined household left no room for flinching; the training ensured complete stillness. 
+Anabelle watched, utterly transfixed. The domestic Companions she maintained in her own home were trained to receive any touch — whether an intimate caress or a disciplinary strike — with absolute stoicism and silent endurance. A disciplined household left no room for flinching; the training ensured complete stillness. 
 
 How could a man who shivered and gasped at a mere touch be of any practical use for their pleasure?
 
-But Sophia was just beginning. Her fingers began to move against the sensitive skin of his armpit, increasing in speed and precision. The man began to buck helplessly against his restraints, a breathless, desperate laugh ripping from his chest—half an automatic plea, half pure ecstasy.
+But Sophia was just beginning. Her fingers began to move against the sensitive skin of his armpit, increasing in speed and precision. The man began to buck helplessly against his restraints, a breathless, desperate laugh ripping from his chest — half an automatic plea, half pure ecstasy.
 
 Sophia didn’t look at the man; she already knew precisely how his body would react. Instead, her eyes remained fixed on Anabelle, carefully reading every flicker of emotion on her lover’s face.
 
-"The pleasure Companions," Sophia explained, "are trained with the exact opposite philosophy. Their physical reflexes aren't dulled by discipline—they are deliberately sharpened. They feel every single nuance of touch, and their psychology is wired to crave it. Come here, experience the difference for yourself." She stepped back, inviting Anabelle to take her place.
+"The pleasure Companions," Sophia explained, "are trained with the exact opposite philosophy. Their physical reflexes aren't dulled by discipline — they are deliberately sharpened. They feel every single nuance of touch, and their psychology is wired to crave it. Come here, experience the difference for yourself." She stepped back, inviting Anabelle to take her place.
 
 Anabelle stepped into the space and raised her hand. His skin was perfectly smooth, hairless, and warm with fine oils. She allowed a sharp, manicured nail to trace a tiny, deliberate circle in his armpit. He immediately convulsed with a gasp, straining hard against the ceiling chains.
 
-She withdrew her hand, paused, and then returned it, tracing a far more intricate pattern across his ribcage. He jumped violently. She was accustomed to absolute, silent obedience from her servants—but this kinetic, raw responsiveness was entirely intoxicating. Giggling, she placed her other hand flat against his chest.
+She withdrew her hand, paused, and then returned it, tracing a far more intricate pattern across his ribcage. He jumped violently. She was accustomed to absolute, silent obedience from her servants - but this kinetic, raw responsiveness was entirely intoxicating. Giggling, she placed her other hand flat against his chest.
 
 He shook, yelping and laughing as he twisted within his bindings, entirely at the mercy of Anabelle's hands as they danced hungrily across his skin. Sophia joined in the laughter, thoroughly enjoying the spectacle. Through it all, the man never once attempted to utter the word that would have brought the torment to a halt.
 
@@ -247,7 +247,7 @@ The moment Sophia's hands began their upward march, the man began to convulse, h
 
 "He won't pull the brackets from the wall, will he?" Anabelle asked, a thrill of genuine excitement mixing with momentary concern.
 
-Rather than answering, Sophia simply resumed the upward climb. By the time her fingers reached his armpits, the man was howling, his frantic thrashing echoing off the walls—yet he remained miles away from using his safeword.
+Rather than answering, Sophia simply resumed the upward climb. By the time her fingers reached his armpits, the man was howling, his frantic thrashing echoing off the walls — yet he remained miles away from using his safeword.
 
 "This," Sophia explained, raising her voice over his laughter, "is the art of anticipation. He knows precisely where my hands are going, and his mind terrifies him with how much it will tickle. The psychological dread compounds the physical nerve responses, so that when the touch finally lands, it strikes with triple the intensity."
 
@@ -275,7 +275,7 @@ The room fell quiet, save for the faint hum of the electrical console and the ma
 
 Sophia’s smile turned thoroughly mischievous. "Tempted to do what, exactly?" she asked with mock innocence.
 
-"You are going to force me to articulate it, aren't you?" Anabelle scoffed, feeling a flush of heat rise to her cheeks. "Fine. His cock, Sophia—I want to experience him."
+"You are going to force me to articulate it, aren't you?" Anabelle scoffed, feeling a flush of heat rise to her cheeks. "Fine. His cock, Sophia — I want to experience him."
 
 Sophia’s face flushed red, her lips puckered, and then she completely collapsed into a fit of breathless laughter. She struck the velvet cushions with her hand, practically reduced to tears of amusement. Anabelle felt a brief flash of mortification, but Sophia quickly moved to comfort her, placing a warm hand on her shoulder. 
 
@@ -285,13 +285,13 @@ Anabelle playfully nudged her away, and Sophia pressed a tender kiss to her lips
 
 "Did you honestly think the tickling was the extent of his utility? That was merely the opening act. What these specific men are engineered for," she nodded toward the man breathing heavily in his chains, "is to provide a woman with the deepest, most absolute physical pleasure imaginable. Let me show you how it's done."
 
-Sophia toggled the intercom, murmuring a brief instruction. Minutes later, the boutique staff entered with silent professionalism to reset the chamber. The electrical leads were removed, a fresh cart of pristine lubricants and tools was wheeled into place, and the standing frame automatically transitioned. The man was lowered onto a contoured, padded bench that rose elegantly from the floor—his hips braced and elevated, his wrists and ankles refastened securely in a position that was both entirely comfortable and perfectly immobile. The manager verified the safety of the configuration one final time, quietly confirmed the man's ongoing consent, and withdrew. The lock clicked shut, leaving them entirely secluded with their domestic Companions, who remained standing like statues against the far wall.
+Sophia toggled the intercom, murmuring a brief instruction. Minutes later, the boutique staff entered with silent professionalism to reset the chamber. The electrical leads were removed, a fresh cart of pristine lubricants and tools was wheeled into place, and the standing frame automatically transitioned. The man was lowered onto a contoured, padded bench that rose elegantly from the floor — his hips braced and elevated, his wrists and ankles refastened securely in a position that was both entirely comfortable and perfectly immobile. The manager verified the safety of the configuration one final time, quietly confirmed the man's ongoing consent, and withdrew. The lock clicked shut, leaving them entirely secluded with their domestic Companions, who remained standing like statues against the far wall.
 
 Sophia walked a slow, predatory loop around the bench, her fingers trailing lightly over the man’s chest. She leaned down to whisper a quiet inquiry; he murmured a respectful assent, and she nodded, satisfied.
 
-Her hand descended upon his anatomy—exceptionally developed, perfectly smooth, and heavy. She cradled him gently in her palm, lifting him slightly aside to reveal a small, polished device resting snugly against his perineum, ringed with fine metallic contacts. 
+Her hand descended upon his anatomy — exceptionally developed, perfectly smooth, and heavy. She cradled him gently in her palm, lifting him slightly aside to reveal a small, polished device resting snugly against his perineum, ringed with fine metallic contacts. 
 
-"The house keeps their exhibition models with automated stimulation," Sophia murmured. "He has consented to the apparatus—it ensures absolute rigidity and endurance throughout the evaluation." The man let out a soft, appreciative sigh at her touch.
+"The house keeps their exhibition models with automated stimulation," Sophia murmured. "He has consented to the apparatus — it ensures absolute rigidity and endurance throughout the evaluation." The man let out a soft, appreciative sigh at her touch.
 
 Anabelle watched from the sofa, entirely enthralled, like a girl waiting for the curtain to rise on a grand performance.
 
@@ -299,11 +299,11 @@ Sophia slid her fingers slowly up the length of his shaft, adjusting a small dia
 
 Anabelle’s breath caught. She had recognized his impressive scale while he hung relaxed, but she was entirely unprepared for this transformation. The base was formidable, doubling in circumference as it reached the heavy, smooth crown.
 
-In the outer world, the men who served the Matriarchy were ubiquitous, yet nearly all of them were strictly caged—their anatomy locked away as a matter of standard domestic discipline, entirely irrelevant to their labor. Anabelle was well-versed in male anatomy, but a pleasure servant, uncaged, eager, and specifically cultivated for this exact purpose, was an entirely different reality.
+In the outer world, the men who served the Matriarchy were ubiquitous, yet nearly all of them were strictly caged — their anatomy locked away as a matter of standard domestic discipline, entirely irrelevant to their labor. Anabelle was well-versed in male anatomy, but a pleasure servant, uncaged, eager, and specifically cultivated for this exact purpose, was an entirely different reality.
 
 The sheer scale of him was magnificent. But what struck Anabelle most was the dark, ravenous hunger reflecting in her own eyes. 
 
-"Go on," Anabelle breathed, her voice tight with arousal. "Show me—I want to watch you take him."
+"Go on," Anabelle breathed, her voice tight with arousal. "Show me — I want to watch you take him."
 
 Sophia’s gaze flicked momentarily to their two Companions lined up against the far wall, waiting silently for orders. For a brief second, a strange hesitation flickered in her eyes.
 
@@ -311,17 +311,17 @@ Anabelle caught the look, assuming Sophia was contemplating incorporating their 
 
 "Leave them where they are, darling. Let them witness their Mistresses having a little fun. Time for team play will come later."
 
-It was a standard truth of their world; every woman they knew enjoyed her pleasures in front of her domestic staff, simply because Companions were remarkably useful for managing the practicalities of intimacy—fetching towels, applying oils, or massaging tired muscles.
+It was a standard truth of their world; every woman they knew enjoyed her pleasures in front of her domestic staff, simply because Companions were remarkably useful for managing the practicalities of intimacy — fetching towels, applying oils, or massaging tired muscles.
 
 But at Anabelle's words, Sophia went completely rigid.
 
-"No," Sophia said. The word fell like a sheet of ice—far too hard, far too fast. For a single, terrifying heartbeat, her expression transformed into something Anabelle had never witnessed before: absolute fury, and beneath the anger, a profound, desperate terror.
+"No," Sophia said. The word fell like a sheet of ice — far too hard, far too fast. For a single, terrifying heartbeat, her expression transformed into something Anabelle had never witnessed before: absolute fury, and beneath the anger, a profound, desperate terror.
 
 Anabelle blinked, caught entirely off guard. "...Sophia?"
 
-And then, as quickly as it had arrived, the mask slid back into place. Sophia laughed, though the sound arrived a fraction of a second too late. "My apologies—goodness, I am sorry." She pressed the back of her hand to her brow, exhaling a shaky breath. "I am simply... not in the correct space for it today. Today is entirely about you, after all." 
+And then, as quickly as it had arrived, the mask slid back into place. Sophia laughed, though the sound arrived a fraction of a second too late. "My apologies — goodness, I am sorry." She pressed the back of her hand to her brow, exhaling a shaky breath. "I am simply... not in the correct space for it today. Today is entirely about you, after all." 
 
-She took Anabelle gently by the hips, guiding her toward the elevated bench and the waiting servant. "This is your celebration. Go on—try him. I'll kneel right here and talk you through it."
+She took Anabelle gently by the hips, guiding her toward the elevated bench and the waiting servant. "This is your celebration. Go on — try him. I'll kneel right here and talk you through it."
 
 Anabelle looked at the bench, her heart hammering against her ribs as she felt Sophia's steadying hand supporting the small of her back. "Fetch the lube from the table," she murmured.
 
@@ -335,13 +335,13 @@ With a swift movement, Anabelle discarded her intimates, hitched her black sequi
 
 Anabelle nodded, her breathing shallow and frantic, and began her descent.
 
-The moment he entered her, a loud, unbidden moan tore from her throat. Inch by agonizing, magnificent inch, she lowered herself onto him, Sophia’s soothing voice guiding her every step of the way—*easy, easy, there you go*—the man beneath her groaning deeply as she sank down, until he was seated entirely within her core, leaving her shaking, gasping, and completely overwhelmed by the fullness of him.
+The moment he entered her, a loud, unbidden moan tore from her throat. Inch by agonizing, magnificent inch, she lowered herself onto him, Sophia’s soothing voice guiding her every step of the way — *easy, easy, there you go* — the man beneath her groaning deeply as she sank down, until he was seated entirely within her core, leaving her shaking, gasping, and completely overwhelmed by the fullness of him.
 
 "Now," Sophia whispered against her cheek. "Move."
 
 Anabelle moved. The man adjusted his movements to match hers with flawless precision, providing exactly the amount of resistance she required, reading her physical cues with the expert intuition Sophia had promised. Anabelle entirely lost herself, wave after wave of intense release crashing through her body. She cried out, gripping Sophia’s hand with white-knuckled intensity, riding the momentum until the boundaries between each climax dissolved entirely. He held perfectly steady beneath her, groaning through the exertion, remaining flawlessly within the contractual boundaries he had named.
 
-She felt utterly spent, her torso swaying with exhaustion as another profound tremor rippled through her core. The man’s own vocalizations deepened, turning ragged as his hands flexed within their padded cuffs—not fighting the constraints, but leaning into them, deriving his own satisfaction from her absolute ecstasy. Never once did his mind drift toward his safeword.
+She felt utterly spent, her torso swaying with exhaustion as another profound tremor rippled through her core. The man’s own vocalizations deepened, turning ragged as his hands flexed within their padded cuffs — not fighting the constraints, but leaning into them, deriving his own satisfaction from her absolute ecstasy. Never once did his mind drift toward his safeword.
 
 When she finally slowed to a halt, completely trembling and spent, she lifted herself off him with a breathless gasp, collapsing entirely against Sophia’s chest, laughing weakly into her shoulder. "...Oh."
 
@@ -365,7 +365,7 @@ Sophia crossed the room to signal the boutique staff. "I am certain. And from th
 
 ---
 
-The private session continued for another hour as the ladies ordered fresh towels and further refreshments. But even as they laughed, teased, and enjoyed the champagne, an unfamiliar quietude settled deep within Sophia—a subtle shadow behind her bright disposition that Anabelle could distinctly sense but could not name, no matter how hard she tried to coax her friend back into the light.
+The private session continued for another hour as the ladies ordered fresh towels and further refreshments. But even as they laughed, teased, and enjoyed the champagne, an unfamiliar quietude settled deep within Sophia — a subtle shadow behind her bright disposition that Anabelle could distinctly sense but could not name, no matter how hard she tried to coax her friend back into the light.
 
 Finally, their time concluded, and Anabelle made her decision. Stepping out into the main corridor, she delivered the words the manager had been waiting for.
 
@@ -375,9 +375,9 @@ Finally, their time concluded, and Anabelle made her decision. Stepping out into
 
 "Yes, the large remote-controlled plug and the tickling claws. He seemed particularly sensitive to those."
 
-"Excellent, Madam. May I also suggest something?" the manager inquired. "Will you be wanting his stand—the pleasure frame he rests in between engagements?"
+"Excellent, Madam. May I also suggest something?" the manager inquired. "Will you be wanting his stand — the pleasure frame he rests in between engagements?"
 
-Anabelle didn't possess one, and a pleasure servant—uncaged and entirely unsuited for standard domestic labor—would require a dedicated station to ensure his optimal maintenance.
+Anabelle didn't possess one, and a pleasure servant — uncaged and entirely unsuited for standard domestic labor — would require a dedicated station to ensure his optimal maintenance.
 
 "Yes, I need one. Can you have it installed?"
 
@@ -391,7 +391,7 @@ Anabelle didn't possess one, and a pleasure servant—uncaged and entirely unsui
 
 Upon their departure, the ladies collected their personal Companions from the waiting area, their porter harnesses still laden with the morning's extensive purchases, and proceeded to the elevator.
 
-Sophia remained remarkably quiet during the descent—not sulking, but clearly lost in some distant train of thought. Her hand rested gently on her Companion’s forearm in that precise, unusual manner Anabelle had noticed on the steps that morning. Her thumb traced a slow, repetitive arc across his skin, as if soothing an unspoken anxiety known only to the two of them.
+Sophia remained remarkably quiet during the descent — not sulking, but clearly lost in some distant train of thought. Her hand rested gently on her Companion’s forearm in that precise, unusual manner Anabelle had noticed on the steps that morning. Her thumb traced a slow, repetitive arc across his skin, as if soothing an unspoken anxiety known only to the two of them.
 
 Anabelle observed her out of the corner of her eye, a small seed of worry taking root in her chest, though she chose to say nothing. She took Sophia’s hand gently, guiding her into the elevator cab. Sophia allowed herself to be led, her eyes focused on vacancy. Only when the heavy doors slid shut did she seem to realize Anabelle was standing beside her; she squeezed her hand in return, attempting a small smile.
 
@@ -433,7 +433,7 @@ Anabelle stood frozen on the pavement, feeling a subtle fracture ripple through 
 
 ## Seven
 
-As the sun began its descent over the city's stone rooftops, the delivery transport materialized outside Anabelle's townhouse. The corporate Orchestrator was a tall, remarkably articulate woman in her thirties, carrying a digital ledger and a fine leather crop at her belt. Standing beside her on a relaxed lead was the man Anabelle had contracted—freshly groomed, calm, and surveying his new environment with an easy curiosity. By law, no male servant was permitted to travel unescorted through the sectors.
+As the sun began its descent over the city's stone rooftops, the delivery transport materialized outside Anabelle's townhouse. The corporate Orchestrator was a tall, remarkably articulate woman in her thirties, carrying a digital ledger and a fine leather crop at her belt. Standing beside her on a relaxed lead was the man Anabelle had contracted — freshly groomed, calm, and surveying his new environment with an easy curiosity. By law, no male servant was permitted to travel unescorted through the sectors.
 
 "Anabelle Goodridge?" the woman confirmed as Anabelle open the door.
 
@@ -493,7 +493,7 @@ The lady sank back in her chair, sipping her tea. Anabelle watched her Companion
 
 "Just some basic rules and adjustments," answered Anabelle, although she was quite proud of the effective household she ran.
 
-Her household was run by two Companions. One was her personal maid, seeing to her daily routine, her diet, and her intimate needs. The new man was something else entirely — kept for pleasure alone, his stand being installed upstairs even now.
+Her household was run by two Companions. One was her personal maid, seeing to her daily routine, her diet, and her intimate needs. The new man was something else entirely  —  kept for pleasure alone, his stand being installed upstairs even now.
 The second one managed all household chores. When starting at the university, she could barely manage with four, and the house looked much sloppier. But then she enrolled in the efficiency course for her extracurricular score, where she went through the overview of male biology, as well as the mechanism of efficient discipline. It was a real eye opener.
 
 She cut their amount of sleep to four hours, adjusted their relief routine to twice a day, and set their milking schedule to once per month. She learned that they worked much better with balls full. It had the double effect of keeping their attention crisply focused on delivering pleasure. The second was that it made them much more susceptible to correction. The most delicate of punishments worked much better on a full ballsack.
@@ -521,7 +521,7 @@ The Orchestrator smiled. "You chose the hanging model. See this button here." Sh
 
 Anabelle was impressed. A soft knock announced the Companion himself, walked up by one of the Orchestrator's attendants. He stepped into the room unbound and looked the frame over with the same easy curiosity he'd shown at the door.
 
-At a word from the Orchestrator, he crossed to the frame and settled himself into place — arms up, feet apart, offering his wrists to the cuffs like a man who had done it a hundred times. Her attendant fastened the padded shackles at his wrists, waist, and ankles, snug but never cruel, while the Orchestrator looked on with quiet pride.
+At a word from the Orchestrator, he crossed to the frame and settled himself into place  —  arms up, feet apart, offering his wrists to the cuffs like a man who had done it a hundred times. Her attendant fastened the padded shackles at his wrists, waist, and ankles, snug but never cruel, while the Orchestrator looked on with quiet pride.
 
 When he was secured, the attendant raised the padded support beneath him and checked that he was held comfortably and well.
 
@@ -780,7 +780,7 @@ The Companion fell silent. Anabelle hooked her foot under his chin, raising it. 
 
 He lowered his lips and planted another kiss on her foot. "I owe your Worship my absolute devotion for making my Mistress happy," he said quietly.
 
-Looking back at Sophia, Anabelle said, "I will allow it—" She stopped Sophia short of throwing her arms around her in excitement. "—but there's a condition."
+Looking back at Sophia, Anabelle said, "I will allow it —" She stopped Sophia short of throwing her arms around her in excitement. "— but there's a condition."
 Sophia froze. "Yes?"
 
 "You will transfer him to me and meet only under my supervision."

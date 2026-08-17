@@ -9,7 +9,7 @@ import unittest
 
 import yaml
 
-from server.story_graph import Edge, Node, StoryGraph, to_yaml
+from server.representations.story_graph import Edge, Node, StoryGraph, to_yaml
 
 
 class ToYaml(unittest.TestCase):
