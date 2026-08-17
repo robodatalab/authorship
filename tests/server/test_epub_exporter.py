@@ -56,15 +56,14 @@ class Chapters(unittest.TestCase):
         chapters = chapters_of(Manuscript("## One\n\na\n\n## Two\n\nb\n"))
         self.assertEqual([c.title for c in chapters], ["One", "Two"])
 
-    def test_front_matter_before_the_first_heading_keeps_the_books_title(self) -> None:
+    def test_front_matter_before_the_first_heading_is_not_a_chapter(self) -> None:
         chapters = chapters_of(Manuscript("# Book\n\nintro\n\n## One\n\nprose\n"))
-        # The lead-in keeps the book's title; the heading opens the next chapter.
-        self.assertEqual([c.title for c in chapters], ["Book", "One"])
+        # The book's title opens the title page, not a chapter of its own.
+        self.assertEqual([c.title for c in chapters], ["One"])
 
-    def test_a_manuscript_with_no_headings_is_one_chapter(self) -> None:
+    def test_a_manuscript_with_no_headings_has_no_chapters(self) -> None:
         chapters = chapters_of(Manuscript("just some prose\nand more\n"))
-        self.assertEqual(len(chapters), 1)
-        self.assertEqual(chapters[0].idx, 0)
+        self.assertEqual(chapters, [])
 
     def test_chapters_are_numbered_in_order(self) -> None:
         chapters = chapters_of(Manuscript("## A\n\nx\n\n## B\n\ny\n"))
@@ -141,6 +140,18 @@ class BuildEpub(unittest.TestCase):
             names = z.namelist()
             self.assertIn("OEBPS/cover.xhtml", names)
             self.assertIn("OEBPS/cover.png", names)
+
+    def test_the_title_page_carries_the_book_title_and_the_author(self) -> None:
+        md_path = self.root / "titled.md"
+        md_path.write_text("# My Book\n\n## One\n\nprose\n", encoding="utf-8")
+        out_path = self.root / "titled.epub"
+        build_epub(Manuscript.load(md_path), out_path, None, None, "A. Writer", "en")
+
+        with zipfile.ZipFile(out_path) as z:
+            page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
+
+        self.assertIn("My Book", page)
+        self.assertIn("A. Writer", page)
 
 
 if __name__ == "__main__":
