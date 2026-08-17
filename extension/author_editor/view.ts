@@ -57,8 +57,23 @@ let editing: number | null = null;
 /** The cell the title-bar commands act on. */
 let selected = 0;
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
-/** What the page was last drawn from, so an unchanged document is not redrawn. */
+/**
+ * What the view believes the document says.
+ *
+ * Set both when the page is drawn and when an edit is sent, so the edit's own
+ * echo can be told apart from a change that came from somewhere else — a revert,
+ * a correction the server wrote, an edit in a text editor alongside.
+ */
 let drawn = '';
+
+/**
+ * Bumped whenever the document changes underneath an open cell.
+ *
+ * The textarea's own handlers are still attached to a cell that no longer says
+ * what it said, and letting their blur write back would put the author's
+ * abandoned text over whatever arrived.
+ */
+let generation = 0;
 
 function signatureOf(list: Cell[]): string {
 	return JSON.stringify(list);
@@ -66,6 +81,8 @@ function signatureOf(list: Cell[]): string {
 
 function commit(next: Cell[]): void {
 	cells = next;
+	// Recorded before it goes, so the change coming back is recognised as ours.
+	drawn = signatureOf(next);
 	vscode.postMessage({ type: 'cells', cells });
 }
 
@@ -301,6 +318,9 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 }
 
 function sourceFor(cell: Cell, index: number): HTMLElement {
+	// The document this box was opened against. If it moves on, nothing typed in
+	// here may be written back over what replaced it.
+	const opened = generation;
 	const input = document.createElement('textarea');
 	input.className = 'source';
 	input.value = cell.source;
@@ -310,17 +330,27 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 		if (typingTimer !== undefined) {
 			clearTimeout(typingTimer);
 		}
-		typingTimer = setTimeout(() => settle(index, input.value), TYPING_DEBOUNCE_MS);
+		typingTimer = setTimeout(() => {
+			if (opened === generation) {
+				settle(index, input.value);
+			}
+		}, TYPING_DEBOUNCE_MS);
 	});
 	input.addEventListener('keydown', (event) => {
 		// Accept the cell the way a notebook accepts one, and leave Enter to do
 		// what Enter does in prose.
 		if (event.key === 'Escape' || (event.key === 'Enter' && event.shiftKey)) {
 			event.preventDefault();
+			if (opened === generation) {
+				accept(index, input.value);
+			}
+		}
+	});
+	input.addEventListener('blur', () => {
+		if (opened === generation) {
 			accept(index, input.value);
 		}
 	});
-	input.addEventListener('blur', () => accept(index, input.value));
 	// Both once the box is on the page: `scrollHeight` needs a laid-out element,
 	// and `preventScroll` because focusing is what was yanking the page around.
 	queueMicrotask(() => {
@@ -598,15 +628,28 @@ window.addEventListener('message', (event) => {
 	if (message?.type === 'askSpellCheck') {
 		answerSpellCheck();
 	} else if (message?.type === 'cells') {
-		cells = withDefaultCell(message.cells as Cell[]);
+		const incoming = withDefaultCell(message.cells as Cell[]);
 		base = String(message.base ?? '');
-		selected = Math.min(selected, Math.max(0, cells.length - 1));
-		// An open cell is the author's, not the document's: repainting would tear
-		// out the textarea they are typing in. And most of what arrives here is
-		// this view's own edit coming back around, which is not news either.
-		if (editing === null && signatureOf(cells) !== drawn) {
-			render();
+		// Most of what arrives here is this view's own edit coming back around,
+		// which is not news and must not disturb a cell being typed in.
+		if (signatureOf(incoming) === drawn) {
+			cells = incoming;
+			return;
 		}
+		// The document says something the view did not write — reverted, corrected,
+		// or edited elsewhere. That wins over anything open: a cell left showing
+		// the old text would write it back the moment the author clicked away.
+		cells = incoming;
+		selected = Math.min(selected, Math.max(0, cells.length - 1));
+		if (editing !== null) {
+			generation += 1;
+			editing = null;
+			if (typingTimer !== undefined) {
+				clearTimeout(typingTimer);
+				typingTimer = undefined;
+			}
+		}
+		render();
 	}
 });
 

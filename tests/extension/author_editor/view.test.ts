@@ -224,6 +224,33 @@ describe('opening a cell', () => {
 		expect(shown()[0]).toBe(before);
 	});
 
+	it('takes a change that came from somewhere else, even mid-edit', async () => {
+		// Reverting the file in git, a correction the server wrote, an edit in a
+		// text editor alongside — the document has moved on and the open cell is
+		// showing something that is no longer there.
+		await mount([markdown('edited')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		send([markdown('reverted')]);
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(shown()[0].querySelector('.rendered')!.textContent).toContain('reverted');
+	});
+
+	it('does not write the abandoned text back over what arrived', async () => {
+		// The textarea's own handlers are still attached when it is torn out, and
+		// its blur used to post the old text — quietly undoing the revert.
+		await mount([markdown('edited')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const abandoned = shown()[0].querySelector('textarea')!;
+		send([markdown('reverted')]);
+		abandoned.dispatchEvent(new Event('blur'));
+		expect(lastCells().map((c) => c.source)).not.toContain('edited');
+		expect(shown()[0].querySelector('.rendered')!.textContent).toContain('reverted');
+	});
+
 	it('redraws when the document has changed', async () => {
 		await mount([markdown('a')]);
 		send([markdown('a'), markdown('b')]);
