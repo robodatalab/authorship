@@ -100,7 +100,7 @@ class _Atlop(nn.Module):
         """Divides the ids into a set of overlapping windows
         and runs the encoder model over them.
 
-        Returns the pooled hidden layers and the attention results.
+        Returns the hidden outputs and the attention aggregated and averaged from each window encoding
         """
         device = next(self.parameters()).device
         inner, length = WINDOW - 2, len(ids)
@@ -138,10 +138,7 @@ class _Atlop(nn.Module):
     def _pool_per_entity(
         self, hidden: torch.Tensor, attention: torch.Tensor, mentions: Sequence[Sequence[int]]
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """A vector and an attention profile per entity, gathered over its mentions.
-
-        logsumexp is the smooth maximum: one telling mention carries the entity, where a
-        mean would let the rest of them dilute it.
+        """Extract the hidden outputs and attention related to each entity individually.
         """
         per_entity_hidden, per_entity_attention = [], []
         for fenced in mentions:
