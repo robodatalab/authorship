@@ -61,15 +61,21 @@ def blocks_to_xhtml(lines: list[str]) -> str:
 
 
 class Chapter:
-    def __init__(self, idx: int, title: str, body_lines: list[str]):
+    def __init__(self, idx: int, title: str | None, body_lines: list[str]):
         self.idx = idx
         self.title = title
         self.body_lines = body_lines
         self.filename = f"chap_{idx:03d}.xhtml"
 
     @property
+    def name(self) -> str:
+        return self.title or f"Chapter {self.idx + 1}"
+
+    @property
     def body_xhtml(self) -> str:
-        return blocks_to_xhtml(self.body_lines)
+        # The `##` that opens a section is not one of its lines, so the chapter
+        # carries its own heading back onto the page.
+        return f"<h2>{_inline(self.name)}</h2>\n{blocks_to_xhtml(self.body_lines)}"
 
 
 def chapters_of(manuscript: Manuscript) -> list[Chapter]:
@@ -88,8 +94,7 @@ def chapters_of(manuscript: Manuscript) -> list[Chapter]:
             previous = index
         if not body:
             continue
-        title = manuscript.title if section.start == 0 else section.title
-        chapters.append(Chapter(len(chapters), title, body))
+        chapters.append(Chapter(len(chapters), section.title, body))
     return chapters
 
 
@@ -105,8 +110,10 @@ CSS = """\
 html, body { margin: 0; padding: 0; }
 body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
        text-align: justify; hyphens: auto; }
+/* No page-break-before here: every chapter is its own spine document, so the
+   reader already opens a page for it. Breaking again leaves a blank one. */
 h1, h2, h3 { font-family: Georgia, serif; text-align: center; font-weight: normal;
-             line-height: 1.25; page-break-before: always; }
+             line-height: 1.25; }
 h1 { font-size: 1.9em; margin: 2.5em 0 0.6em; }
 h2 { font-size: 1.5em; margin: 2.2em 0 1em; }
 h3 { font-size: 1.2em; margin: 1.6em 0 0.8em; font-style: italic; }
@@ -116,6 +123,9 @@ hr.scene-break { border: 0; text-align: center; margin: 1.4em 0; }
 hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 .cover { text-align: center; margin: 0; padding: 0; }
 .cover img { max-width: 100%; height: auto; }
+.title-page { text-align: center; margin-top: 25%; }
+.title-page h1.book-title { font-size: 2.4em; margin: 0 0 1.5em; }
+.title-page p.author { text-indent: 0; font-size: 1.2em; font-style: italic; }
 """
 
 XHTML_DOC = """<?xml version="1.0" encoding="UTF-8"?>
@@ -137,6 +147,15 @@ def xhtml_page(lang: str, title: str, body: str) -> str:
     return XHTML_DOC.format(lang=lang, title=html.escape(title), body=body)
 
 
+def build_title_page(title: str, author: str) -> str:
+    return (
+        '<div class="title-page">\n'
+        f'  <h1 class="book-title">{_inline(title)}</h1>\n'
+        f'  <p class="author">{_inline(author)}</p>\n'
+        "</div>"
+    )
+
+
 def build_content_opf(book_id, title, author, lang, chapters, cover_item, modified):
     manifest = [
         '<item id="css" href="style.css" media-type="text/css"/>',
@@ -156,6 +175,11 @@ def build_content_opf(book_id, title, author, lang, chapters, cover_item, modifi
         )
         spine.append('<itemref idref="cover" linear="yes"/>')
         meta_cover = '<meta name="cover" content="cover-image"/>'
+
+    manifest.append(
+        '<item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>'
+    )
+    spine.append('<itemref idref="titlepage"/>')
 
     for ch in chapters:
         manifest.append(
@@ -185,7 +209,7 @@ def build_content_opf(book_id, title, author, lang, chapters, cover_item, modifi
 
 def build_nav(lang, title, chapters):
     items = "\n".join(
-        f'      <li><a href="{ch.filename}">{html.escape(ch.title)}</a></li>'
+        f'      <li><a href="{ch.filename}">{html.escape(ch.name)}</a></li>'
         for ch in chapters
     )
     body = f"""<nav epub:type="toc" id="toc">
@@ -211,7 +235,7 @@ def build_ncx(book_id, title, chapters):
     for i, ch in enumerate(chapters, start=1):
         points.append(
             f'    <navPoint id="np{i}" playOrder="{i}">\n'
-            f"      <navLabel><text>{html.escape(ch.title)}</text></navLabel>\n"
+            f"      <navLabel><text>{html.escape(ch.name)}</text></navLabel>\n"
             f'      <content src="{ch.filename}"/>\n'
             f"    </navPoint>"
         )
@@ -273,9 +297,14 @@ def build_epub(
             cover_body = f'<div class="cover"><img src="{cover_href}" alt="{html.escape(title)}"/></div>'
             z.writestr("OEBPS/cover.xhtml", xhtml_page(lang, title, cover_body))
 
+        z.writestr(
+            "OEBPS/titlepage.xhtml",
+            xhtml_page(lang, title, build_title_page(title, author)),
+        )
+
         for ch in chapters:
             z.writestr(
-                f"OEBPS/{ch.filename}", xhtml_page(lang, ch.title, ch.body_xhtml)
+                f"OEBPS/{ch.filename}", xhtml_page(lang, ch.name, ch.body_xhtml)
             )
 
     print(
