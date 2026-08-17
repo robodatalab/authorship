@@ -3,12 +3,13 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from server.epub_exporter import (
+from server.publishing.epub_exporter import (
     _inline,
     blocks_to_xhtml,
     build_epub,
-    parse_manuscript,
+    chapters_of,
 )
+from server.manuscript import Manuscript
 
 
 class Inline(unittest.TestCase):
@@ -50,32 +51,28 @@ class Blocks(unittest.TestCase):
                 )
 
 
-class ParseManuscript(unittest.TestCase):
-    def test_title_comes_from_the_first_h1(self) -> None:
-        title, _chapters = parse_manuscript("# My Book\n\n## One\n\nprose\n")
-        self.assertEqual(title, "My Book")
-
-    def test_splits_into_a_chapter_per_h2(self) -> None:
-        _title, chapters = parse_manuscript("## One\n\na\n\n## Two\n\nb\n")
+class Chapters(unittest.TestCase):
+    def test_a_chapter_per_heading(self) -> None:
+        chapters = chapters_of(Manuscript("## One\n\na\n\n## Two\n\nb\n"))
         self.assertEqual([c.title for c in chapters], ["One", "Two"])
 
-    def test_front_matter_before_the_first_h2_is_its_own_chapter(self) -> None:
-        _title, chapters = parse_manuscript("# Book\n\nintro\n\n## One\n\nprose\n")
+    def test_front_matter_before_the_first_heading_keeps_the_books_title(self) -> None:
+        chapters = chapters_of(Manuscript("# Book\n\nintro\n\n## One\n\nprose\n"))
         # The lead-in keeps the book's title; the heading opens the next chapter.
         self.assertEqual([c.title for c in chapters], ["Book", "One"])
 
     def test_a_manuscript_with_no_headings_is_one_chapter(self) -> None:
-        title, chapters = parse_manuscript("just some prose\nand more\n")
+        chapters = chapters_of(Manuscript("just some prose\nand more\n"))
         self.assertEqual(len(chapters), 1)
         self.assertEqual(chapters[0].idx, 0)
-        self.assertEqual(title, "Untitled")
 
     def test_chapters_are_numbered_in_order(self) -> None:
-        _title, chapters = parse_manuscript("## A\n\nx\n\n## B\n\ny\n")
+        chapters = chapters_of(Manuscript("## A\n\nx\n\n## B\n\ny\n"))
         self.assertEqual(
             [c.filename for c in chapters],
             ["chap_000.xhtml", "chap_001.xhtml"],
         )
+
 
 
 class BuildEpub(unittest.TestCase):
@@ -95,7 +92,7 @@ class BuildEpub(unittest.TestCase):
         md_path = self.root / f"{name}.md"
         md_path.write_text(md_text, encoding="utf-8")
         out_path = self.root / f"{name}.epub"
-        build_epub(md_path, out_path, cover, None, "A. Writer", "en")
+        build_epub(Manuscript.load(md_path), out_path, cover, None, "A. Writer", "en")
         return out_path
 
     def test_writes_a_zip_with_the_epub_skeleton(self) -> None:

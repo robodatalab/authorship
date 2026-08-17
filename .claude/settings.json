@@ -25,7 +25,34 @@
       "Bash(timeout 240 .venv/bin/python -m unittest discover -s tests/server -t .)",
       "Bash(.venv/bin/python -m unittest discover -s tests/server -t .)",
       "Bash(.venv/bin/python -m mypy server/grammar.py)",
-      "Bash(git --no-pager diff server/)"
+      "Bash(git --no-pager diff server/)",
+      "Bash(git --no-pager diff extension/parts/model.ts)",
+      "Bash(.venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/ablate.py)",
+      "Bash(PYTHONPATH=/Users/piotrtrochim/GitHub/writer .venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/ablate.py)",
+      "Bash(PYTHONPATH=/Users/piotrtrochim/GitHub/writer .venv/bin/python /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/29b0abb0-341f-483b-bd16-daeb4a2fc924/scratchpad/name_check.py)",
+      "Bash(rg -n \"__round__|__float__\" /Users/piotrtrochim/GitHub/writer/.venv/lib/python*/site-packages/torch/_tensor.py /Users/piotrtrochim/GitHub/writer/.venv/lib/python*/site-packages/torch/_C/_TensorBase.pyi)",
+      "Bash(git -C ~/GitHub/servery log --oneline -5)",
+      "Bash(git -C ~/GitHub/servery remote -v)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(git -C ~/GitHub/roost log --oneline -5)",
+      "Bash(git -C ~/GitHub/roost status --short)",
+      "Bash(git -C ~/GitHub/roost remote -v)",
+      "Bash(git -C ~/GitHub/servery log --oneline -3)",
+      "Bash(git -C ~/GitHub/servery status --short)",
+      "Bash(echo \"--- exit $? ---\")",
+      "Bash(git log *)",
+      "Bash(grep -nP '[ \\\\t]+$' /private/tmp/claude-501/-Users-piotrtrochim-GitHub-writer/ab233de4-dab1-4a17-be16-d53b5c08d30b/scratchpad/cell.py)",
+      "Bash(jq -r '.cells[] | select\\(.id==\"7d30f9ef\"\\) | if \\(.source|type\\)==\"array\" then \\(.source|join\\(\"\"\\)\\) else .source end' /Users/piotrtrochim/GitHub/writer/experiments.ipynb)",
+      "Bash(tail -n +5 cell.py)",
+      "Bash(sed -n '/^@dataclass\\(frozen=True\\)$/,$p' new.py)",
+      "Bash(git -C /Users/piotrtrochim/GitHub/writer status --short)",
+      "Bash(awk '{printf \"%3d  %5d  %s\\\\n\", NR, length\\($0\\), substr\\($0,1,44\\)}' /Users/piotrtrochim/GitHub/writer/data/story_2.md)",
+      "Bash(awk 'NR>=22 && length\\($0\\)>0 {print length\\($0\\)}' /Users/piotrtrochim/GitHub/writer/data/story_2.md)",
+      "Bash(awk '{n++; s+=$1; if\\($1>m\\) m=$1} END {printf \"lines=%d  total=%d  longest=%d\\\\n\", n, s+n-1, m}')"
+    ],
+    "additionalDirectories": [
+      "/Users/piotrtrochim/GitHub/servery/src/servery",
+      "/Users/piotrtrochim/GitHub/servery"
     ]
   }
 }

@@ -94,7 +94,8 @@ def chapters_of(manuscript: Manuscript) -> list[Chapter]:
             previous = index
         if not body:
             continue
-        chapters.append(Chapter(len(chapters), section.title, body))
+        title = manuscript.title if section.start == 0 else section.title
+        chapters.append(Chapter(len(chapters), title, body))
     return chapters
 
 

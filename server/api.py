@@ -9,28 +9,24 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
-from server.epub_exporter import build_epub
-from server.grammar import Span, correct_span, section_span, selected_span
-from server.inference import (
+from server.publishing.epub_exporter import build_epub
+from server.writing_tools.grammar import correct_span
+from roost import (
     InferenceModelResourceManager,
     ModelNotAvailable,
     CausalModel, EncoderModel, Seq2SeqModel,
     coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
-from server.line_contribution import (
-    attribution_path_for,
-    line_contribution,
-    write_attribution,
-)
+from server.representations.line_contribution import line_contribution, write_attribution
+from server.manuscript import Manuscript
 from server.representations import (
     build_character_representation,
     build_plot_representation,
     build_scene_representation,
-    graph_path_for
 )
-from server.semantic_search import SearchIndex
-from server.story_graph import to_yaml
+from server.representations.semantic_search import SearchIndex
+from server.representations.story_graph import to_yaml
 
 _log = log.logger(__name__)
 
@@ -123,6 +119,13 @@ def memory() -> dict[str, Any]:
     }
 
 
+def _manuscript(path: str) -> Manuscript:
+    document = Path(path)
+    if not document.is_file():
+        raise HTTPException(status_code=400, detail=f"No such manuscript: {path}")
+    return Manuscript.load(document)
+
+
 class RepresentationBuildRequest(BaseModel):
     # Path of the document
     path: str
@@ -146,31 +149,30 @@ def _build_representations(model, markdown):
 class RepresentationBuildJob(Job):
     kind = "representation build"
 
-    def __init__(self, model: CausalModel, source: Path) -> None:
-        super().__init__(str(graph_path_for(source)))
+    def __init__(self, model: CausalModel, manuscript: Manuscript) -> None:
+        super().__init__(str(manuscript.graph_path))
         self._model = model
-        self._source = source
-        self._markdown = source.read_text()
+        self._manuscript = manuscript
 
     def execute(self) -> None:
-        graphs = _build_representations(self._model, self._markdown)
+        graphs = _build_representations(self._model, self._manuscript)
         if not self.cancelled:
-            graph_path_for(self._source).write_text(to_yaml(graphs))
+            self._manuscript.graph_path.write_text(to_yaml(graphs))
 
 
 class LineContributionJob(Job):
     kind = "line contribution"
 
-    def __init__(self, model: EncoderModel, source: Path, line: int) -> None:
+    def __init__(self, model: EncoderModel, manuscript: Manuscript, line: int) -> None:
         # Keyed by the file it writes, like every other job — so scoring a section
         # of a manuscript never supersedes a grammar pass on the manuscript itself.
-        super().__init__(str(attribution_path_for(source)))
+        super().__init__(str(manuscript.attribution_path))
         self._model = model
+        self._manuscript = manuscript
         self._line = line
-        self._markdown = source.read_text()
 
     def execute(self) -> None:
-        contribution = line_contribution(self._model, self._markdown, self._line)
+        contribution = line_contribution(self._model, self._manuscript, self._line)
         if contribution is None:
             raise ValueError(f"no section covers line {self._line}")
         if not self.cancelled:
@@ -180,22 +182,20 @@ class LineContributionJob(Job):
 class SearchIndexJob(Job):
     kind = "search index"
 
-    def __init__(self, index: SearchIndex, model: EncoderModel, source: Path) -> None:
+    def __init__(
+        self, index: SearchIndex, model: EncoderModel, manuscript: Manuscript
+    ) -> None:
         # Keyed by the manuscript itself. Alone among the jobs this one writes no
         # file, so there is no file to key it by — and a second indexing of a
         # manuscript should supersede the first in any case.
-        super().__init__(str(source))
+        super().__init__(str(manuscript.path))
         self._index = index
         self._model = model
-        self._source = source
-        self._markdown = source.read_text()
+        self._manuscript = manuscript
 
     def execute(self) -> None:
         self._index.encode_manuscript(
-            self._model,
-            str(self._source),
-            self._markdown,
-            lambda: self.cancelled,
+            self._model, self._manuscript, lambda: self.cancelled
         )
 
 
@@ -203,22 +203,24 @@ class GrammarFixJob(Job):
     kind = "grammar fix"
 
     def __init__(
-        self, model: Seq2SeqModel, source: Path, markdown: str, span: Span
+        self, model: Seq2SeqModel, manuscript: Manuscript, start: int, end: int
     ) -> None:
-        super().__init__(str(source))
+        super().__init__(str(manuscript.path))
         self._model = model
-        self._source = source
-        # A span means nothing apart from the text it was measured in, so the two
-        # arrive together rather than the manuscript being read a second time.
-        self._markdown = markdown
-        self._span = span
+        self._manuscript = manuscript
+        self._start = start
+        self._end = end
 
     def execute(self) -> None:
-        corrected = correct_span(
-            self._model, self._markdown, self._span, lambda: self.cancelled
+        correct_span(
+            self._model,
+            self._manuscript,
+            self._start,
+            self._end,
+            lambda: self.cancelled,
         )
         if not self.cancelled:
-            self._source.write_text(corrected)
+            self._manuscript.save(self._manuscript.path)
 
 
 
@@ -236,7 +238,9 @@ def jobs() -> dict[str, Any]:
 @app.post("/build", status_code=202)
 def build(request: RepresentationBuildRequest) -> dict[str, Any]:
     """Generate representations of a manuscript."""
-    job = RepresentationBuildJob(app.state.completion_model, Path(request.path))
+    job = RepresentationBuildJob(
+        app.state.completion_model, _manuscript(request.path)
+    )
     app.state.jobs.start(job)
     return {"id": job.target, "path": job.target}
 
@@ -260,16 +264,12 @@ class EpubExportRequest(BaseModel):
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     """Export a manuscript to an EPUB written beside it, as `<name>.epub`."""
-    document = Path(request.path)
-    if not document.is_file():
-        raise HTTPException(
-            status_code=400, detail=f"No such manuscript: {request.path}"
-        )
+    manuscript = _manuscript(request.path)
 
-    out_path = document.with_suffix(".epub")
+    out_path = manuscript.epub_path
     cover = Path(request.cover) if request.cover else None
     build_epub(
-        document,
+        manuscript,
         out_path,
         cover,
         request.title,
@@ -295,13 +295,9 @@ def line_contribution_endpoint(request: LineContributionRequest) -> dict[str, An
     that it runs as a job, and the job is followed through /jobs like the rest of
     the work the server has in hand.
     """
-    document = Path(request.path)
-    if not document.is_file():
-        raise HTTPException(
-            status_code=400, detail=f"No such manuscript: {request.path}"
-        )
+    manuscript = _manuscript(request.path)
 
-    job = LineContributionJob(app.state.encoder_model, document, request.line)
+    job = LineContributionJob(app.state.encoder_model, manuscript, request.line)
     app.state.jobs.start(job)
     return {"id": job.target, "path": job.target}
 
@@ -330,13 +326,9 @@ def search_index(request: SearchIndexRequest) -> dict[str, Any]:
     the vectors are held in memory, and /search says how much of a manuscript it
     has yet to see.
     """
-    document = Path(request.path)
-    if not document.is_file():
-        raise HTTPException(
-            status_code=400, detail=f"No such manuscript: {request.path}"
-        )
+    manuscript = _manuscript(request.path)
 
-    job = SearchIndexJob(app.state.search_index, app.state.encoder_model, document)
+    job = SearchIndexJob(app.state.search_index, app.state.encoder_model, manuscript)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -353,18 +345,10 @@ class SearchRequest(BaseModel):
 @app.post("/search")
 def search(request: SearchRequest) -> dict[str, Any]:
     """The passages of a manuscript that answer a phrase."""
-    document = Path(request.path)
-    if not document.is_file():
-        raise HTTPException(
-            status_code=400, detail=f"No such manuscript: {request.path}"
-        )
+    manuscript = _manuscript(request.path)
 
     results = app.state.search_index.search(
-        app.state.encoder_model,
-        str(document),
-        document.read_text(),
-        request.phrase,
-        request.count,
+        app.state.encoder_model, manuscript, request.phrase, request.count
     )
     return {
         "hits": [
@@ -404,22 +388,17 @@ def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
     their cursor is in. Where a section ends is the server's to say, so the
     request carries the cursor rather than a span it worked out for itself.
     """
-    document = Path(request.path)
-    if not document.is_file():
-        raise HTTPException(
-            status_code=400, detail=f"No such manuscript: {request.path}"
-        )
-    markdown = document.read_text()
-    span = (
-        selected_span(markdown, request.selection.start, request.selection.end)
-        if request.selection
-        else section_span(markdown, request.line)
-    )
-    if span is None:
-        raise HTTPException(
-            status_code=400, detail="There is no prose there to correct."
-        )
-    job = GrammarFixJob(app.state.grammar_model, document, markdown, span)
+    manuscript = _manuscript(request.path)
+    if request.selection:
+        start, end = request.selection.start, request.selection.end
+    else:
+        section = manuscript.section_at(request.line)
+        if section is None:
+            raise HTTPException(
+                status_code=400, detail="There is no prose there to correct."
+            )
+        start, end = section.start, section.end
+    job = GrammarFixJob(app.state.grammar_model, manuscript, start, end)
     app.state.jobs.start(job)
     return {"id": job.target}
 

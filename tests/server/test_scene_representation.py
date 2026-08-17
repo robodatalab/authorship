@@ -10,9 +10,10 @@ import unittest
 from typing import cast
 from unittest.mock import create_autospec
 
-from server.inference.causal import CausalModel
+from roost import CausalModel
+from server.manuscript import Manuscript
 from server.representations.scene_representation import build_scene_representation
-from server.story_graph import Edge, Node
+from server.representations.story_graph import Edge, Node
 
 STORY = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten"
 
@@ -31,24 +32,24 @@ class InvalidReplies(unittest.TestCase):
             reply="I could not find any scenes in this story."
         )
         with self.assertRaises(ValueError):
-            build_scene_representation(model, STORY)
+            build_scene_representation(model, Manuscript(STORY))
 
     def test_object_never_closes(self) -> None:
         model = build_completion_model_mock(
             reply='{"nodes": [{"id": 1, "title": "x", "start": 0, "end": 1}'
         )
         with self.assertRaises(ValueError):
-            build_scene_representation(model, STORY)
+            build_scene_representation(model, Manuscript(STORY))
 
     def test_reply_is_an_array_not_an_object(self) -> None:
         model = build_completion_model_mock(reply="[1, 2, 3]")
         with self.assertRaises(ValueError):
-            build_scene_representation(model, STORY)
+            build_scene_representation(model, Manuscript(STORY))
 
     def test_malformed_json_inside_the_braces(self) -> None:
         model = build_completion_model_mock(reply='{"nodes": [1 2 3]}')
         with self.assertRaises(ValueError):
-            build_scene_representation(model, STORY)
+            build_scene_representation(model, Manuscript(STORY))
 
 
 class GraphVariants(unittest.TestCase):
@@ -62,7 +63,7 @@ class GraphVariants(unittest.TestCase):
                 ' "edges": [{"from": 1, "to": 2}]}'
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         # Lines arrive 0-based from the model and are stored 1-based, as read.
         self.assertEqual(
             graph.nodes,
@@ -84,7 +85,7 @@ class GraphVariants(unittest.TestCase):
                 "Let me know if you would like more detail."
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes, (Node(id=1, title="the whole story", start=1, end=10),)
         )
@@ -92,13 +93,13 @@ class GraphVariants(unittest.TestCase):
 
     def test_an_empty_graph_is_allowed(self) -> None:
         model = build_completion_model_mock(reply='{"nodes": [], "edges": []}')
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         self.assertEqual(graph.nodes, ())
         self.assertEqual(graph.edges, ())
 
     def test_missing_keys_are_treated_as_empty(self) -> None:
         model = build_completion_model_mock(reply="{}")
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         self.assertEqual(graph.nodes, ())
         self.assertEqual(graph.edges, ())
 
@@ -111,7 +112,7 @@ class GraphVariants(unittest.TestCase):
                 ' "edges": [{"from": "1", "to": "2"}]}'
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -130,7 +131,7 @@ class GraphVariants(unittest.TestCase):
                 ' "edges": [{"source": 1, "target": 2}]}'
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         self.assertEqual(
             graph.nodes,
             (
@@ -152,7 +153,7 @@ class GraphVariants(unittest.TestCase):
                 '], "edges": []}'
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         # No title, a span running backwards, and a non-object all fall away.
         self.assertEqual(
             graph.nodes,
@@ -175,7 +176,7 @@ class GraphVariants(unittest.TestCase):
                 "]}"
             )
         )
-        graph = build_scene_representation(model, STORY)
+        graph = build_scene_representation(model, Manuscript(STORY))
         # A link needs both ends: 9 was never a node, and a scene does not lead
         # into itself.
         self.assertEqual(graph.edges, (Edge(source=1, target=2),))

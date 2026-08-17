@@ -4,12 +4,14 @@ import {
 	DEFAULT_PART_WORDS,
 	countWords,
 	intoParts,
-	isPartFile,
+	mergeParts,
 	partFileName,
+	partNumber,
 	partTitle,
 	quotaOf,
 	readManuscript,
 	renderPart,
+	titleWithoutPart,
 } from '../../../extension/parts/model';
 
 describe('countWords — words as a reader counts them', () => {
@@ -194,22 +196,111 @@ describe('renderPart — a part as its file reads', () => {
 	});
 });
 
-describe('partFileName / isPartFile — the files a division owns', () => {
+describe('partFileName / partNumber — the files a division owns', () => {
 	it('numbers the parts from one', () => {
 		expect(partFileName(1)).toBe('part_1.md');
 		expect(partFileName(12)).toBe('part_12.md');
 	});
 
-	it('recognizes what an earlier division wrote', () => {
-		expect(isPartFile('part_1.md')).toBe(true);
-		expect(isPartFile('part_12.md')).toBe(true);
+	it('reads back which part a file it wrote holds', () => {
+		expect(partNumber('part_1.md')).toBe(1);
+		expect(partNumber('part_12.md')).toBe(12);
 	});
 
 	it('claims nothing else in the folder', () => {
-		expect(isPartFile('part_one.md')).toBe(false);
-		expect(isPartFile('notes.md')).toBe(false);
-		expect(isPartFile('part_1.md.bak')).toBe(false);
-		expect(isPartFile('draft_part_1.md')).toBe(false);
+		expect(partNumber('part_one.md')).toBeNull();
+		expect(partNumber('notes.md')).toBeNull();
+		expect(partNumber('part_1.md.bak')).toBeNull();
+		expect(partNumber('draft_part_1.md')).toBeNull();
+	});
+
+	it('orders a tenth part after a first, which the folder listing would not', () => {
+		const names = ['part_10.md', 'part_1.md', 'part_2.md'];
+		const sorted = [...names].sort((a, b) => partNumber(a)! - partNumber(b)!);
+		expect(sorted).toEqual(['part_1.md', 'part_2.md', 'part_10.md']);
+		expect([...names].sort()).toEqual(['part_1.md', 'part_10.md', 'part_2.md']);
+	});
+});
+
+describe('titleWithoutPart — a manuscript title read back off a part', () => {
+	it('is the inverse of partTitle', () => {
+		expect(titleWithoutPart(partTitle('The Long Way', 3), 3)).toBe('The Long Way');
+		expect(titleWithoutPart(partTitle('', 3), 3)).toBe('');
+	});
+
+	it('takes a heading the author wrote themselves at its word', () => {
+		expect(titleWithoutPart('An Entirely New Name', 2)).toBe('An Entirely New Name');
+	});
+
+	it('only strips the number the part actually is', () => {
+		expect(titleWithoutPart('The Long Way — Part 3', 2)).toBe('The Long Way — Part 3');
+	});
+});
+
+describe('mergeParts — the parts put back together', () => {
+	it('drops the part titles and takes back the one they were named for', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# The Long Way — Part 1\n\n## One\n\nalpha\n' },
+			{ number: 2, text: '# The Long Way — Part 2\n\n## Two\n\nbeta\n' },
+		]);
+		expect(merged).toBe('# The Long Way\n\n## One\n\nalpha\n\n## Two\n\nbeta\n');
+	});
+
+	it('is the inverse of dividing, for a manuscript that carries no notes', () => {
+		const manuscript = '# The Long Way\n\n## One\n\nalpha\n\n## Two\n\nbeta\n';
+		const { title, sections } = readManuscript(manuscript);
+		const written = intoParts(sections, 1).map((part, index) => ({
+			number: index + 1,
+			text: renderPart(title, index + 1, part),
+		}));
+		expect(written).toHaveLength(2);
+		expect(mergeParts(written)).toBe(manuscript);
+	});
+
+	it('keeps a note the author left in a part — these are the files they write in', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# A Story — Part 1\n\n## One\n\nalpha <!-- rework -->\n' },
+		]);
+		expect(merged).toBe('# A Story\n\n## One\n\nalpha <!-- rework -->\n');
+	});
+
+	it('keeps a section the author added while the story was in parts', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# A Story — Part 1\n\n## One\n\nalpha\n\n## New\n\ngamma\n' },
+			{ number: 2, text: '# A Story — Part 2\n\n## Two\n\nbeta\n' },
+		]);
+		expect(merged).toBe(
+			'# A Story\n\n## One\n\nalpha\n\n## New\n\ngamma\n\n## Two\n\nbeta\n'
+		);
+	});
+
+	it('leaves out a title altogether when the parts were never named for one', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# Part 1\n\n## One\n\nalpha\n' },
+			{ number: 2, text: '# Part 2\n\n## Two\n\nbeta\n' },
+		]);
+		expect(merged).toBe('## One\n\nalpha\n\n## Two\n\nbeta\n');
+	});
+
+	it('carries a part with no title of its own straight through', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# A Story — Part 1\n\nalpha\n' },
+			{ number: 2, text: 'beta\n' },
+		]);
+		expect(merged).toBe('# A Story\n\nalpha\n\nbeta\n');
+	});
+
+	it('passes over a part left empty rather than opening a gap for it', () => {
+		const merged = mergeParts([
+			{ number: 1, text: '# A Story — Part 1\n\nalpha\n' },
+			{ number: 2, text: '# A Story — Part 2\n\n\n' },
+			{ number: 3, text: '# A Story — Part 3\n\nbeta\n' },
+		]);
+		expect(merged).toBe('# A Story\n\nalpha\n\nbeta\n');
+	});
+
+	it('nothing at all merges to nothing', () => {
+		expect(mergeParts([])).toBe('');
 	});
 });
 

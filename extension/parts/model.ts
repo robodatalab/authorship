@@ -43,6 +43,12 @@ export interface Part {
 	words: number;
 }
 
+/** A part as its file holds it, once one has been written. */
+export interface WrittenPart {
+	number: number;
+	text: string;
+}
+
 /** The length a part is asked to be, absent an answer from the author. */
 export const DEFAULT_PART_WORDS = 5000;
 
@@ -124,12 +130,76 @@ export function renderPart(title: string, number: number, part: Part): string {
 	const body = part.sections.flatMap((section) =>
 		section.heading === null ? section.lines : [section.heading, ...section.lines]
 	);
-	return [`${TITLE_PREFIX}${partTitle(title, number)}`, '', ...trimBlank(body), ''].join('\n');
+	return renderDocument(partTitle(title, number), body);
 }
+
+/** A file of prose under a title, or under none when there is no title to give. */
+function renderDocument(title: string, lines: readonly string[]): string {
+	const opening = title === '' ? [] : [`${TITLE_PREFIX}${title}`, ''];
+	return [...trimBlank([...opening, ...trimBlank(lines)]), ''].join('\n');
+}
+
+/** What separates a manuscript's title from the part number after it. */
+const PART_MARKER = ' — Part ';
 
 /** What a part is called — the manuscript's title, and which part this is. */
 export function partTitle(title: string, number: number): string {
-	return title ? `${title} — Part ${number}` : `Part ${number}`;
+	return title ? `${title}${PART_MARKER}${number}` : `Part ${number}`;
+}
+
+/**
+ * The manuscript's title, read back off a part's own — the inverse of
+ * `partTitle`.
+ *
+ * A heading saying neither of the things `partTitle` writes is one the author
+ * named themselves, and is taken at its word rather than second-guessed.
+ */
+export function titleWithoutPart(heading: string, number: number): string {
+	const marker = `${PART_MARKER}${number}`;
+	if (heading.endsWith(marker)) {
+		return heading.slice(0, -marker.length);
+	}
+	return heading === partTitle('', number) ? '' : heading;
+}
+
+/**
+ * The manuscript the parts make when they are put back together — the inverse of
+ * dividing one.
+ *
+ * A part's title is what the division gave it rather than anything the story
+ * says, so it comes off again and the manuscript takes back the title they were
+ * all named for. Everything else in a part is carried over exactly as it stands.
+ * These files are where the writing has been happening: a section the author
+ * added is a section of the manuscript, and a note they left themselves in one is
+ * theirs to keep.
+ */
+export function mergeParts(parts: readonly WrittenPart[]): string {
+	let title = '';
+	const body: string[] = [];
+
+	for (const part of parts) {
+		const lines = part.text.split(/\r?\n/);
+		const titleAt = lines.findIndex((line) => line.startsWith(TITLE_PREFIX));
+		if (titleAt >= 0 && title === '') {
+			const heading = lines[titleAt].slice(TITLE_PREFIX.length).trim();
+			title = titleWithoutPart(heading, part.number);
+		}
+		const kept = trimBlank(
+			titleAt < 0
+				? lines
+				: [...lines.slice(0, titleAt), ...lines.slice(titleAt + 1)]
+		);
+		if (kept.length === 0) {
+			continue;
+		}
+		// The blank line that stands between any two stretches of prose.
+		if (body.length > 0) {
+			body.push('');
+		}
+		body.push(...kept);
+	}
+
+	return renderDocument(title, body);
 }
 
 /** `story.md` divides into `parts/` beside it. */
@@ -140,14 +210,17 @@ export function partFileName(number: number): string {
 }
 
 /**
- * Is this a file a division wrote?
+ * Which part a file in the folder holds, or null if no division wrote it.
  *
- * Asked before writing, so a manuscript that now makes four parts does not sit in
- * a folder still holding a fifth from when it made five. Nothing else in the
- * folder is a division's to remove.
+ * Asked in both directions. Before writing, so a manuscript that now makes four
+ * parts does not sit in a folder still holding a fifth from when it made five —
+ * and nothing else in the folder is a division's to remove. Before merging, so
+ * the parts go back together in the order they were cut rather than the order the
+ * folder happens to list them, which puts a tenth part after a first.
  */
-export function isPartFile(name: string): boolean {
-	return /^part_\d+\.md$/i.test(name);
+export function partNumber(name: string): number | null {
+	const match = /^part_(\d+)\.md$/i.exec(name);
+	return match === null ? null : Number(match[1]);
 }
 
 /**

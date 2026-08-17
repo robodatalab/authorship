@@ -2,21 +2,15 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Any
 
 from yaml import YAMLError, dump, safe_load
 
 from server import log
-from server.inference.encoder import EncoderModel
-from server.representations.utils import parse_sections, section_at, visible_lines
+from roost import EncoderModel
+from server.manuscript import Manuscript, StoryLines
 
 _log = log.logger(__name__)
-
-
-def attribution_path_for(document: Path) -> Path:
-    stem = re.sub(r"\.md$", "", document.name, flags=re.I)
-    return document.with_name(stem + ".attribution.yaml")
 
 
 @dataclass
@@ -37,21 +31,16 @@ class SectionContribution:
 
 
 def line_contribution(
-    model: EncoderModel, story_markdown: str, line: int
+    model: EncoderModel, manuscript: Manuscript, line: int
 ) -> SectionContribution | None:
-    lines = visible_lines(story_markdown.splitlines())
-    section = section_at(parse_sections(story_markdown), line)
+    section = manuscript.section_at(line)
     if section is None:
         return None
 
     # Blank lines have nothing to ablate, and a variant that dropped every line
-    # of a run of them would encode as empty — which comes back as NaN. A line
-    # that was only a comment is blank by the time it arrives here.
-    numbered = [
-        (index, lines[index])
-        for index in range(max(section.start, 0), min(section.end, len(lines) - 1) + 1)
-        if lines[index].strip()
-    ]
+    # of a run of them would encode as empty — which comes back as NaN. What the
+    # section says is neither blank nor a note, so nothing here has to look.
+    numbered = list(StoryLines(manuscript, section.start, section.end))
 
     # One line is the whole section: removing it leaves nothing to compare against,
     # and a lone line trivially carries all of it.

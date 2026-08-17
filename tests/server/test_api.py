@@ -10,12 +10,12 @@ from fastapi.testclient import TestClient
 import yaml
 
 from server.api import app, ParallelJobsManager
-from server.inference.resource_manager import (
+from roost.resource_manager import (
     MemoryReading,
     ModelKind,
     ModelNotAvailable,
 )
-from server.semantic_search import SearchIndex
+from server.representations.semantic_search import SearchIndex
 
 
 DEFAULT_REPLY = (
@@ -285,9 +285,11 @@ class GrammarFix(unittest.TestCase):
             "## One\n\nteh cat.\n\n## Two\n\nthe cat.\n",
         )
 
-    def test_a_selection_of_blank_lines_is_a_bad_request(self) -> None:
+    def test_a_selection_of_blank_lines_has_nothing_to_correct(self) -> None:
+        # Where a section ends is the server's to say, and so is whether there is
+        # prose in it — which it only knows once the job has the manuscript open.
         client = TestClient(app)
-        response = client.post(
+        started = client.post(
             "/fix/grammar",
             json={
                 "path": str(self.manuscript),
@@ -295,7 +297,13 @@ class GrammarFix(unittest.TestCase):
                 "selection": {"start": 3, "end": 3},
             },
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertEqual(status["error"], "There is no prose there to correct.")
+        self.assertEqual(
+            self.manuscript.read_text(), "## One\n\nteh cat.\n\n## Two\n\nteh dog.\n"
+        )
 
     def test_a_missing_manuscript_is_a_bad_request(self) -> None:
         client = TestClient(app)
@@ -312,7 +320,7 @@ class Jobs(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text("teh cat.\n", encoding="utf-8")
+        self.manuscript.write_text("## One\n\nteh cat.\n", encoding="utf-8")
 
         def _restore_model():
             app.state.grammar_model = None
@@ -401,10 +409,11 @@ def wait_for_indexing(client: TestClient, timeout: float = 5.0) -> None:
 
 
 class Search(unittest.TestCase):
-    STORY = "the gate swung shut\n\nshe poured the tea\n"
+    STORY = "## One\n\nthe gate swung shut\n\nshe poured the tea\n"
     VECTORS = {
         "the gate swung shut": [1.0, 0.0],
         "she poured the tea": [0.0, 1.0],
+        "the gate": [1.0, 0.0],
     }
 
     def setUp(self) -> None:
@@ -421,7 +430,6 @@ class Search(unittest.TestCase):
 
         model = mock.MagicMock()
         model.encode.side_effect = lambda texts: [self.VECTORS[text] for text in texts]
-        model.encode_query.return_value = [1.0, 0.0]
 
         app.state.encoder_model = model
         app.state.search_index = SearchIndex()
@@ -449,8 +457,8 @@ class Search(unittest.TestCase):
             {
                 "hits": [
                     {
-                        "start": 0,
-                        "end": 0,
+                        "start": 2,
+                        "end": 2,
                         "score": 1.0,
                         "text": "the gate swung shut",
                     }
