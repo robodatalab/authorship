@@ -147,6 +147,31 @@ describe('the toolbar', () => {
 		await mount([chapter('One'), contents()]);
 		expect(document.getElementById('doc-status')!.textContent).toContain('1 to run');
 	});
+
+	it('says which chapter is being read', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		expect(document.getElementById('doc-where')!.textContent).toBe('One');
+	});
+
+	it('says the part along with the chapter, once the story has parts', async () => {
+		await mount([part('Day One'), chapter('One'), markdown('a')]);
+		expect(document.getElementById('doc-where')!.textContent).toBe(
+			'Day One \u00b7 One'
+		);
+	});
+
+	it('says nothing at all before the first chapter', async () => {
+		await mount([markdown('a')]);
+		expect(document.getElementById('doc-where')!.textContent).toBe('');
+	});
+
+	it('follows the title as it is renamed', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		send([chapter('The First Night'), markdown('a')]);
+		expect(document.getElementById('doc-where')!.textContent).toBe(
+			'The First Night'
+		);
+	});
 });
 
 describe('drawing cells', () => {

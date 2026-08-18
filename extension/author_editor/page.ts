@@ -23,6 +23,8 @@ export const BODY = `	<header class="toolbar" id="toolbar">
 		<button class="tool" id="as-text" type="button"
 			data-tip="View Source — open the same file as plain text"><i class="codicon codicon-file-code"></i></button>
 		<span class="spacer"></span>
+		<span class="doc-where" id="doc-where"></span>
+		<span class="spacer"></span>
 		<span class="doc-status" id="doc-status"></span>
 	</header>
 	<main id="cells" class="cells"></main>
