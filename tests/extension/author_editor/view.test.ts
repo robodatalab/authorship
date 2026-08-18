@@ -361,6 +361,19 @@ describe('changing the document', () => {
 		expect(lastCells().map((c) => c.kind)).toEqual(['chapter', 'markdown']);
 	});
 
+	it('adds a note from the bar, beside the two kinds it is written among', async () => {
+		// A note is reached for as often as the prose it is about, so it is a
+		// button rather than something behind the overflow.
+		await mount([markdown('a')]);
+		const labels = [...bars()[0].querySelectorAll<HTMLElement>('.insert')].map(
+			(button) => button.textContent
+		);
+		expect(labels).toEqual(['Markdown', 'Chapter', 'Note', '']);
+
+		bars()[0].querySelectorAll<HTMLElement>('.insert')[2].click();
+		expect(lastCells().map((c) => c.kind)).toEqual(['note', 'markdown']);
+	});
+
 	it('adds a section in the gap its bar belongs to', async () => {
 		await mount([markdown('a'), markdown('b')]);
 		bars()[1].querySelectorAll<HTMLElement>('.insert')[1].click();
