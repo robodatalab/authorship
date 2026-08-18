@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+bin/
 *.vsix
 .DS_Store
 .vscode-test/
@@ -8,4 +9,3 @@ out/
 __pycache__/
 .venv/
 *.pyc
-uv.lock

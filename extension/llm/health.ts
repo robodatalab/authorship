@@ -1,8 +1,9 @@
 // Watches the model server and mirrors what it reports into the status bar.
 //
-// The extension does not start the server — the launch configuration does — so
-// this only ever observes. Reporting anything the server did not say is how the
-// bar came to claim the model was off while it was downloading.
+// Starting the server is somebody else's job — the extension's in a release, the
+// launch configuration's in development — so this only ever observes. Reporting
+// anything the server did not say is how the bar came to claim the model was off
+// while it was downloading.
 
 import * as vscode from 'vscode';
 

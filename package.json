@@ -3,6 +3,11 @@
   "displayName": "Authorship",
   "description": "Tools for creative writing",
   "version": "0.0.1",
+  "publisher": "RoboDataLab",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robodatalab/writer.git"
+  },
   "engines": {
     "vscode": "^1.125.0"
   },
