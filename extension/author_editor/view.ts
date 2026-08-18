@@ -242,6 +242,12 @@ tipEl.addEventListener('mouseenter', () => {
 	}
 });
 tipEl.addEventListener('mouseleave', hideTip);
+// Pressing something in the box must not take the caret out of the cell. A box
+// that has lost the caret has been accepted and shut, so the author would be put
+// back on the page by the very act of asking for the fix — and the fix would
+// arrive at a cell that was no longer open. Refusing the focus is enough: the
+// click still happens, and the caret never moves.
+tipEl.addEventListener('mousedown', (event) => event.preventDefault());
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -1367,6 +1373,120 @@ function checker(): LocalLinter | null {
 }
 
 /**
+ * How long a word may be before swapping each of its pairs is not worth doing.
+ */
+const PROBE_LONGEST = 16;
+
+/** A word with one pair of neighbouring letters swapped, every way round. */
+function transposals(word: string): string[] {
+	const swapped: string[] = [];
+	for (let at = 0; at + 1 < word.length; at++) {
+		if (word[at] === word[at + 1]) {
+			continue;
+		}
+		swapped.push(
+			word.slice(0, at) + word[at + 1] + word[at] + word.slice(at + 2)
+		);
+	}
+	return swapped;
+}
+
+/**
+ * Which of these are words, asked of the only thing that knows.
+ *
+ * Harper's dictionary is not open to us — the API offers no way to look a word
+ * up — so a word is looked up by showing it to the checker and seeing whether it
+ * complains. One word to a line and one pass over the lot, because the cost of
+ * asking is in the asking rather than in the length of what is asked about.
+ */
+async function realWords(
+	linter: LocalLinter,
+	words: string[]
+): Promise<Set<string>> {
+	const lines = [...new Set(words)];
+	if (lines.length === 0) {
+		return new Set();
+	}
+
+	const starts: number[] = [];
+	let at = 0;
+	for (const line of lines) {
+		starts.push(at);
+		at += line.length + 1;
+	}
+
+	const spelt = new Set(lines);
+	const found = await linter.lint(lines.join('\n'), { language: 'plaintext' });
+	for (const lint of found) {
+		const span = lint.span();
+		// Only spelling. A lone word out of any sentence draws other complaints —
+		// that it is not capitalised, that it is not a sentence — and none of them
+		// are about whether it is in the dictionary.
+		if (lint.lint_kind() === 'Spelling') {
+			let which = 0;
+			for (let index = 0; index < starts.length; index++) {
+				if (starts[index] <= span.start) {
+					which = index;
+				}
+			}
+			spelt.delete(lines[which]);
+		}
+		span.free();
+		lint.free();
+	}
+	return spelt;
+}
+
+/**
+ * Put the transposals Harper will not offer at the front of what it does.
+ *
+ * Harper retrieves a transposal as one edit away and then ranks it as two: the
+ * lookup counts a swap as a single change and the scorer, which is a second and
+ * different implementation, does not know about swaps at all. So the commonest
+ * typing mistake there is scores below unrelated words and is cut from the list
+ * before it ever reaches us — `adn` is offered `ad`, `add`, `adj`, and never
+ * `and`. What it will not say, we work out ourselves.
+ *
+ * Only single swaps of neighbouring letters, which is the gap and not every
+ * typo. Where more than one swap is a word there is nothing here to choose
+ * between them, so both are offered and the author decides.
+ */
+async function withTransposals(
+	linter: LocalLinter,
+	spellings: { mark: Mark; word: string }[]
+): Promise<void> {
+	const swaps = new Map<string, string[]>();
+	for (const { word } of spellings) {
+		if (swaps.has(word) || word.length < 3 || word.length > PROBE_LONGEST) {
+			continue;
+		}
+		if (!/^[A-Za-z']+$/.test(word)) {
+			continue;
+		}
+		swaps.set(word, transposals(word));
+	}
+	if (swaps.size === 0) {
+		return;
+	}
+
+	const real = await realWords(linter, [...swaps.values()].flat());
+	for (const { mark, word } of spellings) {
+		const better = (swaps.get(word) ?? []).filter((one) => real.has(one));
+		if (better.length > 0) {
+			mark.replacements = [
+				...better,
+				...mark.replacements.filter((one) => !better.includes(one)),
+			];
+		}
+	}
+}
+
+/** Harper's messages are Markdown; the box they are shown in is not. */
+function plainly(said: string): string {
+	return said.replace(/`([^`]*)`/g, '\u201c$1\u201d').replace(/`/g, '');
+}
+
+/**
  * What Harper makes of one cell.
  *
  * Cell coordinates from the start: it is given the cell's own text, so what
@@ -1381,28 +1501,32 @@ async function harperMarks(index: number): Promise<Mark[]> {
 	}
 
 	const found = await linter.lint(cell.source, { language: 'markdown' });
-	const marks: Mark[] = [];
+	const built: { mark: Mark; word: string; said: string; named: string }[] = [];
+
 	for (const lint of found) {
 		const span = lint.span();
 		const suggestions = lint.suggestions();
-		const replacements = suggestions.map((one) => one.get_replacement_text());
 		const named = lint.lint_kind();
-		marks.push({
+		const mark: Mark = {
 			id: nextFault++,
 			rule: `harper:${named}`,
 			kind: kindOf(named),
 			source: 'harper',
-			replacements,
-			message: lint.message(),
-			detail: `${lint.lint_kind_pretty()}. ${lint.message()}${
-				replacements.length > 0
-					? `\n\nHarper would put: ${replacements.slice(0, 4).join(', ')}`
-					: ''
-			}`,
+			replacements: suggestions.map((one) => one.get_replacement_text()),
+			// The short line names the fault; what Harper has to say about it is the
+			// long one. They were the same sentence twice over before.
+			message: `${lint.lint_kind_pretty()}: ${lint.get_problem_text()}`,
+			detail: '',
 			cell: index,
 			at: span.start,
 			end: span.end,
 			related: [],
+		};
+		built.push({
+			mark,
+			word: lint.get_problem_text(),
+			said: plainly(lint.message()),
+			named: lint.lint_kind_pretty(),
 		});
 		// The lints are WebAssembly objects, and what is not given back is held for
 		// as long as the editor is open.
@@ -1412,7 +1536,24 @@ async function harperMarks(index: number): Promise<Mark[]> {
 		span.free();
 		lint.free();
 	}
-	return marks;
+
+	await withTransposals(
+		linter,
+		built
+			.filter((one) => one.mark.kind === 'spelling')
+			.map(({ mark, word }) => ({ mark, word }))
+	);
+
+	// Said last, so that what it lists is what will actually be offered.
+	for (const { mark, said, named } of built) {
+		mark.detail =
+			`${named}. ${said}` +
+			(mark.replacements.length > 0
+				? `\n\nSuggested: ${mark.replacements.slice(0, 4).join(', ')}`
+				: '');
+	}
+
+	return built.map((one) => one.mark);
 }
 
 /**
