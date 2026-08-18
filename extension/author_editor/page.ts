@@ -10,6 +10,8 @@ export const BODY = `	<header class="toolbar" id="toolbar">
 			data-tip="Run All — build every section that is built rather than written"><i class="codicon codicon-run-all"></i></button>
 		<button class="tool" id="spell" type="button"
 			data-tip="Spell Check — correct the prose of the selected section"><i class="codicon codicon-check-all"></i></button>
+		<button class="tool" id="check" type="button"
+			data-tip="Check Prose — underline grammar and repetition while you write"><i class="codicon codicon-checklist"></i></button>
 		<span class="divider"></span>
 		<button class="tool" id="import-markdown" type="button"
 			data-tip="Import Markdown — replace this document with an existing markdown manuscript"><i class="aicon aicon-import-markdown"></i></button>
@@ -61,4 +63,5 @@ export const BODY = `	<header class="toolbar" id="toolbar">
 		</div>
 	</header>
 	<main id="cells" class="cells"></main>
-	<div id="menu" class="menu" hidden></div>`;
+	<div id="menu" class="menu" hidden></div>
+	<div id="mark-tip" class="mark-tip" hidden></div>`;

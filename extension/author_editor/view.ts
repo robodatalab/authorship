@@ -47,9 +47,21 @@ import {
 	replacedAll,
 } from './find';
 import { edited, nextOccurrence } from './cursors';
+import {
+	blockAround,
+	changeBetween,
+	fencedMarks,
+	markOf,
+	markedProse,
+	moved,
+	placed,
+	spansIn,
+	withoutBlock,
+} from './marks';
 import type { CellField } from './model';
 import type { Cursor } from './cursors';
 import type { Match, Query } from './find';
+import type { Finding, Mark } from './marks';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -71,6 +83,8 @@ const withEl = document.getElementById('find-with') as HTMLInputElement;
 const countEl = document.getElementById('find-count') as HTMLElement;
 const replaceRowEl = document.getElementById('find-replace-row') as HTMLElement;
 const replaceToggleEl = document.getElementById('find-toggle') as HTMLElement;
+const checkEl = document.getElementById('check') as HTMLElement;
+const tipEl = document.getElementById('mark-tip') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -83,6 +97,34 @@ let editing: number | null = null;
 /** The cell the title-bar commands act on. */
 let selected = 0;
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * What the checks have found, where the page draws rather than where the file
+ * says.
+ *
+ * Not in the document, because a mark is what something thinks of the prose and
+ * not part of it — it is gone when the editor is, as an underline in a code file
+ * is. The host holds the same list, since this page can be rebuilt underneath
+ * the author at any moment.
+ */
+let faults: Mark[] = [];
+/** Whether this document is being checked at all. The host decides, and says. */
+let checking = false;
+/**
+ * Where the last keystroke landed, which is the paragraph the author is in.
+ *
+ * A cell settles on a timer rather than on a key, so by the time the marks in
+ * the paragraph have to be put out the keystroke that did it is gone.
+ */
+let changedAt = 0;
+/**
+ * The box open for typing, so its marks can be redrawn without the page being
+ * rebuilt around it.
+ */
+let openMarks: {
+	input: HTMLTextAreaElement;
+	layer: HTMLElement;
+	index: number;
+} | null = null;
 /**
  * The cell the server is writing, and how far through the story it has read.
  *
@@ -162,6 +204,10 @@ for (const [id, type] of [
 }
 
 document.getElementById('spell')!.addEventListener('click', answerSpellCheck);
+
+// Turning the checks on is the author saying they want to be told. Drafting is
+// the other half of writing, and nothing is checked until they ask.
+checkEl.addEventListener('click', () => vscode.postMessage({ type: 'checkToggle' }));
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -494,13 +540,29 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	const layer = document.createElement('div');
 	layer.className = 'source-cursors';
 	layer.setAttribute('aria-hidden', 'true');
+	// And where the marks are drawn, for the same reason and by the same means: a
+	// box can no more underline a word than it can hold a second caret. Beneath
+	// the cursors, so a place being typed into still reads over a marked word.
+	const marksLayer = document.createElement('div');
+	marksLayer.className = 'source-marks';
+	marksLayer.setAttribute('aria-hidden', 'true');
 
 	const input = document.createElement('textarea');
 	input.className = 'source';
 	input.value = cell.source;
 	input.rows = 1;
+	// What the box said before the keystroke, so that what the keystroke did can be
+	// read off it. The marks over an open box are moved here rather than waited
+	// for: the document is told 400ms later, and an underline that lagged the text
+	// by that much would be worse than none.
+	let was = cell.source;
 	input.addEventListener('input', () => {
 		autosize(input);
+		const change = changeBetween(was, input.value);
+		changedAt = change.at + change.inserted;
+		faults = moved(faults, index, change);
+		was = input.value;
+		drawMarks(input, marksLayer, index);
 		drawCursors(input, layer);
 		if (typingTimer !== undefined) {
 			clearTimeout(typingTimer);
@@ -560,9 +622,24 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	queueMicrotask(() => {
 		autosize(input);
 		input.focus({ preventScroll: true });
+		drawMarks(input, marksLayer, index);
 	});
+	openMarks = { input, layer: marksLayer, index };
 
-	box.append(layer, input);
+	// The box is on top and takes every event, and the layer under it is not there
+	// to be touched — so what the pointer is over is worked out from where the
+	// marks were drawn rather than from what it reached.
+	input.addEventListener('mousemove', (event) => {
+		const over = markAtPoint(marksLayer, event.clientX, event.clientY);
+		if (over) {
+			showTip(over.mark, over.at);
+		} else {
+			hideTip();
+		}
+	});
+	input.addEventListener('mouseleave', hideTip);
+
+	box.append(marksLayer, layer, input);
 	return box;
 }
 
@@ -571,12 +648,9 @@ function renderedFor(cell: Cell, index: number): HTMLElement {
 	rendered.className = 'rendered';
 	if (cell.source) {
 		rendered.innerHTML = withBase(
-			marked(
-				renderMarkdown(
-					fenced(cell.source, foundIn(index, null), found[current] ?? null)
-				)
-			)
+			markedProse(marked(renderMarkdown(fencedFor(cell, index))))
 		);
+		wireMarks(rendered);
 	} else {
 		rendered.classList.add('blank');
 		rendered.textContent = writing?.at === index
@@ -877,6 +951,8 @@ function closeEditing(): void {
 		return;
 	}
 	dropCursors();
+	hideTip();
+	openMarks = null;
 	generation += 1;
 	editing = null;
 	if (typingTimer !== undefined) {
@@ -895,6 +971,7 @@ function settle(index: number, source: string): void {
 		// out from under the caret.
 		drawn = signatureOf(next);
 		commit(next);
+		recheckBlock(index, source);
 	}
 }
 
@@ -1200,6 +1277,194 @@ function replaceEverywhere(): void {
 /** The matches in one of a cell's texts. */
 function foundIn(index: number, field: string | null): Match[] {
 	return found.filter((match) => match.cell === index && match.field === field);
+}
+
+// --- what the checks found ---
+
+/**
+ * A cell's text with both the marks over it and the matches in it fenced.
+ *
+ * Two fencings of one string, and each was measured on the string before either
+ * went in — so the marks go first and the matches are found again in what comes
+ * out. The fences are private-use characters no query can hold, so searching the
+ * fenced text finds the same matches where they have moved to rather than any
+ * others.
+ */
+function fencedFor(cell: Cell, index: number): string {
+	const withMarks = fencedMarks(cell.source, spansIn(faults, index));
+	const here = foundIn(index, null);
+	if (here.length === 0) {
+		return withMarks;
+	}
+	const again = matchesIn([{ ...cell, source: withMarks }], query).filter(
+		(match) => match.field === null
+	);
+	const at = here.indexOf(found[current]);
+	return fenced(withMarks, again, at >= 0 ? (again[at] ?? null) : null);
+}
+
+/** Give the marks in a rendered cell what they need to be stopped on. */
+function wireMarks(rendered: HTMLElement): void {
+	rendered.querySelectorAll('.prose-mark').forEach((element) => {
+		const mark = markOf(faults, Number(element.getAttribute('data-mark')));
+		if (!mark) {
+			return;
+		}
+		element.classList.add(`prose-mark-${mark.rule}`);
+		element.addEventListener('mouseenter', () =>
+			showTip(mark, element as HTMLElement)
+		);
+		element.addEventListener('mouseleave', hideTip);
+	});
+}
+
+/**
+ * Draw the marks on the layer under the box, which holds the same text in the
+ * same face.
+ *
+ * The same bargain the cursors strike, and for the same reason: a textarea can
+ * no more underline a word than it can hold a second caret, so the text is laid
+ * out again underneath and the lines are drawn on that.
+ */
+function drawMarks(
+	input: HTMLTextAreaElement,
+	layer: HTMLElement,
+	index: number
+): void {
+	layer.textContent = '';
+	const text = input.value;
+	const spans = spansIn(faults, index)
+		.filter((span) => span.at >= 0 && span.end <= text.length && span.end > span.at)
+		.sort((a, b) => a.at - b.at);
+
+	let read = 0;
+	for (const span of spans) {
+		// Two marks over the same words are one underline; the second is drawn
+		// nowhere rather than over the top of the first.
+		if (span.at < read) {
+			continue;
+		}
+		layer.append(document.createTextNode(text.slice(read, span.at)));
+		const mark = markOf(faults, span.id);
+		const line = document.createElement('span');
+		line.className = mark ? `prose-mark prose-mark-${mark.rule}` : 'prose-mark';
+		line.dataset.mark = String(span.id);
+		line.textContent = text.slice(span.at, span.end);
+		layer.append(line);
+		read = span.end;
+	}
+	layer.append(document.createTextNode(text.slice(read)));
+}
+
+/**
+ * The mark the pointer is over, worked out from where the marks were drawn.
+ *
+ * The box is on top and takes every event, and the layer beneath it is not there
+ * to be touched — so this asks the drawn spans where they are rather than asking
+ * the pointer what it reached. `getClientRects` and not `getBoundingClientRect`,
+ * because a mark that wrapped is two boxes and the gap between them is not part
+ * of it.
+ */
+function markAtPoint(
+	layer: HTMLElement,
+	x: number,
+	y: number
+): { mark: Mark; at: HTMLElement } | null {
+	const drawn = layer.querySelectorAll('.prose-mark');
+	for (let index = 0; index < drawn.length; index++) {
+		const element = drawn[index] as HTMLElement;
+		const boxes = element.getClientRects();
+		for (let box = 0; box < boxes.length; box++) {
+			const place = boxes[box];
+			if (x >= place.left && x <= place.right && y >= place.top && y <= place.bottom) {
+				const mark = markOf(faults, Number(element.getAttribute('data-mark')));
+				return mark ? { mark, at: element } : null;
+			}
+		}
+	}
+	return null;
+}
+
+/**
+ * What the mark says, where the author stopped on it.
+ *
+ * Two things and not one: what is wrong, which is what the underline would say
+ * if it could speak, and why, which is the whole reason a check is worth having
+ * over a squiggle. Room enough for the second is what makes it a box rather than
+ * a tooltip.
+ */
+function showTip(mark: Mark, at: HTMLElement): void {
+	tipEl.textContent = '';
+	const said = document.createElement('div');
+	said.className = 'mark-tip-said';
+	said.textContent = mark.message;
+	const why = document.createElement('div');
+	why.className = 'mark-tip-why';
+	why.textContent = mark.detail;
+	tipEl.append(said, why);
+	tipEl.hidden = false;
+
+	// Laid out before it is placed, or its width is nothing and it is put wherever
+	// nothing wide belongs.
+	const box = at.getBoundingClientRect();
+	const room = window.innerWidth - tipEl.offsetWidth - 8;
+	tipEl.style.left = `${Math.max(8, Math.min(box.left, room))}px`;
+	tipEl.style.top = `${box.bottom + 6}px`;
+}
+
+function hideTip(): void {
+	tipEl.hidden = true;
+}
+
+/**
+ * Redraw what the marks are drawn on, and nothing else.
+ *
+ * The page is rebuilt when it can be, and every cell but the open one when it
+ * cannot: rebuilding around a box being typed into takes the box with it.
+ */
+function repaintMarks(): void {
+	if (editing === null) {
+		render();
+		return;
+	}
+	cells.forEach((_, index) => {
+		if (index !== editing) {
+			redrawCell(index);
+		}
+	});
+	if (openMarks) {
+		drawMarks(openMarks.input, openMarks.layer, openMarks.index);
+	}
+}
+
+/**
+ * Put out what was said about the paragraph just written in, and ask about it
+ * again.
+ *
+ * Only that paragraph. A mark anywhere else is about prose the author has not
+ * touched and is still true, and taking the underlines off a document because
+ * one word in it changed is the flicker this whole design exists to avoid. What
+ * goes with it is whatever was paired with it — the far half of a repetition the
+ * author has just answered by rewriting this half.
+ */
+function recheckBlock(index: number, source: string): void {
+	if (!checking) {
+		return;
+	}
+	const block = blockAround(source, Math.min(changedAt, source.length));
+	faults = withoutBlock(faults, index, block);
+	if (openMarks && openMarks.index === index) {
+		drawMarks(openMarks.input, openMarks.layer, index);
+	}
+	// The server works in the file's lines, and the paragraph is a run of lines
+	// inside a cell that knows where it starts.
+	const where = sourceLinesOf(cells, index);
+	if (where) {
+		vscode.postMessage({
+			type: 'checkBlock',
+			where: { start: where.start + block.first, end: where.start + block.last },
+		});
+	}
 }
 
 /**
@@ -1681,6 +1946,29 @@ window.addEventListener('message', (event) => {
 		refind();
 		showCount();
 		render();
+	} else if (message?.type === 'checking') {
+		checking = message.on as boolean;
+		checkEl.classList.toggle('on', checking);
+		// Turned off, the marks go with it — the author has said they do not want to
+		// be told, and prose left underlined would be telling them anyway.
+		if (!checking) {
+			faults = [];
+			hideTip();
+			repaintMarks();
+		}
+	} else if (message?.type === 'marks') {
+		const arrived = placed(cells, message.findings as Finding[]);
+		// A pass over the whole document replaces what is there. A pass over one
+		// paragraph adds to it, since every other mark is about prose it never read
+		// — and its findings are numbered from nothing, so they are renumbered past
+		// the marks already standing.
+		if (message.whole) {
+			faults = arrived;
+		} else {
+			const next = faults.reduce((most, mark) => Math.max(most, mark.id + 1), 0);
+			faults = [...faults, ...arrived.map((mark) => ({ ...mark, id: mark.id + next }))];
+		}
+		repaintMarks();
 	}
 });
 

@@ -859,3 +859,88 @@ body {
 	color: var(--vscode-menu-selectionForeground, inherit);
 	background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
 }
+
+/* A tool that is a state rather than an action says which it is in, the way the
+   find widget's own options do. */
+.tool.on {
+	color: var(--vscode-inputOption-activeForeground, inherit);
+	background: var(--vscode-inputOption-activeBackground);
+	outline: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+}
+
+/* What a check found, under the words it found it in. A line and not a
+   highlight: the prose has to stay readable while it is being told about, which
+   is the whole difference between a check an author leaves on and one they turn
+   off. */
+.prose-mark {
+	text-decoration: underline wavy;
+	text-decoration-skip-ink: none;
+	text-underline-offset: 3px;
+	cursor: help;
+}
+
+.prose-mark-grammar {
+	text-decoration-color: var(--vscode-editorError-foreground, #f14c4c);
+}
+
+.prose-mark-repetition {
+	text-decoration-color: var(--vscode-editorInfo-foreground, #3794ff);
+}
+
+/* The marks drawn under the box, laid out exactly as the cursors are and for
+   exactly the same reason — everything here that could move a character has to
+   say what the box says. Under the cursor layer, so a place being typed into
+   still reads over a word that is marked. */
+.source-marks {
+	position: absolute;
+	inset: 0;
+	box-sizing: border-box;
+	padding: 6px 8px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	line-height: 1.5;
+	color: transparent;
+	border: 1px solid transparent;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	pointer-events: none;
+	user-select: none;
+}
+
+/* The text under the box is invisible, so the line has to be told its own
+   colour rather than taking it from what it is under. */
+.source-marks .prose-mark {
+	color: transparent;
+	cursor: text;
+}
+
+.cell[data-kind='note'] .source-marks {
+	font-style: italic;
+}
+
+/* What the mark says, which is the reason a check is worth more than a squiggle.
+   Wide enough for a sentence about the prose rather than a label on it, and
+   fixed to the viewport because the page it is over scrolls. */
+.mark-tip {
+	position: fixed;
+	z-index: 30;
+	max-width: 420px;
+	padding: 8px 10px;
+	color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+	background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+	border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, transparent));
+	border-radius: 3px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+	pointer-events: none;
+}
+
+.mark-tip-said {
+	font-weight: 600;
+}
+
+.mark-tip-why {
+	margin-top: 4px;
+	font-size: 0.95em;
+	line-height: 1.45;
+	color: var(--vscode-descriptionForeground);
+}

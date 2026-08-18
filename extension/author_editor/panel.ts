@@ -62,6 +62,16 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private readonly writing = new Map<string, Writing>();
 
+	/**
+	 * The documents being checked, for as long as this editor is open.
+	 *
+	 * Kept here and written nowhere. What a check found is what something thinks
+	 * of the prose rather than part of it, and an author drafting has said they do
+	 * not want to be told — neither belongs in a file that is the story. So it
+	 * lives for the session, the way an underline in a code file does.
+	 */
+	private readonly checking = new Set<string>();
+
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly port: number
@@ -152,6 +162,12 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'ready':
 					send();
 					this.resume(document, panel);
+					// A page rebuilt under the author — reloaded, or reopened — knows
+					// nothing about the checks it was showing a moment ago.
+					this.sayChecking(document, panel);
+					if (this.checking.has(document.uri.toString())) {
+						void this.check(document, panel, null, true);
+					}
 					break;
 				case 'cells':
 					void this.write(document, message.cells as Cell[]);
@@ -161,6 +177,12 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					break;
 				case 'spellCheck':
 					this.onActive((d) => this.spellCheck(d, message.where));
+					break;
+				case 'checkToggle':
+					this.toggleChecking(document, panel);
+					break;
+				case 'checkBlock':
+					void this.check(document, panel, message.where, false);
 					break;
 				case 'generate':
 					this.onActive((d) => this.generate(d, message.at as number));
@@ -222,6 +244,95 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			text
 		);
 		await vscode.workspace.applyEdit(edit);
+	}
+
+	/**
+	 * Turn the checks on this document on or off.
+	 *
+	 * On, the whole document is read once so the author sees where they stand.
+	 * Off, the page is told and drops what it was showing — a check nobody asked
+	 * for is an opinion nobody asked for, and drafting is when they least want it.
+	 */
+	private toggleChecking(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		const key = document.uri.toString();
+		if (this.checking.has(key)) {
+			this.checking.delete(key);
+			this.sayChecking(document, panel);
+			return;
+		}
+		this.checking.add(key);
+		this.sayChecking(document, panel);
+		void this.check(document, panel, null, true);
+	}
+
+	private sayChecking(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		void panel.webview.postMessage({
+			type: 'checking',
+			on: this.checking.has(document.uri.toString()),
+		});
+	}
+
+	/**
+	 * Read a passage and tell the page what is wrong with it.
+	 *
+	 * The text goes with the request rather than the path alone. Every other job
+	 * here writes the document and so needs it on disk first, but a check only
+	 * reads — and saving a manuscript because a paragraph was worth a second look
+	 * would be the editor writing files the author did not ask it to.
+	 *
+	 * `whole` says whether what comes back replaces the marks or joins them, which
+	 * is the difference between the pass that starts when the checks go on and the
+	 * one that follows a paragraph being written in.
+	 */
+	private async check(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		where: { start: number; end: number } | null,
+		whole: boolean
+	): Promise<void> {
+		if (!this.checking.has(document.uri.toString())) {
+			return;
+		}
+		try {
+			const started = await fetch(`http://127.0.0.1:${this.port}/check/prose`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					path: document.uri.fsPath,
+					text: document.getText(),
+					selection: where,
+				}),
+			});
+			if (!started.ok) {
+				throw new Error(await detailOf(started));
+			}
+			const { id } = (await started.json()) as { id: string };
+			const done = await this.awaitJob('/check/prose/status', id);
+			// A check the author typed over was stopped, and stopped early is not the
+			// same as found nothing — the pass that superseded it is the one to draw.
+			if (done.cancelled) {
+				return;
+			}
+			if (!this.checking.has(document.uri.toString())) {
+				return;
+			}
+			void panel.webview.postMessage({
+				type: 'marks',
+				findings: done.findings ?? [],
+				whole,
+			});
+		} catch (err: unknown) {
+			// Said in the status bar and nowhere else. A check is the editor's own
+			// idea, and a dialog over the manuscript because one failed would be the
+			// interruption the checks are meant not to be.
+			console.warn(`Authorship could not check the prose: ${describe(err)}`);
+		}
 	}
 
 	/**
@@ -668,6 +779,8 @@ interface JobStatus {
 	error: string | null;
 	blurb?: string;
 	progress?: { written: number; chapters: number };
+	cancelled?: boolean;
+	findings?: unknown[];
 }
 
 /**
