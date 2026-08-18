@@ -7,7 +7,7 @@ declared in a notebook or under `__main__`.
 
 from functools import partial
 
-from roost.resource_manager import ModelKind, ModelNotAvailable
+from vramen.resource_manager import ModelKind, ModelNotAvailable
 from transformers import AutoConfig
 
 from server import log
@@ -53,7 +53,7 @@ class CorefModel(ModelKind):
 
     def load(self):
         # Imported here rather than at the top of the file: `load` runs in the serving
-        # process, so the package is only wanted where the model itself is, and roost
+        # process, so the package is only wanted where the model itself is, and vramen
         # stays free of it.
         from fastcoref import LingMessCoref, modeling
         from fastcoref.coref_models.modeling_lingmess import LingMessModel

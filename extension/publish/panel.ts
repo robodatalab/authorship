@@ -39,6 +39,8 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.poll();
+            } else if (message?.type === "stopJob") {
+                void this.stopJob(message.path as string);
             }
         });
 
@@ -125,16 +127,24 @@ export class PublishView implements vscode.WebviewViewProvider {
                 signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
             });
             const body = (await response.json()) as {
-                jobs: { kind: string; path: string; status: string }[];
+                jobs: {
+                    kind: string;
+                    path: string;
+                    status: string;
+                    cancelled: boolean;
+                }[];
             };
             const jobs = body.jobs.map((job) => ({
                 kind: job.kind,
-                // Shown root-relative: the panel is narrow, and the end of the path
-                // is the part that names the file.
-                path: vscode.workspace.asRelativePath(
+                // The path the server keys the job by, which is what stopping one
+                // has to name. Shown root-relative beside it: the panel is narrow,
+                // and the end of a path is the part that says which file it is.
+                path: job.path,
+                name: vscode.workspace.asRelativePath(
                     vscode.Uri.file(job.path),
                 ),
                 status: job.status,
+                cancelled: job.cancelled,
             }));
             void this.view.webview.postMessage({ type: "jobs", jobs });
         } catch (err) {
@@ -142,6 +152,29 @@ export class PublishView implements vscode.WebviewViewProvider {
                 void this.view.webview.postMessage({ type: "jobs", jobs: null });
             }
         }
+    }
+
+    /**
+     * Ask the server to stop a job, and repaint the drawer on the click rather
+     * than at the next tick.
+     *
+     * A job that finished between the click and this is no failure — what was
+     * asked for is a job that is not running, and there is not one. Either way
+     * what the drawer then shows is what the server says now.
+     */
+    private async stopJob(path: string): Promise<void> {
+        try {
+            await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ path }),
+                signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+            });
+        } catch {
+            // A server that cannot be reached is already said so by the polling
+            // beside this; there is nothing here to tell the author twice.
+        }
+        await this.pollJobs();
     }
 
     private html(webview: vscode.Webview): string {

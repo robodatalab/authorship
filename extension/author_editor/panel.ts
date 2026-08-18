@@ -18,7 +18,22 @@ import { BODY } from './page';
 /** How often a running job is asked whether it has finished. */
 const JOB_POLL_MS = 400;
 
-/** Long enough for a model that has to load first, short enough to give up. */
+/**
+ * How many polls in a row may go unanswered before the wait is given up on.
+ *
+ * A job runs on the server and outlives any one question put to it, so a poll
+ * that fails is a poll, not a job — giving up on the first one abandons work
+ * that is still being done, in the one place the author cannot see it.
+ */
+const POLLS_UNANSWERED = 5;
+
+/**
+ * How long a job that cannot say how it is getting on is waited for.
+ *
+ * Long enough for a model that has to load first, short enough to give up. A job
+ * that reports its progress is never given up on — the author can watch it move
+ * and has a button to stop it, which is better than a clock nobody set.
+ */
 const JOB_TIMEOUT_MS = 180_000;
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
@@ -35,6 +50,16 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * arrive here knowing nothing about which document they were pressed over.
 	 */
 	private active?: { document: vscode.TextDocument; panel: vscode.WebviewPanel };
+
+	/**
+	 * The cell a blurb is being written into, per document, while it is written.
+	 *
+	 * The page is a view and can be rebuilt under the author — reloaded, reopened,
+	 * or simply asking again on start-up — so the one thing it shows that is not
+	 * in the document is held here and told to it again. A bar that lived only in
+	 * the page would vanish while the job it was drawing carried on.
+	 */
+	private readonly writing = new Map<string, Writing>();
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
@@ -125,6 +150,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			switch (message?.type) {
 				case 'ready':
 					send();
+					this.resume(document, panel);
 					break;
 				case 'cells':
 					void this.write(document, message.cells as Cell[]);
@@ -137,6 +163,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					break;
 				case 'generate':
 					this.onActive((d) => this.generate(d, message.at as number));
+					break;
+				case 'stop':
+					this.onActive((d) => this.stop(d));
 					break;
 				case 'exportEpub':
 					void this.exportEpub(document);
@@ -263,51 +292,186 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// It is written from the story, so what is on screen has to be on disk.
 			await document.save();
 		}
-		const blurb = await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: `Writing the blurb for ${basename(document.uri)}…`,
-			},
-			async () => {
-				const started = await fetch(
-					`http://127.0.0.1:${this.port}/generate/blurb`,
-					{
-						method: 'POST',
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({ path: document.uri.fsPath }),
-					}
-				);
-				if (!started.ok) {
-					throw new Error(await detailOf(started));
-				}
-				const { id } = (await started.json()) as { id: string };
-				const done = await this.awaitJob('/generate/blurb/status', id);
-				return done.blurb ?? '';
-			}
-		);
-
-		const cells = parse(document.getText());
-		if (!cells[at] || !blurb) {
-			return;
+		const started = await fetch(`http://127.0.0.1:${this.port}/generate/blurb`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path: document.uri.fsPath }),
+		});
+		if (!started.ok) {
+			throw new Error(await detailOf(started));
 		}
-		cells[at] = { ...cells[at], source: blurb };
-		await this.write(document, cells);
+		// The panel is held rather than looked up as it goes: the author is free to
+		// click into another editor while the model writes, and the cell waiting for
+		// the blurb is in this one whether or not it is still the active panel.
+		await this.watch(document, at, this.active?.panel);
 	}
 
-	/** Wait for a job to finish, or for it to have gone wrong, and hand back what it says. */
-	private async awaitJob(status: string, id: string): Promise<JobStatus> {
-		const deadline = Date.now() + JOB_TIMEOUT_MS;
+	/**
+	 * Follow the blurb being written for a document until it lands in its cell.
+	 *
+	 * Apart from starting the job this is the whole of writing a blurb, which is
+	 * why it is not part of starting one: a job outlives the click that began it,
+	 * and an editor that comes back to a document being written has to be able to
+	 * pick the job up rather than start a second.
+	 */
+	private async watch(
+		document: vscode.TextDocument,
+		at: number,
+		panel: vscode.WebviewPanel | undefined
+	): Promise<void> {
+		const key = document.uri.toString();
+		const tell = (message: unknown): void => void panel?.webview.postMessage(message);
+		const reached = (written: number, chapters: number): void => {
+			this.writing.set(key, { at, written, chapters });
+			tell({ type: 'writing', at, written, chapters });
+		};
+
+		reached(0, 0);
+		try {
+			const blurb = await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Writing the blurb for ${basename(document.uri)}…`,
+				},
+				async (report) => {
+					// VS Code is told what has happened since the last poll rather
+					// than how far along the job is, so the share already shown is
+					// kept here to subtract. The cell is told the count itself.
+					let shown = 0;
+					const done = await this.awaitJob(
+						'/generate/blurb/status',
+						document.uri.fsPath,
+						(written, chapters) => {
+							const share = (100 * written) / chapters;
+							report.report({
+								increment: share - shown,
+								message: `chapter ${Math.min(written + 1, chapters)} of ${chapters}`,
+							});
+							shown = share;
+							reached(written, chapters);
+						}
+					);
+					return done.blurb ?? '';
+				}
+			);
+
+			const cells = parse(document.getText());
+			// A cancelled job hands back nothing rather than a blurb for half the
+			// book, and nothing is not what to put in the author's cell.
+			if (!cells[at] || !blurb) {
+				return;
+			}
+			cells[at] = { ...cells[at], source: blurb };
+			await this.write(document, cells);
+		} finally {
+			this.writing.delete(key);
+			tell({ type: 'writing', at: null });
+		}
+	}
+
+	/**
+	 * Tell a page that has just come up what is being written into it.
+	 *
+	 * Twice over, because there are two ways to arrive at a document with a job
+	 * already running on it. The page may have been rebuilt under a wait this
+	 * editor is still holding — then what it needs is only to be told again. Or
+	 * the editor itself is new to a job the server never stopped doing, in which
+	 * case nobody is waiting for the blurb and it would be written to nobody.
+	 */
+	private resume(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		const held = this.writing.get(document.uri.toString());
+		if (held) {
+			void panel.webview.postMessage({ type: 'writing', ...held });
+			return;
+		}
+		void this.reattach(document, panel).catch(() => {
+			// A document with no job on it is the usual answer, and no news.
+		});
+	}
+
+	private async reattach(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): Promise<void> {
+		const response = await fetch(
+			`http://127.0.0.1:${this.port}/generate/blurb/status?id=${encodeURIComponent(document.uri.fsPath)}`
+		);
+		if (!response.ok) {
+			return;
+		}
+		const body = (await response.json()) as JobStatus;
+		if (!body.running) {
+			return;
+		}
+		// Which cell it is going into is not the server's to know — it writes the
+		// blurb and the editor places it — but a document has one blurb cell, and
+		// that is the one that asked.
+		const at = parse(document.getText()).findIndex((cell) => cell.kind === 'blurb');
+		if (at >= 0) {
+			await this.watch(document, at, panel);
+		}
+	}
+
+	/** Ask the server to stop whatever it is writing for this document. */
+	private async stop(document: vscode.TextDocument): Promise<void> {
+		const response = await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path: document.uri.fsPath }),
+		});
+		// A job that finished between the click and this is no failure — what the
+		// author asked for is a job that is not running, and there is not one.
+		if (!response.ok && response.status !== 404) {
+			throw new Error(await detailOf(response));
+		}
+	}
+
+	/**
+	 * Wait for a job to finish, or for it to have gone wrong, and hand back what
+	 * it says.
+	 *
+	 * A job that counts what it has done says so on every poll, and what that is
+	 * drawn as belongs to whoever asked — a notification wants the change since
+	 * last time, a cell wants the count. This one only passes on what it heard.
+	 */
+	private async awaitJob(
+		status: string,
+		id: string,
+		progress?: (written: number, chapters: number) => void
+	): Promise<JobStatus> {
+		const deadline = progress ? Infinity : Date.now() + JOB_TIMEOUT_MS;
+		let unanswered = 0;
 		while (Date.now() < deadline) {
 			await new Promise((wake) => setTimeout(wake, JOB_POLL_MS));
-			const response = await fetch(
-				`http://127.0.0.1:${this.port}${status}?id=${encodeURIComponent(id)}`
-			);
+			let response: Response;
+			try {
+				response = await fetch(
+					`http://127.0.0.1:${this.port}${status}?id=${encodeURIComponent(id)}`
+				);
+			} catch (err: unknown) {
+				// The job is on the server and does not stop being done because one
+				// question about it went astray; only a run of them means nobody is
+				// there to answer.
+				if ((unanswered += 1) > POLLS_UNANSWERED) {
+					throw err;
+				}
+				continue;
+			}
 			if (!response.ok) {
 				throw new Error(await detailOf(response));
 			}
+			unanswered = 0;
 			const body = (await response.json()) as JobStatus;
 			if (body.error) {
 				throw new Error(body.error);
+			}
+			const { written = 0, chapters = 0 } = body.progress ?? {};
+			// Nothing to be a fraction of until the document has been read.
+			if (progress && chapters) {
+				progress(written, chapters);
 			}
 			if (!body.running) {
 				return body;
@@ -486,16 +650,25 @@ interface Markdown {
 	uri: vscode.Uri;
 }
 
+/** A cell being written, and how far into the story the writing has read. */
+interface Writing {
+	at: number;
+	written: number;
+	chapters: number;
+}
+
 /**
  * What a job's status endpoint answers, whichever job it is.
  *
  * A grammar pass leaves its result in the file and has nothing to hand back; a
- * blurb is handed back for the editor to place. Both are polled the same way.
+ * blurb is handed back for the editor to place. Both are polled the same way,
+ * and a job divided into pieces says how many of them it has finished.
  */
 interface JobStatus {
 	running: boolean;
 	error: string | null;
 	blurb?: string;
+	progress?: { written: number; chapters: number };
 }
 
 /**

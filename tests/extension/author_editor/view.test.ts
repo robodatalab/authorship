@@ -41,6 +41,15 @@ function send(cells: Cell[]): void {
 	);
 }
 
+/** What the host sends while the server writes a cell, and when it stops. */
+function writes(at: number | null, written = 0, chapters = 0): void {
+	window.dispatchEvent(
+		new MessageEvent('message', {
+			data: { type: 'writing', at, written, chapters },
+		})
+	);
+}
+
 function shown(): Element[] {
 	return [...document.querySelectorAll('.cell')];
 }
@@ -439,5 +448,156 @@ describe('the menus', () => {
 			(item) => item.textContent
 		);
 		expect(listed).toContain('Blurb');
+	});
+});
+
+describe('a cell the server is writing', () => {
+	// The author's half of a job that runs for minutes: they can see it moving,
+	// they can stop it, and they cannot type into what is about to be replaced.
+
+	it('turns the run button into the button that stops it', async () => {
+		await mount([blurb('An older draft.')]);
+		writes(0);
+		expect(shown()[0].querySelector('.run .codicon-primitive-square')).not.toBeNull();
+		expect(shown()[0].querySelector('.run .codicon-play')).toBeNull();
+		expect(shown()[0].querySelector<HTMLElement>('.run')!.dataset.tip).toBe(
+			'Stop writing this blurb'
+		);
+	});
+
+	it('stops the job rather than starting a second one', async () => {
+		await mount([blurb()]);
+		writes(0);
+		shown()[0].querySelector<HTMLElement>('.run')!.click();
+		expect(posted.at(-1)).toEqual({ type: 'stop', at: 0 });
+		expect(posted.filter((m) => m.type === 'generate')).toHaveLength(0);
+	});
+
+	it('draws how far through the story it has read', async () => {
+		await mount([blurb()]);
+		writes(0, 3, 14);
+		const fill = shown()[0].querySelector<HTMLElement>('.writing-fill')!;
+		expect(Math.round(parseFloat(fill.style.width))).toBe(21);
+		expect(shown()[0].querySelector('.writing-said')!.textContent).toBe(
+			'Writing — chapter 4 of 14'
+		);
+	});
+
+	it('says only that it is writing until it knows how long the book is', async () => {
+		// The document is read before the first chapter goes to the model, and
+		// nothing is a fraction of nothing.
+		await mount([blurb()]);
+		writes(0, 0, 0);
+		expect(shown()[0].querySelector<HTMLElement>('.writing-fill')!.style.width).toBe(
+			'0%'
+		);
+		expect(shown()[0].querySelector('.writing-said')!.textContent).toBe('Writing…');
+	});
+
+	it('does not name a chapter after the last one', async () => {
+		await mount([blurb()]);
+		writes(0, 14, 14);
+		expect(shown()[0].querySelector('.writing-said')!.textContent).toBe(
+			'Writing — chapter 14 of 14'
+		);
+	});
+
+	it('refuses to open the cell for typing', async () => {
+		await mount([blurb('An older draft.')]);
+		writes(0, 1, 14);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('refuses the keyboard way in as well', async () => {
+		await mount([blurb('An older draft.')]);
+		shown()[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+		writes(0, 1, 14);
+		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('takes the cell back off the author if they were already typing in it', async () => {
+		// What they have typed is about to be written over; leaving the box open
+		// would let its blur put it back on top of the blurb.
+		await mount([blurb('An older draft.')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).not.toBeNull();
+		writes(0, 1, 14);
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('does not write back what was in the box when it was taken away', async () => {
+		await mount([blurb('An older draft.')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const box = shown()[0].querySelector('textarea')!;
+		box.value = 'half a sentence the author was';
+		writes(0, 1, 14);
+		box.dispatchEvent(new Event('blur'));
+		expect(lastCells()).toEqual([]);
+	});
+
+	it('offers Stop in the menu in place of Write', async () => {
+		await mount([blurb()]);
+		writes(0, 1, 14);
+		shown()[0].dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+		const listed = [...document.querySelectorAll('#menu .menu-item')].map(
+			(item) => item.textContent
+		);
+		expect(listed).toContain('Stop');
+		expect(listed).not.toContain('Write');
+	});
+
+	it('leaves every other cell alone', async () => {
+		await mount([markdown('a'), blurb()]);
+		writes(1, 1, 14);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).not.toBeNull();
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+	});
+
+	it('gives the cell back when the writing stops', async () => {
+		// Stopping is the same news as finishing: the job is not running, and the
+		// cell is the author's again.
+		await mount([blurb('An older draft.')]);
+		writes(0, 4, 14);
+		writes(null);
+		expect(shown()[0].querySelector('.run .codicon-play')).not.toBeNull();
+		expect(shown()[0].querySelector('.run .codicon-primitive-square')).toBeNull();
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).not.toBeNull();
+	});
+
+	it('takes the bar and the stop button with it when the job moves on', async () => {
+		await mount([blurb('One.'), blurb('Two.')]);
+		writes(0, 1, 14);
+		writes(1, 1, 9);
+		expect(shown()[0].querySelector('.run .codicon-play')).not.toBeNull();
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		expect(shown()[1].querySelector('.run .codicon-primitive-square')).not.toBeNull();
+		expect(shown()[1].querySelector('.writing')).not.toBeNull();
+	});
+
+	it('keeps the cell locked while the document changes underneath it', async () => {
+		// A blurb job saves the file first, so the document comes back mid-write.
+		await mount([blurb('An older draft.')]);
+		writes(0, 2, 14);
+		send([blurb('An older draft.'), markdown('a')]);
+		expect(shown()[0].querySelector('.run .codicon-primitive-square')).not.toBeNull();
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).toBeNull();
 	});
 });

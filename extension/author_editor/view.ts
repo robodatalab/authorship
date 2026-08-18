@@ -59,6 +59,21 @@ let editing: number | null = null;
 let selected = 0;
 let typingTimer: ReturnType<typeof setTimeout> | undefined;
 /**
+ * The cell the server is writing, and how far through the story it has read.
+ *
+ * The host says when it starts, how far it has got, and when it stops. Nothing
+ * here starts it or times it out — a view that decided for itself when a job was
+ * over would show a cell as finished while the model was still writing it.
+ */
+let writing: Writing | null = null;
+
+interface Writing {
+	at: number;
+	written: number;
+	chapters: number;
+}
+
+/**
  * What is on the page right now.
  *
  * The document comes back after every edit, and this is how the view tells an
@@ -173,6 +188,9 @@ function cellElement(cell: Cell, index: number): HTMLElement {
 	if (editing === index) {
 		row.classList.add('editing');
 	}
+	if (writing?.at === index) {
+		row.classList.add('writing');
+	}
 	row.addEventListener('mousedown', () => select(index));
 	row.addEventListener('contextmenu', (event) => {
 		event.preventDefault();
@@ -217,18 +235,28 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	}
 
 	const named = labelOf(cell.kind).toLowerCase();
+	// A cell being written is stopped by the same button that started it, as a
+	// notebook stops a running cell: the button says what the cell is doing, and
+	// pressing it asks for the other thing.
+	const running = writing?.at === index;
 	const run = document.createElement('button');
 	run.type = 'button';
-	run.className = 'run';
-	run.dataset.tip = built
-		? `Build this ${named} from the document`
-		: `Write this ${named} from the story`;
+	run.className = running ? 'run running' : 'run';
+	run.dataset.tip = running
+		? `Stop writing this ${named}`
+		: built
+			? `Build this ${named} from the document`
+			: `Write this ${named} from the story`;
 	const glyph = document.createElement('i');
-	glyph.className = 'codicon codicon-play';
+	glyph.className = running
+		? 'codicon codicon-primitive-square'
+		: 'codicon codicon-play';
 	run.append(glyph);
 	run.addEventListener('click', (event) => {
 		event.stopPropagation();
-		if (built) {
+		if (running) {
+			vscode.postMessage({ type: 'stop', at: index });
+		} else if (built) {
 			commit(runCell(cells, index));
 		} else {
 			vscode.postMessage({ type: 'generate', at: index });
@@ -269,6 +297,12 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	const fields = fieldsOf(cell.kind);
 	if (fields.length > 0) {
 		body.append(fieldsFor(cell, index, fields));
+	}
+
+	// Above what is being replaced, because that is where the author is looking
+	// while they wait for it — not at a notification behind the editor.
+	if (writing?.at === index) {
+		body.append(writingBarFor(writing));
 	}
 
 	// A chapter is its title and nothing else — there is no prose in it to show,
@@ -392,15 +426,49 @@ function renderedFor(cell: Cell, index: number): HTMLElement {
 		rendered.innerHTML = withBase(renderMarkdown(cell.source));
 	} else {
 		rendered.classList.add('blank');
-		rendered.textContent = isAutomated(cell.kind)
-			? 'Empty — run this section to build it.'
-			: 'Empty — double-click to write.';
+		rendered.textContent = writing?.at === index
+			? 'Being written from the story…'
+			: isAutomated(cell.kind)
+				? 'Empty — run this section to build it.'
+				: 'Empty — double-click to write.';
 	}
 	// Clicking selects; opening a cell is a double-click, as it is in a notebook.
 	// One gesture that sometimes opened a cell and sometimes did not was the
 	// whole trouble — where in the cell you happened to land decided it.
 	rendered.addEventListener('dblclick', () => beginEditing(index));
 	return rendered;
+}
+
+/**
+ * How far the server has got with the cell it is writing.
+ *
+ * The story is read a chapter at a time, so the bar is chapters — the one
+ * division the work actually has. Until the document has been read there is no
+ * fraction to draw, and an empty track says waiting rather than none of none.
+ */
+function writingBarFor(progress: Writing): HTMLElement {
+	const holder = document.createElement('div');
+	holder.className = 'writing';
+
+	const track = document.createElement('div');
+	track.className = 'writing-track';
+	const fill = document.createElement('div');
+	fill.className = 'writing-fill';
+	fill.style.width = progress.chapters
+		? `${(100 * progress.written) / progress.chapters}%`
+		: '0%';
+	track.append(fill);
+
+	const said = document.createElement('span');
+	said.className = 'writing-said';
+	// The bar is what is finished; the words are what is being worked on, which
+	// is the chapter after the last one done — until there is none after it.
+	said.textContent = progress.chapters
+		? `Writing — chapter ${Math.min(progress.written + 1, progress.chapters)} of ${progress.chapters}`
+		: 'Writing…';
+
+	holder.append(track, said);
+	return holder;
 }
 
 /** What the cell is, in its bottom corner, the way a notebook names its language. */
@@ -503,6 +571,11 @@ function beginEditing(index: number): void {
 	if (!cell || isAutomated(cell.kind) || !hasProse(cell.kind)) {
 		return;
 	}
+	// Neither is one the server is writing, until it has finished: what is typed
+	// into it now is either lost under what comes back or written over it.
+	if (writing?.at === index) {
+		return;
+	}
 	const was = editing;
 	editing = index;
 	selected = index;
@@ -510,6 +583,25 @@ function beginEditing(index: number): void {
 		redrawCell(was);
 	}
 	redrawCell(index);
+}
+
+/**
+ * Shut whatever cell is open for typing, and cut its box loose.
+ *
+ * The textarea's own handlers are still attached to a cell that is about to say
+ * something else, and letting their blur write back would put the author's
+ * abandoned text over whatever arrived.
+ */
+function closeEditing(): void {
+	if (editing === null) {
+		return;
+	}
+	generation += 1;
+	editing = null;
+	if (typingTimer !== undefined) {
+		clearTimeout(typingTimer);
+		typingTimer = undefined;
+	}
 }
 
 /** Write what has been typed without closing the cell. */
@@ -601,7 +693,11 @@ function openCellMenu(x: number, y: number, index: number): void {
 		menuEl.append(menuItem('Run', () => commit(runCell(cells, index))));
 	} else if (isGenerated(kind)) {
 		menuEl.append(
-			menuItem('Write', () => vscode.postMessage({ type: 'generate', at: index }))
+			writing?.at === index
+				? menuItem('Stop', () => vscode.postMessage({ type: 'stop', at: index }))
+				: menuItem('Write', () =>
+						vscode.postMessage({ type: 'generate', at: index })
+					)
 		);
 	}
 	menuEl.append(
@@ -671,6 +767,30 @@ window.addEventListener('message', (event) => {
 	const message = event.data;
 	if (message?.type === 'askSpellCheck') {
 		answerSpellCheck();
+	} else if (message?.type === 'writing') {
+		const was = writing?.at ?? null;
+		writing =
+			message.at === null
+				? null
+				: {
+						at: message.at as number,
+						written: (message.written as number) ?? 0,
+						chapters: (message.chapters as number) ?? 0,
+					};
+		// A cell open for typing when the server starts writing it is taken away
+		// from the author, box and all — leaving it open would be inviting them
+		// to write something the blurb is about to land on top of.
+		if (writing !== null && editing === writing.at) {
+			closeEditing();
+		}
+		// The cell that has stopped has its run button to get back, and it is not
+		// always the cell that has started.
+		if (was !== null && was !== writing?.at) {
+			redrawCell(was);
+		}
+		if (writing) {
+			redrawCell(writing.at);
+		}
 	} else if (message?.type === 'cells') {
 		const incoming = withDefaultCell(message.cells as Cell[]);
 		base = String(message.base ?? '');
@@ -685,14 +805,7 @@ window.addEventListener('message', (event) => {
 		// the old text would write it back the moment the author clicked away.
 		cells = incoming;
 		selected = Math.min(selected, Math.max(0, cells.length - 1));
-		if (editing !== null) {
-			generation += 1;
-			editing = null;
-			if (typingTimer !== undefined) {
-				clearTimeout(typingTimer);
-				typingTimer = undefined;
-			}
-		}
+		closeEditing();
 		render();
 	}
 });
