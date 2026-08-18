@@ -38,7 +38,18 @@ import {
 	sourceLinesOf,
 	splitAt,
 } from './model';
+import {
+	fenced,
+	isUnderstood,
+	marked,
+	matchesIn,
+	replaced,
+	replacedAll,
+} from './find';
+import { edited, nextOccurrence } from './cursors';
 import type { CellField } from './model';
+import type { Cursor } from './cursors';
+import type { Match, Query } from './find';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -53,6 +64,13 @@ const menuEl = document.getElementById('menu') as HTMLElement;
 const toolbarEl = document.getElementById('toolbar') as HTMLElement;
 const statusEl = document.getElementById('doc-status') as HTMLElement;
 const whereEl = document.getElementById('doc-where') as HTMLElement;
+const findEl = document.getElementById('find') as HTMLElement;
+const findBoxEl = document.getElementById('find-box') as HTMLElement;
+const whatEl = document.getElementById('find-what') as HTMLInputElement;
+const withEl = document.getElementById('find-with') as HTMLInputElement;
+const countEl = document.getElementById('find-count') as HTMLElement;
+const replaceRowEl = document.getElementById('find-replace-row') as HTMLElement;
+const replaceToggleEl = document.getElementById('find-toggle') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -121,6 +139,11 @@ function signatureOf(list: Cell[]): string {
 function commit(next: Cell[]): void {
 	cells = next;
 	vscode.postMessage({ type: 'cells', cells });
+	// What was found is found in the document, so it is asked again whenever the
+	// document says something else. The marks themselves are left to whoever
+	// redraws — a cell repainted here would be a cell repainted mid-keystroke.
+	refind();
+	showCount();
 }
 
 // --- the toolbar ---
@@ -178,6 +201,7 @@ function render(): void {
 	showWhere();
 	drawn = signatureOf(cells);
 	seamAt = null;
+	noteMarks();
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
 }
@@ -421,6 +445,16 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 		// a good value looks like instead of repeating the name.
 		input.placeholder =
 			field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
+		// A box cannot hold a mark around part of what it says, so a field with a
+		// match in it is lit whole.
+		const hits = foundIn(index, field.name);
+		if (hits.length > 0) {
+			input.classList.add('find-field');
+			const here = found[current];
+			if (here && hits.includes(here)) {
+				input.classList.add('current');
+			}
+		}
 		input.addEventListener('change', () => {
 			const next = [...cells];
 			const attrs = { ...cell.attrs, [field.name]: input.value };
@@ -452,12 +486,22 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	// The document this box was opened against. If it moves on, nothing typed in
 	// here may be written back over what replaced it.
 	const opened = generation;
+	const box = document.createElement('div');
+	box.className = 'source-box';
+	// Where the cursors Ctrl+D has taken are drawn, since a box can show only the
+	// one caret it has. It lies under the box holding the same text in the same
+	// face, so a place drawn on it is the place the box has it.
+	const layer = document.createElement('div');
+	layer.className = 'source-cursors';
+	layer.setAttribute('aria-hidden', 'true');
+
 	const input = document.createElement('textarea');
 	input.className = 'source';
 	input.value = cell.source;
 	input.rows = 1;
 	input.addEventListener('input', () => {
 		autosize(input);
+		drawCursors(input, layer);
 		if (typingTimer !== undefined) {
 			clearTimeout(typingTimer);
 		}
@@ -467,7 +511,34 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 			}
 		}, TYPING_DEBOUNCE_MS);
 	});
+	// A box cannot be typed into in two places at once, so the keystroke is taken
+	// off it and put in by hand.
+	input.addEventListener('beforeinput', (event) =>
+		typeEverywhere(event, input, layer)
+	);
 	input.addEventListener('keydown', (event) => {
+		if (isCursorKey(event)) {
+			event.preventDefault();
+			addCursor(input, layer);
+			return;
+		}
+		// Escape gives up the other cursors before it gives up the cell.
+		if (event.key === 'Escape' && cursors.length > 1) {
+			event.preventDefault();
+			dropCursors(layer);
+			return;
+		}
+		// A step left or right is taken by every cursor at once. Anything else that
+		// goes somewhere — a line, a word, a selection reached for with shift — is
+		// going to one place, and gives the others up.
+		if (cursors.length > 1 && isStepKey(event)) {
+			event.preventDefault();
+			moveCursors(input, layer, event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
+		if (MOVES.has(event.key)) {
+			dropCursors(layer);
+		}
 		// Accept the cell the way a notebook accepts one, and leave Enter to do
 		// what Enter does in prose.
 		if (event.key === 'Escape' || (event.key === 'Enter' && event.shiftKey)) {
@@ -477,6 +548,8 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 			}
 		}
 	});
+	// Clicking is choosing one place to type in.
+	input.addEventListener('mousedown', () => dropCursors(layer));
 	input.addEventListener('blur', () => {
 		if (opened === generation) {
 			accept(index, input.value);
@@ -488,14 +561,22 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 		autosize(input);
 		input.focus({ preventScroll: true });
 	});
-	return input;
+
+	box.append(layer, input);
+	return box;
 }
 
 function renderedFor(cell: Cell, index: number): HTMLElement {
 	const rendered = document.createElement('div');
 	rendered.className = 'rendered';
 	if (cell.source) {
-		rendered.innerHTML = withBase(renderMarkdown(cell.source));
+		rendered.innerHTML = withBase(
+			marked(
+				renderMarkdown(
+					fenced(cell.source, foundIn(index, null), found[current] ?? null)
+				)
+			)
+		);
 	} else {
 		rendered.classList.add('blank');
 		rendered.textContent = writing?.at === index
@@ -774,6 +855,7 @@ function beginEditing(index: number): void {
 	if (writing?.at === index) {
 		return;
 	}
+	dropCursors();
 	const was = editing;
 	editing = index;
 	selected = index;
@@ -794,6 +876,7 @@ function closeEditing(): void {
 	if (editing === null) {
 		return;
 	}
+	dropCursors();
 	generation += 1;
 	editing = null;
 	if (typingTimer !== undefined) {
@@ -816,6 +899,7 @@ function settle(index: number, source: string): void {
 }
 
 function accept(index: number, source: string): void {
+	dropCursors();
 	if (typingTimer !== undefined) {
 		clearTimeout(typingTimer);
 		typingTimer = undefined;
@@ -863,6 +947,561 @@ function iconButton(
 		onClick(event);
 	});
 	return button;
+}
+
+// --- find and replace ---
+
+/**
+ * What is being looked for, and where it is.
+ *
+ * The query outlives the widget being shut, as it does in the editor next door —
+ * an author who closes the box and opens it again is looking for the same thing.
+ * `found` is the whole document's worth of matches in reading order, and
+ * `current` is the one the author is standing on.
+ */
+let query: Query = { text: '', matchCase: false, wholeWord: false, regex: false };
+let found: Match[] = [];
+let current = -1;
+let searching = false;
+
+/**
+ * The cells drawn with marks on them.
+ *
+ * Kept so that a cell which has just lost its last match is redrawn too — the
+ * marks are in the HTML of the cell, and nothing else would take them off.
+ */
+let marks = new Set<number>();
+let markedCell: number | null = null;
+
+for (const [id, act] of [
+	['find-next', () => step(1)],
+	['find-previous', () => step(-1)],
+	['find-close', closeFind],
+	['find-toggle', () => showReplace(replaceRowEl.hidden === true)],
+	['find-replace', replaceCurrent],
+	['find-replace-all', replaceEverywhere],
+] as const) {
+	document.getElementById(id)!.addEventListener('click', act);
+}
+
+for (const [id, turned] of [
+	['find-case', () => ({ ...query, matchCase: !query.matchCase })],
+	['find-word', () => ({ ...query, wholeWord: !query.wholeWord })],
+	['find-regex', () => ({ ...query, regex: !query.regex })],
+] as const) {
+	document.getElementById(id)!.addEventListener('click', () => {
+		query = turned();
+		research();
+	});
+}
+
+whatEl.addEventListener('input', () => {
+	query = { ...query, text: whatEl.value };
+	research();
+});
+
+whatEl.addEventListener('keydown', (event) => {
+	if (event.key === 'Enter') {
+		event.preventDefault();
+		step(event.shiftKey ? -1 : 1);
+	}
+});
+
+withEl.addEventListener('keydown', (event) => {
+	if (event.key === 'Enter') {
+		event.preventDefault();
+		if (event.ctrlKey || event.metaKey || event.altKey) {
+			replaceEverywhere();
+		} else {
+			replaceCurrent();
+		}
+	}
+});
+
+/**
+ * Open the widget on whatever is selected.
+ *
+ * Taking the focus is also what settles a cell that was open for typing: the box
+ * writes itself back as it loses focus, so what is searched is the document and
+ * not a page that is still ahead of it.
+ */
+function openFind(replace: boolean): void {
+	const seed = selectedText();
+	if (seed) {
+		query = { ...query, text: seed };
+		whatEl.value = seed;
+	}
+	searching = true;
+	findEl.hidden = false;
+	if (replace) {
+		showReplace(true);
+	}
+	research();
+	whatEl.focus();
+	whatEl.select();
+}
+
+function closeFind(): void {
+	searching = false;
+	findEl.hidden = true;
+	refind();
+	repaint(true);
+}
+
+function showReplace(on: boolean): void {
+	replaceRowEl.hidden = !on;
+	(replaceToggleEl.firstElementChild as HTMLElement).className =
+		`codicon codicon-chevron-${on ? 'down' : 'right'}`;
+}
+
+/** Ask the document again, and show the answer from the top of it. */
+function research(): void {
+	current = -1;
+	refind();
+	showCount();
+	repaint(true);
+	reveal();
+}
+
+/**
+ * Ask the document what it holds now, keeping the author where they were.
+ *
+ * Where they were is a place in the document rather than a number: an edit
+ * anywhere above them would otherwise renumber the matches under their feet and
+ * send them back to a chapter they had finished with.
+ */
+function refind(): void {
+	const was = found[current] ?? null;
+	found = searching ? matchesIn(cells, query) : [];
+	current = was ? nextFrom(was) : found.length > 0 ? 0 : -1;
+}
+
+/** The first match at or after a place, wrapping to the top when there is none. */
+function nextFrom(place: Match): number {
+	const at = found.findIndex(
+		(match) =>
+			match.cell > place.cell || (match.cell === place.cell && match.at >= place.at)
+	);
+	return at >= 0 ? at : found.length > 0 ? 0 : -1;
+}
+
+function step(by: number): void {
+	if (found.length === 0) {
+		return;
+	}
+	current = (current + by + found.length) % found.length;
+	showCount();
+	repaint(false);
+	reveal();
+}
+
+function showCount(): void {
+	if (!searching) {
+		return;
+	}
+	countEl.textContent = !query.text
+		? ''
+		: found.length === 0
+			? 'No results'
+			: `${current + 1} of ${found.length}`;
+	// An unfinished regular expression is not an error to report; the box says so
+	// and the document is left alone until it means something.
+	findBoxEl.classList.toggle('invalid', !isUnderstood(query));
+	for (const [id, on] of [
+		['find-case', query.matchCase],
+		['find-word', query.wholeWord],
+		['find-regex', query.regex],
+	] as const) {
+		document.getElementById(id)!.classList.toggle('on', on);
+	}
+	for (const id of ['find-previous', 'find-next', 'find-replace', 'find-replace-all']) {
+		(document.getElementById(id) as HTMLButtonElement).disabled = found.length === 0;
+	}
+}
+
+/**
+ * Redraw the cells whose marks have changed.
+ *
+ * `everything` when the matches themselves have moved — a new query, or a
+ * document that says something else. Stepping from one match to the next only
+ * moves which one is current, and then the two cells that changes are the only
+ * two worth rebuilding; a search that hits three hundred chapters would
+ * otherwise rebuild all three hundred on every press of Enter.
+ */
+function repaint(everything: boolean): void {
+	const wanted = new Set(found.map((match) => match.cell));
+	const here = found[current]?.cell ?? null;
+	const touched = everything ? new Set([...marks, ...wanted]) : new Set<number>();
+	if (markedCell !== null) {
+		touched.add(markedCell);
+	}
+	if (here !== null) {
+		touched.add(here);
+	}
+	marks = wanted;
+	markedCell = here;
+	for (const index of touched) {
+		// Never the cell that is open for typing: it is the author's box, its text
+		// is ahead of the document anyway, and rebuilding it takes the caret.
+		if (index !== editing && cells[index]) {
+			redrawCell(index);
+		}
+	}
+}
+
+/** Record what a full redraw has just drawn, so the next one knows what to undo. */
+function noteMarks(): void {
+	marks = new Set(found.map((match) => match.cell));
+	markedCell = found[current]?.cell ?? null;
+}
+
+/**
+ * Bring the current match on screen without taking the focus off the box.
+ *
+ * The author is still typing what they are looking for; a match that took the
+ * caret with it would put the next keystroke in the manuscript.
+ */
+function reveal(): void {
+	const match = found[current];
+	if (!match) {
+		return;
+	}
+	const row = cellsEl.querySelectorAll('.cell')[match.cell];
+	const at =
+		row?.querySelector('.find-match.current') ??
+		row?.querySelector('.find-field.current') ??
+		row;
+	at?.scrollIntoView({ block: 'center' });
+}
+
+function replaceCurrent(): void {
+	const match = found[current];
+	if (!match) {
+		return;
+	}
+	commit(replaced(cells, match, query, withEl.value));
+	// Past what was just written, not at it: replacing "the" with "there" would
+	// otherwise land on the match it had just made and never move on.
+	current = nextFrom({ ...match, at: match.at + withEl.value.length });
+	showCount();
+	repaint(true);
+	reveal();
+}
+
+function replaceEverywhere(): void {
+	if (found.length === 0) {
+		return;
+	}
+	commit(replacedAll(cells, query, withEl.value));
+	repaint(true);
+	reveal();
+}
+
+/** The matches in one of a cell's texts. */
+function foundIn(index: number, field: string | null): Match[] {
+	return found.filter((match) => match.cell === index && match.field === field);
+}
+
+/**
+ * What the author has selected, when it is a line of it worth searching for.
+ *
+ * The box seeds itself from the selection the way the editor's does. Its own
+ * selection is not a seed — opening find twice would then search for whatever it
+ * had already highlighted in the box.
+ */
+function selectedText(): string {
+	const focused = document.activeElement;
+	if (focused === whatEl || focused === withEl) {
+		return '';
+	}
+	const text =
+		focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement
+			? focused.value.slice(focused.selectionStart ?? 0, focused.selectionEnd ?? 0)
+			: (window.getSelection()?.toString() ?? '');
+	return text.includes('\n') ? '' : text;
+}
+
+/** Ctrl+F, and Cmd+F on a Mac. */
+function isFindKey(event: KeyboardEvent): boolean {
+	return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f';
+}
+
+/** Ctrl+H, and Cmd+Alt+F on a Mac, where Cmd+H is the system's own. */
+function isReplaceKey(event: KeyboardEvent): boolean {
+	if (event.altKey) {
+		// Alt makes the key itself say something else on a Mac; what is meant is
+		// where the key is on the keyboard.
+		return (event.ctrlKey || event.metaKey) && event.code === 'KeyF';
+	}
+	return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h';
+}
+
+// --- typing in several places ---
+
+/**
+ * The places in the open cell that are typed into at once, and which of them the
+ * box's own caret is on.
+ *
+ * Fewer than two is no more than a box does by itself, and none of this is in
+ * the way. They belong to the cell that is open: it is shut, and they are gone.
+ */
+let cursors: Cursor[] = [];
+let leading = -1;
+/**
+ * How much of what was taken lies each side of the caret.
+ *
+ * One pair for all of them, because they all took the same keys and all stand at
+ * the same spot in the same word. It is what turns a caret back into something
+ * an author can see: the word being changed, drawn at every place, with the
+ * caret somewhere inside it.
+ */
+let runBefore = 0;
+let runAfter = 0;
+
+/** The keys that mean one place rather than several. */
+const MOVES = new Set([
+	'ArrowLeft',
+	'ArrowRight',
+	'ArrowUp',
+	'ArrowDown',
+	'Home',
+	'End',
+	'PageUp',
+	'PageDown',
+]);
+
+/** A plain step left or right, which every cursor can take together. */
+function isStepKey(event: KeyboardEvent): boolean {
+	return (
+		(event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+		!event.shiftKey &&
+		!event.altKey &&
+		!event.ctrlKey &&
+		!event.metaKey
+	);
+}
+
+/** Ctrl+D, and Cmd+D on a Mac. */
+function isCursorKey(event: KeyboardEvent): boolean {
+	return (
+		(event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'd'
+	);
+}
+
+/**
+ * Take the next place the cell says what the author has selected.
+ *
+ * The selection is the whole of the question. With nothing selected there is
+ * nothing to look for, and taking the word under the caret instead would be
+ * taking a word nobody asked for.
+ *
+ * The box is asked what it has selected every time rather than trusted to have
+ * left it where it was put: between one press and the next the author may have
+ * changed it, and what they are pointing at now is what they mean.
+ */
+function addCursor(input: HTMLTextAreaElement, layer: HTMLElement): void {
+	const text = input.value;
+	const at = input.selectionStart ?? 0;
+	const end = input.selectionEnd ?? 0;
+	if (at === end) {
+		return;
+	}
+
+	if (cursors.length === 0) {
+		cursors = [{ at, end }];
+		leading = 0;
+		runBefore = 0;
+		runAfter = 0;
+	} else {
+		cursors[leading] = { at, end };
+	}
+
+	const taken = cursors[leading];
+	const next = nextOccurrence(text, text.slice(taken.at, taken.end), cursors);
+	if (!next) {
+		return;
+	}
+	cursors.push(next);
+	leading = cursors.length - 1;
+	input.setSelectionRange(next.at, next.end);
+	drawCursors(input, layer);
+	// A cell can be a chapter long, and the place just taken is no use behind the
+	// bottom of the window.
+	layer.querySelector('.leading')?.scrollIntoView({ block: 'nearest' });
+}
+
+function dropCursors(layer?: HTMLElement): void {
+	cursors = [];
+	leading = -1;
+	runBefore = 0;
+	runAfter = 0;
+	if (layer) {
+		layer.textContent = '';
+	}
+}
+
+/**
+ * Put what was typed in at every cursor.
+ *
+ * Only what can honestly be done in several places at once: letters, a return, a
+ * paste, and the two keys that delete a character. Anything else — a word
+ * deleted, an undo — is the box's to do, and giving the other cursors up is
+ * truer than doing half of it.
+ */
+function typeEverywhere(
+	event: InputEvent,
+	input: HTMLTextAreaElement,
+	layer: HTMLElement
+): void {
+	if (cursors.length < 2) {
+		return;
+	}
+	const typed = typedIn(event);
+	if (typed === null) {
+		dropCursors(layer);
+		return;
+	}
+	event.preventDefault();
+	cursors[leading] = {
+		at: input.selectionStart ?? 0,
+		end: input.selectionEnd ?? 0,
+	};
+	const reach =
+		event.inputType === 'deleteContentBackward'
+			? -1
+			: event.inputType === 'deleteContentForward'
+				? 1
+				: 0;
+	// What is taken follows the keys: typing over a selection makes what is typed
+	// the whole of it, and after that it grows and shrinks around the caret.
+	if (cursors.some((cursor) => cursor.end > cursor.at)) {
+		runBefore = typed.length;
+		runAfter = 0;
+	} else if (event.inputType === 'deleteContentBackward') {
+		runBefore = Math.max(0, runBefore - 1);
+	} else if (event.inputType === 'deleteContentForward') {
+		runAfter = Math.max(0, runAfter - 1);
+	} else {
+		runBefore += typed.length;
+	}
+	const next = edited(input.value, cursors, typed, reach);
+	input.value = next.text;
+	cursors = next.cursors;
+	const here = cursors[leading];
+	input.setSelectionRange(here.at, here.end);
+	// The keystroke the box would have seen, so that it grows and settles on its
+	// own schedule as though it had been typed into.
+	input.dispatchEvent(new Event('input'));
+}
+
+function typedIn(event: InputEvent): string | null {
+	switch (event.inputType) {
+		case 'insertText':
+			return event.data ?? '';
+		case 'insertLineBreak':
+		case 'insertParagraph':
+			return '\n';
+		case 'insertFromPaste':
+			return event.dataTransfer?.getData('text') ?? '';
+		case 'deleteContentBackward':
+		case 'deleteContentForward':
+			return '';
+		default:
+			return null;
+	}
+}
+
+/**
+ * Draw what is taken, at every place but under the author's own caret.
+ *
+ * A place shows what is selected there, or — once that has been typed over — the
+ * run the keys have been going into, which is the same run at every place. A
+ * caret alone is a line an author has to hunt for; the words they are changing
+ * are what they can see.
+ *
+ * The text is laid out again around them, so that a place drawn here is under
+ * the same word there. The caret is a character of no width, cut into what is
+ * taken where it stands rather than left at the end of it.
+ */
+function drawCursors(input: HTMLTextAreaElement, layer: HTMLElement): void {
+	layer.textContent = '';
+	if (cursors.length < 2) {
+		return;
+	}
+	const text = input.value;
+	const order = cursors
+		.map((cursor, index) => ({ cursor, index }))
+		.sort((a, b) => a.cursor.at - b.cursor.at);
+	let read = 0;
+
+	const taken = (from: number, to: number, leads: boolean): void => {
+		const span = document.createElement('span');
+		span.className = leads ? 'at leading' : 'at';
+		span.textContent = text.slice(from, to);
+		layer.append(span);
+	};
+
+	for (const { cursor, index } of order) {
+		const empty = cursor.end === cursor.at;
+		// The caret stands at the far end of a selection, and at itself otherwise.
+		const caret = cursor.end;
+		if (caret < read) {
+			continue;
+		}
+		const from = Math.max(read, Math.min(empty ? cursor.at - runBefore : cursor.at, caret));
+		const to = Math.min(text.length, Math.max(empty ? cursor.at + runAfter : cursor.end, caret));
+
+		layer.append(document.createTextNode(text.slice(read, from)));
+		if (caret > from) {
+			taken(from, caret, index === leading);
+		}
+		// The box draws its own caret, and a second under it would be two carets
+		// in one place.
+		if (index !== leading) {
+			const bar = document.createElement('span');
+			bar.className = 'caret';
+			bar.textContent = '\u200b';
+			layer.append(bar);
+		}
+		if (to > caret) {
+			taken(caret, to, index === leading);
+		}
+		read = to;
+	}
+
+	layer.append(document.createTextNode(text.slice(read)));
+}
+
+/**
+ * Move every cursor the same way at once.
+ *
+ * They all took the same keys and all stand at the same spot in the same word,
+ * so they all move together; what is taken stays where it is in the text while
+ * the caret walks through it. A selection collapses to the end it is moving
+ * towards, as it does anywhere.
+ */
+function moveCursors(input: HTMLTextAreaElement, layer: HTMLElement, by: number): void {
+	const text = input.value;
+	const held = cursors.some((cursor) => cursor.end > cursor.at);
+	if (held) {
+		const length = cursors[leading].end - cursors[leading].at;
+		runBefore = by < 0 ? 0 : length;
+		runAfter = by < 0 ? length : 0;
+	} else {
+		runBefore += by;
+		runAfter -= by;
+	}
+	cursors = cursors.map((cursor) => {
+		const to = cursor.end > cursor.at
+			? by < 0
+				? cursor.at
+				: cursor.end
+			: Math.min(text.length, Math.max(0, cursor.at + by));
+		return { at: to, end: to };
+	});
+	const here = cursors[leading];
+	input.setSelectionRange(here.at, here.end);
+	drawCursors(input, layer);
 }
 
 // --- the menu ---
@@ -965,6 +1604,26 @@ document.addEventListener('keydown', (event) => {
 		closeMenu();
 		return;
 	}
+	if (isReplaceKey(event)) {
+		event.preventDefault();
+		openFind(true);
+		return;
+	}
+	if (isFindKey(event)) {
+		event.preventDefault();
+		openFind(false);
+		return;
+	}
+	if (searching && event.key === 'Escape') {
+		event.preventDefault();
+		closeFind();
+		return;
+	}
+	if (searching && event.key === 'F3') {
+		event.preventDefault();
+		step(event.shiftKey ? -1 : 1);
+		return;
+	}
 	// The keyboard way into a cell, since the mouse way is now a double-click.
 	// Not while something is already taking the keys.
 	const typing =
@@ -1019,6 +1678,8 @@ window.addEventListener('message', (event) => {
 		cells = incoming;
 		selected = Math.min(selected, Math.max(0, cells.length - 1));
 		closeEditing();
+		refind();
+		showCount();
 		render();
 	}
 });

@@ -93,6 +93,154 @@ body {
 	background: var(--vscode-editor-background);
 }
 
+/* --- find and replace ---
+   The editor's own widget belongs to the text editor and never reaches a
+   webview, so this is that widget, drawn again. It hangs off the toolbar rather
+   than the window, so it stays put while the manuscript scrolls under it. */
+
+.find {
+	position: absolute;
+	top: calc(100% + 1px);
+	right: 12px;
+	display: flex;
+	align-items: flex-start;
+	gap: 2px;
+	padding: 4px 4px 4px 2px;
+	color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.find[hidden] {
+	display: none;
+}
+
+.find-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.find-row {
+	display: flex;
+	gap: 2px;
+	align-items: center;
+}
+
+.find-row[hidden] {
+	display: none;
+}
+
+/* The buttons that turn the search into a different search sit inside the box
+   they belong to, as they do everywhere else in the editor. */
+.find-box {
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	padding: 0 2px 0 5px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 2px;
+}
+
+.find-box:focus-within {
+	border-color: var(--vscode-focusBorder);
+}
+
+.find-box.invalid {
+	border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+.find-input {
+	width: 190px;
+	padding: 3px 0;
+	font-family: inherit;
+	font-size: 0.9em;
+	color: var(--vscode-input-foreground);
+	background: none;
+	border: none;
+	outline: none;
+}
+
+.find-input::placeholder {
+	color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+
+.find-option,
+.find-action,
+.find-toggle {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px;
+	color: inherit;
+	background: none;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+.find-option:hover,
+.find-action:hover:not([disabled]),
+.find-toggle:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.find-option.on {
+	color: var(--vscode-inputOption-activeForeground, inherit);
+	background: var(--vscode-inputOption-activeBackground);
+	outline: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+}
+
+.find-action[disabled] {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Wide enough for "999 of 999", so the buttons beside it do not shuffle along
+   as the author types. */
+.find-count {
+	min-width: 72px;
+	padding: 0 4px;
+	font-size: 0.85em;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+
+/* The chevron is as tall as both rows, the way the editor draws it. */
+.find-toggle {
+	align-self: stretch;
+}
+
+/* Near the right edge of the window there is no room to hang a tooltip
+   rightwards. */
+.find [data-tip]::after {
+	left: auto;
+	right: 0;
+}
+
+.find-match {
+	color: inherit;
+	background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+	border-radius: 2px;
+}
+
+.find-match.current {
+	background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+	outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
+}
+
+/* A title is a box, and a box cannot hold a mark around part of what it says. */
+.find-field {
+	background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
+
+.find-field.current {
+	background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+}
+
 /* --- tooltips ---
    Only for the buttons that live in here. The document's own tools are in the
    editor title bar and VS Code draws their tooltips; a webview has no way to ask
@@ -367,7 +515,16 @@ body {
 	font-style: italic;
 }
 
+/* The box and the cursors drawn under it are one thing on the page, and the
+   background belongs to the pair rather than to the box on top. */
+.source-box {
+	position: relative;
+	background: var(--vscode-notebook-cellEditorBackground, var(--vscode-input-background));
+	border-radius: 2px;
+}
+
 .source {
+	display: block;
 	width: 100%;
 	box-sizing: border-box;
 	font-family: var(--vscode-editor-font-family);
@@ -375,11 +532,48 @@ body {
 	line-height: 1.5;
 	padding: 6px 8px;
 	color: var(--vscode-input-foreground);
-	background: var(--vscode-notebook-cellEditorBackground, var(--vscode-input-background));
+	background: transparent;
 	border: 1px solid var(--vscode-focusBorder);
 	border-radius: 2px;
 	overflow-y: hidden;
 	resize: none;
+}
+
+/* The same text in the same face at the same place, so that what is drawn on it
+   is under the word the box has there. Everything about it that could move a
+   character has to say what the box says — hence the border, which is there only
+   to take up the width of the box's own. */
+.source-cursors {
+	position: absolute;
+	inset: 0;
+	box-sizing: border-box;
+	padding: 6px 8px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	line-height: 1.5;
+	color: transparent;
+	border: 1px solid transparent;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	pointer-events: none;
+	user-select: none;
+}
+
+.source-cursors .at {
+	background: var(--vscode-editor-selectionBackground);
+	border-radius: 2px;
+}
+
+/* What is left of a place once it has been typed into. The line is a border on a
+   box of no width, pulled back by its own width, so that it stands between two
+   characters without moving either of them. */
+.source-cursors .caret {
+	display: inline-block;
+	width: 0;
+	height: 1.15em;
+	vertical-align: middle;
+	margin-left: -1px;
+	border-left: 2px solid var(--vscode-editorCursor-foreground, currentColor);
 }
 
 .rendered {
@@ -397,7 +591,8 @@ body {
    than telling it, and reads as one: set in italic and a shade quieter than the
    prose it stands beside, on the page and in the box it is written in. */
 .cell[data-kind='note'] .rendered,
-.cell[data-kind='note'] .source {
+.cell[data-kind='note'] .source,
+.cell[data-kind='note'] .source-cursors {
 	font-style: italic;
 	color: var(--vscode-descriptionForeground);
 }
