@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from server import storydoc
-from server.storydoc import Cell
+from server.storydoc import Cell, Document
 
 CORPUS = json.loads(
     (Path(__file__).parents[1] / "storydoc_corpus.json").read_text(encoding="utf-8")
@@ -106,6 +106,44 @@ class Preparing(unittest.TestCase):
         mine = Cell(storydoc.CONTENTS, "My own contents.")
         prepared = storydoc.add_missing([mine], [storydoc.contents()])
         self.assertEqual(prepared, [mine])
+
+
+class Chapters(unittest.TestCase):
+    def test_each_chapter_carries_the_prose_written_under_it(self) -> None:
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("One"),
+                    storydoc.markdown("The door stood open."),
+                    storydoc.chapter("Two"),
+                    storydoc.markdown("It closed."),
+                ]
+            )
+        )
+        self.assertEqual(
+            document.chapters(),
+            [("One", ["The door stood open."]), ("Two", ["It closed."])],
+        )
+
+    def test_a_part_divides_the_chapters_without_being_one(self) -> None:
+        # A part names a run of chapters and carries no prose, so it is neither a
+        # chapter of its own nor something falling into the one before it.
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.part("Day One"),
+                    storydoc.chapter("One"),
+                    storydoc.markdown("The door stood open."),
+                    storydoc.part("Day Two"),
+                    storydoc.chapter("Two"),
+                    storydoc.markdown("It closed."),
+                ]
+            )
+        )
+        self.assertEqual(
+            document.chapters(),
+            [("One", ["The door stood open."]), ("Two", ["It closed."])],
+        )
 
 
 class OnDisk(unittest.TestCase):

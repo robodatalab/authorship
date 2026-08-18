@@ -192,6 +192,19 @@ describe('compile — the sections that are built rather than written', () => {
 		expect(compiled[1].source).toBe('1. One\n1. Two');
 	});
 
+	it('lists the chapters and not the parts they are divided into', () => {
+		// A table of contents is a list of places a reader looks up, and a part is
+		// a divider they meet on the way past rather than one they turn to.
+		const compiled = compile([
+			part('Day One'),
+			chapter('One'),
+			contents(),
+			part('Day Two'),
+			chapter('Two'),
+		]);
+		expect(compiled[2].source).toBe('1. One\n1. Two');
+	});
+
 	it('leaves everything that is not automated alone', () => {
 		const cells = [markdown('Prose.'), contents()];
 		expect(compile(cells)[0]).toEqual(cells[0]);

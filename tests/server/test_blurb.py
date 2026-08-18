@@ -88,6 +88,21 @@ class WriteBlurb(unittest.TestCase):
         for call in model.complete.call_args_list:
             self.assertNotIn("1. The First Night", call.args[1])
 
+    def test_a_part_is_a_division_of_the_story_and_not_a_chapter_of_it(self) -> None:
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.part("Day One"),
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out again."),
+                ]
+            )
+        )
+        model = build_model()
+        write_blurb(model, document)
+        self.assertEqual(model.complete.call_count, 1)
+        self.assertNotIn("Day One", model.complete.call_args_list[0].args[1])
+
     def test_a_blurb_already_in_the_document_is_not_read_back(self) -> None:
         document = Document(
             storydoc.dumps(
