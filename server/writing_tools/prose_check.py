@@ -105,6 +105,17 @@ class Passage:
     def span(self, at: int, end: int) -> tuple[Place, Place]:
         return self.place(at), self.place(end)
 
+    def line_spans(self) -> list[tuple[int, int]]:
+        """Where each line of the passage begins and ends.
+
+        The blank lines between paragraphs are gone by the time a passage is
+        built — `story_lines` yields only lines with something on them — so a
+        paragraph break survives here as nothing but the join between two lines.
+        Anything that needs to know where one paragraph stops has to ask.
+        """
+        ends = [start - 1 for start in self._starts[1:]] + [len(self.text)]
+        return list(zip(self._starts, ends))
+
 
 # --- the rules -------------------------------------------------------------
 
