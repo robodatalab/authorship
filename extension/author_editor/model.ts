@@ -14,6 +14,7 @@ import {
 	COVER,
 	DISCLAIMER,
 	MARKDOWN,
+	NOTE,
 	PART,
 	TITLE_PAGE,
 	type Cell,
@@ -59,6 +60,15 @@ export interface CellKind {
 	 * the EPUB.
 	 */
 	unpublished?: boolean;
+	/**
+	 * Written about the story from inside it.
+	 *
+	 * A note the author leaves themselves stands where the writing it is about
+	 * stands, so it travels with the chapter it was written under rather than
+	 * with the book. It is still not the story: it weighs nothing where words are
+	 * counted, and it leaves the format as the comment it was always written as.
+	 */
+	aside?: boolean;
 	/**
 	 * A page of the book rather than part of the story.
 	 *
@@ -134,6 +144,21 @@ export const KINDS: CellKind[] = [
 		fields: [{ name: 'title', label: 'Title' }],
 		primary: true,
 		blank: () => ({ kind: CHAPTER, source: '', attrs: { title: 'Untitled' } }),
+	},
+	{
+		kind: NOTE,
+		// What the author says to themselves about the story while writing it —
+		// where the plot is going, what still has to be planted. It belongs beside
+		// the passage it is about, which is the one place a reader must never
+		// find it.
+		prose: true,
+		fields: [],
+		label: 'Note',
+		automated: false,
+		unpublished: true,
+		aside: true,
+		primary: true,
+		blank: () => ({ kind: NOTE, source: '', attrs: {} }),
 	},
 	{
 		kind: PART,
@@ -281,6 +306,16 @@ export function isMatter(kind: string): boolean {
  */
 export function isUnpublished(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.unpublished ?? false;
+}
+
+/**
+ * Whether this kind is written about the story rather than being it.
+ *
+ * A kind nobody has heard of is not: an unrecognised cell holds text the author
+ * put in the document, and the safe reading of it is the story.
+ */
+export function isAside(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.aside ?? false;
 }
 
 /** What this kind records apart from prose; empty for a kind that is only prose. */
@@ -453,6 +488,15 @@ export function fromMarkdown(text: string): Cell[] {
 export function toMarkdown(cells: Cell[]): string {
 	const out: string[] = [];
 	for (const cell of cells) {
+		// An aside travels with the passage it was written beside, so it leaves the
+		// format as what it has been all along: a comment, which every reader of
+		// markdown renders as nothing at all.
+		if (isAside(cell.kind)) {
+			if (cell.source) {
+				out.push(commented(cell.source));
+			}
+			continue;
+		}
 		// Leaving the format loses which cell a passage came from; it must not also
 		// leak what was never part of the book.
 		if (isUnpublished(cell.kind)) {
@@ -483,6 +527,18 @@ export function toMarkdown(cells: Cell[]): string {
 		}
 	}
 	return out.join('\n\n') + (out.length > 0 ? '\n' : '');
+}
+
+/**
+ * A note as markdown holds one: inside a comment, read by whoever opens the file
+ * and by no reader of the book.
+ *
+ * A note that says `-->` would close the comment early and spill the rest of
+ * itself onto the page, so the one sequence a comment cannot hold is written the
+ * way HTML writes it.
+ */
+function commented(source: string): string {
+	return `<!--\n${source.replace(/-->/g, '--&gt;')}\n-->`;
 }
 
 /**

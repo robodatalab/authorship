@@ -12,7 +12,7 @@
 // without launching an editor. Everything here deals in cells and counts;
 // divide.ts turns the parts into files.
 
-import { isMatter, isUnpublished } from '../author_editor/model';
+import { isAside, isMatter, isUnpublished } from '../author_editor/model';
 import {
 	CHAPTER,
 	COVER,
@@ -74,7 +74,8 @@ export const DEFAULT_PART_WORDS = 5000;
  *
  * The book's furniture is not the story and belongs to every part rather than to
  * one; what the author keeps beside the story and publishes nowhere belongs to
- * neither.
+ * neither. An aside is the exception: it was written about the passage it stands
+ * beside, so it goes wherever that passage goes and weighs nothing on the way.
  */
 export function sectionsOf(cells: readonly Cell[]): Section[] {
 	const sections: Section[] = [];
@@ -101,7 +102,7 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 			opening = null;
 			continue;
 		}
-		if (isMatter(cell.kind) || isUnpublished(cell.kind)) {
+		if (isMatter(cell.kind) || (isUnpublished(cell.kind) && !isAside(cell.kind))) {
 			continue;
 		}
 		const holding = opening ?? sections[sections.length - 1];
@@ -109,7 +110,9 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 			continue;
 		}
 		holding.cells.push(cell);
-		holding.words += countWords(cell.source);
+		// A note the author left themselves is not words the reader reads, so a
+		// part holds as much story with one in it as it would without.
+		holding.words += isAside(cell.kind) ? 0 : countWords(cell.source);
 	}
 
 	// A part nobody wrote a chapter under names nothing, and what stands after it

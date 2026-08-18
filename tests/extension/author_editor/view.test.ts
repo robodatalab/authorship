@@ -180,6 +180,19 @@ describe('drawing cells', () => {
 		]);
 	});
 
+	it('draws a note as prose, saying the kind the stylesheet quietens it by', async () => {
+		// Set in italic and a shade greyer by `.cell[data-kind='note']`, so a cell
+		// that stopped saying its kind would read as the story it is not.
+		await mount([
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		]);
+		const cell = shown()[0];
+		expect((cell as HTMLElement).dataset.kind).toBe('note');
+		expect(cell.querySelector('.rendered')!.innerHTML).toContain(
+			'She has to find the letter here.'
+		);
+	});
+
 	it('hints at the date format in the empty box', async () => {
 		await mount([{ kind: 'title-page', source: '', attrs: { title: 'T' } }]);
 		const boxes = [...shown()[0].querySelectorAll<HTMLInputElement>('.cell-field')];

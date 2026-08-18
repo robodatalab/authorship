@@ -675,7 +675,7 @@ function iconButton(
 /**
  * The kinds the bar has no button for, added after `index`.
  *
- * The everyday two are already buttons an inch to the left, so listing them here
+ * The everyday few are already buttons an inch to the left, so listing them here
  * again would be two ways to click the same thing. Between the buttons and this,
  * every kind is one click from the bar and none of them twice.
  */

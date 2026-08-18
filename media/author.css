@@ -379,6 +379,15 @@ body {
 	font-style: italic;
 }
 
+/* A note is the author talking to themselves in the middle of the story rather
+   than telling it, and reads as one: set in italic and a shade quieter than the
+   prose it stands beside, on the page and in the box it is written in. */
+.cell[data-kind='note'] .rendered,
+.cell[data-kind='note'] .source {
+	font-style: italic;
+	color: var(--vscode-descriptionForeground);
+}
+
 .rendered h1,
 .rendered h2,
 .rendered h3 {

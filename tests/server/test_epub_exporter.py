@@ -589,6 +589,26 @@ class BuildEpub(unittest.TestCase):
 
         self.assertNotIn("A woman loses her name.", everything)
 
+    def test_a_note_reaches_no_part_of_the_book(self) -> None:
+        # What the author left themselves about the plot stands in the middle of
+        # the story and is printed nowhere in it.
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(storydoc.NOTE, "She has to find the letter here.", {}),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            everything = "".join(
+                z.read(name).decode("utf-8")
+                for name in z.namelist()
+                if name.endswith((".xhtml", ".opf", ".ncx"))
+            )
+
+        self.assertNotIn("She has to find the letter here.", everything)
+
     def test_a_section_written_twice_still_binds(self) -> None:
         # Two manifest items under one id is a book no reader will open.
         out = written(
