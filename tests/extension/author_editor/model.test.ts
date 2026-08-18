@@ -7,6 +7,7 @@ import {
 	fromMarkdown,
 	insertAt,
 	hasProse,
+	isAside,
 	isAutomated,
 	isGenerated,
 	isMatter,
@@ -65,6 +66,27 @@ describe('the kinds a section can be', () => {
 		expect(isUnpublished('chapter')).toBe(false);
 		// An unrecognised cell is writing the author put there; it is published.
 		expect(isUnpublished('epigraph')).toBe(false);
+	});
+
+	it('knows a note is written about the story rather than being it', () => {
+		// Kept out of the book like the blurb, but written in the middle of the
+		// story rather than beside it — which is the difference a division reads.
+		expect(isUnpublished('note')).toBe(true);
+		expect(isAside('note')).toBe(true);
+		expect(hasProse('note')).toBe(true);
+		expect(isMatter('note')).toBe(false);
+		expect(isAside('blurb')).toBe(false);
+		expect(isAside('markdown')).toBe(false);
+		expect(isAside('epigraph')).toBe(false);
+	});
+
+	it('starts a note with nothing said and nothing to fill in', () => {
+		expect(KINDS.find((k) => k.kind === 'note')!.blank()).toEqual({
+			kind: 'note',
+			source: '',
+			attrs: {},
+		});
+		expect(fieldsOf('note')).toEqual([]);
 	});
 
 	it('knows which kinds are pages of the book rather than the story', () => {
@@ -173,10 +195,13 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('epigraph')).toBe(true);
 	});
 
-	it('offers the two everyday kinds on the bar between cells', () => {
+	it('offers the everyday kinds on the bar between cells', () => {
+		// The three an author reaches for while writing: the prose, the place in
+		// the book it goes, and what they have to remember about it.
 		expect(KINDS.filter((k) => k.primary).map((k) => k.kind)).toEqual([
 			'markdown',
 			'chapter',
+			'note',
 		]);
 	});
 
@@ -619,6 +644,31 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 		]);
 		expect(written).not.toContain('A woman loses her name.');
 		expect(written).toBe('### One\n\na\n');
+	});
+
+	it('writes a note into the comment it has been all along', () => {
+		const written = toMarkdown([
+			chapter('One'),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+			markdown('a'),
+		]);
+		expect(written).toBe(
+			'### One\n\n<!--\nShe has to find the letter here.\n-->\n\na\n'
+		);
+	});
+
+	it('keeps a note that says `-->` inside its comment', () => {
+		// The one sequence that would close the comment early and spill the rest
+		// of the note onto the page.
+		expect(toMarkdown([{ kind: 'note', source: 'Anna --> the tower.', attrs: {} }])).toBe(
+			'<!--\nAnna --&gt; the tower.\n-->\n'
+		);
+	});
+
+	it('writes nothing at all for a note nobody has written', () => {
+		expect(
+			toMarkdown([{ kind: 'note', source: '', attrs: {} }, markdown('a')])
+		).toBe('a\n');
 	});
 
 	it('round-trips a manuscript back to the cells it was read from', () => {

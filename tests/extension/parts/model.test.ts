@@ -194,6 +194,22 @@ describe('sectionsOf — the sections a division cuts along', () => {
 		expect(sections).toHaveLength(1);
 		expect(sections[0].cells.map((cell) => cell.source)).toEqual(['', 'alpha']);
 	});
+
+	it('keeps a note with the chapter it was written under, and weighs it as nothing', () => {
+		const sections = sectionsOf([
+			chapter('One'),
+			prose(10),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		]);
+		expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
+			'chapter',
+			'markdown',
+			'note',
+		]);
+		// The title and the prose under it. What the author left themselves is not
+		// a word the reader reads.
+		expect(sections[0].words).toBe(11);
+	});
 });
 
 describe('furnitureOf — what stands before the story and after it', () => {
@@ -446,6 +462,20 @@ describe('partCells — a part as a document of its own', () => {
 			'about',
 		]);
 		expect(second[3].source).toBe('beta');
+	});
+
+	it('carries a note into the part its chapter went to, and no other', () => {
+		const note: Cell = {
+			kind: 'note',
+			source: 'She has to find the letter here.',
+			attrs: {},
+		};
+		const cells = [chapter('One'), prose(10), note, chapter('Two'), prose(10)];
+		const parts = intoParts(sectionsOf(cells), 11);
+
+		expect(parts).toHaveLength(2);
+		expect(partCells(furnitureOf(cells), 1, parts[0])).toContainEqual(note);
+		expect(partCells(furnitureOf(cells), 2, parts[1])).not.toContainEqual(note);
 	});
 
 	it('renumbers the title page, and leaves the subtitle as it stands', () => {

@@ -50,6 +50,7 @@ CONTENTS = "contents"
 DISCLAIMER = "disclaimer"
 ABOUT = "about"
 BLURB = "blurb"
+NOTE = "note"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
@@ -238,9 +239,10 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 BUILT_KINDS = frozenset({CONTENTS})
 
 # Kept in the working document and printed in no book. What the author writes
-# *about* the story — the blurb for a shop page, a covering letter — belongs
-# beside it and never inside it, so it is written here and published nowhere.
-PRIVATE_KINDS = frozenset({BLURB})
+# *about* the story — the blurb for a shop page, a covering letter, a note on
+# where the plot is going — belongs beside it and never inside it, so it is
+# written here and published nowhere.
+PRIVATE_KINDS = frozenset({BLURB, NOTE})
 
 
 @dataclass(frozen=True)

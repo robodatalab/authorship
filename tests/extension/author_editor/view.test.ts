@@ -180,6 +180,19 @@ describe('drawing cells', () => {
 		]);
 	});
 
+	it('draws a note as prose, saying the kind the stylesheet quietens it by', async () => {
+		// Set in italic and a shade greyer by `.cell[data-kind='note']`, so a cell
+		// that stopped saying its kind would read as the story it is not.
+		await mount([
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		]);
+		const cell = shown()[0];
+		expect((cell as HTMLElement).dataset.kind).toBe('note');
+		expect(cell.querySelector('.rendered')!.innerHTML).toContain(
+			'She has to find the letter here.'
+		);
+	});
+
 	it('hints at the date format in the empty box', async () => {
 		await mount([{ kind: 'title-page', source: '', attrs: { title: 'T' } }]);
 		const boxes = [...shown()[0].querySelectorAll<HTMLInputElement>('.cell-field')];
@@ -346,6 +359,19 @@ describe('changing the document', () => {
 		await mount([markdown('a')]);
 		bars()[0].querySelectorAll<HTMLElement>('.insert')[1].click();
 		expect(lastCells().map((c) => c.kind)).toEqual(['chapter', 'markdown']);
+	});
+
+	it('adds a note from the bar, beside the two kinds it is written among', async () => {
+		// A note is reached for as often as the prose it is about, so it is a
+		// button rather than something behind the overflow.
+		await mount([markdown('a')]);
+		const labels = [...bars()[0].querySelectorAll<HTMLElement>('.insert')].map(
+			(button) => button.textContent
+		);
+		expect(labels).toEqual(['Markdown', 'Chapter', 'Note', '']);
+
+		bars()[0].querySelectorAll<HTMLElement>('.insert')[2].click();
+		expect(lastCells().map((c) => c.kind)).toEqual(['note', 'markdown']);
 	});
 
 	it('adds a section in the gap its bar belongs to', async () => {
