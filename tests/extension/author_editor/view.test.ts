@@ -12,7 +12,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BODY } from '../../../extension/author_editor/page';
-import { chapter, contents, markdown, type Cell } from '../../../extension/storydoc/model';
+import {
+	chapter,
+	contents,
+	markdown,
+	part,
+	type Cell,
+} from '../../../extension/storydoc/model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
@@ -149,6 +155,24 @@ describe('drawing cells', () => {
 		const cell = shown()[0];
 		expect(cell.querySelector<HTMLInputElement>('.cell-title')!.value).toBe('One');
 		expect(cell.querySelector('.rendered')).toBeNull();
+	});
+
+	it('gives a part its title field and no prose editor, as a chapter has', async () => {
+		await mount([part('Day One')]);
+		const cell = shown()[0];
+		expect(cell.querySelector<HTMLInputElement>('.cell-title')!.value).toBe('Day One');
+		expect(cell.querySelector('.rendered')).toBeNull();
+	});
+
+	it('says what kind every cell is, which is what the stylesheet draws it by', async () => {
+		// The part is centred on the page by `.cell[data-kind='part']`, so a cell
+		// that stopped saying its kind would silently stop being drawn as one.
+		await mount([markdown('a'), part('Day One'), chapter('One')]);
+		expect(shown().map((cell) => (cell as HTMLElement).dataset.kind)).toEqual([
+			'markdown',
+			'part',
+			'chapter',
+		]);
 	});
 
 	it('hints at the date format in the empty box', async () => {

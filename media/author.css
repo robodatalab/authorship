@@ -280,6 +280,13 @@ body {
 	border-radius: 2px;
 }
 
+/* A part is a divider rather than a heading in a run of them, and it is centred
+   on its own page in the book. Centred here too, so the document on screen reads
+   the way the book will. */
+.cell[data-kind='part'] .cell-title {
+	text-align: center;
+}
+
 .cell-title:hover {
 	border-color: var(--vscode-input-border, var(--vscode-widget-border, transparent));
 }

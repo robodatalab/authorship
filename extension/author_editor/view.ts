@@ -182,6 +182,9 @@ function documentStatus(): string {
 function cellElement(cell: Cell, index: number): HTMLElement {
 	const row = document.createElement('section');
 	row.className = 'cell';
+	// The kind is the cell's identity, so the stylesheet is told it rather than
+	// being told a class per kind that means the same thing.
+	row.dataset.kind = cell.kind;
 	if (index === selected) {
 		row.classList.add('selected');
 	}
