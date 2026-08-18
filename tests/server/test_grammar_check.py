@@ -277,6 +277,64 @@ class Edits(unittest.TestCase):
         self.assertEqual(grammar_check._edits("Nothing wrong.", "Nothing wrong."), [])
 
 
+class Renaming(unittest.TestCase):
+    def test_a_capitalised_word_swapped_for_another_is_a_rename(self) -> None:
+        self.assertTrue(grammar_check._renames("Henry ", "Avenue "))
+
+    def test_an_invented_name_swapped_for_a_word_is_a_rename(self) -> None:
+        self.assertTrue(grammar_check._renames("Kaelith", "Kenneth"))
+
+    def test_a_name_left_where_it_was_is_not_a_rename(self) -> None:
+        self.assertFalse(grammar_check._renames("Diane leaned", "Diane leant"))
+
+    def test_a_lower_case_correction_is_not_a_rename(self) -> None:
+        self.assertFalse(grammar_check._renames("their", "there"))
+
+    def test_a_sentence_opener_is_not_a_name(self) -> None:
+        self.assertFalse(grammar_check._renames("The door", "A door"))
+
+    def test_a_pronoun_is_not_a_name(self) -> None:
+        self.assertFalse(grammar_check._renames("She was", "He was"))
+
+    def test_a_month_is_not_a_name(self) -> None:
+        self.assertFalse(grammar_check._renames("August was", "April was"))
+
+    def test_a_name_among_words_that_change_is_still_protected(self) -> None:
+        self.assertTrue(grammar_check._renames("Kendra who sat", "Kendrick that sat"))
+
+    def test_a_correction_around_a_name_is_allowed(self) -> None:
+        self.assertFalse(grammar_check._renames("Kendra who sat", "Kendra that sat"))
+
+    def test_capitalising_a_lower_case_word_is_not_a_rename(self) -> None:
+        self.assertFalse(grammar_check._renames("henry was", "Henry was"))
+
+    def test_check_does_not_report_a_renamed_character(self) -> None:
+        written = "Henry was the CEO of their fintech arm."
+        model = build_fake_model({written: "Avenue was the CEO of their fintech arm."})
+        self.assertEqual(grammar_check.check(model, lines(written), []), [])
+
+    def test_check_does_not_report_a_renamed_character_mid_sentence(self) -> None:
+        written = "She could not see Kaelith among the folk at the back."
+        model = build_fake_model(
+            {written: "She could not see Kenneth among the folk at the back."}
+        )
+        self.assertEqual(grammar_check.check(model, lines(written), []), [])
+
+    def test_check_still_reports_a_misspelling_beside_a_name(self) -> None:
+        written = "Kendra leaned back in resopnse to the noise."
+        model = build_fake_model({written: "Kendra leaned back in response to the noise."})
+        found = grammar_check.check(model, lines(written), [])
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].replacements, ("response",))
+
+    def test_check_still_reports_a_correction_that_keeps_the_name(self) -> None:
+        written = "Diane leaned towards him, genuine curious."
+        model = build_fake_model({written: "Diane leaned towards him, genuinely curious."})
+        found = grammar_check.check(model, lines(written), [])
+        self.assertEqual(len(found), 1)
+        self.assertIn("genuinely", found[0].replacements[0])
+
+
 class Names(unittest.TestCase):
     def test_finds_a_name_that_is_not_at_the_head_of_a_sentence(self) -> None:
         self.assertIn("Kaelith", grammar_check.names_in("The door opened. Then Kaelith ran."))

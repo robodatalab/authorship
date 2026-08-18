@@ -72,6 +72,10 @@ _OPENERS = "“‘«"
 # missing one is a real fault worth saying so about.
 _QUOTES = re.compile(r'["“”«»]')
 
+# Anything wearing a capital. Whether it is a name is not the question — what
+# matters is that the model does not get to decide it is a different one.
+_CAPITALISED = re.compile(r"[A-Z][A-Za-z'’-]*")
+
 # Capitalised and not a name: the days, the months, the word one calls oneself,
 # and the handful that open sentences often enough to be caught anyway.
 NOT_NAMES = frozenset(
@@ -261,6 +265,30 @@ def _typography(text: str) -> str:
     return _DASH.sub("-", _QUOTES.sub("", "".join(text.split())))
 
 
+def _renames(was: str, now: str) -> bool:
+    """Whether the change takes a capitalised word out and puts another in.
+
+    A capitalised word in the middle of a novel is almost always somebody's
+    name, and a name is the one thing in the manuscript that cannot be wrong.
+    The model has never met it — an invented name is a run of word-pieces it has
+    no entry for, and a familiar one in an unfamiliar sentence is not much
+    better — so what it offers is a guess at a word it knows. "Henry" becomes
+    "Avenue" and the author is asked to accept it.
+
+    Names are hidden from it where they are known, and this is what catches the
+    ones that were not: nothing is a correction if it renames somebody.
+
+    The words a capital is owed to grammar rather than to a name — the openers,
+    the days, the months — are left out, so "The" for "A" and "She" for "He"
+    are corrections like any other.
+    """
+    for found in _CAPITALISED.finditer(was):
+        word = found.group()
+        if word not in NOT_NAMES and word not in now:
+            return True
+    return False
+
+
 def _named(was: str, now: str) -> tuple[str, str]:
     """What sort of change this is, and how to say it."""
     if not was.strip():
@@ -313,6 +341,8 @@ def check(
             # the model puts a capital on everything it is handed. That is the
             # cut speaking, not the author.
             and not (first == 0 and asked[first:last].lower() == now.lower())
+            # And nothing that renames somebody is a correction.
+            and not _renames(asked[first:last], now)
         ]
         if not edits:
             continue

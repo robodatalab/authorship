@@ -72,6 +72,17 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private readonly checking = new Set<string>();
 
+	/**
+	 * The edit still being written to each document, if there is one.
+	 *
+	 * The page says what it changed and asks for the paragraph to be checked
+	 * again in the same breath, and the document is written between the two —
+	 * so a check that read the file straight away would read it as it was, find
+	 * the fault that has just been put right, and send the mark back to sit under
+	 * the correction.
+	 */
+	private readonly writes = new Map<string, Promise<void>>();
+
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly port: number
@@ -167,7 +178,10 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					}
 					break;
 				case 'cells':
-					void this.write(document, message.cells as Cell[]);
+					this.writes.set(
+						document.uri.toString(),
+						this.write(document, message.cells as Cell[]).catch(() => undefined)
+					);
 					break;
 				case 'compile':
 					void this.write(document, compile(parse(document.getText())));
@@ -293,6 +307,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		where: { start: number; end: number } | null,
 		whole: boolean
 	): Promise<void> {
+		// Whatever the page last changed has to be in the document before it is
+		// read, or the check answers about the prose as it was.
+		await this.writes.get(document.uri.toString());
 		// The rules answer in milliseconds and the model in seconds, so they are two
 		// waits rather than one. Awaited in order, and the slower one adds to what
 		// the faster one put up rather than replacing it — a report that waits for
