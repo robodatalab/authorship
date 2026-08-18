@@ -505,6 +505,69 @@ body {
 	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
+/* --- the seam: where a section is cut in two, or joined to the one above --- */
+
+.seam {
+	position: absolute;
+	left: var(--run-column);
+	right: 6px;
+	height: 0;
+	z-index: 2;
+	/* It follows the pointer across the prose, so it must never be in the way of
+	   what is under it — only its menu takes a click. */
+	pointer-events: none;
+}
+
+.seam[hidden] {
+	display: none;
+}
+
+/* Laid over the writing rather than set into it, so it is drawn through. */
+.seam-line {
+	height: 2px;
+	margin-top: -1px;
+	border-radius: 1px;
+	background: var(--vscode-focusBorder);
+	opacity: 0.45;
+}
+
+/* Out in the margin the run column already reserves, level with the line rather
+   than hung above it: anywhere over the body and it covers the writing the
+   author is deciding where to cut. */
+.seam-menu {
+	position: absolute;
+	top: 50%;
+	right: 100%;
+	margin-right: 3px;
+	transform: translateY(-50%);
+	display: flex;
+	padding: 1px;
+	pointer-events: auto;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+	border-radius: 4px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.seam-action {
+	display: flex;
+	align-items: center;
+	padding: 2px 4px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+.seam-action:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.seam-action .codicon {
+	font-size: 14px;
+}
+
 /* --- the bar between cells, where the next one is added --- */
 
 .insert-bar {

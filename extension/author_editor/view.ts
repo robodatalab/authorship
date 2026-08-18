@@ -17,21 +17,26 @@
 
 import {
 	KINDS,
+	divisionsOf,
 	insertAt,
 	withDefaultCell,
 	hasProse,
 	isAutomated,
+	isDivisible,
 	isGenerated,
 	isNamed,
 	isStale,
 	fieldsOf,
 	labelOf,
+	mergeAt,
+	mergesUp,
 	moveBy,
 	placeOf,
 	removeAt,
 	renderMarkdown,
 	runCell,
 	sourceLinesOf,
+	splitAt,
 } from './model';
 import type { CellField } from './model';
 import type { Cell } from '../storydoc/model';
@@ -74,6 +79,19 @@ interface Writing {
 	written: number;
 	chapters: number;
 }
+
+/** Somewhere a section can be divided, and where that place is on screen. */
+interface Seam {
+	/** How far down the cell the line is drawn. */
+	y: number;
+	/** The source line a cut would fall on; 0 for the seam above the section. */
+	line: number;
+	/** The seam above a section joins it to the one before rather than cutting it. */
+	merge: boolean;
+}
+
+/** The seam the line is drawn at, and the section it was drawn on. */
+let seamAt: (Seam & { index: number }) | null = null;
 
 /**
  * What is on the page right now.
@@ -159,6 +177,7 @@ function render(): void {
 	statusEl.textContent = documentStatus();
 	showWhere();
 	drawn = signatureOf(cells);
+	seamAt = null;
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
 }
@@ -174,6 +193,7 @@ function redrawCell(index: number): void {
 	statusEl.textContent = documentStatus();
 	showWhere();
 	drawn = signatureOf(cells);
+	seamAt = null;
 }
 
 /**
@@ -246,6 +266,11 @@ function cellElement(cell: Cell, index: number): HTMLElement {
 	});
 
 	row.append(runColumnFor(cell, index), bodyFor(cell, index), actionsFor(index));
+	if (isDivisible(cell.kind)) {
+		row.append(seamFor(index));
+		row.addEventListener('mousemove', (event) => showSeam(row, index, event.clientY));
+		row.addEventListener('mouseleave', () => hideSeam(row, index));
+	}
 	return row;
 }
 
@@ -594,6 +619,132 @@ function insertButton(
 		onClick(event);
 	});
 	return button;
+}
+
+// --- the seam, where a section is cut in two or joined to the one above ---
+
+/**
+ * The line that offers to divide a section, hidden until the pointer says where.
+ *
+ * It hangs over the cell rather than standing in it, so following the pointer
+ * from paragraph to paragraph moves nothing the author is reading. One per
+ * section that can be divided; a section that is one thing has none at all.
+ */
+function seamFor(index: number): HTMLElement {
+	const seam = document.createElement('div');
+	seam.className = 'seam';
+	seam.hidden = true;
+
+	const line = document.createElement('div');
+	line.className = 'seam-line';
+
+	const menu = document.createElement('div');
+	menu.className = 'seam-menu';
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.className = 'seam-action';
+	button.append(document.createElement('i'));
+	button.addEventListener('click', (event) => {
+		event.stopPropagation();
+		if (seamAt === null || seamAt.index !== index) {
+			return;
+		}
+		if (seamAt.merge) {
+			selected = index - 1;
+			commit(mergeAt(cells, index));
+		} else {
+			selected = index + 1;
+			commit(splitAt(cells, index, seamAt.line));
+		}
+	});
+	menu.append(button);
+
+	seam.append(line, menu);
+	return seam;
+}
+
+/**
+ * Draw the line at whichever seam the pointer is nearest.
+ *
+ * Nothing is rebuilt while the pointer is still between the same two paragraphs:
+ * a mousemove arrives far more often than the answer to it changes.
+ */
+function showSeam(row: HTMLElement, index: number, pointer: number): void {
+	const seam = row.querySelector('.seam') as HTMLElement | null;
+	if (!seam) {
+		return;
+	}
+	const y = pointer - row.getBoundingClientRect().top;
+	const nearest = seamsOf(row, index).reduce<Seam | null>(
+		(best, one) =>
+			best === null || Math.abs(one.y - y) < Math.abs(best.y - y) ? one : best,
+		null
+	);
+	if (nearest === null) {
+		hideSeam(row, index);
+		return;
+	}
+	if (
+		seamAt !== null &&
+		seamAt.index === index &&
+		seamAt.line === nearest.line &&
+		seamAt.merge === nearest.merge
+	) {
+		return;
+	}
+	seamAt = { ...nearest, index };
+	seam.hidden = false;
+	seam.style.top = `${nearest.y}px`;
+	const button = seam.querySelector('.seam-action') as HTMLElement;
+	button.dataset.tip = nearest.merge
+		? 'Join this section to the one above it'
+		: 'Split the section here';
+	(button.firstElementChild as HTMLElement).className = nearest.merge
+		? 'codicon codicon-merge'
+		: 'codicon codicon-split-vertical';
+}
+
+function hideSeam(row: HTMLElement, index: number): void {
+	const seam = row.querySelector('.seam') as HTMLElement | null;
+	if (seam) {
+		seam.hidden = true;
+	}
+	if (seamAt?.index === index) {
+		seamAt = null;
+	}
+}
+
+/**
+ * Where this section can be divided, and how far down the cell each place is.
+ *
+ * The seam above a section is not a cut — nothing would be above it — it is
+ * where the section joins the one before, when that one is the same kind. Which
+ * is why the top of a section is never offered as somewhere to split it.
+ *
+ * A section open for typing has none: what is on screen is the text itself, and
+ * the author is already free to cut it with the return key.
+ */
+function seamsOf(row: HTMLElement, index: number): Seam[] {
+	const cell = cells[index];
+	if (!cell || editing === index || writing?.at === index) {
+		return [];
+	}
+	const seams: Seam[] = [];
+	if (mergesUp(cells, index)) {
+		seams.push({ y: 0, line: 0, merge: true });
+	}
+	const rendered = row.querySelector('.rendered');
+	if (!rendered) {
+		return seams;
+	}
+	const top = row.getBoundingClientRect().top;
+	divisionsOf(cell.source).forEach((line, block) => {
+		const shown = rendered.children[block + 1];
+		if (shown) {
+			seams.push({ y: shown.getBoundingClientRect().top - top, line, merge: false });
+		}
+	});
+	return seams;
 }
 
 /** The actions that float at the cell's top-right corner. */

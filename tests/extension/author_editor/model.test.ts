@@ -4,11 +4,13 @@ import {
 	KINDS,
 	builtSource,
 	compile,
+	divisionsOf,
 	fromMarkdown,
 	insertAt,
 	hasProse,
 	isAside,
 	isAutomated,
+	isDivisible,
 	isGenerated,
 	isMatter,
 	isNamed,
@@ -16,6 +18,8 @@ import {
 	isUnpublished,
 	fieldsOf,
 	labelOf,
+	mergeAt,
+	mergesUp,
 	moveBy,
 	placeOf,
 	removeAt,
@@ -23,6 +27,7 @@ import {
 	runCell,
 	safeUrl,
 	sourceLinesOf,
+	splitAt,
 	toMarkdown,
 	withDefaultCell,
 } from '../../../extension/author_editor/model';
@@ -759,5 +764,90 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 		for (const value of ['T', 'A', 'P', 'D', 'V', 'I']) {
 			expect(written).toContain(value);
 		}
+	});
+});
+
+describe('dividing a section', () => {
+	it('divides the sections that are only prose, and nothing else', () => {
+		expect(isDivisible('markdown')).toBe(true);
+		expect(isDivisible('note')).toBe(true);
+		expect(isDivisible('chapter')).toBe(false);
+		expect(isDivisible('cover')).toBe(false);
+		expect(isDivisible('title-page')).toBe(false);
+		expect(isDivisible('epigraph')).toBe(false);
+	});
+
+	it('offers every paragraph but the first as somewhere to cut', () => {
+		expect(divisionsOf('one\n\ntwo\n\nthree')).toEqual([2, 4]);
+	});
+
+	it('offers nowhere at all in a section that is one paragraph', () => {
+		expect(divisionsOf('one\ntwo')).toEqual([]);
+	});
+
+	it('counts a heading, a list and a rule as places of their own', () => {
+		expect(divisionsOf('one\n\n# Two\n\n- a\n- b\n\n---')).toEqual([2, 4, 7]);
+	});
+
+	it('cuts the section in two at the line', () => {
+		expect(splitAt([markdown('one\n\ntwo')], 0, 2)).toEqual([
+			markdown('one'),
+			markdown('two'),
+		]);
+	});
+
+	it('leaves the sections around the cut where they were', () => {
+		const cells = [chapter('One'), markdown('a\n\nb'), chapter('Two')];
+		expect(splitAt(cells, 1, 2).map((cell) => cell.kind)).toEqual([
+			'chapter',
+			'markdown',
+			'markdown',
+			'chapter',
+		]);
+	});
+
+	it('refuses a cut that would leave a half with nothing in it', () => {
+		const cells = [markdown('one\n\ntwo')];
+		expect(splitAt(cells, 0, 0)).toBe(cells);
+		expect(splitAt(cells, 0, 9)).toBe(cells);
+	});
+
+	it('refuses to cut a section that is one thing', () => {
+		const cells = [chapter('One')];
+		expect(splitAt(cells, 0, 1)).toBe(cells);
+	});
+});
+
+describe('joining a section to the one above it', () => {
+	it('joins two of the same kind and nothing else', () => {
+		expect(mergesUp([markdown('a'), markdown('b')], 1)).toBe(true);
+		expect(mergesUp([markdown('a'), markdown('b')], 0)).toBe(false);
+		expect(mergesUp([chapter('One'), markdown('b')], 1)).toBe(false);
+		expect(mergesUp([chapter('One'), chapter('Two')], 1)).toBe(false);
+	});
+
+	it('joins notes the way it joins markdown', () => {
+		const first: Cell = { kind: 'note', source: 'a', attrs: {} };
+		const second: Cell = { kind: 'note', source: 'b', attrs: {} };
+		expect(mergesUp([first, second], 1)).toBe(true);
+		expect(mergeAt([first, second], 1)).toEqual([
+			{ kind: 'note', source: 'a\n\nb', attrs: {} },
+		]);
+	});
+
+	it('puts the two back with a blank line between them', () => {
+		expect(mergeAt([markdown('one'), markdown('two')], 1)).toEqual([
+			markdown('one\n\ntwo'),
+		]);
+	});
+
+	it('undoes a cut exactly', () => {
+		const cells = [markdown('one\n\ntwo\n\nthree')];
+		expect(mergeAt(splitAt(cells, 0, 2), 1)).toEqual(cells);
+	});
+
+	it('leaves a document it cannot join alone', () => {
+		const cells = [chapter('One'), markdown('b')];
+		expect(mergeAt(cells, 1)).toBe(cells);
 	});
 });
