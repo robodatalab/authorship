@@ -29,7 +29,14 @@ export interface Span {
 export interface Mark {
 	/** Its place in the report it came in, which is what the page draws it by. */
 	id: number;
+	/** Which rule found it — what the fix is asked for by, and judged by. */
 	rule: string;
+	/** What sort of fault it is, which is the colour it is drawn in. */
+	kind: string;
+	/** What found it. Marks are replaced a source at a time, never all at once. */
+	source: string;
+	/** What could go there instead, when whatever found the fault already knows. */
+	replacements: string[];
 	/** What fits under the underline. */
 	message: string;
 	/** What the author reads when they stop on it. */
@@ -50,11 +57,13 @@ interface At {
 /** One thing the server found. */
 export interface Finding {
 	rule: string;
+	kind: string;
 	message: string;
 	detail: string;
 	at: At;
 	end: At;
 	related: { at: At; end: At }[];
+	replacements?: string[];
 }
 
 /** What an edit did to a cell's text, in the text as it was before it. */
@@ -76,7 +85,7 @@ const OPEN = '\uE010';
 const SHUT = '\uE011';
 const CLOSE = '\uE012';
 
-const FENCED = /\uE010(\d+)\uE011([^\uE010-\uE012]*)\uE012/g;
+const FENCED = /\uE010([\d,]+)\uE011([^\uE010-\uE012]*)\uE012/g;
 const STRAY = /[\uE010-\uE012]/g;
 
 /**
@@ -132,11 +141,24 @@ function spanAt(places: Place[], at: At, end: At): Span | null {
 	return null;
 }
 
-/** The report, in the coordinates the page draws in. */
-export function placed(cells: Cell[], findings: Finding[]): Mark[] {
+/**
+ * The report, in the coordinates the page draws in.
+ *
+ * `from` is the first id to give out. Marks come from more than one place — the
+ * server's rules and the checker running in the page itself — and two of them
+ * numbering their findings from nothing would be two marks claiming to be the
+ * same one.
+ */
+export function placed(
+	cells: Cell[],
+	findings: Finding[],
+	from: number,
+	source: string
+): Mark[] {
 	const places = placement(cells);
 	const marks: Mark[] = [];
-	findings.forEach((finding, id) => {
+	findings.forEach((finding, index) => {
+		const id = from + index;
 		const span = spanAt(places, finding.at, finding.end);
 		if (!span) {
 			return;
@@ -153,6 +175,9 @@ export function placed(cells: Cell[], findings: Finding[]): Mark[] {
 		marks.push({
 			id,
 			rule: finding.rule,
+			kind: finding.kind,
+			source,
+			replacements: finding.replacements ?? [],
 			message: finding.message,
 			detail: finding.detail,
 			...span,
@@ -176,6 +201,76 @@ export function spansIn(marks: Mark[], cell: number): { id: number; at: number; 
 		}
 	}
 	return found;
+}
+
+/**
+ * One run of text and every mark over it.
+ *
+ * Marks overlap — a repeated word can also be misspelt, and the author is owed
+ * both — but a run of text can only be drawn once. So the spans are cut at every
+ * boundary either of them has, and what is drawn is the pieces. Being cut rather
+ * than nested, no piece is inside another and each can be laid into the text
+ * without disturbing the offsets of the rest.
+ */
+export interface Segment {
+	at: number;
+	end: number;
+	ids: number[];
+}
+
+export function segmentsIn(marks: Mark[], cell: number): Segment[] {
+	const spans = spansIn(marks, cell);
+	if (spans.length === 0) {
+		return [];
+	}
+	const edges = new Set<number>();
+	for (const span of spans) {
+		edges.add(span.at);
+		edges.add(span.end);
+	}
+	const points = [...edges].sort((a, b) => a - b);
+
+	const segments: Segment[] = [];
+	for (let index = 0; index < points.length - 1; index++) {
+		const at = points[index];
+		const end = points[index + 1];
+		const ids = [
+			...new Set(
+				spans.filter((span) => span.at <= at && span.end >= end).map((span) => span.id)
+			),
+		];
+		// The gap between two marks that do not touch is text like any other.
+		if (ids.length > 0) {
+			segments.push({ at, end, ids });
+		}
+	}
+	return segments;
+}
+
+/**
+ * Where an offset in a cell falls in the file, which is how the server is told
+ * what to look at.
+ *
+ * The inverse of what `placed` does on the way in: a mark comes back from the
+ * page knowing only its own cell, and a fix has to name the same span in the
+ * coordinates the document is written in.
+ */
+export function placeInFile(
+	cells: Cell[],
+	cell: number,
+	at: number
+): { line: number; character: number } | null {
+	const place = placement(cells)[cell];
+	if (!place || place.offsets.length === 0) {
+		return null;
+	}
+	let line = 0;
+	for (let index = 0; index < place.offsets.length; index++) {
+		if (place.offsets[index] <= at) {
+			line = index;
+		}
+	}
+	return { line: place.first + line, character: at - place.offsets[line] };
 }
 
 export function markOf(marks: Mark[], id: number): Mark | undefined {
@@ -319,30 +414,45 @@ export function changeBetween(before: string, after: string): Change {
 }
 
 /**
- * The text with its marks fenced, ready to be rendered.
+ * The text with its segments fenced, ready to be rendered.
  *
- * From the end, so that each fence leaves the offsets before it alone.
+ * From the end, so that each fence leaves the offsets before it alone — which is
+ * only sound because segments do not overlap. Two marks over one word arrive
+ * here as one segment naming both, rather than as two fences that would have to
+ * be threaded through each other.
  */
-export function fencedMarks(
-	text: string,
-	spans: { id: number; at: number; end: number }[]
-): string {
+export function fencedMarks(text: string, segments: Segment[]): string {
 	let out = text;
-	for (const span of [...spans].sort((a, b) => b.at - a.at)) {
+	for (const segment of [...segments].sort((a, b) => b.at - a.at)) {
 		// A mark over nothing but space would turn a blank line into a paragraph.
-		if (!text.slice(span.at, span.end).trim()) {
+		if (!text.slice(segment.at, segment.end).trim()) {
 			continue;
 		}
 		out =
-			out.slice(0, span.at) +
+			out.slice(0, segment.at) +
 			OPEN +
-			String(span.id) +
+			segment.ids.join(',') +
 			SHUT +
-			out.slice(span.at, span.end) +
+			out.slice(segment.at, segment.end) +
 			CLOSE +
-			out.slice(span.end);
+			out.slice(segment.end);
 	}
 	return out;
+}
+
+/** The marks a drawn segment names, in the order they were found. */
+export function marksOf(marks: Mark[], said: string | null): Mark[] {
+	if (!said) {
+		return [];
+	}
+	const found: Mark[] = [];
+	for (const part of said.split(',')) {
+		const mark = markOf(marks, Number(part));
+		if (mark) {
+			found.push(mark);
+		}
+	}
+	return found;
 }
 
 /**
@@ -354,6 +464,6 @@ export function fencedMarks(
  */
 export function markedProse(html: string): string {
 	return html
-		.replace(FENCED, '<span class="prose-mark" data-mark="$1">$2</span>')
+		.replace(FENCED, '<span class="prose-mark" data-marks="$1">$2</span>')
 		.replace(STRAY, '');
 }

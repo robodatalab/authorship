@@ -1,10 +1,8 @@
 """Backend API."""
 
-import re
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable
+from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -14,6 +12,7 @@ from server.publishing import authorship
 from server.publishing.epub_exporter import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
+from server.writing_tools import prose_check
 from vramen import (
     CausalModel,
     InferenceModelResourceManager,
@@ -322,51 +321,15 @@ def generate_blurb_status(id: str) -> dict[str, Any]:
     }
 
 
-# --- checking the prose ---------------------------------------------------
+# --- checking the prose ----------------------------------------------------
 #
-# Mocked, and written to be thrown away. What the editor has to be built
-# against is a check that takes a while to answer, hands back spans it can
-# underline, and supersedes itself when the author types over one — none of
-# which needs a model to be true. The rules below are stand-ins, picked for
-# firing on any manuscript and for firing in the same place twice.
-
-
-# How far apart two sayings of the same word are still a repetition. Lines
-# rather than sentences, because lines are what the server works in.
-_NEARBY_LINES = 6
-
-# What a model would take, so that the editor is built against a wait it will
-# actually have to draw.
-_SECONDS_PER_LINE = 0.02
-_SECONDS_AT_MOST = 2.0
-_SLICE_SECONDS = 0.05
-
-_WORD = re.compile(r"[A-Za-z][A-Za-z'’]*")
-
-_SLIPS = {
-    "teh": "the",
-    "recieve": "receive",
-    "occured": "occurred",
-    "seperate": "separate",
-    "definately": "definitely",
-    "acheive": "achieve",
-}
-
-# Said twice on purpose often enough that flagging them is worse than missing
-# them.
-_DOUBLES_ALLOWED = frozenset({"had", "that", "no"})
-
-# Long enough to be a content word by length alone, common enough that saying
-# them twice is not a repetition anyone would hear.
-_COMMON = frozenset(
-    {
-        "about", "after", "again", "against", "because", "before", "being",
-        "between", "could", "every", "first", "found", "might", "never",
-        "other", "should", "still", "their", "there", "these", "thing",
-        "think", "those", "through", "under", "where", "which", "while",
-        "would",
-    }
-)
+# The rules live in `server/writing_tools/prose_check.py`. What is here is the
+# job that runs them and the two endpoints it is driven by.
+#
+# A check writes nothing — it reports — which is what makes it unlike every other
+# job in this file, and is why its target is the passage rather than the
+# document: two passages can be read at once, and a paragraph re-read after an
+# edit must not cancel the pass over the rest of the book.
 
 
 class ProseCheckRequest(BaseModel):
@@ -390,10 +353,10 @@ def _check_target(path: Path, selection: tuple[int, int] | None) -> str:
 
     Every other job here writes the document, so the file is the thing two of
     them cannot both hold and the newer one rightly cancels the older. A check
-    writes nothing — it reports — and there is no reason two passages cannot be
-    read at once. Keyed by the file, re-checking one paragraph would cancel the
-    pass over the rest of the book, and marks the author never touched would go
-    out from under them.
+    writes nothing, and there is no reason two passages cannot be read at once.
+    Keyed by the file, re-checking one paragraph would cancel the pass over the
+    rest of the book, and marks the author never touched would go out from under
+    them.
     """
     where = "all" if selection is None else f"{selection[0]}-{selection[1]}"
     return f"{path}#{where}"
@@ -401,7 +364,7 @@ def _check_target(path: Path, selection: tuple[int, int] | None) -> str:
 
 class ProseCheckJob(Job):
     """A pass over a passage that says what is wrong with it and changes none of
-    it. Nothing is written and nothing is saved, so the result is the report."""
+    it. Nothing is written and nothing is saved, so the report is the result."""
 
     kind = "prose check"
 
@@ -414,137 +377,57 @@ class ProseCheckJob(Job):
 
     def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
-        # `story_lines` hands back the line stripped; a mark has to be placed on
-        # the line as it is written, so only the number is taken from it.
-        prose = [
+        # A crutch word is only visible across a whole book, so the pass over the
+        # whole document is the only one in a position to see one. A paragraph
+        # re-read after an edit is not, and says nothing about habits.
+        crutches = (
+            prose_check.crutch_lemmas(self._prose(0, len(self._document.lines) - 1))
+            if self._selection is None
+            else frozenset()
+        )
+        if self.cancelled:
+            return
+        self.findings = [
+            _reported(finding)
+            for finding in prose_check.check(self._prose(start, end), crutches)
+        ]
+
+    def _prose(self, start: int, end: int) -> list[tuple[int, str]]:
+        """The story's own lines, by their number in the file.
+
+        `story_lines` hands back the line stripped; a mark has to be placed on the
+        line as it is written, so only the number is taken from it.
+        """
+        return [
             (index, self._document.lines[index])
             for index, _ in self._document.story_lines(start, end)
         ]
-        if not _waited(len(prose), lambda: self.cancelled):
-            return
-        self.findings = _slips_in(prose) + _repetitions_in(prose)
 
 
-def _waited(lines: int, cancelled: Callable[[], bool]) -> bool:
-    """Take as long as a model might, and say whether it is still worth going on.
-
-    In slices, so that a check the author has typed over stops where a real one
-    would — between pieces of work — rather than reporting on a paragraph that
-    has since changed.
-    """
-    total = min(lines * _SECONDS_PER_LINE, _SECONDS_AT_MOST)
-    waited = 0.0
-    while waited < total:
-        if cancelled():
-            return False
-        time.sleep(_SLICE_SECONDS)
-        waited += _SLICE_SECONDS
-    return not cancelled()
+def _at(place: prose_check.Place) -> dict[str, int]:
+    return {"line": place.line, "character": place.character}
 
 
-def _slips_in(prose: list[tuple[int, str]]) -> list[dict[str, Any]]:
-    """Misspellings and doubled words, standing in for the grammar model."""
-    found: list[dict[str, Any]] = []
-    for index, line in prose:
-        words = list(_WORD.finditer(line))
-        for place, word in enumerate(words):
-            said = word.group().lower()
-
-            correction = _SLIPS.get(said)
-            if correction:
-                found.append(
-                    _finding(
-                        "grammar",
-                        index,
-                        word.start(),
-                        word.end(),
-                        f"“{word.group()}” is misspelt",
-                        f"“{word.group()}” is not a word. The spelling is "
-                        f"“{correction}”.",
-                    )
-                )
-
-            before = words[place - 1] if place else None
-            if (
-                before is not None
-                and before.group().lower() == said
-                and said not in _DOUBLES_ALLOWED
-            ):
-                found.append(
-                    _finding(
-                        "grammar",
-                        index,
-                        before.start(),
-                        word.end(),
-                        f"“{said}” is written twice",
-                        f"The word “{said}” appears twice in a row. Usually one "
-                        "of the two is a copy left behind by an edit.",
-                    )
-                )
-    return found
-
-
-def _repetitions_in(prose: list[tuple[int, str]]) -> list[dict[str, Any]]:
-    """A content word said twice close together, standing in for the style model.
-
-    One finding carrying both places rather than two findings, because a
-    repetition is a pair and an underline under one half of it says nothing. It
-    is also why a check of a single paragraph cannot settle a repetition on its
-    own: the other half is in a paragraph it was not asked to read.
-    """
-    seen: dict[str, tuple[int, int, int]] = {}
-    found: list[dict[str, Any]] = []
-    for index, line in prose:
-        for word in _WORD.finditer(line):
-            said = word.group().lower()
-            if len(said) < 5 or said in _COMMON:
-                continue
-            before = seen.get(said)
-            if before is not None and index - before[0] <= _NEARBY_LINES:
-                found.append(
-                    _finding(
-                        "repetition",
-                        index,
-                        word.start(),
-                        word.end(),
-                        f"“{word.group()}” again",
-                        f"“{word.group()}” was used a moment ago and is used "
-                        "again here. A word repeated inside a few lines is "
-                        "heard as an echo rather than as emphasis, unless the "
-                        "echo is the point.",
-                        related=[_span(before[0], before[1], before[2])],
-                    )
-                )
-            seen[said] = (index, word.start(), word.end())
-    return found
-
-
-def _span(line: int, at: int, end: int) -> dict[str, Any]:
-    return {"at": {"line": line, "character": at}, "end": {"line": line, "character": end}}
-
-
-def _finding(
-    rule: str,
-    line: int,
-    at: int,
-    end: int,
-    message: str,
-    detail: str,
-    related: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """One thing wrong, and everywhere it is wrong.
+def _reported(finding: prose_check.Finding) -> dict[str, Any]:
+    """A finding as the editor is told it.
 
     `message` is what fits under the underline and `detail` is what the author
-    reads when they stop on it; a mark that can only afford one of the two ends
-    up saying neither well. `related` is the rest of the same fault — empty for
-    a fault that is in one place, which most are.
+    reads when they stop on it; a mark that can afford only one of the two ends
+    up saying neither well. `kind` is what colour it is drawn in and `rule` is
+    what it is — the first for whoever reads the underline, the second for
+    whatever has to act on it.
     """
     return {
-        "rule": rule,
-        "message": message,
-        "detail": detail,
-        **_span(line, at, end),
-        "related": related or [],
+        "rule": finding.rule,
+        "kind": finding.kind,
+        "message": finding.message,
+        "detail": finding.detail,
+        "at": _at(finding.at),
+        "end": _at(finding.end),
+        "related": [{"at": _at(at), "end": _at(end)} for at, end in finding.related],
+        # A rule that already knows what belongs there says so, and the editor
+        # puts it in without troubling the model at all.
+        "replacements": list(finding.replacements),
     }
 
 
@@ -553,7 +436,7 @@ def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
     """Start checking a passage; poll /check/prose/status for what it found.
 
     The whole document when the author turns the checks on, and one paragraph
-    when they have just written in it — the same pass over a different span, so
+    when they have just written in it — the same rules over a different span, so
     the second is not a lesser kind of the first and returns findings of exactly
     the same shape.
     """
@@ -588,4 +471,194 @@ def check_prose_status(id: str) -> dict[str, Any]:
         "cancelled": job.cancelled,
         "error": job.error,
         "findings": job.findings,
+    }
+
+
+# --- putting one fault right -----------------------------------------------
+#
+# The counterpart of the checks, and the reason they are worth having beyond the
+# underline: a fault that was found by a rule can be described to a model, and
+# the same rule can be run over what comes back.
+#
+# Two things follow from that which correcting a passage cannot have. The model
+# is answering a question — these words, this is wrong with them — rather than
+# being handed a paragraph and asked what it thinks. And the answer is checked
+# before it is offered, because the thing that found the fault is still there to
+# ask again. A fix that leaves the rule firing is not a fix.
+
+
+# A phrase, not a paragraph. What comes back replaces a few words.
+FIX_TOKENS = 64
+
+FIX_INSTRUCTION = (
+    "You are correcting one phrase in a novel. You are told what is wrong with "
+    "it and shown the sentence it sits in. Answer with the replacement for that "
+    "phrase and nothing else — no quotation marks, no explanation, and not the "
+    "rest of the sentence. Keep the author's voice, tense and register, and "
+    "change as little as will put the fault right."
+)
+
+
+class Place(BaseModel):
+    # 0-based, as everything the server says about a file is.
+    line: int
+    character: int
+
+
+class Span(BaseModel):
+    at: Place
+    end: Place
+
+
+class SpanFixRequest(BaseModel):
+    # Path of the document the fault is in.
+    path: str
+    # The document as the author has it, for the same reason a check is given it.
+    text: str | None = None
+    where: Span
+    # What found the fault, which is also what will judge the answer.
+    rule: str
+    message: str
+    detail: str = ""
+
+
+class SpanFixJob(Job):
+    """Rewrite one marked phrase, and refuse the rewrite if it does not work."""
+
+    kind = "span fix"
+
+    def __init__(
+        self,
+        model: CausalModel,
+        document: Document,
+        where: Span,
+        rule: str,
+        message: str,
+    ) -> None:
+        assert document.path is not None
+        super().__init__(f"{document.path}#fix:{where.at.line}:{where.at.character}")
+        self._model = model
+        self._document = document
+        self._where = where
+        self._rule = rule
+        self._message = message
+        self.replacement = ""
+        self.verified = False
+
+    def execute(self) -> None:
+        line = self._document.lines[self._where.at.line]
+        first, last = self._where.at.character, self._where.end.character
+        wrong = line[first:last]
+        if not wrong.strip():
+            return
+
+        answer = self._model.complete(
+            FIX_INSTRUCTION,
+            _asking(self._rule, self._message, line, first, last),
+            max_new_tokens=FIX_TOKENS,
+        )
+        if self.cancelled:
+            return
+        self.replacement = _phrase(answer)
+        if not self.replacement:
+            return
+
+        # The rule that found it is asked again, over the paragraph as it would
+        # be — a repetition is only answered if the other half still stands.
+        rewritten = line[:first] + self.replacement + line[last:]
+        self.verified = not _fires(
+            self._rule,
+            self._context(rewritten),
+            self._where.at.line,
+            first,
+            first + len(self.replacement),
+        )
+
+    def _context(self, rewritten: str) -> list[tuple[int, str]]:
+        """The cell's prose with this line as the model would leave it."""
+        where = self._document.lines_at(self._where.at.line)
+        first, last = where or (self._where.at.line, self._where.at.line)
+        return [
+            (
+                index,
+                rewritten if index == self._where.at.line else self._document.lines[index],
+            )
+            for index, _ in self._document.story_lines(first, last)
+        ]
+
+
+def _asking(rule: str, message: str, line: str, at: int, end: int) -> str:
+    """What the model is shown: the sentence, the words, and the complaint.
+
+    The complaint is the whole point. A model handed a paragraph guesses at what
+    it is for; a model handed a phrase and told what is wrong with it is doing
+    something it can be judged on.
+    """
+    return (
+        f"The sentence:\n\n{line}\n\n"
+        f'The phrase to replace: "{line[at:end]}"\n'
+        f"What is wrong with it ({rule}): {message}\n\n"
+        "Write the replacement phrase."
+    )
+
+
+def _phrase(answer: str) -> str:
+    """The phrase out of whatever the model wrapped it in."""
+    for said in answer.strip().splitlines():
+        said = said.strip().strip('"“”\'')
+        if said:
+            return said
+    return ""
+
+
+def _fires(
+    rule: str, prose: list[tuple[int, str]], line: int, at: int, end: int
+) -> bool:
+    """Whether that rule still finds fault where the fix was put in."""
+    return prose_check.fires(rule, prose, line, at, end)
+
+
+@app.post("/fix/span", status_code=202)
+def fix_span(request: SpanFixRequest) -> dict[str, Any]:
+    """Start rewriting one marked phrase; poll /fix/span/status for the answer.
+
+    The document is not written. What comes back is a phrase, and where it goes
+    is the editor's to say — the mark it belongs to has very likely moved while
+    the model was reading, and only the page knows where it is now.
+    """
+    if request.where.at.line != request.where.end.line:
+        raise HTTPException(
+            status_code=400, detail="A fault is fixed a line at a time."
+        )
+    document = (
+        Document(request.text, Path(request.path))
+        if request.text is not None
+        else _document(request.path)
+    )
+    if request.where.at.line >= len(document.lines):
+        raise HTTPException(status_code=400, detail="There is no such line.")
+    job = SpanFixJob(
+        app.state.causal_model, document, request.where, request.rule, request.message
+    )
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+@app.get("/fix/span/status")
+def fix_span_status(id: str) -> dict[str, Any]:
+    """Whether the fix is still being written, what it is, and whether it worked.
+
+    `verified` is the rule's own answer, not the model's: it is false when the
+    phrase came back and the fault is still there. The editor shows the author
+    what was offered and leaves the prose alone.
+    """
+    job = app.state.jobs.get(id)
+    if not isinstance(job, SpanFixJob):
+        raise HTTPException(status_code=404, detail=f"No span fix for {id}")
+    return {
+        "running": not job.done,
+        "cancelled": job.cancelled,
+        "error": job.error,
+        "replacement": job.replacement,
+        "verified": job.verified,
     }

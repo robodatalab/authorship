@@ -184,6 +184,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'checkBlock':
 					void this.check(document, panel, message.where, false);
 					break;
+				case 'fixMark':
+					void this.fixMark(document, panel, message);
+					break;
 				case 'generate':
 					this.onActive((d) => this.generate(d, message.at as number));
 					break;
@@ -332,6 +335,74 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// idea, and a dialog over the manuscript because one failed would be the
 			// interruption the checks are meant not to be.
 			console.warn(`Authorship could not check the prose: ${describe(err)}`);
+		}
+	}
+
+	/**
+	 * Put one fault right, by naming it rather than the prose around it.
+	 *
+	 * The whole of the difference from correcting a passage: the model is told
+	 * which words and what is wrong with them, so it is answering a question
+	 * rather than being asked to reread a paragraph and see what it thinks. And
+	 * because a rule found the fault, the same rule can be run over the answer —
+	 * a fix that leaves the rule still firing is refused rather than shown.
+	 *
+	 * Refusals are said out loud, unlike a check that fails. The author pressed a
+	 * button and is owed an answer either way.
+	 */
+	private async fixMark(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		asked: {
+			id: number;
+			where: unknown;
+			rule: string;
+			message: string;
+			detail: string;
+		}
+	): Promise<void> {
+		try {
+			const started = await fetch(`http://127.0.0.1:${this.port}/fix/span`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					path: document.uri.fsPath,
+					text: document.getText(),
+					where: asked.where,
+					rule: asked.rule,
+					message: asked.message,
+					detail: asked.detail,
+				}),
+			});
+			if (!started.ok) {
+				throw new Error(await detailOf(started));
+			}
+			const { id } = (await started.json()) as { id: string };
+			const done = await this.awaitJob('/fix/span/status', id);
+			if (done.cancelled) {
+				return;
+			}
+			if (!done.replacement) {
+				void vscode.window.showInformationMessage(
+					'Nothing came back for that one.'
+				);
+				return;
+			}
+			if (!done.verified) {
+				void vscode.window.showInformationMessage(
+					`That is still flagged after the change, so it was not made: “${done.replacement}”`
+				);
+				return;
+			}
+			void panel.webview.postMessage({
+				type: 'fixed',
+				id: asked.id,
+				text: done.replacement,
+			});
+		} catch (err: unknown) {
+			void vscode.window.showWarningMessage(
+				`Authorship could not fix that: ${describe(err)}`
+			);
 		}
 	}
 
@@ -735,6 +806,12 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		const codicons = webview.asWebviewUri(
 			vscode.Uri.joinPath(media, 'codicon.css')
 		);
+		// Harper's checker is WebAssembly, and the page fetches it rather than
+		// carrying it: inlined it is twenty megabytes of JavaScript to parse before
+		// the first cell is drawn. Copied into dist/ by the build.
+		const harper = webview.asWebviewUri(
+			vscode.Uri.joinPath(dist, 'harper_wasm_bg.wasm')
+		);
 		const nonce = nonceString();
 
 		return `<!DOCTYPE html>
@@ -742,13 +819,13 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 <head>
 	<meta charset="UTF-8">
 	<meta http-equiv="Content-Security-Policy"
-		content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+		content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; connect-src ${webview.cspSource}; script-src 'nonce-${nonce}' 'wasm-unsafe-eval';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link href="${codicons}" rel="stylesheet">
 	<link href="${style}" rel="stylesheet">
 	<title>Author</title>
 </head>
-<body>
+<body data-harper="${harper}">
 ${BODY}
 	<script nonce="${nonce}" src="${script}"></script>
 </body>
@@ -781,6 +858,8 @@ interface JobStatus {
 	progress?: { written: number; chapters: number };
 	cancelled?: boolean;
 	findings?: unknown[];
+	replacement?: string;
+	verified?: boolean;
 }
 
 /**

@@ -53,15 +53,18 @@ import {
 	fencedMarks,
 	markOf,
 	markedProse,
+	marksOf,
 	moved,
+	placeInFile,
 	placed,
-	spansIn,
+	segmentsIn,
 	withoutBlock,
 } from './marks';
 import type { CellField } from './model';
 import type { Cursor } from './cursors';
 import type { Match, Query } from './find';
 import type { Finding, Mark } from './marks';
+import { Dialect, LocalLinter, createBinaryModuleFromUrl } from 'harper.js';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -88,6 +91,15 @@ const tipEl = document.getElementById('mark-tip') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
+
+/**
+ * How long what a mark says stays up once the pointer has left the word.
+ *
+ * Long enough to reach the box, because there is a button in it now. A tooltip
+ * that vanishes on the way to the thing it is offering is a tooltip that offers
+ * nothing.
+ */
+const TIP_GRACE_MS = 250;
 
 let cells: Cell[] = [];
 /** Where images in a cell resolve from; the host rewrites the folder for us. */
@@ -125,6 +137,18 @@ let openMarks: {
 	layer: HTMLElement;
 	index: number;
 } | null = null;
+/** The wait before what a mark says is taken off the page. */
+let tipTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * The next number to give a mark.
+ *
+ * Marks arrive from two places — the rules on the server and Harper running in
+ * here — and each numbering its own findings from nothing would be two marks
+ * claiming to be the same one.
+ */
+let nextFault = 0;
+/** Harper, made once and only if the author has asked to be checked. */
+let harper: LocalLinter | null = null;
 /**
  * The cell the server is writing, and how far through the story it has read.
  *
@@ -208,6 +232,16 @@ document.getElementById('spell')!.addEventListener('click', answerSpellCheck);
 // Turning the checks on is the author saying they want to be told. Drafting is
 // the other half of writing, and nothing is checked until they ask.
 checkEl.addEventListener('click', () => vscode.postMessage({ type: 'checkToggle' }));
+
+// The box has a button in it, so the pointer has to be able to live there. It
+// stays while it is under the pointer and goes when the pointer leaves it.
+tipEl.addEventListener('mouseenter', () => {
+	if (tipTimer !== undefined) {
+		clearTimeout(tipTimer);
+		tipTimer = undefined;
+	}
+});
+tipEl.addEventListener('mouseleave', hideTip);
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -632,7 +666,7 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	input.addEventListener('mousemove', (event) => {
 		const over = markAtPoint(marksLayer, event.clientX, event.clientY);
 		if (over) {
-			showTip(over.mark, over.at);
+			showTip(over.marks, over.at);
 		} else {
 			hideTip();
 		}
@@ -1282,6 +1316,142 @@ function foundIn(index: number, field: string | null): Match[] {
 // --- what the checks found ---
 
 /**
+ * Harper's own kinds, sorted into the two channels an underline has.
+ *
+ * Spelling is kept apart from the rest of the mechanics, because it is the one
+ * an author wants to see at a glance and the one most likely to be wrong about a
+ * novel — invented names, dialect, a word a character mangles on purpose.
+ */
+const MECHANICAL = new Set([
+	'Agreement',
+	'BoundaryError',
+	'Capitalization',
+	'Eggcorn',
+	'Formatting',
+	'Grammar',
+	'Malapropism',
+	'Nonstandard',
+	'Punctuation',
+	'Typo',
+	'WordOrder',
+]);
+
+function kindOf(lint: string): string {
+	if (lint === 'Spelling') {
+		return 'spelling';
+	}
+	return MECHANICAL.has(lint) ? 'grammar' : 'style';
+}
+
+/**
+ * Harper, built the first time it is wanted.
+ *
+ * It runs in here rather than on the server, which is the whole reason it was
+ * chosen: no request, no job, no poll. The WebAssembly is fetched from the
+ * extension's own folder — the host puts the address on the page, because only
+ * the host can turn a file into something a webview is allowed to load.
+ */
+function checker(): LocalLinter | null {
+	if (harper) {
+		return harper;
+	}
+	const binary = document.body.dataset.harper;
+	if (!binary) {
+		return null;
+	}
+	harper = new LocalLinter({
+		binary: createBinaryModuleFromUrl(binary, 'full'),
+		dialect: Dialect.American,
+	});
+	return harper;
+}
+
+/**
+ * What Harper makes of one cell.
+ *
+ * Cell coordinates from the start: it is given the cell's own text, so what
+ * comes back is already where the page draws. Nothing goes through the file's
+ * line numbers, because nothing went to the server.
+ */
+async function harperMarks(index: number): Promise<Mark[]> {
+	const linter = checker();
+	const cell = cells[index];
+	if (!linter || !cell?.source) {
+		return [];
+	}
+
+	const found = await linter.lint(cell.source, { language: 'markdown' });
+	const marks: Mark[] = [];
+	for (const lint of found) {
+		const span = lint.span();
+		const suggestions = lint.suggestions();
+		const replacements = suggestions.map((one) => one.get_replacement_text());
+		const named = lint.lint_kind();
+		marks.push({
+			id: nextFault++,
+			rule: `harper:${named}`,
+			kind: kindOf(named),
+			source: 'harper',
+			replacements,
+			message: lint.message(),
+			detail: `${lint.lint_kind_pretty()}. ${lint.message()}${
+				replacements.length > 0
+					? `\n\nHarper would put: ${replacements.slice(0, 4).join(', ')}`
+					: ''
+			}`,
+			cell: index,
+			at: span.start,
+			end: span.end,
+			related: [],
+		});
+		// The lints are WebAssembly objects, and what is not given back is held for
+		// as long as the editor is open.
+		for (const one of suggestions) {
+			one.free();
+		}
+		span.free();
+		lint.free();
+	}
+	return marks;
+}
+
+/**
+ * Have Harper read these cells again, and replace what it said about them.
+ *
+ * A source at a time: what Harper thinks of a cell is replaced wholesale, and
+ * what the server's rules think is left exactly as it was. Two checkers looking
+ * at one paragraph must not be able to delete each other's findings.
+ */
+async function harperCheck(indexes: number[]): Promise<void> {
+	if (!checking) {
+		return;
+	}
+	try {
+		for (const index of indexes) {
+			const fresh = await harperMarks(index);
+			if (!checking) {
+				return;
+			}
+			faults = [
+				...faults.filter(
+					(mark) => !(mark.source === 'harper' && mark.cell === index)
+				),
+				...fresh,
+			];
+		}
+		repaintMarks();
+	} catch {
+		// A checker that cannot start is a checker with nothing to say. The rules on
+		// the server are unaffected, and the author is not told about a component.
+	}
+}
+
+/** Every cell, for when there is no reason to think one of them is unchanged. */
+function everyCell(): number[] {
+	return cells.map((_, index) => index);
+}
+
+/**
  * A cell's text with both the marks over it and the matches in it fenced.
  *
  * Two fencings of one string, and each was measured on the string before either
@@ -1291,7 +1461,7 @@ function foundIn(index: number, field: string | null): Match[] {
  * others.
  */
 function fencedFor(cell: Cell, index: number): string {
-	const withMarks = fencedMarks(cell.source, spansIn(faults, index));
+	const withMarks = fencedMarks(cell.source, segmentsIn(faults, index));
 	const here = foundIn(index, null);
 	if (here.length === 0) {
 		return withMarks;
@@ -1303,16 +1473,24 @@ function fencedFor(cell: Cell, index: number): string {
 	return fenced(withMarks, again, at >= 0 ? (again[at] ?? null) : null);
 }
 
-/** Give the marks in a rendered cell what they need to be stopped on. */
+/**
+ * Give the marks in a rendered cell what they need to be stopped on.
+ *
+ * A run of text can be under more than one mark, and wears the colours of all of
+ * them — the underlines are drawn on separate channels so that neither hides the
+ * other, and stopping on the word says what each of them thinks.
+ */
 function wireMarks(rendered: HTMLElement): void {
 	rendered.querySelectorAll('.prose-mark').forEach((element) => {
-		const mark = markOf(faults, Number(element.getAttribute('data-mark')));
-		if (!mark) {
+		const shown = marksOf(faults, element.getAttribute('data-marks'));
+		if (shown.length === 0) {
 			return;
 		}
-		element.classList.add(`prose-mark-${mark.rule}`);
+		for (const mark of shown) {
+			element.classList.add(`prose-mark-${mark.kind}`);
+		}
 		element.addEventListener('mouseenter', () =>
-			showTip(mark, element as HTMLElement)
+			showTip(shown, element as HTMLElement)
 		);
 		element.addEventListener('mouseleave', hideTip);
 	});
@@ -1333,25 +1511,24 @@ function drawMarks(
 ): void {
 	layer.textContent = '';
 	const text = input.value;
-	const spans = spansIn(faults, index)
-		.filter((span) => span.at >= 0 && span.end <= text.length && span.end > span.at)
-		.sort((a, b) => a.at - b.at);
+	const segments = segmentsIn(faults, index).filter(
+		(segment) =>
+			segment.at >= 0 && segment.end <= text.length && segment.end > segment.at
+	);
 
 	let read = 0;
-	for (const span of spans) {
-		// Two marks over the same words are one underline; the second is drawn
-		// nowhere rather than over the top of the first.
-		if (span.at < read) {
-			continue;
-		}
-		layer.append(document.createTextNode(text.slice(read, span.at)));
-		const mark = markOf(faults, span.id);
+	for (const segment of segments) {
+		layer.append(document.createTextNode(text.slice(read, segment.at)));
+		const shown = marksOf(faults, segment.ids.join(','));
 		const line = document.createElement('span');
-		line.className = mark ? `prose-mark prose-mark-${mark.rule}` : 'prose-mark';
-		line.dataset.mark = String(span.id);
-		line.textContent = text.slice(span.at, span.end);
+		line.className = [
+			'prose-mark',
+			...new Set(shown.map((mark) => `prose-mark-${mark.kind}`)),
+		].join(' ');
+		line.dataset.marks = segment.ids.join(',');
+		line.textContent = text.slice(segment.at, segment.end);
 		layer.append(line);
-		read = span.end;
+		read = segment.end;
 	}
 	layer.append(document.createTextNode(text.slice(read)));
 }
@@ -1369,7 +1546,7 @@ function markAtPoint(
 	layer: HTMLElement,
 	x: number,
 	y: number
-): { mark: Mark; at: HTMLElement } | null {
+): { marks: Mark[]; at: HTMLElement } | null {
 	const drawn = layer.querySelectorAll('.prose-mark');
 	for (let index = 0; index < drawn.length; index++) {
 		const element = drawn[index] as HTMLElement;
@@ -1377,8 +1554,8 @@ function markAtPoint(
 		for (let box = 0; box < boxes.length; box++) {
 			const place = boxes[box];
 			if (x >= place.left && x <= place.right && y >= place.top && y <= place.bottom) {
-				const mark = markOf(faults, Number(element.getAttribute('data-mark')));
-				return mark ? { mark, at: element } : null;
+				const shown = marksOf(faults, element.getAttribute('data-marks'));
+				return shown.length > 0 ? { marks: shown, at: element } : null;
 			}
 		}
 	}
@@ -1386,22 +1563,51 @@ function markAtPoint(
 }
 
 /**
- * What the mark says, where the author stopped on it.
+ * What the marks on a word say, where the author stopped on them.
  *
- * Two things and not one: what is wrong, which is what the underline would say
- * if it could speak, and why, which is the whole reason a check is worth having
- * over a squiggle. Room enough for the second is what makes it a box rather than
- * a tooltip.
+ * Three things about each and not one: what is wrong, which is what the
+ * underline would say if it could speak; why, which is the whole reason a check
+ * is worth having over a squiggle; and what to do about it, which is the only
+ * part the author cannot work out for themselves.
+ *
+ * All of them, because a word can be under more than one mark and the author is
+ * owed both readings rather than whichever happened to be found first.
  */
-function showTip(mark: Mark, at: HTMLElement): void {
+function showTip(shown: Mark[], at: HTMLElement): void {
+	if (shown.length === 0) {
+		hideTip();
+		return;
+	}
+	if (tipTimer !== undefined) {
+		clearTimeout(tipTimer);
+		tipTimer = undefined;
+	}
+
 	tipEl.textContent = '';
-	const said = document.createElement('div');
-	said.className = 'mark-tip-said';
-	said.textContent = mark.message;
-	const why = document.createElement('div');
-	why.className = 'mark-tip-why';
-	why.textContent = mark.detail;
-	tipEl.append(said, why);
+	for (const mark of shown) {
+		const row = document.createElement('div');
+		row.className = `mark-tip-row mark-tip-${mark.kind}`;
+
+		const said = document.createElement('div');
+		said.className = 'mark-tip-said';
+		said.textContent = mark.message;
+
+		const why = document.createElement('div');
+		why.className = 'mark-tip-why';
+		why.textContent = mark.detail;
+
+		// The fault is what the fix is asked for by. Nothing here rewrites the
+		// paragraph and hopes — the model is told which words and what is wrong with
+		// them, and its answer is refused if the same rule still fires on it.
+		const fix = document.createElement('button');
+		fix.className = 'mark-tip-fix';
+		fix.type = 'button';
+		fix.textContent = 'Fix';
+		fix.addEventListener('click', () => askFix(mark));
+
+		row.append(said, why, fix);
+		tipEl.append(row);
+	}
 	tipEl.hidden = false;
 
 	// Laid out before it is placed, or its width is nothing and it is put wherever
@@ -1412,8 +1618,90 @@ function showTip(mark: Mark, at: HTMLElement): void {
 	tipEl.style.top = `${box.bottom + 6}px`;
 }
 
+/** Take the box away, after long enough for the pointer to reach it. */
 function hideTip(): void {
+	if (tipTimer !== undefined) {
+		clearTimeout(tipTimer);
+	}
+	tipTimer = setTimeout(() => {
+		tipEl.hidden = true;
+		tipTimer = undefined;
+	}, TIP_GRACE_MS);
+}
+
+/**
+ * Ask for this fault to be put right, naming it rather than the paragraph it is
+ * in.
+ *
+ * The mark is named by its id and not by where it is, because where it is will
+ * have moved by the time the answer comes back — the author goes on typing while
+ * the model reads.
+ */
+function askFix(mark: Mark): void {
+	// Whatever found the fault sometimes knows what belongs there — a misspelling
+	// has a spelling, a redundancy has a shorter form. There is nothing for a
+	// model to work out, and nothing to wait for.
+	if (mark.replacements.length > 0) {
+		tipEl.hidden = true;
+		applyFix(mark.id, mark.replacements[0]);
+		return;
+	}
+	const at = placeInFile(cells, mark.cell, mark.at);
+	const end = placeInFile(cells, mark.cell, mark.end);
+	if (!at || !end) {
+		return;
+	}
+	vscode.postMessage({
+		type: 'fixMark',
+		id: mark.id,
+		where: { at, end },
+		rule: mark.rule,
+		message: mark.message,
+		detail: mark.detail,
+	});
 	tipEl.hidden = true;
+}
+
+/**
+ * Put the fix in, where the mark is now.
+ *
+ * An edit like any other, and it goes in the same way the author's own would:
+ * into the open box if the cell is being typed in, so that the keystroke path
+ * moves the marks and settles the cell, and into the document otherwise. A mark
+ * the author has meanwhile typed over is gone, and so is the fix for it.
+ */
+function applyFix(id: number, replacement: string): void {
+	const mark = markOf(faults, id);
+	if (!mark) {
+		return;
+	}
+	const cell = cells[mark.cell];
+	if (!cell) {
+		return;
+	}
+
+	if (openMarks && openMarks.index === mark.cell) {
+		const input = openMarks.input;
+		input.value =
+			input.value.slice(0, mark.at) + replacement + input.value.slice(mark.end);
+		input.dispatchEvent(new Event('input'));
+		return;
+	}
+
+	const source =
+		cell.source.slice(0, mark.at) + replacement + cell.source.slice(mark.end);
+	const next = [...cells];
+	next[mark.cell] = { ...cell, source };
+	faults = moved(faults, mark.cell, {
+		at: mark.at,
+		removed: mark.end - mark.at,
+		inserted: replacement.length,
+	});
+	changedAt = mark.at + replacement.length;
+	drawn = signatureOf(next);
+	commit(next);
+	recheckBlock(mark.cell, source);
+	repaintMarks();
 }
 
 /**
@@ -1465,6 +1753,9 @@ function recheckBlock(index: number, source: string): void {
 			where: { start: where.start + block.first, end: where.start + block.last },
 		});
 	}
+	// Harper is here rather than over a wire, so it reads the whole cell again
+	// rather than being told which paragraph — it costs less than working it out.
+	void harperCheck([index]);
 }
 
 /**
@@ -1946,6 +2237,7 @@ window.addEventListener('message', (event) => {
 		refind();
 		showCount();
 		render();
+		void harperCheck(everyCell());
 	} else if (message?.type === 'checking') {
 		checking = message.on as boolean;
 		checkEl.classList.toggle('on', checking);
@@ -1955,20 +2247,27 @@ window.addEventListener('message', (event) => {
 			faults = [];
 			hideTip();
 			repaintMarks();
+		} else {
+			// The server is already reading the document; this is the other half of
+			// the same answer, and it needs nobody's permission to start.
+			void harperCheck(everyCell());
 		}
 	} else if (message?.type === 'marks') {
-		const arrived = placed(cells, message.findings as Finding[]);
-		// A pass over the whole document replaces what is there. A pass over one
-		// paragraph adds to it, since every other mark is about prose it never read
-		// — and its findings are numbered from nothing, so they are renumbered past
-		// the marks already standing.
+		const findings = message.findings as Finding[];
+		const arrived = placed(cells, findings, nextFault, 'server');
+		nextFault += findings.length;
+		// A pass over the whole document replaces what the server said and nothing
+		// else — Harper read the same paragraphs and is not being overruled. A pass
+		// over one paragraph only adds, since every other mark is about prose it
+		// never looked at.
 		if (message.whole) {
-			faults = arrived;
+			faults = [...faults.filter((mark) => mark.source !== 'server'), ...arrived];
 		} else {
-			const next = faults.reduce((most, mark) => Math.max(most, mark.id + 1), 0);
-			faults = [...faults, ...arrived.map((mark) => ({ ...mark, id: mark.id + next }))];
+			faults = [...faults, ...arrived];
 		}
 		repaintMarks();
+	} else if (message?.type === 'fixed') {
+		applyFix(message.id as number, message.text as string);
 	}
 });
 
