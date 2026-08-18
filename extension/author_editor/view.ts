@@ -528,7 +528,14 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 			dropCursors(layer);
 			return;
 		}
-		// Going somewhere is going to one place.
+		// A step left or right is taken by every cursor at once. Anything else that
+		// goes somewhere — a line, a word, a selection reached for with shift — is
+		// going to one place, and gives the others up.
+		if (cursors.length > 1 && isStepKey(event)) {
+			event.preventDefault();
+			moveCursors(input, layer, event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
 		if (MOVES.has(event.key)) {
 			dropCursors(layer);
 		}
@@ -1241,13 +1248,15 @@ function isReplaceKey(event: KeyboardEvent): boolean {
 let cursors: Cursor[] = [];
 let leading = -1;
 /**
- * How much has been typed at every cursor since they were taken.
+ * How much of what was taken lies each side of the caret.
  *
- * One number for all of them, because they all took the same keys: it is what
- * turns a caret back into something the author can see, by saying how much of
- * the text in front of it is what they have just written.
+ * One pair for all of them, because they all took the same keys and all stand at
+ * the same spot in the same word. It is what turns a caret back into something
+ * an author can see: the word being changed, drawn at every place, with the
+ * caret somewhere inside it.
  */
-let typedRun = 0;
+let runBefore = 0;
+let runAfter = 0;
 
 /** The keys that mean one place rather than several. */
 const MOVES = new Set([
@@ -1260,6 +1269,17 @@ const MOVES = new Set([
 	'PageUp',
 	'PageDown',
 ]);
+
+/** A plain step left or right, which every cursor can take together. */
+function isStepKey(event: KeyboardEvent): boolean {
+	return (
+		(event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+		!event.shiftKey &&
+		!event.altKey &&
+		!event.ctrlKey &&
+		!event.metaKey
+	);
+}
 
 /** Ctrl+D, and Cmd+D on a Mac. */
 function isCursorKey(event: KeyboardEvent): boolean {
@@ -1290,7 +1310,8 @@ function addCursor(input: HTMLTextAreaElement, layer: HTMLElement): void {
 	if (cursors.length === 0) {
 		cursors = [{ at, end }];
 		leading = 0;
-		typedRun = 0;
+		runBefore = 0;
+		runAfter = 0;
 	} else {
 		cursors[leading] = { at, end };
 	}
@@ -1312,7 +1333,8 @@ function addCursor(input: HTMLTextAreaElement, layer: HTMLElement): void {
 function dropCursors(layer?: HTMLElement): void {
 	cursors = [];
 	leading = -1;
-	typedRun = 0;
+	runBefore = 0;
+	runAfter = 0;
 	if (layer) {
 		layer.textContent = '';
 	}
@@ -1350,10 +1372,18 @@ function typeEverywhere(
 			: event.inputType === 'deleteContentForward'
 				? 1
 				: 0;
-	typedRun =
-		event.inputType === 'deleteContentBackward'
-			? Math.max(0, typedRun - 1)
-			: typedRun + typed.length;
+	// What is taken follows the keys: typing over a selection makes what is typed
+	// the whole of it, and after that it grows and shrinks around the caret.
+	if (cursors.some((cursor) => cursor.end > cursor.at)) {
+		runBefore = typed.length;
+		runAfter = 0;
+	} else if (event.inputType === 'deleteContentBackward') {
+		runBefore = Math.max(0, runBefore - 1);
+	} else if (event.inputType === 'deleteContentForward') {
+		runAfter = Math.max(0, runAfter - 1);
+	} else {
+		runBefore += typed.length;
+	}
 	const next = edited(input.value, cursors, typed, reach);
 	input.value = next.text;
 	cursors = next.cursors;
@@ -1384,14 +1414,14 @@ function typedIn(event: InputEvent): string | null {
 /**
  * Draw what is taken, at every place but under the author's own caret.
  *
- * A place shows what is selected there, or — once that has been typed over —
- * what has just been written there, which is the run every cursor shares. A
+ * A place shows what is selected there, or — once that has been typed over — the
+ * run the keys have been going into, which is the same run at every place. A
  * caret alone is a line an author has to hunt for; the words they are changing
  * are what they can see.
  *
  * The text is laid out again around them, so that a place drawn here is under
- * the same word there. The caret itself is a character of no width, rather than
- * one that would push the rest of the line out of step.
+ * the same word there. The caret is a character of no width, cut into what is
+ * taken where it stands rather than left at the end of it.
  */
 function drawCursors(input: HTMLTextAreaElement, layer: HTMLElement): void {
 	layer.textContent = '';
@@ -1404,33 +1434,74 @@ function drawCursors(input: HTMLTextAreaElement, layer: HTMLElement): void {
 		.sort((a, b) => a.cursor.at - b.cursor.at);
 	let read = 0;
 
+	const taken = (from: number, to: number, leads: boolean): void => {
+		const span = document.createElement('span');
+		span.className = leads ? 'at leading' : 'at';
+		span.textContent = text.slice(from, to);
+		layer.append(span);
+	};
+
 	for (const { cursor, index } of order) {
-		if (cursor.end < read) {
+		const empty = cursor.end === cursor.at;
+		// The caret stands at the far end of a selection, and at itself otherwise.
+		const caret = cursor.end;
+		if (caret < read) {
 			continue;
 		}
-		const from = Math.max(
-			read,
-			cursor.end > cursor.at ? cursor.at : cursor.at - typedRun
-		);
+		const from = Math.max(read, Math.min(empty ? cursor.at - runBefore : cursor.at, caret));
+		const to = Math.min(text.length, Math.max(empty ? cursor.at + runAfter : cursor.end, caret));
+
 		layer.append(document.createTextNode(text.slice(read, from)));
-		if (cursor.end > from) {
-			const taken = document.createElement('span');
-			taken.className = index === leading ? 'at leading' : 'at';
-			taken.textContent = text.slice(from, cursor.end);
-			layer.append(taken);
+		if (caret > from) {
+			taken(from, caret, index === leading);
 		}
 		// The box draws its own caret, and a second under it would be two carets
 		// in one place.
 		if (index !== leading) {
-			const caret = document.createElement('span');
-			caret.className = 'caret';
-			caret.textContent = '\u200b';
-			layer.append(caret);
+			const bar = document.createElement('span');
+			bar.className = 'caret';
+			bar.textContent = '\u200b';
+			layer.append(bar);
 		}
-		read = cursor.end;
+		if (to > caret) {
+			taken(caret, to, index === leading);
+		}
+		read = to;
 	}
 
 	layer.append(document.createTextNode(text.slice(read)));
+}
+
+/**
+ * Move every cursor the same way at once.
+ *
+ * They all took the same keys and all stand at the same spot in the same word,
+ * so they all move together; what is taken stays where it is in the text while
+ * the caret walks through it. A selection collapses to the end it is moving
+ * towards, as it does anywhere.
+ */
+function moveCursors(input: HTMLTextAreaElement, layer: HTMLElement, by: number): void {
+	const text = input.value;
+	const held = cursors.some((cursor) => cursor.end > cursor.at);
+	if (held) {
+		const length = cursors[leading].end - cursors[leading].at;
+		runBefore = by < 0 ? 0 : length;
+		runAfter = by < 0 ? length : 0;
+	} else {
+		runBefore += by;
+		runAfter -= by;
+	}
+	cursors = cursors.map((cursor) => {
+		const to = cursor.end > cursor.at
+			? by < 0
+				? cursor.at
+				: cursor.end
+			: Math.min(text.length, Math.max(0, cursor.at + by));
+		return { at: to, end: to };
+	});
+	const here = cursors[leading];
+	input.setSelectionRange(here.at, here.end);
+	drawCursors(input, layer);
 }
 
 // --- the menu ---
