@@ -19,6 +19,7 @@ import {
 	has,
 	markdown,
 	parse,
+	part,
 	titleOf,
 	type Cell,
 } from '../../../extension/storydoc/model';
@@ -69,6 +70,10 @@ describe('writing', () => {
 
 	it('writes a chapter as its marker alone, since it is only a name', () => {
 		expect(dumps([chapter('One')])).toBe('<!-- cell: chapter title="One" -->\n');
+	});
+
+	it('writes a part as its marker alone, since it too is only a name', () => {
+		expect(dumps([part('Book One')])).toBe('<!-- cell: part title="Book One" -->\n');
 	});
 
 	it('writes a cell with no text as its marker alone', () => {

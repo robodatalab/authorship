@@ -366,6 +366,84 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<h2>Heads Up</h2>", page)
         self.assertIn("Any resemblance is coincidental.", page)
 
+    def test_a_part_gets_a_page_of_its_own_carrying_only_its_name(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/part.xhtml").decode("utf-8")
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn("<h1>Book One</h1>", page)
+        self.assertIn('class="part-page"', page)
+        self.assertNotIn("prose", page)
+        # Centred both ways against the reader's page, which is the whole of what
+        # a part divider looks like.
+        self.assertIn(".part-page", css)
+        self.assertIn("height: 100vh", css)
+        self.assertIn("text-align: center", css)
+
+    def test_a_part_opens_a_page_the_chapters_under_it_do_not_share(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.part("Book Two"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("more"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(
+            order, ["titlepage", "part", "chap_000", "part_2", "chap_001"]
+        )
+
+    def test_a_part_with_no_name_is_numbered_by_where_it_stands(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            Cell(storydoc.PART, "", {}),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(storydoc.PART, "", {}),
+            storydoc.chapter("Two"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            first = z.read("OEBPS/part.xhtml").decode("utf-8")
+            second = z.read("OEBPS/part_2.xhtml").decode("utf-8")
+
+        self.assertIn("<h1>Part 1</h1>", first)
+        self.assertIn("<h1>Part 2</h1>", second)
+
+    def test_a_part_is_somewhere_the_reader_can_navigate_to(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+
+        self.assertIn("Book One", nav)
+
     def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
         out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
 

@@ -14,6 +14,7 @@ import {
 	COVER,
 	DISCLAIMER,
 	MARKDOWN,
+	PART,
 	TITLE_PAGE,
 	type Cell,
 } from '../storydoc/model';
@@ -133,6 +134,17 @@ export const KINDS: CellKind[] = [
 		fields: [{ name: 'title', label: 'Title' }],
 		primary: true,
 		blank: () => ({ kind: CHAPTER, source: '', attrs: { title: 'Untitled' } }),
+	},
+	{
+		kind: PART,
+		// A division of the story, one level above a chapter: it names the run of
+		// chapters under it and holds no prose, exactly as a chapter does.
+		prose: false,
+		label: 'Part',
+		automated: false,
+		fields: [{ name: 'title', label: 'Title' }],
+		primary: false,
+		blank: () => ({ kind: PART, source: '', attrs: { title: 'Untitled' } }),
 	},
 	{
 		kind: TITLE_PAGE,
@@ -377,12 +389,28 @@ export function withDefaultCell(cells: Cell[]): Cell[] {
 }
 
 /**
+ * The levels of the story, in the order markdown's headings run.
+ *
+ * One list, read both ways: `fromMarkdown` reads a heading as the level its
+ * depth names, and `toMarkdown` writes that depth back. Everything below the
+ * last of them is prose — a `####` line is something the author wrote inside a
+ * scene, not a division of the book.
+ */
+const LEVELS: string[] = [TITLE_PAGE, PART, CHAPTER];
+
+const HEADING = /^(#{1,3})\s+(.*)$/;
+
+/** The heading a level of the story is written as. */
+function headingFor(kind: string): string {
+	return '#'.repeat(LEVELS.indexOf(kind) + 1);
+}
+
+/**
  * A plain markdown manuscript, read as cells.
  *
- * `#` names the book and `##` names a chapter, which is the convention every
- * manuscript in this repo was already written in. A chapter carries only its
- * name, so the prose under one becomes markdown cells of its own — the same
- * split the editor keeps everywhere else.
+ * `#` names the book, `##` a part, `###` a chapter. Each of the three carries
+ * only its name, so the prose under one becomes markdown cells of its own — the
+ * same split the editor keeps everywhere else.
  */
 export function fromMarkdown(text: string): Cell[] {
 	const cells: Cell[] = [];
@@ -397,25 +425,17 @@ export function fromMarkdown(text: string): Cell[] {
 	};
 
 	for (const line of text.split('\n')) {
-		const chapterHeading = /^##\s+(.*)$/.exec(line.trim());
-		const bookTitle = /^#\s+(.*)$/.exec(line.trim());
-		if (chapterHeading) {
-			flush();
-			cells.push({
-				kind: CHAPTER,
-				source: '',
-				attrs: { title: chapterHeading[1].trim() },
-			});
-		} else if (bookTitle) {
-			flush();
-			cells.push({
-				kind: TITLE_PAGE,
-				source: '',
-				attrs: { title: bookTitle[1].trim() },
-			});
-		} else {
+		const heading = HEADING.exec(line.trim());
+		if (!heading) {
 			prose.push(line);
+			continue;
 		}
+		flush();
+		cells.push({
+			kind: LEVELS[heading[1].length - 1],
+			source: '',
+			attrs: { title: heading[2].trim() },
+		});
 	}
 	flush();
 	return cells;
@@ -424,11 +444,11 @@ export function fromMarkdown(text: string): Cell[] {
 /**
  * The cells as a plain markdown manuscript.
  *
- * The inverse of `fromMarkdown` for the parts it can be: a chapter goes back to
- * the `##` it came from, and everything that holds prose contributes its prose.
- * What the markdown cannot carry is which cell a passage came from — that is the
- * cost of leaving the format, and the reason this is an export rather than a
- * save.
+ * The inverse of `fromMarkdown` for the parts it can be: the story's three
+ * levels go back to the headings they came from, and everything that holds
+ * prose contributes its prose. What the markdown cannot carry is which cell a
+ * passage came from — that is the cost of leaving the format, and the reason
+ * this is an export rather than a save.
  */
 export function toMarkdown(cells: Cell[]): string {
 	const out: string[] = [];
@@ -442,8 +462,8 @@ export function toMarkdown(cells: Cell[]): string {
 			out.push(...titlePageMarkdown(cell));
 			continue;
 		}
-		if (cell.kind === CHAPTER) {
-			out.push(`## ${cell.attrs.title || 'Untitled'}`);
+		if (cell.kind === PART || cell.kind === CHAPTER) {
+			out.push(`${headingFor(cell.kind)} ${cell.attrs.title || 'Untitled'}`);
 			continue;
 		}
 		if (cell.kind === ABOUT) {
@@ -451,9 +471,12 @@ export function toMarkdown(cells: Cell[]): string {
 			continue;
 		}
 		// Any other cell that carries a name is headed by it — a disclaimer is a
-		// page with a title and prose, and reads as one in markdown too.
+		// page with a title and prose, and reads as one in markdown too. A page of
+		// the book is not a level of the story, so it is headed as a chapter is:
+		// markdown has no way to say "disclaimer", and it is the chapters such a
+		// page stands among.
 		if (cell.attrs.title) {
-			out.push(`## ${cell.attrs.title}`);
+			out.push(`${headingFor(CHAPTER)} ${cell.attrs.title}`);
 		}
 		if (cell.source) {
 			out.push(cell.source);
@@ -490,11 +513,11 @@ function aboutMarkdown(cell: Cell): string[] {
 	}
 	// Nothing written and nowhere to send anyone: the page is not printed. An
 	// empty "About the Author" is worse than no page at all.
-	return said.length > 0 ? ['## About the Author', ...said] : [];
+	return said.length > 0 ? [`${headingFor(CHAPTER)} About the Author`, ...said] : [];
 }
 
 function titlePageMarkdown(cell: Cell): string[] {
-	const out = [`# ${cell.attrs.title || 'Untitled'}`];
+	const out = [`${headingFor(TITLE_PAGE)} ${cell.attrs.title || 'Untitled'}`];
 	if (cell.attrs.subtitle) {
 		out.push(`*${cell.attrs.subtitle}*`);
 	}

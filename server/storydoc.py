@@ -43,6 +43,7 @@ EXTENSION = ".author"
 
 MARKDOWN = "markdown"
 CHAPTER = "chapter"
+PART = "part"
 TITLE_PAGE = "title-page"
 COVER = "cover"
 CONTENTS = "contents"
@@ -162,6 +163,15 @@ def chapter(title: str) -> Cell:
     so a chapter carries a title and no source of its own.
     """
     return Cell(CHAPTER, "", {"title": title})
+
+
+def part(title: str) -> Cell:
+    """A named division of the story, gathering the chapters that follow it.
+
+    The same bargain a chapter strikes, one level up: it names a run of chapters
+    and carries no prose of its own.
+    """
+    return Cell(PART, "", {"title": title})
 
 
 def cover(src: str, alt: str = "Cover") -> Cell:

@@ -29,6 +29,7 @@ import {
 	contents,
 	dumps,
 	markdown,
+	part,
 	type Cell,
 } from '../../../extension/storydoc/model';
 
@@ -72,7 +73,7 @@ describe('the kinds a section can be', () => {
 		for (const kind of ['title-page', 'cover', 'contents', 'disclaimer', 'about']) {
 			expect(isMatter(kind), kind).toBe(true);
 		}
-		for (const kind of ['markdown', 'chapter', 'epigraph']) {
+		for (const kind of ['markdown', 'chapter', 'part', 'epigraph']) {
 			expect(isMatter(kind), kind).toBe(false);
 		}
 	});
@@ -90,6 +91,17 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('chapter')).toBe(false);
 		expect(fieldsOf('markdown')).toHaveLength(0);
 		expect(hasProse('markdown')).toBe(true);
+	});
+
+	it('gives a part the same shape as a chapter — a name and nothing else', () => {
+		expect(fieldsOf('part').map((f) => f.name)).toEqual(['title']);
+		expect(hasProse('part')).toBe(false);
+		expect(isAutomated('part')).toBe(false);
+		expect(KINDS.find((k) => k.kind === 'part')!.blank()).toEqual({
+			kind: 'part',
+			source: '',
+			attrs: { title: 'Untitled' },
+		});
 	});
 
 	it('records the whole title page in fields, not in prose', () => {
@@ -433,11 +445,19 @@ describe('safeUrl', () => {
 });
 
 describe('fromMarkdown — reading a plain manuscript in', () => {
-	it('reads `##` as a chapter that carries only its name', () => {
-		const cells = fromMarkdown('## The First Night\n\nIt began badly.\n');
+	it('reads `###` as a chapter that carries only its name', () => {
+		const cells = fromMarkdown('### The First Night\n\nIt began badly.\n');
 		expect(cells).toEqual([
 			{ kind: 'chapter', source: '', attrs: { title: 'The First Night' } },
 			{ kind: 'markdown', source: 'It began badly.', attrs: {} },
+		]);
+	});
+
+	it('reads `##` as a part, the level between the book and its chapters', () => {
+		const cells = fromMarkdown('## Day One\n\n### The First Night\n');
+		expect(cells).toEqual([
+			{ kind: 'part', source: '', attrs: { title: 'Day One' } },
+			{ kind: 'chapter', source: '', attrs: { title: 'The First Night' } },
 		]);
 	});
 
@@ -450,7 +470,7 @@ describe('fromMarkdown — reading a plain manuscript in', () => {
 
 	it('reads a whole manuscript in order', () => {
 		const cells = fromMarkdown(
-			'# Book\n\nintro\n\n## One\n\na\n\n## Two\n\nb\n'
+			'# Book\n\nintro\n\n### One\n\na\n\n### Two\n\nb\n'
 		);
 		expect(cells.map((c) => c.kind)).toEqual([
 			'title-page',
@@ -459,6 +479,21 @@ describe('fromMarkdown — reading a plain manuscript in', () => {
 			'markdown',
 			'chapter',
 			'markdown',
+		]);
+	});
+
+	it('reads the three levels of a divided manuscript in order', () => {
+		const cells = fromMarkdown(
+			'# Book\n\n## Day One\n\n### One\n\na\n\n## Day Two\n\n### Two\n\nb\n'
+		);
+		expect(cells.map((c) => [c.kind, c.attrs.title ?? c.source])).toEqual([
+			['title-page', 'Book'],
+			['part', 'Day One'],
+			['chapter', 'One'],
+			['markdown', 'a'],
+			['part', 'Day Two'],
+			['chapter', 'Two'],
+			['markdown', 'b'],
 		]);
 	});
 
@@ -473,15 +508,38 @@ describe('fromMarkdown — reading a plain manuscript in', () => {
 		expect(fromMarkdown('\n\n')).toEqual([]);
 	});
 
-	it('does not mistake `###` for a chapter', () => {
-		const cells = fromMarkdown('### A scene\n\nprose\n');
+	it('does not mistake a heading below a chapter for one', () => {
+		// Three levels is the whole of the story's structure; a `####` line is
+		// something the author wrote inside a scene.
+		const cells = fromMarkdown('#### A scene\n\nprose\n');
 		expect(cells.map((c) => c.kind)).toEqual(['markdown']);
+	});
+
+	it('does not mistake a hash with no space after it for a heading', () => {
+		expect(fromMarkdown('#notatitle\n').map((c) => c.kind)).toEqual(['markdown']);
+		expect(fromMarkdown('##3 of them\n').map((c) => c.kind)).toEqual(['markdown']);
 	});
 });
 
 describe('toMarkdown — writing a plain manuscript out', () => {
-	it('writes a chapter back as the `##` it came from', () => {
-		expect(toMarkdown([chapter('One')])).toBe('## One\n');
+	it('writes a chapter as `###`, a level below the part it sits in', () => {
+		expect(toMarkdown([chapter('One')])).toBe('### One\n');
+	});
+
+	it('writes the three levels of the story as the three headings markdown has', () => {
+		const written = toMarkdown([
+			{ kind: 'title-page', source: '', attrs: { title: 'Book' } },
+			part('One'),
+			chapter('The First Night'),
+			markdown('a'),
+		]);
+		expect(written).toBe('# Book\n\n## One\n\n### The First Night\n\na\n');
+	});
+
+	it('writes a part with no name of its own under a placeholder', () => {
+		expect(toMarkdown([{ kind: 'part', source: '', attrs: {} }])).toBe(
+			'## Untitled\n'
+		);
 	});
 
 	it('writes prose as itself', () => {
@@ -490,14 +548,16 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 
 	it('separates sections by a blank line', () => {
 		expect(toMarkdown([chapter('One'), markdown('a'), chapter('Two')])).toBe(
-			'## One\n\na\n\n## Two\n'
+			'### One\n\na\n\n### Two\n'
 		);
 	});
 
-	it('heads a disclaimer with its title, like any other page', () => {
+	it('heads a disclaimer with its title, at the level of the chapters it stands among', () => {
+		// A page of the book is not a level of the story, and markdown has no way
+		// to say "disclaimer" — so it is headed the way a chapter is.
 		expect(
 			toMarkdown([{ kind: 'disclaimer', source: 'Careful.', attrs: { title: 'Heads Up!' } }])
-		).toBe('## Heads Up!\n\nCareful.\n');
+		).toBe('### Heads Up!\n\nCareful.\n');
 	});
 
 	it('prints nothing at all when the author has filled nothing in', () => {
@@ -507,7 +567,7 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 	it('prints the author page for a single link', () => {
 		expect(
 			toMarkdown([{ kind: 'about', source: '', attrs: { substack: 'https://s.example' } }])
-		).toBe('## About the Author\n\n[Substack](https://s.example)\n');
+		).toBe('### About the Author\n\n[Substack](https://s.example)\n');
 	});
 
 	it('prints the blurb above the links', () => {
@@ -519,7 +579,7 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 			},
 		]);
 		expect(written).toBe(
-			'## About the Author\n\nA. Writer lives by the sea.\n\n' +
+			'### About the Author\n\nA. Writer lives by the sea.\n\n' +
 				'[Books on Amazon](https://a.example) \u00b7 [Website](https://w.example)\n'
 		);
 	});
@@ -545,12 +605,19 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 			markdown('a'),
 		]);
 		expect(written).not.toContain('A woman loses her name.');
-		expect(written).toBe('## One\n\na\n');
+		expect(written).toBe('### One\n\na\n');
 	});
 
 	it('round-trips a manuscript back to the cells it was read from', () => {
-		const source = '# Book\n\nintro\n\n## One\n\na\n\n## Two\n\nb\n';
+		const source = '# Book\n\nintro\n\n### One\n\na\n\n### Two\n\nb\n';
 		const cells = fromMarkdown(source);
+		expect(fromMarkdown(toMarkdown(cells))).toEqual(cells);
+	});
+
+	it('round-trips a manuscript divided into parts', () => {
+		const source = '# Book\n\n## Day One\n\n### One\n\na\n\n## Day Two\n\n### Two\n\nb\n';
+		const cells = fromMarkdown(source);
+		expect(toMarkdown(cells)).toBe(source);
 		expect(fromMarkdown(toMarkdown(cells))).toEqual(cells);
 	});
 

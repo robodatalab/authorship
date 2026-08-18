@@ -30,6 +30,7 @@ from server.storydoc import (
     CONTENTS,
     COVER,
     DISCLAIMER,
+    PART,
     PRIVATE_KINDS,
     TITLE_PAGE,
     Cell,
@@ -221,11 +222,15 @@ def read_book(document: Document) -> Book:
     listings: list[Page] = []
     cover: Cover | None = None
     chapters = 0
+    parts = 0
 
     for cell in document.cells:
         if cell.kind == CHAPTER:
             documents.append(Chapter(chapters, cell.title, []))
             chapters += 1
+        elif cell.kind == PART:
+            documents.append(build_part_page(parts, cell))
+            parts += 1
         elif cell.kind == TITLE_PAGE:
             documents.append(build_title_page(imprint))
         elif cell.kind == COVER:
@@ -321,7 +326,7 @@ body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
    cover can still fill the page edge to edge. Without it the first-line indent
    is the only white space on the page and reads as a stray offset rather than
    as the paragraph opening it is. */
-.chapter, .title-page, .contents, .disclaimer, .about { padding: 0 6%; }
+.chapter, .title-page, .contents, .disclaimer, .about, .part-page { padding: 0 6%; }
 /* No page-break-before here: every chapter is its own spine document, so the
    reader already opens a page for it. Breaking again leaves a blank one. */
 h1, h2, h3 { font-family: Georgia, serif; text-align: center; font-weight: normal;
@@ -333,6 +338,12 @@ p { margin: 0; text-indent: 1.4em; }
 p:first-of-type, h1 + p, h2 + p, h3 + p, hr + p { text-indent: 0; }
 hr.scene-break { border: 0; text-align: center; margin: 1.4em 0; }
 hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
+/* A part is one line on an otherwise empty page, set in the middle of it both
+   ways. The height is the reader's page rather than the text's, which is what
+   lets the line be centred against something. */
+.part-page { display: flex; flex-direction: column; justify-content: center;
+             align-items: center; height: 100vh; text-align: center; }
+.part-page h1 { margin: 0; }
 .cover { text-align: center; margin: 0; padding: 0; }
 .cover img { max-width: 100%; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
@@ -400,6 +411,21 @@ def build_title_page(imprint: Imprint) -> Page:
         "titlepage",
         imprint.title,
         '<div class="title-page">\n' + "\n".join(said) + "\n</div>",
+    )
+
+
+def build_part_page(idx: int, cell: Cell) -> Page:
+    """The divider a reader turns to before the chapters under it.
+
+    A page of its own carrying one line: every document in the spine opens a
+    page, so the name stands alone with nothing above or below it.
+    """
+    name = cell.title or f"Part {idx + 1}"
+    return Page(
+        "part",
+        name,
+        f'<div class="part-page">\n<h1>{_inline(name)}</h1>\n</div>',
+        in_toc=True,
     )
 
 

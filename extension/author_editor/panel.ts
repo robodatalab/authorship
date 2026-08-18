@@ -35,9 +35,19 @@ const POLLS_UNANSWERED = 5;
  * and has a button to stop it, which is better than a clock nobody set.
  */
 const JOB_TIMEOUT_MS = 180_000;
+
+/**
+ * The two ways a story that has parts of its own can be divided into files.
+ *
+ * The author is only ever offered this where it is a real choice: a story with
+ * no parts has one division and is not asked which one it wants.
+ */
+const ALONG_THE_PARTS = 'Along the story\u2019s parts, then by length';
+const BY_LENGTH_ALONE = 'By length alone';
+
 import { divideManuscript } from '../parts/divide';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { dumps, parse, type Cell } from '../storydoc/model';
+import { PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -544,15 +554,31 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	/**
 	 * Cut the story into `parts/part_1.author`, `part_2.author`… beside it.
 	 *
-	 * The one thing asked is how long a part should be — where they go and what
-	 * they are called follow from the document's own name. The cuts fall between
-	 * chapters, so a part never opens mid-scene and the lengths land near the
+	 * How long a part should be is always asked; where the cuts fall is asked only
+	 * of a story that has parts of its own to cut along, since in one that has
+	 * none the two answers divide it identically. The cuts fall between chapters
+	 * either way, so a part never opens mid-scene and the lengths land near the
 	 * quota rather than on it.
 	 *
 	 * A part is a story document like any other, so exporting one to an EPUB or to
 	 * markdown is the export that already exists.
 	 */
 	private async partition(document: vscode.TextDocument): Promise<void> {
+		const cells = parse(document.getText());
+		// Dismissed rather than answered, at either question: the author changed
+		// their mind, and a division they did not ask for is a folder of files
+		// they have to delete.
+		let alongParts = false;
+		if (has(cells, PART)) {
+			const where = await vscode.window.showQuickPick(
+				[ALONG_THE_PARTS, BY_LENGTH_ALONE],
+				{ title: 'Divide into Parts', placeHolder: 'Where should the cuts fall?' }
+			);
+			if (where === undefined) {
+				return;
+			}
+			alongParts = where === ALONG_THE_PARTS;
+		}
 		const asked = await vscode.window.showInputBox({
 			title: 'Divide into Parts',
 			prompt: 'About how many words should a part be?',
@@ -560,15 +586,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			validateInput: (raw) =>
 				Number(raw) > 0 ? null : 'A part is some positive number of words.',
 		});
-		// Dismissed rather than answered: the author changed their mind, and a
-		// division they did not ask for is a folder of files they have to delete.
 		if (asked === undefined) {
 			return;
 		}
 		const { folder, parts } = await divideManuscript(
 			document.uri,
-			parse(document.getText()),
-			quotaOf(asked)
+			cells,
+			quotaOf(asked),
+			alongParts
 		);
 		void vscode.window.showInformationMessage(
 			parts === 0

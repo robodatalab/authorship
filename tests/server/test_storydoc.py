@@ -48,6 +48,12 @@ class Writing(unittest.TestCase):
         written = storydoc.dumps([storydoc.chapter("One")])
         self.assertEqual(written, '<!-- cell: chapter title="One" -->\n')
 
+    def test_a_part_is_written_as_its_marker_alone(self) -> None:
+        # A part names a division of the story; the chapters under it are their
+        # own cells, exactly as the prose under a chapter is.
+        written = storydoc.dumps([storydoc.part("Book One")])
+        self.assertEqual(written, '<!-- cell: part title="Book One" -->\n')
+
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
         self.assertEqual(storydoc.dumps([storydoc.contents()]), "<!-- cell: contents -->\n")
 

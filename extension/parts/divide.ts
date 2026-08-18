@@ -31,13 +31,17 @@ export interface Division {
  * out in the same format they came in. A part is a story document like any
  * other, so exporting one to an EPUB is the export that already exists rather
  * than a second way of building a book.
+ *
+ * `alongParts` asks for the author's own parts to be the first cut and length
+ * the second, so no file spans two of them.
  */
 export async function divideManuscript(
 	document: vscode.Uri,
 	cells: readonly Cell[],
-	quota: number
+	quota: number,
+	alongParts = false
 ): Promise<Division> {
-	const parts = intoParts(sectionsOf(cells), quota);
+	const parts = intoParts(sectionsOf(cells), quota, alongParts);
 	const folder = vscode.Uri.joinPath(document, '..', PARTS_FOLDER);
 	if (parts.length === 0) {
 		return { folder, parts: 0 };

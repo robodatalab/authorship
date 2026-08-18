@@ -189,6 +189,41 @@
       "dumped": "<!-- cell: chapter title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n"
     },
     {
+      "name": "a part opens a run of chapters and carries only its name",
+      "text": "<!-- cell: part title=\"Book One\" -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part title=\"Book Two\" -->\n\n<!-- cell: chapter title=\"After\" -->\n\nIt ended worse.\n",
+      "cells": [
+        {
+          "kind": "part",
+          "source": "",
+          "attrs": {
+            "title": "Book One"
+          }
+        },
+        {
+          "kind": "chapter",
+          "source": "It began badly.",
+          "attrs": {
+            "title": "The First Night"
+          }
+        },
+        {
+          "kind": "part",
+          "source": "",
+          "attrs": {
+            "title": "Book Two"
+          }
+        },
+        {
+          "kind": "chapter",
+          "source": "It ended worse.",
+          "attrs": {
+            "title": "After"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: part title=\"Book One\" -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part title=\"Book Two\" -->\n\n<!-- cell: chapter title=\"After\" -->\n\nIt ended worse.\n"
+    },
+    {
       "name": "a full publishing layout",
       "text": "<!-- cell: cover src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about -->\n\n[My website](https://example.com)\n",
       "cells": [

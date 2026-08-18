@@ -34,6 +34,7 @@ export const EXTENSION = '.author';
 
 export const MARKDOWN = 'markdown';
 export const CHAPTER = 'chapter';
+export const PART = 'part';
 export const TITLE_PAGE = 'title-page';
 export const COVER = 'cover';
 export const CONTENTS = 'contents';
@@ -145,6 +146,16 @@ export function markdown(source: string): Cell {
  */
 export function chapter(title: string): Cell {
 	return { kind: CHAPTER, source: '', attrs: { title } };
+}
+
+/**
+ * A part is a named division of the story, and nothing else.
+ *
+ * The same bargain a chapter strikes, one level up: it names a run of chapters
+ * and carries no prose of its own, so moving it moves only the name.
+ */
+export function part(title: string): Cell {
+	return { kind: PART, source: '', attrs: { title } };
 }
 
 export function cover(src: string, alt = 'Cover'): Cell {

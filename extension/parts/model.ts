@@ -13,18 +13,36 @@
 // divide.ts turns the parts into files.
 
 import { isMatter, isUnpublished } from '../author_editor/model';
-import { CHAPTER, COVER, EXTENSION, TITLE_PAGE, type Cell } from '../storydoc/model';
+import {
+	CHAPTER,
+	COVER,
+	EXTENSION,
+	PART,
+	TITLE_PAGE,
+	type Cell,
+} from '../storydoc/model';
 
 /** A chapter and the cells written under it, with what a reader counts in them. */
 export interface Section {
 	cells: Cell[];
 	words: number;
+	/**
+	 * What the story calls the part this section stands in, or '' where it stands
+	 * in none.
+	 *
+	 * The author's own division of the book, which a division into files can be
+	 * asked to cut along rather than across.
+	 */
+	under: string;
 }
 
 /** Whole sections, gathered into one part. */
 export interface Part {
 	sections: Section[];
 	words: number;
+	/** The part of the story these sections were taken from, or '' if the cuts
+	 *  were made by length alone and fell wherever they fell. */
+	under: string;
 }
 
 /**
@@ -49,27 +67,57 @@ export const DEFAULT_PART_WORDS = 5000;
  * so a heading someone wrote in their prose stays prose — the one thing cutting
  * along `##` in flattened markdown could never get right.
  *
+ * A part names the chapters that follow it and is printed above the first of
+ * them, so it travels with the section it opens rather than joining the one it
+ * happens to stand after. Every section carries the name of the part it fell in,
+ * which is what lets a division cut along the author's own divisions.
+ *
  * The book's furniture is not the story and belongs to every part rather than to
  * one; what the author keeps beside the story and publishes nowhere belongs to
  * neither.
  */
 export function sectionsOf(cells: readonly Cell[]): Section[] {
 	const sections: Section[] = [];
+	// A part waits here for the chapter it names, and so does anything written
+	// between the two: they are the head of that section and not the tail of the
+	// one above it.
+	let opening: Section | null = null;
+	let under = '';
 
 	for (const cell of cells) {
-		if (cell.kind === CHAPTER) {
-			sections.push({
-				cells: [cell],
-				words: countWords(cell.attrs.title ?? ''),
-			});
+		if (cell.kind === PART) {
+			under = cell.attrs.title ?? '';
+			opening = opening ?? { cells: [], words: 0, under };
+			opening.cells.push(cell);
+			opening.words += countWords(under);
 			continue;
 		}
-		const holding = sections[sections.length - 1];
-		if (!holding || isMatter(cell.kind) || isUnpublished(cell.kind)) {
+		if (cell.kind === CHAPTER) {
+			const opened = opening ?? { cells: [], words: 0, under };
+			opened.cells.push(cell);
+			opened.words += countWords(cell.attrs.title ?? '');
+			opened.under = under;
+			sections.push(opened);
+			opening = null;
+			continue;
+		}
+		if (isMatter(cell.kind) || isUnpublished(cell.kind)) {
+			continue;
+		}
+		const holding = opening ?? sections[sections.length - 1];
+		if (!holding) {
 			continue;
 		}
 		holding.cells.push(cell);
 		holding.words += countWords(cell.source);
+	}
+
+	// A part nobody wrote a chapter under names nothing, and what stands after it
+	// is left where it was written rather than dropped.
+	const last = sections[sections.length - 1];
+	if (opening && last) {
+		last.cells.push(...opening.cells);
+		last.words += opening.words;
 	}
 	return sections;
 }
@@ -93,20 +141,63 @@ export function furnitureOf(cells: readonly Cell[]): Furniture {
 /**
  * Fill each part with as many whole sections as it will hold.
  *
+ * `alongParts` asks for the author's own divisions to be the first cut: each
+ * part of the story is filled on its own, so a part never carries chapters from
+ * two of them and every file says which one it came from. Length is then the
+ * second cut, made inside each — a part of the story longer than the quota still
+ * becomes as many files as it needs.
+ *
+ * Without it — or in a story that has no parts, where the two are the same
+ * division — the cuts are made by length alone, wherever they fall.
+ */
+export function intoParts(
+	sections: readonly Section[],
+	quota: number,
+	alongParts = false
+): Part[] {
+	if (!alongParts) {
+		return filled(sections, quota);
+	}
+	return divisions(sections).flatMap((division) =>
+		filled(division, quota).map((part) => ({ ...part, under: division[0].under }))
+	);
+}
+
+/**
+ * The sections in the runs the author divided them into.
+ *
+ * Cut where a part cell stands rather than wherever the name changes, so two
+ * parts the author happened to give the same name are still two parts.
+ */
+function divisions(sections: readonly Section[]): Section[][] {
+	const runs: Section[][] = [];
+	for (const section of sections) {
+		if (runs.length === 0 || section.cells[0].kind === PART) {
+			runs.push([section]);
+			continue;
+		}
+		runs[runs.length - 1].push(section);
+	}
+	return runs;
+}
+
+/**
+ * As many whole sections as each part will hold.
+ *
  * A section joins the part being filled while doing so lands nearer the quota
  * than stopping short would — so a part runs over only by less than it would
  * otherwise run under, and a section that would blow past the quota starts the
  * next part instead. A part always takes at least one section: a section longer
  * than the quota is still a section, and there is nowhere smaller to put it.
  */
-export function intoParts(sections: readonly Section[], quota: number): Part[] {
+function filled(sections: readonly Section[], quota: number): Part[] {
 	const parts: Part[] = [];
 	let held: Section[] = [];
 	let words = 0;
 
 	for (const section of sections) {
 		if (held.length > 0 && !nearer(words, section.words, quota)) {
-			parts.push({ sections: held, words });
+			parts.push({ sections: held, words, under: '' });
 			held = [];
 			words = 0;
 		}
@@ -114,7 +205,7 @@ export function intoParts(sections: readonly Section[], quota: number): Part[] {
 		words += section.words;
 	}
 	if (held.length > 0) {
-		parts.push({ sections: held, words });
+		parts.push({ sections: held, words, under: '' });
 	}
 	return parts;
 }
@@ -133,9 +224,9 @@ export function partCells(
 	part: Part
 ): Cell[] {
 	return [
-		...furniture.front.map((cell) => carried(cell, number)),
+		...furniture.front.map((cell) => carried(cell, number, part.under)),
 		...part.sections.flatMap((section) => section.cells),
-		...furniture.back.map((cell) => carried(cell, number)),
+		...furniture.back.map((cell) => carried(cell, number, part.under)),
 	];
 }
 
@@ -147,13 +238,13 @@ export function partCells(
  * names its art relative to the file naming it, so a part — which sits a folder
  * deeper than the story — has to name it from where it now stands.
  */
-function carried(cell: Cell, number: number): Cell {
+function carried(cell: Cell, number: number, under: string): Cell {
 	if (cell.kind === TITLE_PAGE) {
 		return {
 			...cell,
 			attrs: {
 				...cell.attrs,
-				title: partTitle(cell.attrs.title ?? '', number),
+				title: partTitle(cell.attrs.title ?? '', number, under),
 			},
 		};
 	}
@@ -197,12 +288,19 @@ function fromTheFolder(cell: Cell): Cell {
 	};
 }
 
-/** What separates a story's title from the part number after it. */
-const PART_MARKER = ' — Part ';
+/** What stands between the pieces of a part's name. */
+const PART_MARKER = ' — ';
 
-/** What a part is called — the story's title, and which part this is. */
-export function partTitle(title: string, number: number): string {
-	return title ? `${title}${PART_MARKER}${number}` : `Part ${number}`;
+/**
+ * What a part is called — the story, the part of it this came from, and which
+ * part of that it is.
+ *
+ * `Veriona — Day One — Part 3`, so a reader holding one file can see all three.
+ * A piece the story does not have is left out rather than left blank, and a part
+ * cut by length alone stands under nothing and says so by saying nothing.
+ */
+export function partTitle(title: string, number: number, under = ''): string {
+	return [title, under, `Part ${number}`].filter(Boolean).join(PART_MARKER);
 }
 
 /** A story divides into `parts/` beside it. */
