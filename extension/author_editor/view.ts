@@ -27,6 +27,7 @@ import {
 	fieldsOf,
 	labelOf,
 	moveBy,
+	placeOf,
 	removeAt,
 	renderMarkdown,
 	runCell,
@@ -46,6 +47,7 @@ const cellsEl = document.getElementById('cells') as HTMLElement;
 const menuEl = document.getElementById('menu') as HTMLElement;
 const toolbarEl = document.getElementById('toolbar') as HTMLElement;
 const statusEl = document.getElementById('doc-status') as HTMLElement;
+const whereEl = document.getElementById('doc-where') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -155,6 +157,7 @@ function render(): void {
 	// only way a cover gets in front of a title page that is already written.
 	cellsEl.append(insertBarFor(cells.length));
 	statusEl.textContent = documentStatus();
+	showWhere();
 	drawn = signatureOf(cells);
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
@@ -169,7 +172,48 @@ function redrawCell(index: number): void {
 	}
 	existing.replaceWith(cellElement(cells[index], index));
 	statusEl.textContent = documentStatus();
+	showWhere();
 	drawn = signatureOf(cells);
+}
+
+/**
+ * Say at the top of the page which part and chapter is being read.
+ *
+ * Taken from what is on screen rather than from what is selected: an author
+ * scrolling through a hundred thousand words has not clicked on anything, and
+ * telling them where they have got to is the whole job of the line.
+ *
+ * A story with no parts is only ever in a chapter, and says so. Before the first
+ * chapter there is nowhere to be, and the line stands empty rather than naming
+ * the front matter — the toolbar already has enough to say.
+ */
+function showWhere(): void {
+	const place = placeOf(cells, cellAtTop());
+	whereEl.textContent =
+		place.chapter === null
+			? ''
+			: place.part === null
+				? place.chapter
+				: `${place.part} \u00b7 ${place.chapter}`;
+}
+
+/**
+ * The cell the toolbar is sitting on: the last one whose top has gone under it.
+ *
+ * The toolbar covers the page rather than pushing it down, so what counts as the
+ * top of the view is the underside of the toolbar — a chapter measured against
+ * the window's top would still be named for a moment after it had scrolled out
+ * of sight behind it.
+ */
+function cellAtTop(): number {
+	const line = toolbarEl.getBoundingClientRect().bottom;
+	let at = 0;
+	cellsEl.querySelectorAll('.cell').forEach((row, index) => {
+		if (row.getBoundingClientRect().top <= line) {
+			at = index;
+		}
+	});
+	return at;
 }
 
 function documentStatus(): string {
@@ -743,6 +787,21 @@ function menuItem(text: string, onClick: () => void): HTMLElement {
 	});
 	return item;
 }
+
+// Measuring every cell is a page-wide layout, and scrolling asks for one far
+// faster than the page can be repainted; the frame is the most often it can
+// usefully be answered.
+let following = false;
+window.addEventListener('scroll', () => {
+	if (following) {
+		return;
+	}
+	following = true;
+	requestAnimationFrame(() => {
+		following = false;
+		showWhere();
+	});
+});
 
 document.addEventListener('click', (event) => {
 	if (!menuEl.hidden && !menuEl.contains(event.target as Node)) {

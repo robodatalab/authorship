@@ -17,6 +17,7 @@ import {
 	fieldsOf,
 	labelOf,
 	moveBy,
+	placeOf,
 	removeAt,
 	renderMarkdown,
 	runCell,
@@ -416,6 +417,48 @@ describe('sourceLinesOf — where a cell sits in the written file', () => {
 
 	it('has nowhere to point for a cell that is not there', () => {
 		expect(sourceLinesOf([markdown('Prose.')], 4)).toBeNull();
+	});
+});
+
+describe('placeOf — where in the book a cell stands', () => {
+	it('names the chapter a passage is under', () => {
+		const cells = [chapter('One'), markdown('a'), markdown('b')];
+		expect(placeOf(cells, 2)).toEqual({ part: null, chapter: 'One' });
+	});
+
+	it('puts a chapter heading in its own chapter', () => {
+		expect(placeOf([chapter('One')], 0)).toEqual({ part: null, chapter: 'One' });
+	});
+
+	it('names the part as well, once the story is divided into them', () => {
+		const cells = [part('Day One'), chapter('One'), markdown('a')];
+		expect(placeOf(cells, 2)).toEqual({ part: 'Day One', chapter: 'One' });
+	});
+
+	it('reports no part for a story that has none', () => {
+		const cells = [chapter('One'), markdown('a'), chapter('Two'), markdown('b')];
+		expect(placeOf(cells, 3)).toEqual({ part: null, chapter: 'Two' });
+	});
+
+	it('leaves the chapter behind at a part heading, which ended it', () => {
+		const cells = [part('Day One'), chapter('One'), part('Day Two'), markdown('a')];
+		expect(placeOf(cells, 3)).toEqual({ part: 'Day Two', chapter: null });
+	});
+
+	it('reports nowhere for the pages before the first chapter', () => {
+		expect(placeOf([contents(), markdown('a')], 1)).toEqual({
+			part: null,
+			chapter: null,
+		});
+	});
+
+	it('calls an untitled chapter what the contents call it', () => {
+		const cells: Cell[] = [{ kind: 'chapter', source: '', attrs: {} }];
+		expect(placeOf(cells, 0)).toEqual({ part: null, chapter: 'Untitled' });
+	});
+
+	it('reports nowhere for a cell that is not in the document', () => {
+		expect(placeOf([], 0)).toEqual({ part: null, chapter: null });
 	});
 });
 

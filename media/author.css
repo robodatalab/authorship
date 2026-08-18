@@ -58,6 +58,20 @@
 	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
+/* Where in the book the author has got to. Set apart from the counts beside it,
+   because it is the one thing in the bar that is about the story. Truncated
+   rather than wrapped: the bar is one line tall and a chapter can be titled
+   anything at all. */
+.doc-where {
+	min-width: 0;
+	overflow: hidden;
+	font-size: 0.9em;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
 .doc-status {
 	font-size: 0.9em;
 	color: var(--vscode-descriptionForeground);

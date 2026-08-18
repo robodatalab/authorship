@@ -409,6 +409,38 @@ function contentsListing(cells: Cell[]): string {
 		.join('\n');
 }
 
+/** Where in the book a cell stands. Either level may be missing. */
+export interface Place {
+	part: string | null;
+	chapter: string | null;
+}
+
+/**
+ * The part and chapter a cell is under, found by walking back up the document.
+ *
+ * That walk is what the levels *are*: a chapter runs until something ends it,
+ * and the thing that ends it is the next chapter or the next part. So the walk
+ * stops at the first part it meets and reports no chapter if it has not found
+ * one by then — the chapter above a part heading belongs to the part before it,
+ * and naming it here would put the author in the wrong half of the book.
+ *
+ * A story with no parts has no part to report, and the pages before the first
+ * chapter are under nothing at all.
+ */
+export function placeOf(cells: Cell[], index: number): Place {
+	let chapter: string | null = null;
+	for (let i = Math.min(index, cells.length - 1); i >= 0; i--) {
+		const cell = cells[i];
+		if (cell.kind === PART) {
+			return { part: cell.attrs.title || 'Untitled', chapter };
+		}
+		if (cell.kind === CHAPTER && chapter === null) {
+			chapter = cell.attrs.title || 'Untitled';
+		}
+	}
+	return { part: null, chapter };
+}
+
 /**
  * A document always has somewhere to write, so an empty one gets an empty cell.
  *
