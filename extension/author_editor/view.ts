@@ -38,7 +38,16 @@ import {
 	sourceLinesOf,
 	splitAt,
 } from './model';
+import {
+	fenced,
+	isUnderstood,
+	marked,
+	matchesIn,
+	replaced,
+	replacedAll,
+} from './find';
 import type { CellField } from './model';
+import type { Match, Query } from './find';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -53,6 +62,13 @@ const menuEl = document.getElementById('menu') as HTMLElement;
 const toolbarEl = document.getElementById('toolbar') as HTMLElement;
 const statusEl = document.getElementById('doc-status') as HTMLElement;
 const whereEl = document.getElementById('doc-where') as HTMLElement;
+const findEl = document.getElementById('find') as HTMLElement;
+const findBoxEl = document.getElementById('find-box') as HTMLElement;
+const whatEl = document.getElementById('find-what') as HTMLInputElement;
+const withEl = document.getElementById('find-with') as HTMLInputElement;
+const countEl = document.getElementById('find-count') as HTMLElement;
+const replaceRowEl = document.getElementById('find-replace-row') as HTMLElement;
+const replaceToggleEl = document.getElementById('find-toggle') as HTMLElement;
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;
@@ -121,6 +137,11 @@ function signatureOf(list: Cell[]): string {
 function commit(next: Cell[]): void {
 	cells = next;
 	vscode.postMessage({ type: 'cells', cells });
+	// What was found is found in the document, so it is asked again whenever the
+	// document says something else. The marks themselves are left to whoever
+	// redraws — a cell repainted here would be a cell repainted mid-keystroke.
+	refind();
+	showCount();
 }
 
 // --- the toolbar ---
@@ -178,6 +199,7 @@ function render(): void {
 	showWhere();
 	drawn = signatureOf(cells);
 	seamAt = null;
+	noteMarks();
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
 }
@@ -421,6 +443,16 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 		// a good value looks like instead of repeating the name.
 		input.placeholder =
 			field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
+		// A box cannot hold a mark around part of what it says, so a field with a
+		// match in it is lit whole.
+		const hits = foundIn(index, field.name);
+		if (hits.length > 0) {
+			input.classList.add('find-field');
+			const here = found[current];
+			if (here && hits.includes(here)) {
+				input.classList.add('current');
+			}
+		}
 		input.addEventListener('change', () => {
 			const next = [...cells];
 			const attrs = { ...cell.attrs, [field.name]: input.value };
@@ -495,7 +527,13 @@ function renderedFor(cell: Cell, index: number): HTMLElement {
 	const rendered = document.createElement('div');
 	rendered.className = 'rendered';
 	if (cell.source) {
-		rendered.innerHTML = withBase(renderMarkdown(cell.source));
+		rendered.innerHTML = withBase(
+			marked(
+				renderMarkdown(
+					fenced(cell.source, foundIn(index, null), found[current] ?? null)
+				)
+			)
+		);
 	} else {
 		rendered.classList.add('blank');
 		rendered.textContent = writing?.at === index
@@ -865,6 +903,293 @@ function iconButton(
 	return button;
 }
 
+// --- find and replace ---
+
+/**
+ * What is being looked for, and where it is.
+ *
+ * The query outlives the widget being shut, as it does in the editor next door —
+ * an author who closes the box and opens it again is looking for the same thing.
+ * `found` is the whole document's worth of matches in reading order, and
+ * `current` is the one the author is standing on.
+ */
+let query: Query = { text: '', matchCase: false, wholeWord: false, regex: false };
+let found: Match[] = [];
+let current = -1;
+let searching = false;
+
+/**
+ * The cells drawn with marks on them.
+ *
+ * Kept so that a cell which has just lost its last match is redrawn too — the
+ * marks are in the HTML of the cell, and nothing else would take them off.
+ */
+let marks = new Set<number>();
+let markedCell: number | null = null;
+
+for (const [id, act] of [
+	['find-next', () => step(1)],
+	['find-previous', () => step(-1)],
+	['find-close', closeFind],
+	['find-toggle', () => showReplace(replaceRowEl.hidden === true)],
+	['find-replace', replaceCurrent],
+	['find-replace-all', replaceEverywhere],
+] as const) {
+	document.getElementById(id)!.addEventListener('click', act);
+}
+
+for (const [id, turned] of [
+	['find-case', () => ({ ...query, matchCase: !query.matchCase })],
+	['find-word', () => ({ ...query, wholeWord: !query.wholeWord })],
+	['find-regex', () => ({ ...query, regex: !query.regex })],
+] as const) {
+	document.getElementById(id)!.addEventListener('click', () => {
+		query = turned();
+		research();
+	});
+}
+
+whatEl.addEventListener('input', () => {
+	query = { ...query, text: whatEl.value };
+	research();
+});
+
+whatEl.addEventListener('keydown', (event) => {
+	if (event.key === 'Enter') {
+		event.preventDefault();
+		step(event.shiftKey ? -1 : 1);
+	}
+});
+
+withEl.addEventListener('keydown', (event) => {
+	if (event.key === 'Enter') {
+		event.preventDefault();
+		if (event.ctrlKey || event.metaKey || event.altKey) {
+			replaceEverywhere();
+		} else {
+			replaceCurrent();
+		}
+	}
+});
+
+/**
+ * Open the widget on whatever is selected.
+ *
+ * Taking the focus is also what settles a cell that was open for typing: the box
+ * writes itself back as it loses focus, so what is searched is the document and
+ * not a page that is still ahead of it.
+ */
+function openFind(replace: boolean): void {
+	const seed = selectedText();
+	if (seed) {
+		query = { ...query, text: seed };
+		whatEl.value = seed;
+	}
+	searching = true;
+	findEl.hidden = false;
+	if (replace) {
+		showReplace(true);
+	}
+	research();
+	whatEl.focus();
+	whatEl.select();
+}
+
+function closeFind(): void {
+	searching = false;
+	findEl.hidden = true;
+	refind();
+	repaint(true);
+}
+
+function showReplace(on: boolean): void {
+	replaceRowEl.hidden = !on;
+	(replaceToggleEl.firstElementChild as HTMLElement).className =
+		`codicon codicon-chevron-${on ? 'down' : 'right'}`;
+}
+
+/** Ask the document again, and show the answer from the top of it. */
+function research(): void {
+	current = -1;
+	refind();
+	showCount();
+	repaint(true);
+	reveal();
+}
+
+/**
+ * Ask the document what it holds now, keeping the author where they were.
+ *
+ * Where they were is a place in the document rather than a number: an edit
+ * anywhere above them would otherwise renumber the matches under their feet and
+ * send them back to a chapter they had finished with.
+ */
+function refind(): void {
+	const was = found[current] ?? null;
+	found = searching ? matchesIn(cells, query) : [];
+	current = was ? nextFrom(was) : found.length > 0 ? 0 : -1;
+}
+
+/** The first match at or after a place, wrapping to the top when there is none. */
+function nextFrom(place: Match): number {
+	const at = found.findIndex(
+		(match) =>
+			match.cell > place.cell || (match.cell === place.cell && match.at >= place.at)
+	);
+	return at >= 0 ? at : found.length > 0 ? 0 : -1;
+}
+
+function step(by: number): void {
+	if (found.length === 0) {
+		return;
+	}
+	current = (current + by + found.length) % found.length;
+	showCount();
+	repaint(false);
+	reveal();
+}
+
+function showCount(): void {
+	if (!searching) {
+		return;
+	}
+	countEl.textContent = !query.text
+		? ''
+		: found.length === 0
+			? 'No results'
+			: `${current + 1} of ${found.length}`;
+	// An unfinished regular expression is not an error to report; the box says so
+	// and the document is left alone until it means something.
+	findBoxEl.classList.toggle('invalid', !isUnderstood(query));
+	for (const [id, on] of [
+		['find-case', query.matchCase],
+		['find-word', query.wholeWord],
+		['find-regex', query.regex],
+	] as const) {
+		document.getElementById(id)!.classList.toggle('on', on);
+	}
+	for (const id of ['find-previous', 'find-next', 'find-replace', 'find-replace-all']) {
+		(document.getElementById(id) as HTMLButtonElement).disabled = found.length === 0;
+	}
+}
+
+/**
+ * Redraw the cells whose marks have changed.
+ *
+ * `everything` when the matches themselves have moved — a new query, or a
+ * document that says something else. Stepping from one match to the next only
+ * moves which one is current, and then the two cells that changes are the only
+ * two worth rebuilding; a search that hits three hundred chapters would
+ * otherwise rebuild all three hundred on every press of Enter.
+ */
+function repaint(everything: boolean): void {
+	const wanted = new Set(found.map((match) => match.cell));
+	const here = found[current]?.cell ?? null;
+	const touched = everything ? new Set([...marks, ...wanted]) : new Set<number>();
+	if (markedCell !== null) {
+		touched.add(markedCell);
+	}
+	if (here !== null) {
+		touched.add(here);
+	}
+	marks = wanted;
+	markedCell = here;
+	for (const index of touched) {
+		// Never the cell that is open for typing: it is the author's box, its text
+		// is ahead of the document anyway, and rebuilding it takes the caret.
+		if (index !== editing && cells[index]) {
+			redrawCell(index);
+		}
+	}
+}
+
+/** Record what a full redraw has just drawn, so the next one knows what to undo. */
+function noteMarks(): void {
+	marks = new Set(found.map((match) => match.cell));
+	markedCell = found[current]?.cell ?? null;
+}
+
+/**
+ * Bring the current match on screen without taking the focus off the box.
+ *
+ * The author is still typing what they are looking for; a match that took the
+ * caret with it would put the next keystroke in the manuscript.
+ */
+function reveal(): void {
+	const match = found[current];
+	if (!match) {
+		return;
+	}
+	const row = cellsEl.querySelectorAll('.cell')[match.cell];
+	const at =
+		row?.querySelector('.find-match.current') ??
+		row?.querySelector('.find-field.current') ??
+		row;
+	at?.scrollIntoView({ block: 'center' });
+}
+
+function replaceCurrent(): void {
+	const match = found[current];
+	if (!match) {
+		return;
+	}
+	commit(replaced(cells, match, query, withEl.value));
+	// Past what was just written, not at it: replacing "the" with "there" would
+	// otherwise land on the match it had just made and never move on.
+	current = nextFrom({ ...match, at: match.at + withEl.value.length });
+	showCount();
+	repaint(true);
+	reveal();
+}
+
+function replaceEverywhere(): void {
+	if (found.length === 0) {
+		return;
+	}
+	commit(replacedAll(cells, query, withEl.value));
+	repaint(true);
+	reveal();
+}
+
+/** The matches in one of a cell's texts. */
+function foundIn(index: number, field: string | null): Match[] {
+	return found.filter((match) => match.cell === index && match.field === field);
+}
+
+/**
+ * What the author has selected, when it is a line of it worth searching for.
+ *
+ * The box seeds itself from the selection the way the editor's does. Its own
+ * selection is not a seed — opening find twice would then search for whatever it
+ * had already highlighted in the box.
+ */
+function selectedText(): string {
+	const focused = document.activeElement;
+	if (focused === whatEl || focused === withEl) {
+		return '';
+	}
+	const text =
+		focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement
+			? focused.value.slice(focused.selectionStart ?? 0, focused.selectionEnd ?? 0)
+			: (window.getSelection()?.toString() ?? '');
+	return text.includes('\n') ? '' : text;
+}
+
+/** Ctrl+F, and Cmd+F on a Mac. */
+function isFindKey(event: KeyboardEvent): boolean {
+	return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f';
+}
+
+/** Ctrl+H, and Cmd+Alt+F on a Mac, where Cmd+H is the system's own. */
+function isReplaceKey(event: KeyboardEvent): boolean {
+	if (event.altKey) {
+		// Alt makes the key itself say something else on a Mac; what is meant is
+		// where the key is on the keyboard.
+		return (event.ctrlKey || event.metaKey) && event.code === 'KeyF';
+	}
+	return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h';
+}
+
 // --- the menu ---
 
 /**
@@ -965,6 +1290,26 @@ document.addEventListener('keydown', (event) => {
 		closeMenu();
 		return;
 	}
+	if (isReplaceKey(event)) {
+		event.preventDefault();
+		openFind(true);
+		return;
+	}
+	if (isFindKey(event)) {
+		event.preventDefault();
+		openFind(false);
+		return;
+	}
+	if (searching && event.key === 'Escape') {
+		event.preventDefault();
+		closeFind();
+		return;
+	}
+	if (searching && event.key === 'F3') {
+		event.preventDefault();
+		step(event.shiftKey ? -1 : 1);
+		return;
+	}
 	// The keyboard way into a cell, since the mouse way is now a double-click.
 	// Not while something is already taking the keys.
 	const typing =
@@ -1019,6 +1364,8 @@ window.addEventListener('message', (event) => {
 		cells = incoming;
 		selected = Math.min(selected, Math.max(0, cells.length - 1));
 		closeEditing();
+		refind();
+		showCount();
 		render();
 	}
 });

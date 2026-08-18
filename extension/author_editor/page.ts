@@ -26,6 +26,39 @@ export const BODY = `	<header class="toolbar" id="toolbar">
 		<span class="doc-where" id="doc-where"></span>
 		<span class="spacer"></span>
 		<span class="doc-status" id="doc-status"></span>
+		<div class="find" id="find" hidden>
+			<button class="find-toggle" id="find-toggle" type="button"
+				aria-label="Toggle Replace" data-tip="Toggle Replace"><i class="codicon codicon-chevron-right"></i></button>
+			<div class="find-rows">
+				<div class="find-row">
+					<div class="find-box" id="find-box">
+						<input class="find-input" id="find-what" type="text" placeholder="Find" aria-label="Find">
+						<button class="find-option" id="find-case" type="button"
+							aria-label="Match Case" data-tip="Match Case"><i class="codicon codicon-case-sensitive"></i></button>
+						<button class="find-option" id="find-word" type="button"
+							aria-label="Match Whole Word" data-tip="Match Whole Word"><i class="codicon codicon-whole-word"></i></button>
+						<button class="find-option" id="find-regex" type="button"
+							aria-label="Use Regular Expression" data-tip="Use Regular Expression"><i class="codicon codicon-regex"></i></button>
+					</div>
+					<span class="find-count" id="find-count"></span>
+					<button class="find-action" id="find-previous" type="button"
+						aria-label="Previous Match" data-tip="Previous Match"><i class="codicon codicon-arrow-up"></i></button>
+					<button class="find-action" id="find-next" type="button"
+						aria-label="Next Match" data-tip="Next Match"><i class="codicon codicon-arrow-down"></i></button>
+					<button class="find-action" id="find-close" type="button"
+						aria-label="Close" data-tip="Close"><i class="codicon codicon-close"></i></button>
+				</div>
+				<div class="find-row" id="find-replace-row" hidden>
+					<div class="find-box">
+						<input class="find-input" id="find-with" type="text" placeholder="Replace" aria-label="Replace">
+					</div>
+					<button class="find-action" id="find-replace" type="button"
+						aria-label="Replace" data-tip="Replace"><i class="codicon codicon-replace"></i></button>
+					<button class="find-action" id="find-replace-all" type="button"
+						aria-label="Replace All" data-tip="Replace All"><i class="codicon codicon-replace-all"></i></button>
+				</div>
+			</div>
+		</div>
 	</header>
 	<main id="cells" class="cells"></main>
 	<div id="menu" class="menu" hidden></div>`;

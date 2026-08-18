@@ -93,6 +93,154 @@ body {
 	background: var(--vscode-editor-background);
 }
 
+/* --- find and replace ---
+   The editor's own widget belongs to the text editor and never reaches a
+   webview, so this is that widget, drawn again. It hangs off the toolbar rather
+   than the window, so it stays put while the manuscript scrolls under it. */
+
+.find {
+	position: absolute;
+	top: calc(100% + 1px);
+	right: 12px;
+	display: flex;
+	align-items: flex-start;
+	gap: 2px;
+	padding: 4px 4px 4px 2px;
+	color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.find[hidden] {
+	display: none;
+}
+
+.find-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.find-row {
+	display: flex;
+	gap: 2px;
+	align-items: center;
+}
+
+.find-row[hidden] {
+	display: none;
+}
+
+/* The buttons that turn the search into a different search sit inside the box
+   they belong to, as they do everywhere else in the editor. */
+.find-box {
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	padding: 0 2px 0 5px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 2px;
+}
+
+.find-box:focus-within {
+	border-color: var(--vscode-focusBorder);
+}
+
+.find-box.invalid {
+	border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+.find-input {
+	width: 190px;
+	padding: 3px 0;
+	font-family: inherit;
+	font-size: 0.9em;
+	color: var(--vscode-input-foreground);
+	background: none;
+	border: none;
+	outline: none;
+}
+
+.find-input::placeholder {
+	color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+
+.find-option,
+.find-action,
+.find-toggle {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px;
+	color: inherit;
+	background: none;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+.find-option:hover,
+.find-action:hover:not([disabled]),
+.find-toggle:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.find-option.on {
+	color: var(--vscode-inputOption-activeForeground, inherit);
+	background: var(--vscode-inputOption-activeBackground);
+	outline: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+}
+
+.find-action[disabled] {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Wide enough for "999 of 999", so the buttons beside it do not shuffle along
+   as the author types. */
+.find-count {
+	min-width: 72px;
+	padding: 0 4px;
+	font-size: 0.85em;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+
+/* The chevron is as tall as both rows, the way the editor draws it. */
+.find-toggle {
+	align-self: stretch;
+}
+
+/* Near the right edge of the window there is no room to hang a tooltip
+   rightwards. */
+.find [data-tip]::after {
+	left: auto;
+	right: 0;
+}
+
+.find-match {
+	color: inherit;
+	background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+	border-radius: 2px;
+}
+
+.find-match.current {
+	background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+	outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
+}
+
+/* A title is a box, and a box cannot hold a mark around part of what it says. */
+.find-field {
+	background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
+
+.find-field.current {
+	background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+}
+
 /* --- tooltips ---
    Only for the buttons that live in here. The document's own tools are in the
    editor title bar and VS Code draws their tooltips; a webview has no way to ask
