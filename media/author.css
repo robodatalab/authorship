@@ -564,11 +564,16 @@ body {
 	border-radius: 2px;
 }
 
-/* A caret has no width; the line is a shadow, which nothing is laid out around. */
+/* What is left of a place once it has been typed into. The line is a border on a
+   box of no width, pulled back by its own width, so that it stands between two
+   characters without moving either of them. */
 .source-cursors .caret {
 	display: inline-block;
 	width: 0;
-	box-shadow: 1px 0 0 0 var(--vscode-editorCursor-foreground, currentColor);
+	height: 1.15em;
+	vertical-align: middle;
+	margin-left: -1px;
+	border-left: 2px solid var(--vscode-editorCursor-foreground, currentColor);
 }
 
 .rendered {
