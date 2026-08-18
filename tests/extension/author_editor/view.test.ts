@@ -138,6 +138,11 @@ describe('the toolbar', () => {
 		expect(document.getElementById('doc-status')!.textContent).toContain('2 chapters');
 	});
 
+	it('does not count a part among the chapters', async () => {
+		await mount([part('Day One'), chapter('One'), chapter('Two')]);
+		expect(document.getElementById('doc-status')!.textContent).toContain('2 chapters');
+	});
+
 	it('says how many built sections are waiting to be run', async () => {
 		await mount([chapter('One'), contents()]);
 		expect(document.getElementById('doc-status')!.textContent).toContain('1 to run');
