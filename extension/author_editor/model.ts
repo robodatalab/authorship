@@ -95,6 +95,16 @@ export interface CellKind {
 	 */
 	prose: boolean;
 	/**
+	 * Can be cut in two where its prose leaves a gap, and joined back to one of
+	 * its own kind above it.
+	 *
+	 * Such a section is a run of paragraphs and nothing more, so wherever one
+	 * paragraph ends is somewhere the author may decide the section ends.
+	 * Everything else is one indivisible thing — a chapter is a name, a cover is
+	 * an image, a title page is a page — and half of any of them is nothing.
+	 */
+	divisible?: boolean;
+	/**
 	 * Prints its label as the section's heading.
 	 *
 	 * For a section the reader meets by name but the author does not get to
@@ -130,6 +140,7 @@ export const KINDS: CellKind[] = [
 	{
 		kind: MARKDOWN,
 		prose: true,
+		divisible: true,
 		label: 'Markdown',
 		automated: false,
 		fields: [],
@@ -152,6 +163,7 @@ export const KINDS: CellKind[] = [
 		// the passage it is about, which is the one place a reader must never
 		// find it.
 		prose: true,
+		divisible: true,
 		fields: [],
 		label: 'Note',
 		automated: false,
@@ -332,6 +344,99 @@ export function fieldsOf(kind: string): CellField[] {
  */
 export function hasProse(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.prose ?? true;
+}
+
+/**
+ * Whether a section of this kind can be cut in two, or joined to its neighbour.
+ *
+ * A kind nobody has heard of cannot: what an unknown marker means is not ours to
+ * decide, and cutting one in half would be deciding it.
+ */
+export function isDivisible(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.divisible ?? false;
+}
+
+/**
+ * The lines a section may be cut at: where each rendered block after the first
+ * begins.
+ *
+ * The blocks are what the author is looking at, so they are what the cut is
+ * offered between — a line in the middle of a paragraph is a place the author
+ * can see no boundary. Neither end is offered: above the first block and below
+ * the last one, one of the two halves would be empty, which divides nothing.
+ */
+export function divisionsOf(source: string): number[] {
+	return renderBlocks(source)
+		.slice(1)
+		.map((block) => block.line);
+}
+
+/**
+ * Cut a section in two at a line, leaving both halves where the one was.
+ *
+ * Refused rather than done badly: a kind that is one thing, or a cut that would
+ * leave a half with nothing in it, leaves the document exactly as it was.
+ */
+export function splitAt(cells: Cell[], index: number, line: number): Cell[] {
+	const cell = cells[index];
+	if (!cell || !isDivisible(cell.kind)) {
+		return cells;
+	}
+	const lines = cell.source.split('\n');
+	const above = withoutBlankEnds(lines.slice(0, line));
+	const below = withoutBlankEnds(lines.slice(line));
+	if (!above || !below) {
+		return cells;
+	}
+	return [
+		...cells.slice(0, index),
+		{ ...cell, source: above },
+		{ ...cell, source: below },
+		...cells.slice(index + 1),
+	];
+}
+
+/** Whether the section above this one is the same kind, so the two are one. */
+export function mergesUp(cells: Cell[], index: number): boolean {
+	const cell = cells[index];
+	const above = cells[index - 1];
+	if (!cell || !above) {
+		return false;
+	}
+	return above.kind === cell.kind && isDivisible(cell.kind);
+}
+
+/**
+ * Join a section to the one above it, which is what undoes a cut.
+ *
+ * The upper section survives and keeps what it recorded — it is the one that was
+ * there first — and the gap between the two becomes the blank line that stands
+ * between any two paragraphs.
+ */
+export function mergeAt(cells: Cell[], index: number): Cell[] {
+	if (!mergesUp(cells, index)) {
+		return cells;
+	}
+	const above = cells[index - 1];
+	const source = [above.source, cells[index].source]
+		.filter(Boolean)
+		.join('\n\n');
+	return [
+		...cells.slice(0, index - 1),
+		{ ...above, source },
+		...cells.slice(index + 1),
+	];
+}
+
+function withoutBlankEnds(lines: string[]): string {
+	const kept = [...lines];
+	while (kept.length > 0 && !kept[0].trim()) {
+		kept.shift();
+	}
+	while (kept.length > 0 && !kept[kept.length - 1].trim()) {
+		kept.pop();
+	}
+	return kept.join('\n');
 }
 
 /**
@@ -708,27 +813,43 @@ function inline(text: string): string {
 	return out;
 }
 
+/** One top-level piece of a rendered cell, and the source line it starts on. */
+export interface Block {
+	line: number;
+	html: string;
+}
+
 /**
- * The cell as the author will see it once they accept it.
+ * The cell as the author will see it once they accept it, a block at a time.
+ *
+ * Rendered in pieces because where the pieces begin is where the section can be
+ * cut: the author points at a paragraph on the page, and the cut has to land on
+ * the line that paragraph was written on.
  *
  * A small renderer rather than a library: the webview's policy admits no script
  * but its own, and what a manuscript uses of markdown is a short list.
  */
-export function renderMarkdown(source: string): string {
-	const out: string[] = [];
+export function renderBlocks(source: string): Block[] {
+	const out: Block[] = [];
 	let paragraph: string[] = [];
 	let list: string[] | null = null;
 	let ordered = false;
+	// Where whichever of the two is open began, since neither is pushed until
+	// something else has ended it.
+	let opened = 0;
 
 	const flushParagraph = (): void => {
 		if (paragraph.length > 0) {
-			out.push(`<p>${inline(paragraph.join(' '))}</p>`);
+			out.push({ line: opened, html: `<p>${inline(paragraph.join(' '))}</p>` });
 			paragraph = [];
 		}
 	};
 	const flushList = (): void => {
 		if (list) {
-			out.push(`<${ordered ? 'ol' : 'ul'}>${list.join('')}</${ordered ? 'ol' : 'ul'}>`);
+			out.push({
+				line: opened,
+				html: `<${ordered ? 'ol' : 'ul'}>${list.join('')}</${ordered ? 'ol' : 'ul'}>`,
+			});
 			list = null;
 		}
 	};
@@ -737,7 +858,7 @@ export function renderMarkdown(source: string): string {
 		flushList();
 	};
 
-	for (const raw of source.split('\n')) {
+	source.split('\n').forEach((raw, at) => {
 		const line = raw.trim();
 		const heading = /^(#{1,6})\s+(.*)$/.exec(line);
 		const bullet = /^[-*+]\s+(.*)$/.exec(line);
@@ -747,14 +868,14 @@ export function renderMarkdown(source: string): string {
 			flush();
 		} else if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
 			flush();
-			out.push('<hr>');
+			out.push({ line: at, html: '<hr>' });
 		} else if (heading) {
 			flush();
 			const level = heading[1].length;
-			out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+			out.push({ line: at, html: `<h${level}>${inline(heading[2])}</h${level}>` });
 		} else if (line.startsWith('> ')) {
 			flush();
-			out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`);
+			out.push({ line: at, html: `<blockquote>${inline(line.slice(2))}</blockquote>` });
 		} else if (bullet || numbered) {
 			flushParagraph();
 			const wantsOrdered = numbered !== null;
@@ -762,13 +883,25 @@ export function renderMarkdown(source: string): string {
 				flushList();
 			}
 			ordered = wantsOrdered;
-			list = list ?? [];
+			if (!list) {
+				list = [];
+				opened = at;
+			}
 			list.push(`<li>${inline((bullet ?? numbered)![1])}</li>`);
 		} else {
 			flushList();
+			if (paragraph.length === 0) {
+				opened = at;
+			}
 			paragraph.push(line);
 		}
-	}
+	});
 	flush();
-	return out.join('\n');
+	return out;
+}
+
+export function renderMarkdown(source: string): string {
+	return renderBlocks(source)
+		.map((block) => block.html)
+		.join('\n');
 }

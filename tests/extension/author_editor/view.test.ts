@@ -681,3 +681,71 @@ describe('a cell the server is writing', () => {
 		expect(shown()[0].querySelector('textarea')).toBeNull();
 	});
 });
+
+describe('dividing a section', () => {
+	// happy-dom lays nothing out, so every seam measures to the same place and the
+	// first one found wins. Which one that is, is model.test.ts's question; that
+	// there is one, that it is on the right sections, and that pressing it divides
+	// the document, is this one's.
+
+	it('draws a line over a section of prose the pointer is on', async () => {
+		await mount([markdown('one\n\ntwo')]);
+		shown()[0].dispatchEvent(new MouseEvent('mousemove'));
+		expect((shown()[0].querySelector('.seam') as HTMLElement).hidden).toBe(false);
+	});
+
+	it('draws none over a section that is one thing', async () => {
+		await mount([chapter('One'), contents()]);
+		expect(shown()[0].querySelector('.seam')).toBeNull();
+		expect(shown()[1].querySelector('.seam')).toBeNull();
+	});
+
+	it('draws none over a section with nowhere to cut', async () => {
+		await mount([markdown('one')]);
+		shown()[0].dispatchEvent(new MouseEvent('mousemove'));
+		expect((shown()[0].querySelector('.seam') as HTMLElement).hidden).toBe(true);
+	});
+
+	it('draws none over a section that is open for writing', async () => {
+		await mount([markdown('one\n\ntwo')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		shown()[0].dispatchEvent(new MouseEvent('mousemove'));
+		expect((shown()[0].querySelector('.seam') as HTMLElement).hidden).toBe(true);
+	});
+
+	it('takes the line away when the pointer leaves', async () => {
+		await mount([markdown('one\n\ntwo')]);
+		shown()[0].dispatchEvent(new MouseEvent('mousemove'));
+		shown()[0].dispatchEvent(new MouseEvent('mouseleave'));
+		expect((shown()[0].querySelector('.seam') as HTMLElement).hidden).toBe(true);
+	});
+
+	it('cuts the section at the line when the button is pressed', async () => {
+		await mount([markdown('one\n\ntwo')]);
+		shown()[0].dispatchEvent(new MouseEvent('mousemove'));
+		(shown()[0].querySelector('.seam-action') as HTMLElement).dispatchEvent(
+			new MouseEvent('click')
+		);
+		expect(lastCells()).toEqual([markdown('one'), markdown('two')]);
+	});
+
+	it('offers the section below the join to the one of its kind above it', async () => {
+		await mount([markdown('one'), markdown('two')]);
+		shown()[1].dispatchEvent(new MouseEvent('mousemove'));
+		const seam = shown()[1].querySelector('.seam') as HTMLElement;
+		expect(seam.hidden).toBe(false);
+		expect(seam.querySelector('.codicon-merge')).not.toBeNull();
+		(seam.querySelector('.seam-action') as HTMLElement).dispatchEvent(
+			new MouseEvent('click')
+		);
+		expect(lastCells()).toEqual([markdown('one\n\ntwo')]);
+	});
+
+	it('offers no join where the section above is another kind', async () => {
+		await mount([chapter('One'), markdown('two')]);
+		shown()[1].dispatchEvent(new MouseEvent('mousemove'));
+		expect((shown()[1].querySelector('.seam') as HTMLElement).hidden).toBe(true);
+	});
+});
