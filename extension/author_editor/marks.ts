@@ -144,10 +144,8 @@ function spanAt(places: Place[], at: At, end: At): Span | null {
 /**
  * The report, in the coordinates the page draws in.
  *
- * `from` is the first id to give out. Marks come from more than one place — the
- * server's rules and the checker running in the page itself — and two of them
- * numbering their findings from nothing would be two marks claiming to be the
- * same one.
+ * `from` is the first id to give out. A report numbers its own findings from
+ * nothing, and a second report would then be claiming the ids of the first.
  */
 export function placed(
 	cells: Cell[],

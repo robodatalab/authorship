@@ -81,9 +81,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	get commands(): Record<string, () => void> {
 		return {
 			runAll: () => this.onActive((d) => this.write(d, compile(parse(d.getText())))),
-			// The cell to check is the one the view has selected, and only the view
-			// knows which that is — so the command asks it rather than guessing.
-			spellCheck: () => this.active?.panel.webview.postMessage({ type: 'askSpellCheck' }),
 			importMarkdown: () => this.onActive((d) => this.importMarkdown(d)),
 			exportMarkdown: () =>
 				this.onActive(async (d) => {
@@ -174,9 +171,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					break;
 				case 'compile':
 					void this.write(document, compile(parse(document.getText())));
-					break;
-				case 'spellCheck':
-					this.onActive((d) => this.spellCheck(d, message.where));
 					break;
 				case 'checkToggle':
 					this.toggleChecking(document, panel);
@@ -299,42 +293,67 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		where: { start: number; end: number } | null,
 		whole: boolean
 	): Promise<void> {
+		// The rules answer in milliseconds and the model in seconds, so they are two
+		// waits rather than one. Awaited in order, and the slower one adds to what
+		// the faster one put up rather than replacing it — a report that waits for
+		// the slowest thing in it is a report nobody sees.
+		const asked = {
+			path: document.uri.fsPath,
+			text: document.getText(),
+			selection: where,
+		};
+		if (await this.report(document, panel, '/check/prose', asked, whole)) {
+			await this.report(document, panel, '/check/grammar', asked, false);
+		}
+	}
+
+	/**
+	 * Run one pass and hand what it found to the page.
+	 *
+	 * Answers whether it is worth going on: a check the author has switched off,
+	 * typed over, or that failed outright is not a reason to start the next one.
+	 */
+	private async report(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		pass: string,
+		asked: unknown,
+		whole: boolean
+	): Promise<boolean> {
 		if (!this.checking.has(document.uri.toString())) {
-			return;
+			return false;
 		}
 		try {
-			const started = await fetch(`http://127.0.0.1:${this.port}/check/prose`, {
+			const started = await fetch(`http://127.0.0.1:${this.port}${pass}`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					path: document.uri.fsPath,
-					text: document.getText(),
-					selection: where,
-				}),
+				body: JSON.stringify(asked),
 			});
 			if (!started.ok) {
 				throw new Error(await detailOf(started));
 			}
 			const { id } = (await started.json()) as { id: string };
-			const done = await this.awaitJob('/check/prose/status', id);
+			const done = await this.awaitJob(`${pass}/status`, id);
 			// A check the author typed over was stopped, and stopped early is not the
 			// same as found nothing — the pass that superseded it is the one to draw.
 			if (done.cancelled) {
-				return;
+				return false;
 			}
 			if (!this.checking.has(document.uri.toString())) {
-				return;
+				return false;
 			}
 			void panel.webview.postMessage({
 				type: 'marks',
 				findings: done.findings ?? [],
 				whole,
 			});
+			return true;
 		} catch (err: unknown) {
-			// Said in the status bar and nowhere else. A check is the editor's own
-			// idea, and a dialog over the manuscript because one failed would be the
+			// Said in the log and nowhere else. A check is the editor's own idea, and
+			// a dialog over the manuscript because one failed would be the
 			// interruption the checks are meant not to be.
 			console.warn(`Authorship could not check the prose: ${describe(err)}`);
+			return false;
 		}
 	}
 
@@ -404,59 +423,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				`Authorship could not fix that: ${describe(err)}`
 			);
 		}
-	}
-
-	/**
-	 * Correct one cell's prose, by the lines it occupies in the file.
-	 *
-	 * The server works on files and line spans, and a `.author` file is a file
-	 * like any other — so a cell asks for the lines it is on and the correction
-	 * arrives back as a change to the document, which repaints the view.
-	 *
-	 * The pass runs as a job on the server, so this waits on it rather than
-	 * firing and returning: a correction that takes ten seconds to arrive is
-	 * indistinguishable from one that never started.
-	 */
-	private async spellCheck(
-		document: vscode.TextDocument,
-		where: { start: number; end: number } | null
-	): Promise<void> {
-		if (!where) {
-			void vscode.window.showInformationMessage(
-				'That section has no prose to correct — select one that does.'
-			);
-			return;
-		}
-		if (document.isDirty) {
-			// The server reads the file from disk, so what is on screen has to be
-			// what it will read.
-			await document.save();
-		}
-		await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: `Correcting ${basename(document.uri)}…`,
-			},
-			async () => {
-				const started = await fetch(
-					`http://127.0.0.1:${this.port}/fix/grammar`,
-					{
-						method: 'POST',
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({
-							path: document.uri.fsPath,
-							line: where.start,
-							selection: where,
-						}),
-					}
-				);
-				if (!started.ok) {
-					throw new Error(await detailOf(started));
-				}
-				const { id } = (await started.json()) as { id: string };
-				await this.awaitJob('/fix/grammar/status', id);
-			}
-		);
 	}
 
 	/**
@@ -806,12 +772,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		const codicons = webview.asWebviewUri(
 			vscode.Uri.joinPath(media, 'codicon.css')
 		);
-		// Harper's checker is WebAssembly, and the page fetches it rather than
-		// carrying it: inlined it is twenty megabytes of JavaScript to parse before
-		// the first cell is drawn. Copied into dist/ by the build.
-		const harper = webview.asWebviewUri(
-			vscode.Uri.joinPath(dist, 'harper_wasm_bg.wasm')
-		);
 		const nonce = nonceString();
 
 		return `<!DOCTYPE html>
@@ -819,13 +779,13 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 <head>
 	<meta charset="UTF-8">
 	<meta http-equiv="Content-Security-Policy"
-		content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; connect-src ${webview.cspSource}; script-src 'nonce-${nonce}' 'wasm-unsafe-eval';">
+		content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link href="${codicons}" rel="stylesheet">
 	<link href="${style}" rel="stylesheet">
 	<title>Author</title>
 </head>
-<body data-harper="${harper}">
+<body>
 ${BODY}
 	<script nonce="${nonce}" src="${script}"></script>
 </body>

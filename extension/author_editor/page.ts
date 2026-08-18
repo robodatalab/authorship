@@ -8,8 +8,6 @@
 export const BODY = `	<header class="toolbar" id="toolbar">
 		<button class="tool" id="run-all" type="button"
 			data-tip="Run All — build every section that is built rather than written"><i class="codicon codicon-run-all"></i></button>
-		<button class="tool" id="spell" type="button"
-			data-tip="Spell Check — correct the prose of the selected section"><i class="codicon codicon-check-all"></i></button>
 		<button class="tool" id="check" type="button"
 			data-tip="Check Prose — underline grammar and repetition while you write"><i class="codicon codicon-checklist"></i></button>
 		<span class="divider"></span>

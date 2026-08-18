@@ -64,7 +64,6 @@ import type { CellField } from './model';
 import type { Cursor } from './cursors';
 import type { Match, Query } from './find';
 import type { Finding, Mark } from './marks';
-import { Dialect, LocalLinter, createBinaryModuleFromUrl } from 'harper.js';
 import type { Cell } from '../storydoc/model';
 
 interface VsCodeApi {
@@ -142,13 +141,10 @@ let tipTimer: ReturnType<typeof setTimeout> | undefined;
 /**
  * The next number to give a mark.
  *
- * Marks arrive from two places — the rules on the server and Harper running in
- * here — and each numbering its own findings from nothing would be two marks
- * claiming to be the same one.
+ * Findings arrive a report at a time, and a report numbers its own from
+ * nothing — so the numbering is done here instead, where it can keep counting.
  */
 let nextFault = 0;
-/** Harper, made once and only if the author has asked to be checked. */
-let harper: LocalLinter | null = null;
 /**
  * The cell the server is writing, and how far through the story it has read.
  *
@@ -227,8 +223,6 @@ for (const [id, type] of [
 		.addEventListener('click', () => vscode.postMessage({ type }));
 }
 
-document.getElementById('spell')!.addEventListener('click', answerSpellCheck);
-
 // Turning the checks on is the author saying they want to be told. Drafting is
 // the other half of writing, and nothing is checked until they ask.
 checkEl.addEventListener('click', () => vscode.postMessage({ type: 'checkToggle' }));
@@ -251,17 +245,6 @@ tipEl.addEventListener('mousedown', (event) => event.preventDefault());
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
-
-/**
- * Which lines the host should have corrected, or null when there are none.
- *
- * Null is reported rather than swallowed: a selected chapter has no prose in it
- * and a button that quietly does nothing is indistinguishable from one that is
- * broken.
- */
-function answerSpellCheck(): void {
-	vscode.postMessage({ type: 'spellCheck', where: sourceLinesOf(cells, selected) });
-}
 
 // --- cells ---
 
@@ -1322,277 +1305,6 @@ function foundIn(index: number, field: string | null): Match[] {
 // --- what the checks found ---
 
 /**
- * Harper's own kinds, sorted into the two channels an underline has.
- *
- * Spelling is kept apart from the rest of the mechanics, because it is the one
- * an author wants to see at a glance and the one most likely to be wrong about a
- * novel — invented names, dialect, a word a character mangles on purpose.
- */
-const MECHANICAL = new Set([
-	'Agreement',
-	'BoundaryError',
-	'Capitalization',
-	'Eggcorn',
-	'Formatting',
-	'Grammar',
-	'Malapropism',
-	'Nonstandard',
-	'Punctuation',
-	'Typo',
-	'WordOrder',
-]);
-
-function kindOf(lint: string): string {
-	if (lint === 'Spelling') {
-		return 'spelling';
-	}
-	return MECHANICAL.has(lint) ? 'grammar' : 'style';
-}
-
-/**
- * Harper, built the first time it is wanted.
- *
- * It runs in here rather than on the server, which is the whole reason it was
- * chosen: no request, no job, no poll. The WebAssembly is fetched from the
- * extension's own folder — the host puts the address on the page, because only
- * the host can turn a file into something a webview is allowed to load.
- */
-function checker(): LocalLinter | null {
-	if (harper) {
-		return harper;
-	}
-	const binary = document.body.dataset.harper;
-	if (!binary) {
-		return null;
-	}
-	harper = new LocalLinter({
-		binary: createBinaryModuleFromUrl(binary, 'full'),
-		dialect: Dialect.American,
-	});
-	return harper;
-}
-
-/**
- * How long a word may be before swapping each of its pairs is not worth doing.
- */
-const PROBE_LONGEST = 16;
-
-/** A word with one pair of neighbouring letters swapped, every way round. */
-function transposals(word: string): string[] {
-	const swapped: string[] = [];
-	for (let at = 0; at + 1 < word.length; at++) {
-		if (word[at] === word[at + 1]) {
-			continue;
-		}
-		swapped.push(
-			word.slice(0, at) + word[at + 1] + word[at] + word.slice(at + 2)
-		);
-	}
-	return swapped;
-}
-
-/**
- * Which of these are words, asked of the only thing that knows.
- *
- * Harper's dictionary is not open to us — the API offers no way to look a word
- * up — so a word is looked up by showing it to the checker and seeing whether it
- * complains. One word to a line and one pass over the lot, because the cost of
- * asking is in the asking rather than in the length of what is asked about.
- */
-async function realWords(
-	linter: LocalLinter,
-	words: string[]
-): Promise<Set<string>> {
-	const lines = [...new Set(words)];
-	if (lines.length === 0) {
-		return new Set();
-	}
-
-	const starts: number[] = [];
-	let at = 0;
-	for (const line of lines) {
-		starts.push(at);
-		at += line.length + 1;
-	}
-
-	const spelt = new Set(lines);
-	const found = await linter.lint(lines.join('\n'), { language: 'plaintext' });
-	for (const lint of found) {
-		const span = lint.span();
-		// Only spelling. A lone word out of any sentence draws other complaints —
-		// that it is not capitalised, that it is not a sentence — and none of them
-		// are about whether it is in the dictionary.
-		if (lint.lint_kind() === 'Spelling') {
-			let which = 0;
-			for (let index = 0; index < starts.length; index++) {
-				if (starts[index] <= span.start) {
-					which = index;
-				}
-			}
-			spelt.delete(lines[which]);
-		}
-		span.free();
-		lint.free();
-	}
-	return spelt;
-}
-
-/**
- * Put the transposals Harper will not offer at the front of what it does.
- *
- * Harper retrieves a transposal as one edit away and then ranks it as two: the
- * lookup counts a swap as a single change and the scorer, which is a second and
- * different implementation, does not know about swaps at all. So the commonest
- * typing mistake there is scores below unrelated words and is cut from the list
- * before it ever reaches us — `adn` is offered `ad`, `add`, `adj`, and never
- * `and`. What it will not say, we work out ourselves.
- *
- * Only single swaps of neighbouring letters, which is the gap and not every
- * typo. Where more than one swap is a word there is nothing here to choose
- * between them, so both are offered and the author decides.
- */
-async function withTransposals(
-	linter: LocalLinter,
-	spellings: { mark: Mark; word: string }[]
-): Promise<void> {
-	const swaps = new Map<string, string[]>();
-	for (const { word } of spellings) {
-		if (swaps.has(word) || word.length < 3 || word.length > PROBE_LONGEST) {
-			continue;
-		}
-		if (!/^[A-Za-z']+$/.test(word)) {
-			continue;
-		}
-		swaps.set(word, transposals(word));
-	}
-	if (swaps.size === 0) {
-		return;
-	}
-
-	const real = await realWords(linter, [...swaps.values()].flat());
-	for (const { mark, word } of spellings) {
-		const better = (swaps.get(word) ?? []).filter((one) => real.has(one));
-		if (better.length > 0) {
-			mark.replacements = [
-				...better,
-				...mark.replacements.filter((one) => !better.includes(one)),
-			];
-		}
-	}
-}
-
-/** Harper's messages are Markdown; the box they are shown in is not. */
-function plainly(said: string): string {
-	return said.replace(/`([^`]*)`/g, '\u201c$1\u201d').replace(/`/g, '');
-}
-
-/**
- * What Harper makes of one cell.
- *
- * Cell coordinates from the start: it is given the cell's own text, so what
- * comes back is already where the page draws. Nothing goes through the file's
- * line numbers, because nothing went to the server.
- */
-async function harperMarks(index: number): Promise<Mark[]> {
-	const linter = checker();
-	const cell = cells[index];
-	if (!linter || !cell?.source) {
-		return [];
-	}
-
-	const found = await linter.lint(cell.source, { language: 'markdown' });
-	const built: { mark: Mark; word: string; said: string; named: string }[] = [];
-
-	for (const lint of found) {
-		const span = lint.span();
-		const suggestions = lint.suggestions();
-		const named = lint.lint_kind();
-		const mark: Mark = {
-			id: nextFault++,
-			rule: `harper:${named}`,
-			kind: kindOf(named),
-			source: 'harper',
-			replacements: suggestions.map((one) => one.get_replacement_text()),
-			// The short line names the fault; what Harper has to say about it is the
-			// long one. They were the same sentence twice over before.
-			message: `${lint.lint_kind_pretty()}: ${lint.get_problem_text()}`,
-			detail: '',
-			cell: index,
-			at: span.start,
-			end: span.end,
-			related: [],
-		};
-		built.push({
-			mark,
-			word: lint.get_problem_text(),
-			said: plainly(lint.message()),
-			named: lint.lint_kind_pretty(),
-		});
-		// The lints are WebAssembly objects, and what is not given back is held for
-		// as long as the editor is open.
-		for (const one of suggestions) {
-			one.free();
-		}
-		span.free();
-		lint.free();
-	}
-
-	await withTransposals(
-		linter,
-		built
-			.filter((one) => one.mark.kind === 'spelling')
-			.map(({ mark, word }) => ({ mark, word }))
-	);
-
-	// Said last, so that what it lists is what will actually be offered.
-	for (const { mark, said, named } of built) {
-		mark.detail =
-			`${named}. ${said}` +
-			(mark.replacements.length > 0
-				? `\n\nSuggested: ${mark.replacements.slice(0, 4).join(', ')}`
-				: '');
-	}
-
-	return built.map((one) => one.mark);
-}
-
-/**
- * Have Harper read these cells again, and replace what it said about them.
- *
- * A source at a time: what Harper thinks of a cell is replaced wholesale, and
- * what the server's rules think is left exactly as it was. Two checkers looking
- * at one paragraph must not be able to delete each other's findings.
- */
-async function harperCheck(indexes: number[]): Promise<void> {
-	if (!checking) {
-		return;
-	}
-	try {
-		for (const index of indexes) {
-			const fresh = await harperMarks(index);
-			if (!checking) {
-				return;
-			}
-			faults = [
-				...faults.filter(
-					(mark) => !(mark.source === 'harper' && mark.cell === index)
-				),
-				...fresh,
-			];
-		}
-		repaintMarks();
-	} catch {
-		// A checker that cannot start is a checker with nothing to say. The rules on
-		// the server are unaffected, and the author is not told about a component.
-	}
-}
-
-/** Every cell, for when there is no reason to think one of them is unchanged. */
-function everyCell(): number[] {
-	return cells.map((_, index) => index);
-}
-
-/**
  * A cell's text with both the marks over it and the matches in it fenced.
  *
  * Two fencings of one string, and each was measured on the string before either
@@ -1894,9 +1606,6 @@ function recheckBlock(index: number, source: string): void {
 			where: { start: where.start + block.first, end: where.start + block.last },
 		});
 	}
-	// Harper is here rather than over a wire, so it reads the whole cell again
-	// rather than being told which paragraph — it costs less than working it out.
-	void harperCheck([index]);
 }
 
 /**
@@ -2334,9 +2043,7 @@ document.addEventListener('keydown', (event) => {
 
 window.addEventListener('message', (event) => {
 	const message = event.data;
-	if (message?.type === 'askSpellCheck') {
-		answerSpellCheck();
-	} else if (message?.type === 'writing') {
+	if (message?.type === 'writing') {
 		const was = writing?.at ?? null;
 		writing =
 			message.at === null
@@ -2378,7 +2085,6 @@ window.addEventListener('message', (event) => {
 		refind();
 		showCount();
 		render();
-		void harperCheck(everyCell());
 	} else if (message?.type === 'checking') {
 		checking = message.on as boolean;
 		checkEl.classList.toggle('on', checking);
@@ -2388,19 +2094,14 @@ window.addEventListener('message', (event) => {
 			faults = [];
 			hideTip();
 			repaintMarks();
-		} else {
-			// The server is already reading the document; this is the other half of
-			// the same answer, and it needs nobody's permission to start.
-			void harperCheck(everyCell());
 		}
 	} else if (message?.type === 'marks') {
 		const findings = message.findings as Finding[];
 		const arrived = placed(cells, findings, nextFault, 'server');
 		nextFault += findings.length;
-		// A pass over the whole document replaces what the server said and nothing
-		// else — Harper read the same paragraphs and is not being overruled. A pass
-		// over one paragraph only adds, since every other mark is about prose it
-		// never looked at.
+		// A pass over the whole document replaces what the server said. A pass over
+		// one paragraph only adds, since every other mark is about prose it never
+		// looked at.
 		if (message.whole) {
 			faults = [...faults.filter((mark) => mark.source !== 'server'), ...arrived];
 		} else {

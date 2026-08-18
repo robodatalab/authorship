@@ -488,6 +488,25 @@ RULES: dict[str, Callable[[Doc, Passage], Iterator[Finding]]] = {
 }
 
 
+def sentences(text: str) -> list[tuple[int, int]]:
+    """Where each sentence of the text begins and ends.
+
+    From the parser rather than from the full stops. Dialogue ends on question
+    marks and exclamation marks as often as on periods, and a period is as often
+    an initial, an abbreviation or the middle of a number — a rule written by
+    hand gets the first page of any novel wrong.
+    """
+    if not text.strip():
+        return []
+    with _LOCK:
+        doc = _nlp()(text)
+        return [
+            (sentence.start_char, sentence.end_char)
+            for sentence in doc.sents
+            if sentence.text.strip()
+        ]
+
+
 def crutch_lemmas(prose: Iterable[tuple[int, str]]) -> frozenset[str]:
     """The words a whole manuscript leans on.
 

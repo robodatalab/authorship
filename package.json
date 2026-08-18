@@ -64,22 +64,10 @@
     ],
     "commands": [
       {
-        "command": "authorship.fixGrammar",
-        "title": "Fix Grammar",
-        "category": "Authorship",
-        "icon": "$(wand)"
-      },
-      {
         "command": "authorship.author.runAll",
         "title": "Run All",
         "category": "Authorship",
         "icon": "$(run-all)"
-      },
-      {
-        "command": "authorship.author.spellCheck",
-        "title": "Spell Check",
-        "category": "Authorship",
-        "icon": "$(check-all)"
       },
       {
         "command": "authorship.author.importMarkdown",
@@ -112,15 +100,6 @@
         "icon": "$(file-code)"
       }
     ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "authorship.fixGrammar",
-          "when": "resourceExtname == .md",
-          "group": "navigation@1"
-        }
-      ]
-    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -143,12 +122,11 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "harper": "mkdir -p dist && cp node_modules/harper.js/dist/harper_wasm_bg.wasm dist/",
-    "compile": "npm run harper && webpack",
+    "compile": "webpack",
     "clean": "rm -rf dist out",
     "rebuild": "npm run clean && npm run compile",
     "watch": "webpack --watch",
-    "package": "npm run harper && webpack --mode production --devtool hidden-source-map",
+    "package": "webpack --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "lint": "eslint extension tests/extension",
@@ -173,7 +151,6 @@
     "serialize-javascript": "^7.0.6"
   },
   "dependencies": {
-    "harper.js": "^2.7.0",
     "yaml": "^2.9.0"
   }
 }
