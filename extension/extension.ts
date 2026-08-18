@@ -4,7 +4,6 @@ import * as vscode from 'vscode';
 import { AuthorEditorProvider } from './author_editor/panel';
 import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
-import { GrammarFix } from './llm/grammar';
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -60,40 +59,6 @@ export function activate(context: vscode.ExtensionContext) {
 	const health = new ModelHealth(8765);
 	context.subscriptions.push(health);
 
-	// Correcting the passage in hand. The server rewrites the file, so the
-	// correction arrives as a change to the prose rather than a report about it.
-	const grammar = new GrammarFix(8765, health);
-	context.subscriptions.push(grammar);
-
-	context.subscriptions.push(
-		vscode.commands.registerCommand('authorship.fixGrammar', () => {
-			const editor = activeManuscript();
-			if (!editor) {
-				vscode.window.showInformationMessage(
-					'Open a manuscript, and select the lines to correct or put the cursor in the section to correct.'
-				);
-				return;
-			}
-			void grammar.fix(editor);
-		})
-	);
-
-}
-
-/**
- * The manuscript a title-bar button acts on — the editor rather than the file,
- * because what an author has selected, and where their cursor is, is half of
- * what they are asking for.
- */
-function activeManuscript(): vscode.TextEditor | undefined {
-	const editor = vscode.window.activeTextEditor;
-	if (
-		editor?.document.languageId === 'markdown' &&
-		editor.document.uri.scheme === 'file'
-	) {
-		return editor;
-	}
-	return undefined;
 }
 
 // This method is called when your extension is deactivated

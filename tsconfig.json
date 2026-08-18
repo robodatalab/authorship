@@ -4,7 +4,15 @@
 		"tests/extension"
 	],
 	"compilerOptions": {
-		"module": "Node16",
+		// Webpack is what decides the shape of each bundle — commonjs2 for the
+		// extension host, plain scripts for the webviews — so what TypeScript
+		// emits is only ever fed to it. Emitting modules is what lets a
+		// dependency that ships only ESM, as harper.js does, be imported at all,
+		// and `Bundler` is what makes the `exports` map in its package.json the
+		// thing that gets read.
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"esModuleInterop": true,
 		"target": "ES2022",
 		"lib": [
 			"ES2022",

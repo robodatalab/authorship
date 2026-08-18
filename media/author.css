@@ -859,3 +859,177 @@ body {
 	color: var(--vscode-menu-selectionForeground, inherit);
 	background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
 }
+
+/* A tool that is a state rather than an action says which it is in, the way the
+   find widget's own options do. */
+.tool.on {
+	color: var(--vscode-inputOption-activeForeground, inherit);
+	background: var(--vscode-inputOption-activeBackground);
+	outline: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+}
+
+/* What a check found, under the words it found it in. A line and not a
+   highlight: the prose has to stay readable while it is being told about, which
+   is the whole difference between a check an author leaves on and one they turn
+   off. */
+.prose-mark {
+	cursor: help;
+}
+
+/* Two marks can be over one word, so the kinds are drawn on channels that cannot
+   collide — a word that is both misspelt and repeated wears both lines rather
+   than whichever was found first. An element has only one `text-decoration`, so
+   the second channel is a background laid along the bottom of the line box,
+   which survives wrapping as a decoration does.
+
+   What is wrong with the words goes on the first channel; what is wrong with the
+   writing goes on the second. Two faults sharing a channel share its colour, and
+   the box that opens on the word names them both regardless. */
+.prose-mark-grammar {
+	text-decoration: underline wavy var(--vscode-editorError-foreground, #f14c4c);
+	text-decoration-skip-ink: none;
+	text-underline-offset: 2px;
+}
+
+/* After grammar deliberately: a word that is both misspelt and ungrammatical is
+   misspelt first, and that is the more useful thing to be told. */
+.prose-mark-spelling {
+	text-decoration: underline wavy var(--vscode-editorWarning-foreground, #cca700);
+	text-decoration-skip-ink: none;
+	text-underline-offset: 2px;
+}
+
+.prose-mark-style {
+	background-image: linear-gradient(
+		to right,
+		var(--vscode-editorInfo-foreground, #3794ff) 0 100%
+	);
+	background-repeat: repeat-x;
+	background-size: 100% 2px;
+	background-position: 0 100%;
+}
+
+/* Borrowed opinions, drawn quieter than our own: proselint reads usage guides
+   rather than the story, and is right less often about a novel. */
+.prose-mark-usage {
+	background-image: linear-gradient(
+		to right,
+		var(--vscode-charts-purple, #b180d7) 0 100%
+	);
+	background-repeat: repeat-x;
+	background-size: 100% 1px;
+	background-position: 0 100%;
+}
+
+/* The marks drawn under the box, laid out exactly as the cursors are and for
+   exactly the same reason — everything here that could move a character has to
+   say what the box says. Under the cursor layer, so a place being typed into
+   still reads over a word that is marked. */
+.source-marks {
+	position: absolute;
+	inset: 0;
+	box-sizing: border-box;
+	padding: 6px 8px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	line-height: 1.5;
+	color: transparent;
+	border: 1px solid transparent;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	pointer-events: none;
+	user-select: none;
+}
+
+/* The text under the box is invisible, so each line has to carry its own colour
+   rather than take it from what it is under — which both channels already do. */
+.source-marks .prose-mark {
+	color: transparent;
+	cursor: text;
+}
+
+.cell[data-kind='note'] .source-marks {
+	font-style: italic;
+}
+
+/* What the marks say, which is the reason a check is worth more than a squiggle.
+   Wide enough for a sentence about the prose rather than a label on it, fixed to
+   the viewport because the page it is over scrolls, and reachable by the pointer
+   because there is a button in it. */
+.mark-tip {
+	position: fixed;
+	z-index: 30;
+	max-width: 420px;
+	color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+	background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+	border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, transparent));
+	border-radius: 3px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* One fault to a row, because a word under two marks has two things said about
+   it and neither is a footnote to the other. */
+.mark-tip-row {
+	position: relative;
+	padding: 8px 10px;
+}
+
+.mark-tip-row + .mark-tip-row {
+	border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, transparent));
+}
+
+/* The row says which kind of fault it is in the same colour the underline does,
+   so the box and the word agree without either having to name the rule. */
+.mark-tip-row::before {
+	content: '';
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 2px;
+}
+
+.mark-tip-grammar::before {
+	background: var(--vscode-editorError-foreground, #f14c4c);
+}
+
+.mark-tip-spelling::before {
+	background: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.mark-tip-style::before {
+	background: var(--vscode-editorInfo-foreground, #3794ff);
+}
+
+.mark-tip-usage::before {
+	background: var(--vscode-charts-purple, #b180d7);
+}
+
+.mark-tip-said {
+	font-weight: 600;
+	padding-right: 44px;
+}
+
+.mark-tip-why {
+	margin-top: 4px;
+	font-size: 0.95em;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.mark-tip-fix {
+	position: absolute;
+	top: 6px;
+	right: 8px;
+	padding: 2px 8px;
+	font-family: inherit;
+	font-size: 0.85em;
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+	border: none;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.mark-tip-fix:hover {
+	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+}

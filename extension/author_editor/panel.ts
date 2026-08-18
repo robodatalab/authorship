@@ -62,6 +62,27 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private readonly writing = new Map<string, Writing>();
 
+	/**
+	 * The documents being checked, for as long as this editor is open.
+	 *
+	 * Kept here and written nowhere. What a check found is what something thinks
+	 * of the prose rather than part of it, and an author drafting has said they do
+	 * not want to be told — neither belongs in a file that is the story. So it
+	 * lives for the session, the way an underline in a code file does.
+	 */
+	private readonly checking = new Set<string>();
+
+	/**
+	 * The edit still being written to each document, if there is one.
+	 *
+	 * The page says what it changed and asks for the paragraph to be checked
+	 * again in the same breath, and the document is written between the two —
+	 * so a check that read the file straight away would read it as it was, find
+	 * the fault that has just been put right, and send the mark back to sit under
+	 * the correction.
+	 */
+	private readonly writes = new Map<string, Promise<void>>();
+
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly port: number
@@ -71,9 +92,6 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	get commands(): Record<string, () => void> {
 		return {
 			runAll: () => this.onActive((d) => this.write(d, compile(parse(d.getText())))),
-			// The cell to check is the one the view has selected, and only the view
-			// knows which that is — so the command asks it rather than guessing.
-			spellCheck: () => this.active?.panel.webview.postMessage({ type: 'askSpellCheck' }),
 			importMarkdown: () => this.onActive((d) => this.importMarkdown(d)),
 			exportMarkdown: () =>
 				this.onActive(async (d) => {
@@ -152,15 +170,30 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'ready':
 					send();
 					this.resume(document, panel);
+					// A page rebuilt under the author — reloaded, or reopened — knows
+					// nothing about the checks it was showing a moment ago.
+					this.sayChecking(document, panel);
+					if (this.checking.has(document.uri.toString())) {
+						void this.check(document, panel, null, true);
+					}
 					break;
 				case 'cells':
-					void this.write(document, message.cells as Cell[]);
+					this.writes.set(
+						document.uri.toString(),
+						this.write(document, message.cells as Cell[]).catch(() => undefined)
+					);
 					break;
 				case 'compile':
 					void this.write(document, compile(parse(document.getText())));
 					break;
-				case 'spellCheck':
-					this.onActive((d) => this.spellCheck(d, message.where));
+				case 'checkToggle':
+					this.toggleChecking(document, panel);
+					break;
+				case 'checkBlock':
+					void this.check(document, panel, message.where, false);
+					break;
+				case 'fixMark':
+					void this.fixMark(document, panel, message);
 					break;
 				case 'generate':
 					this.onActive((d) => this.generate(d, message.at as number));
@@ -225,56 +258,188 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	}
 
 	/**
-	 * Correct one cell's prose, by the lines it occupies in the file.
+	 * Turn the checks on this document on or off.
 	 *
-	 * The server works on files and line spans, and a `.author` file is a file
-	 * like any other — so a cell asks for the lines it is on and the correction
-	 * arrives back as a change to the document, which repaints the view.
-	 *
-	 * The pass runs as a job on the server, so this waits on it rather than
-	 * firing and returning: a correction that takes ten seconds to arrive is
-	 * indistinguishable from one that never started.
+	 * On, the whole document is read once so the author sees where they stand.
+	 * Off, the page is told and drops what it was showing — a check nobody asked
+	 * for is an opinion nobody asked for, and drafting is when they least want it.
 	 */
-	private async spellCheck(
+	private toggleChecking(
 		document: vscode.TextDocument,
-		where: { start: number; end: number } | null
-	): Promise<void> {
-		if (!where) {
-			void vscode.window.showInformationMessage(
-				'That section has no prose to correct — select one that does.'
-			);
+		panel: vscode.WebviewPanel
+	): void {
+		const key = document.uri.toString();
+		if (this.checking.has(key)) {
+			this.checking.delete(key);
+			this.sayChecking(document, panel);
 			return;
 		}
-		if (document.isDirty) {
-			// The server reads the file from disk, so what is on screen has to be
-			// what it will read.
-			await document.save();
+		this.checking.add(key);
+		this.sayChecking(document, panel);
+		void this.check(document, panel, null, true);
+	}
+
+	private sayChecking(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		void panel.webview.postMessage({
+			type: 'checking',
+			on: this.checking.has(document.uri.toString()),
+		});
+	}
+
+	/**
+	 * Read a passage and tell the page what is wrong with it.
+	 *
+	 * The text goes with the request rather than the path alone. Every other job
+	 * here writes the document and so needs it on disk first, but a check only
+	 * reads — and saving a manuscript because a paragraph was worth a second look
+	 * would be the editor writing files the author did not ask it to.
+	 *
+	 * `whole` says whether what comes back replaces the marks or joins them, which
+	 * is the difference between the pass that starts when the checks go on and the
+	 * one that follows a paragraph being written in.
+	 */
+	private async check(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		where: { start: number; end: number } | null,
+		whole: boolean
+	): Promise<void> {
+		// Whatever the page last changed has to be in the document before it is
+		// read, or the check answers about the prose as it was.
+		await this.writes.get(document.uri.toString());
+		// The rules answer in milliseconds and the model in seconds, so they are two
+		// waits rather than one. Awaited in order, and the slower one adds to what
+		// the faster one put up rather than replacing it — a report that waits for
+		// the slowest thing in it is a report nobody sees.
+		const asked = {
+			path: document.uri.fsPath,
+			text: document.getText(),
+			selection: where,
+		};
+		if (await this.report(document, panel, '/check/prose', asked, whole)) {
+			await this.report(document, panel, '/check/grammar', asked, false);
 		}
-		await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: `Correcting ${basename(document.uri)}…`,
-			},
-			async () => {
-				const started = await fetch(
-					`http://127.0.0.1:${this.port}/fix/grammar`,
-					{
-						method: 'POST',
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({
-							path: document.uri.fsPath,
-							line: where.start,
-							selection: where,
-						}),
-					}
-				);
-				if (!started.ok) {
-					throw new Error(await detailOf(started));
-				}
-				const { id } = (await started.json()) as { id: string };
-				await this.awaitJob('/fix/grammar/status', id);
+	}
+
+	/**
+	 * Run one pass and hand what it found to the page.
+	 *
+	 * Answers whether it is worth going on: a check the author has switched off,
+	 * typed over, or that failed outright is not a reason to start the next one.
+	 */
+	private async report(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		pass: string,
+		asked: unknown,
+		whole: boolean
+	): Promise<boolean> {
+		if (!this.checking.has(document.uri.toString())) {
+			return false;
+		}
+		try {
+			const started = await fetch(`http://127.0.0.1:${this.port}${pass}`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(asked),
+			});
+			if (!started.ok) {
+				throw new Error(await detailOf(started));
 			}
-		);
+			const { id } = (await started.json()) as { id: string };
+			const done = await this.awaitJob(`${pass}/status`, id);
+			// A check the author typed over was stopped, and stopped early is not the
+			// same as found nothing — the pass that superseded it is the one to draw.
+			if (done.cancelled) {
+				return false;
+			}
+			if (!this.checking.has(document.uri.toString())) {
+				return false;
+			}
+			void panel.webview.postMessage({
+				type: 'marks',
+				findings: done.findings ?? [],
+				whole,
+			});
+			return true;
+		} catch (err: unknown) {
+			// Said in the log and nowhere else. A check is the editor's own idea, and
+			// a dialog over the manuscript because one failed would be the
+			// interruption the checks are meant not to be.
+			console.warn(`Authorship could not check the prose: ${describe(err)}`);
+			return false;
+		}
+	}
+
+	/**
+	 * Put one fault right, by naming it rather than the prose around it.
+	 *
+	 * The whole of the difference from correcting a passage: the model is told
+	 * which words and what is wrong with them, so it is answering a question
+	 * rather than being asked to reread a paragraph and see what it thinks. And
+	 * because a rule found the fault, the same rule can be run over the answer —
+	 * a fix that leaves the rule still firing is refused rather than shown.
+	 *
+	 * Refusals are said out loud, unlike a check that fails. The author pressed a
+	 * button and is owed an answer either way.
+	 */
+	private async fixMark(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		asked: {
+			id: number;
+			where: unknown;
+			rule: string;
+			message: string;
+			detail: string;
+		}
+	): Promise<void> {
+		try {
+			const started = await fetch(`http://127.0.0.1:${this.port}/fix/span`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					path: document.uri.fsPath,
+					text: document.getText(),
+					where: asked.where,
+					rule: asked.rule,
+					message: asked.message,
+					detail: asked.detail,
+				}),
+			});
+			if (!started.ok) {
+				throw new Error(await detailOf(started));
+			}
+			const { id } = (await started.json()) as { id: string };
+			const done = await this.awaitJob('/fix/span/status', id);
+			if (done.cancelled) {
+				return;
+			}
+			if (!done.replacement) {
+				void vscode.window.showInformationMessage(
+					'Nothing came back for that one.'
+				);
+				return;
+			}
+			if (!done.verified) {
+				void vscode.window.showInformationMessage(
+					`That is still flagged after the change, so it was not made: “${done.replacement}”`
+				);
+				return;
+			}
+			void panel.webview.postMessage({
+				type: 'fixed',
+				id: asked.id,
+				text: done.replacement,
+			});
+		} catch (err: unknown) {
+			void vscode.window.showWarningMessage(
+				`Authorship could not fix that: ${describe(err)}`
+			);
+		}
 	}
 
 	/**
@@ -668,6 +833,10 @@ interface JobStatus {
 	error: string | null;
 	blurb?: string;
 	progress?: { written: number; chapters: number };
+	cancelled?: boolean;
+	findings?: unknown[];
+	replacement?: string;
+	verified?: boolean;
 }
 
 /**

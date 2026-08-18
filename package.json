@@ -64,22 +64,10 @@
     ],
     "commands": [
       {
-        "command": "authorship.fixGrammar",
-        "title": "Fix Grammar",
-        "category": "Authorship",
-        "icon": "$(wand)"
-      },
-      {
         "command": "authorship.author.runAll",
         "title": "Run All",
         "category": "Authorship",
         "icon": "$(run-all)"
-      },
-      {
-        "command": "authorship.author.spellCheck",
-        "title": "Spell Check",
-        "category": "Authorship",
-        "icon": "$(check-all)"
       },
       {
         "command": "authorship.author.importMarkdown",
@@ -112,15 +100,6 @@
         "icon": "$(file-code)"
       }
     ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "authorship.fixGrammar",
-          "when": "resourceExtname == .md",
-          "group": "navigation@1"
-        }
-      ]
-    },
     "viewsContainers": {
       "activitybar": [
         {
