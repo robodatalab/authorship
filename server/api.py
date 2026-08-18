@@ -13,9 +13,10 @@ from server.publishing.epub_exporter import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
 from vramen import (
+    CausalModel,
     InferenceModelResourceManager,
     Seq2SeqModel,
-    coedit_prompt, machine_memory
+    coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
 from server.storydoc import Document
@@ -25,9 +26,16 @@ _log = log.logger(__name__)
 
 GRAMMAR_MODEL = "grammarly/coedit-xl"
 
+# Everything that is asked in words rather than trained for goes to this one:
+# blurbs now, and whatever else is written by instruction later. At 8B in bf16 it
+# leaves half the budget for the prompt, which is what a tool feeding it a whole
+# chapter needs; a larger model would buy prose and lose the room to read.
+CAUSAL_MODEL = "Qwen/Qwen3-8B"
+
 # What the model was measured holding over a single batch, and what it is allowed.
 GRAMMAR_MODEL_GB = 5.0
-MEMORY_QUOTA_GB = 11.0
+CAUSAL_MODEL_GB = 17.0
+MEMORY_QUOTA_GB = 24.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -36,7 +44,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.grammar_model = Seq2SeqModel(
         GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
     )
-    app.state.inference_models = [app.state.grammar_model]
+    app.state.causal_model = CausalModel(
+        CAUSAL_MODEL, qwen_chat_prompt, app.state.models, CAUSAL_MODEL_GB
+    )
+    app.state.inference_models = [app.state.grammar_model, app.state.causal_model]
     app.state.jobs = ParallelJobsManager()
     _log.info("Completion models created")
 
@@ -134,6 +145,26 @@ def jobs() -> dict[str, Any]:
     }
 
 
+class JobCancelRequest(BaseModel):
+    # Path of the document whose job is to stop — a job is keyed by what it writes.
+    path: str
+
+
+@app.post("/jobs/cancel")
+def cancel_job(request: JobCancelRequest) -> dict[str, Any]:
+    """Ask the job on a document to stop.
+
+    Asked rather than killed: a job stops between pieces of work, where it has
+    left nothing half-done. So this answers that it was asked, and the job's own
+    status endpoint is what says when it has.
+    """
+    job = app.state.jobs.get(request.path)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"No job for {request.path}")
+    job.cancel()
+    return {"cancelling": job.target}
+
+
 class EpubExportRequest(BaseModel):
     # Path of the document to publish. What the book says about itself — its
     # title page, its cover, its disclaimer, where to find the author — is in
@@ -224,13 +255,24 @@ class BlurbRequest(BaseModel):
 class BlurbJob(Job):
     kind = "blurb"
 
-    def __init__(self, document: Document) -> None:
+    def __init__(self, model: CausalModel, document: Document) -> None:
         super().__init__(str(document.path))
+        self._model = model
         self._document = document
         self.blurb = ""
+        # A chapter at a time is the only division the work has, so it is the
+        # only one the author can be shown. Read from the thread answering the
+        # status endpoint while the worker writes them, which two ints tolerate.
+        self.written = 0
+        self.chapters = 0
 
     def execute(self) -> None:
-        self.blurb = write_blurb(self._document, lambda: self.cancelled)
+        self.blurb = write_blurb(
+            self._model, self._document, lambda: self.cancelled, self._reached
+        )
+
+    def _reached(self, written: int, chapters: int) -> None:
+        self.written, self.chapters = written, chapters
 
 
 @app.post("/generate/blurb", status_code=202)
@@ -241,15 +283,27 @@ def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     back and the editor puts it in the cell that asked, because a cell's text is
     the editor's to write and a line span is a poor way to name an empty cell.
     """
-    job = BlurbJob(_document(request.path))
+    document = _document(request.path)
+    job = BlurbJob(app.state.causal_model, document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
 
 @app.get("/generate/blurb/status")
 def generate_blurb_status(id: str) -> dict[str, Any]:
-    """Whether the blurb job is still running, and the blurb once it is not."""
+    """Whether the blurb job is still running, how far it has read, and the blurb
+    once it is not.
+
+    A book is read chapter by chapter, so how far it has got is a real fraction
+    rather than a guess — `chapters` is 0 only in the moment before the document
+    has been read, when there is nothing yet to be a fraction of.
+    """
     job = app.state.jobs.get(id)
     if not isinstance(job, BlurbJob):
         raise HTTPException(status_code=404, detail=f"No blurb job for {id}")
-    return {"running": not job.done, "error": job.error, "blurb": job.blurb}
+    return {
+        "running": not job.done,
+        "error": job.error,
+        "blurb": job.blurb,
+        "progress": {"written": job.written, "chapters": job.chapters},
+    }

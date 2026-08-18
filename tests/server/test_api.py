@@ -276,11 +276,22 @@ class GenerateBlurb(unittest.TestCase):
             [
                 storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
                 storydoc.chapter("One"),
-                storydoc.markdown("prose"),
+                storydoc.markdown("The lantern had gone out."),
+                storydoc.chapter("Two"),
+                storydoc.markdown("The door stood open."),
                 storydoc.Cell(storydoc.BLURB, "", {}),
             ]
         )
         self.document.write_text(self.written, encoding="utf-8")
+
+        def _restore_model():
+            app.state.causal_model = None
+
+        self.addCleanup(_restore_model)
+
+        app.state.causal_model = build_fake_completion_model(
+            reply="A woman loses her name."
+        )
         app.state.jobs = ParallelJobsManager()
 
     def test_runs_as_a_job_and_hands_the_blurb_back(self) -> None:
@@ -290,7 +301,8 @@ class GenerateBlurb(unittest.TestCase):
 
         status = wait_for_blurb(client, started.json()["id"])
         self.assertIsNone(status["error"])
-        self.assertIn("Veriona", status["blurb"])
+        self.assertEqual(status["blurb"], "A woman loses her name.")
+        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_leaves_the_document_alone(self) -> None:
         # The blurb comes back for the editor to place; a job that wrote it into
@@ -318,6 +330,103 @@ class GenerateBlurb(unittest.TestCase):
         client = TestClient(app)
         response = client.get("/generate/blurb/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
+
+    def test_says_how_much_of_the_story_it_has_read_while_it_reads(self) -> None:
+        # The one division the work has is chapters, and it is what the editor
+        # draws its bar from — so it has to be answerable mid-job, not after.
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "A woman loses her name."
+
+        app.state.causal_model.complete.side_effect = complete
+        client = TestClient(app)
+
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        self.assertTrue(entered.acquire(timeout=5))
+
+        status = client.get(
+            "/generate/blurb/status", params={"id": started.json()["id"]}
+        )
+        self.assertTrue(status.json()["running"])
+        self.assertEqual(status.json()["progress"], {"written": 0, "chapters": 2})
+
+        release.set()
+        self.assertEqual(
+            wait_for_blurb(client, started.json()["id"])["progress"],
+            {"written": 2, "chapters": 2},
+        )
+
+    def test_stopping_it_leaves_the_blurb_unwritten(self) -> None:
+        # Stopping has to reach the job itself: a client that merely stopped
+        # asking would leave the model reading the rest of the book.
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "A woman loses her name."
+
+        app.state.causal_model.complete.side_effect = complete
+        client = TestClient(app)
+
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        self.assertTrue(entered.acquire(timeout=5))
+
+        cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
+        self.assertEqual(cancelled.status_code, 200)
+        release.set()
+
+        status = wait_for_blurb(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(status["blurb"], "")
+        # The second chapter was never read: stopping is what it did, not merely
+        # what it was told.
+        self.assertEqual(app.state.causal_model.complete.call_count, 1)
+        self.assertEqual(status["progress"], {"written": 1, "chapters": 2})
+        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+
+    def test_stopping_it_leaves_the_document_as_the_author_left_it(self) -> None:
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "A woman loses her name."
+
+        app.state.causal_model.complete.side_effect = complete
+        client = TestClient(app)
+
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        self.assertTrue(entered.acquire(timeout=5))
+        client.post("/jobs/cancel", json={"path": str(self.document)})
+        release.set()
+        wait_for_blurb(client, started.json()["id"])
+
+        self.assertEqual(self.document.read_text(), self.written)
+
+    def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/jobs/cancel",
+            json={"path": str(self.document.with_name("nope.author"))},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_stopping_one_that_has_already_finished_is_no_failure(self) -> None:
+        # The click and the last chapter can land in either order, and an author
+        # who pressed stop wanted a job that is not running.
+        client = TestClient(app)
+        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        wait_for_blurb(client, started.json()["id"])
+
+        cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
+        self.assertEqual(cancelled.status_code, 200)
 
 
 class ExportEpub(unittest.TestCase):

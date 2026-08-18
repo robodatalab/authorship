@@ -186,6 +186,13 @@ body {
 	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
+/* A cell being written is working whether or not the pointer is over it, so the
+   button that stops it is lit without having to be found first. */
+.run-column .run.running,
+.cell:hover .run-column .run.running {
+	color: var(--vscode-charts-blue, var(--vscode-focusBorder));
+}
+
 .run-column .state {
 	color: var(--vscode-descriptionForeground);
 }
@@ -213,6 +220,46 @@ body {
 .cell-fields {
 	display: block;
 	margin-bottom: 2px;
+}
+
+/* --- a cell the server is writing --- */
+
+.writing {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 8px;
+}
+
+/* Dimmed by its own colour rather than by opacity — the fill sits inside it, and
+   a transparent track would take the fill down with it. */
+.writing-track {
+	flex: 1;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--vscode-widget-border, var(--vscode-editorWidget-border));
+}
+
+.writing-fill {
+	height: 100%;
+	border-radius: 1px;
+	background: var(--vscode-progressBar-background, var(--vscode-focusBorder));
+	/* The chapters arrive one at a time and minutes apart; a bar that jumped
+	   would read as a redraw rather than as progress. */
+	transition: width 0.3s ease-out;
+}
+
+.writing-said {
+	flex: 0 0 auto;
+	font-size: 0.85em;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Nothing in a cell being written is the author's to change until it is done:
+   what they typed would go under what arrives, or over it. */
+.cell.writing .rendered {
+	opacity: 0.55;
+	cursor: default;
 }
 
 /* A chapter is a landmark in a long document — it has to be findable while
