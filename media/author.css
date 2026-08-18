@@ -515,7 +515,16 @@ body {
 	font-style: italic;
 }
 
+/* The box and the cursors drawn under it are one thing on the page, and the
+   background belongs to the pair rather than to the box on top. */
+.source-box {
+	position: relative;
+	background: var(--vscode-notebook-cellEditorBackground, var(--vscode-input-background));
+	border-radius: 2px;
+}
+
 .source {
+	display: block;
 	width: 100%;
 	box-sizing: border-box;
 	font-family: var(--vscode-editor-font-family);
@@ -523,11 +532,43 @@ body {
 	line-height: 1.5;
 	padding: 6px 8px;
 	color: var(--vscode-input-foreground);
-	background: var(--vscode-notebook-cellEditorBackground, var(--vscode-input-background));
+	background: transparent;
 	border: 1px solid var(--vscode-focusBorder);
 	border-radius: 2px;
 	overflow-y: hidden;
 	resize: none;
+}
+
+/* The same text in the same face at the same place, so that what is drawn on it
+   is under the word the box has there. Everything about it that could move a
+   character has to say what the box says — hence the border, which is there only
+   to take up the width of the box's own. */
+.source-cursors {
+	position: absolute;
+	inset: 0;
+	box-sizing: border-box;
+	padding: 6px 8px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	line-height: 1.5;
+	color: transparent;
+	border: 1px solid transparent;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	pointer-events: none;
+	user-select: none;
+}
+
+.source-cursors .at {
+	background: var(--vscode-editor-selectionBackground);
+	border-radius: 2px;
+}
+
+/* A caret has no width; the line is a shadow, which nothing is laid out around. */
+.source-cursors .caret {
+	display: inline-block;
+	width: 0;
+	box-shadow: 1px 0 0 0 var(--vscode-editorCursor-foreground, currentColor);
 }
 
 .rendered {
@@ -545,7 +586,8 @@ body {
    than telling it, and reads as one: set in italic and a shade quieter than the
    prose it stands beside, on the page and in the box it is written in. */
 .cell[data-kind='note'] .rendered,
-.cell[data-kind='note'] .source {
+.cell[data-kind='note'] .source,
+.cell[data-kind='note'] .source-cursors {
 	font-style: italic;
 	color: var(--vscode-descriptionForeground);
 }

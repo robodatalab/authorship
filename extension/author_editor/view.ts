@@ -46,7 +46,9 @@ import {
 	replaced,
 	replacedAll,
 } from './find';
+import { edited, nextOccurrence } from './cursors';
 import type { CellField } from './model';
+import type { Cursor } from './cursors';
 import type { Match, Query } from './find';
 import type { Cell } from '../storydoc/model';
 
@@ -484,12 +486,22 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	// The document this box was opened against. If it moves on, nothing typed in
 	// here may be written back over what replaced it.
 	const opened = generation;
+	const box = document.createElement('div');
+	box.className = 'source-box';
+	// Where the cursors Ctrl+D has taken are drawn, since a box can show only the
+	// one caret it has. It lies under the box holding the same text in the same
+	// face, so a place drawn on it is the place the box has it.
+	const layer = document.createElement('div');
+	layer.className = 'source-cursors';
+	layer.setAttribute('aria-hidden', 'true');
+
 	const input = document.createElement('textarea');
 	input.className = 'source';
 	input.value = cell.source;
 	input.rows = 1;
 	input.addEventListener('input', () => {
 		autosize(input);
+		drawCursors(input, layer);
 		if (typingTimer !== undefined) {
 			clearTimeout(typingTimer);
 		}
@@ -499,7 +511,27 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 			}
 		}, TYPING_DEBOUNCE_MS);
 	});
+	// A box cannot be typed into in two places at once, so the keystroke is taken
+	// off it and put in by hand.
+	input.addEventListener('beforeinput', (event) =>
+		typeEverywhere(event, input, layer)
+	);
 	input.addEventListener('keydown', (event) => {
+		if (isCursorKey(event)) {
+			event.preventDefault();
+			addCursor(input, layer);
+			return;
+		}
+		// Escape gives up the other cursors before it gives up the cell.
+		if (event.key === 'Escape' && cursors.length > 1) {
+			event.preventDefault();
+			dropCursors(layer);
+			return;
+		}
+		// Going somewhere is going to one place.
+		if (MOVES.has(event.key)) {
+			dropCursors(layer);
+		}
 		// Accept the cell the way a notebook accepts one, and leave Enter to do
 		// what Enter does in prose.
 		if (event.key === 'Escape' || (event.key === 'Enter' && event.shiftKey)) {
@@ -509,6 +541,8 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 			}
 		}
 	});
+	// Clicking is choosing one place to type in.
+	input.addEventListener('mousedown', () => dropCursors(layer));
 	input.addEventListener('blur', () => {
 		if (opened === generation) {
 			accept(index, input.value);
@@ -520,7 +554,9 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 		autosize(input);
 		input.focus({ preventScroll: true });
 	});
-	return input;
+
+	box.append(layer, input);
+	return box;
 }
 
 function renderedFor(cell: Cell, index: number): HTMLElement {
@@ -812,6 +848,7 @@ function beginEditing(index: number): void {
 	if (writing?.at === index) {
 		return;
 	}
+	dropCursors();
 	const was = editing;
 	editing = index;
 	selected = index;
@@ -832,6 +869,7 @@ function closeEditing(): void {
 	if (editing === null) {
 		return;
 	}
+	dropCursors();
 	generation += 1;
 	editing = null;
 	if (typingTimer !== undefined) {
@@ -854,6 +892,7 @@ function settle(index: number, source: string): void {
 }
 
 function accept(index: number, source: string): void {
+	dropCursors();
 	if (typingTimer !== undefined) {
 		clearTimeout(typingTimer);
 		typingTimer = undefined;
@@ -1188,6 +1227,179 @@ function isReplaceKey(event: KeyboardEvent): boolean {
 		return (event.ctrlKey || event.metaKey) && event.code === 'KeyF';
 	}
 	return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h';
+}
+
+// --- typing in several places ---
+
+/**
+ * The places in the open cell that are typed into at once, and which of them the
+ * box's own caret is on.
+ *
+ * Fewer than two is no more than a box does by itself, and none of this is in
+ * the way. They belong to the cell that is open: it is shut, and they are gone.
+ */
+let cursors: Cursor[] = [];
+let leading = -1;
+
+/** The keys that mean one place rather than several. */
+const MOVES = new Set([
+	'ArrowLeft',
+	'ArrowRight',
+	'ArrowUp',
+	'ArrowDown',
+	'Home',
+	'End',
+	'PageUp',
+	'PageDown',
+]);
+
+/** Ctrl+D, and Cmd+D on a Mac. */
+function isCursorKey(event: KeyboardEvent): boolean {
+	return (
+		(event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'd'
+	);
+}
+
+/**
+ * Take the next place the cell says what the author has selected.
+ *
+ * The selection is the whole of the question. With nothing selected there is
+ * nothing to look for, and taking the word under the caret instead would be
+ * taking a word nobody asked for.
+ *
+ * The box is asked what it has selected every time rather than trusted to have
+ * left it where it was put: between one press and the next the author may have
+ * changed it, and what they are pointing at now is what they mean.
+ */
+function addCursor(input: HTMLTextAreaElement, layer: HTMLElement): void {
+	const text = input.value;
+	const at = input.selectionStart ?? 0;
+	const end = input.selectionEnd ?? 0;
+	if (at === end) {
+		return;
+	}
+
+	if (cursors.length === 0) {
+		cursors = [{ at, end }];
+		leading = 0;
+	} else {
+		cursors[leading] = { at, end };
+	}
+
+	const taken = cursors[leading];
+	const next = nextOccurrence(text, text.slice(taken.at, taken.end), cursors);
+	if (!next) {
+		return;
+	}
+	cursors.push(next);
+	leading = cursors.length - 1;
+	input.setSelectionRange(next.at, next.end);
+	drawCursors(input, layer);
+	// A cell can be a chapter long, and the place just taken is no use behind the
+	// bottom of the window.
+	layer.querySelector('.leading')?.scrollIntoView({ block: 'nearest' });
+}
+
+function dropCursors(layer?: HTMLElement): void {
+	cursors = [];
+	leading = -1;
+	if (layer) {
+		layer.textContent = '';
+	}
+}
+
+/**
+ * Put what was typed in at every cursor.
+ *
+ * Only what can honestly be done in several places at once: letters, a return, a
+ * paste, and the two keys that delete a character. Anything else — a word
+ * deleted, an undo — is the box's to do, and giving the other cursors up is
+ * truer than doing half of it.
+ */
+function typeEverywhere(
+	event: InputEvent,
+	input: HTMLTextAreaElement,
+	layer: HTMLElement
+): void {
+	if (cursors.length < 2) {
+		return;
+	}
+	const typed = typedIn(event);
+	if (typed === null) {
+		dropCursors(layer);
+		return;
+	}
+	event.preventDefault();
+	cursors[leading] = {
+		at: input.selectionStart ?? 0,
+		end: input.selectionEnd ?? 0,
+	};
+	const reach =
+		event.inputType === 'deleteContentBackward'
+			? -1
+			: event.inputType === 'deleteContentForward'
+				? 1
+				: 0;
+	const next = edited(input.value, cursors, typed, reach);
+	input.value = next.text;
+	cursors = next.cursors;
+	const here = cursors[leading];
+	input.setSelectionRange(here.at, here.end);
+	// The keystroke the box would have seen, so that it grows and settles on its
+	// own schedule as though it had been typed into.
+	input.dispatchEvent(new Event('input'));
+}
+
+function typedIn(event: InputEvent): string | null {
+	switch (event.inputType) {
+		case 'insertText':
+			return event.data ?? '';
+		case 'insertLineBreak':
+		case 'insertParagraph':
+			return '\n';
+		case 'insertFromPaste':
+			return event.dataTransfer?.getData('text') ?? '';
+		case 'deleteContentBackward':
+		case 'deleteContentForward':
+			return '';
+		default:
+			return null;
+	}
+}
+
+/**
+ * Draw the cursors the box cannot.
+ *
+ * The text is laid out again around them, so that a place drawn here is under
+ * the same word there — which is why an empty caret is drawn with a character of
+ * no width rather than one that would push the rest of the line out of step.
+ */
+function drawCursors(input: HTMLTextAreaElement, layer: HTMLElement): void {
+	layer.textContent = '';
+	if (cursors.length < 2) {
+		return;
+	}
+	const text = input.value;
+	const order = cursors
+		.map((cursor, index) => ({ cursor, index }))
+		.sort((a, b) => a.cursor.at - b.cursor.at);
+	let read = 0;
+	for (const { cursor, index } of order) {
+		const empty = cursor.end === cursor.at;
+		// The author's own caret is the box's to draw; a second under it would be
+		// two carets in one place. What it has selected is drawn all the same, so
+		// that there is something to bring on screen.
+		if (cursor.at < read || (index === leading && empty)) {
+			continue;
+		}
+		layer.append(document.createTextNode(text.slice(read, cursor.at)));
+		const drawn = document.createElement('span');
+		drawn.className = empty ? 'caret' : index === leading ? 'at leading' : 'at';
+		drawn.textContent = empty ? '\u200b' : text.slice(cursor.at, cursor.end);
+		layer.append(drawn);
+		read = cursor.end;
+	}
+	layer.append(document.createTextNode(text.slice(read)));
 }
 
 // --- the menu ---
