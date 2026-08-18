@@ -136,10 +136,21 @@ class GrammarFixJob(Job):
 
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
-    """The work in hand: every unfinished job and the file it is queued on."""
+    """The work in hand: every unfinished job, the file it is queued on, and
+    whether it has been told to stop.
+
+    A job stops between the pieces of work it is made of, so being told and
+    being finished are minutes apart on a long one. Both are reported, because
+    a stop button whose row still says `running` reads as a button that failed.
+    """
     return {
         "jobs": [
-            {"kind": job.kind, "path": job.target, "status": job.status}
+            {
+                "kind": job.kind,
+                "path": job.target,
+                "status": job.status,
+                "cancelled": job.cancelled,
+            }
             for job in app.state.jobs.queued()
         ]
     }

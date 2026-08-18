@@ -18,8 +18,12 @@ interface ModelStatus {
 
 interface JobStatus {
 	kind: string;
+	/** What the server keys the job by, and what stopping it names. */
 	path: string;
+	/** The same file, said short enough for the panel. */
+	name: string;
 	status: string;
+	cancelled: boolean;
 }
 
 interface Memory {
@@ -259,16 +263,33 @@ function renderJobs(jobs: JobStatus[] | null): void {
 		kind.className = 'kind';
 		kind.textContent = job.kind;
 
+		// A job stops between the pieces of work it is made of, so on a long one
+		// there is a stretch where it has been told and is still going. Saying so
+		// is the difference between a slow button and a broken one.
 		const phase = document.createElement('span');
-		phase.className = `phase ${job.status}`;
-		phase.textContent = job.status;
+		phase.className = `phase ${job.cancelled ? 'stopping' : job.status}`;
+		phase.textContent = job.cancelled ? 'stopping' : job.status;
 
 		head.append(kind, phase);
 
+		// Only a job nobody has stopped yet: pressing it twice asks the server
+		// for something it is already doing.
+		if (!job.cancelled) {
+			const stop = document.createElement('button');
+			stop.type = 'button';
+			stop.className = 'stop';
+			stop.title = `Stop this ${job.kind}`;
+			stop.append(document.createElement('i'));
+			stop.addEventListener('click', () =>
+				vscode.postMessage({ type: 'stopJob', path: job.path })
+			);
+			head.append(stop);
+		}
+
 		const name = document.createElement('div');
 		name.className = 'name';
-		name.textContent = job.path;
-		name.title = job.path;
+		name.textContent = job.name;
+		name.title = job.name;
 
 		row.append(head, name);
 		jobsStatus.append(row);

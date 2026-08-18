@@ -246,6 +246,7 @@ class Jobs(unittest.TestCase):
                         "kind": "grammar fix",
                         "path": str(self.manuscript),
                         "status": "running",
+                        "cancelled": False,
                     }
                 ]
             },
@@ -254,6 +255,64 @@ class Jobs(unittest.TestCase):
         release.set()
         wait_for_grammar(client, started.json()["id"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+
+    def test_any_job_can_be_stopped_and_says_so_while_it_finishes(self) -> None:
+        # Cancelling belongs to the jobs framework rather than to any one tool:
+        # what the drawer stops is a job, and this one writes no blurbs.
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "the cat."
+
+        model = build_fake_completion_model()
+        model.complete.side_effect = complete
+        app.state.grammar_model = model
+        client = TestClient(app)
+
+        started = client.post(
+            "/fix/grammar", json={"path": str(self.manuscript), "line": 0}
+        )
+        self.assertTrue(entered.acquire(timeout=5))
+
+        cancelled = client.post(
+            "/jobs/cancel", json={"path": str(self.manuscript)}
+        )
+        self.assertEqual(cancelled.status_code, 200)
+
+        # Told and finished are not the same moment: it is still working on the
+        # paragraph it had in hand when the button was pressed.
+        self.assertEqual(
+            client.get("/jobs").json(),
+            {
+                "jobs": [
+                    {
+                        "kind": "grammar fix",
+                        "path": str(self.manuscript),
+                        "status": "running",
+                        "cancelled": True,
+                    }
+                ]
+            },
+        )
+
+        release.set()
+        status = wait_for_grammar(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+        # A correction half done is not written: the file is as it was.
+        self.assertEqual(
+            self.manuscript.read_text(), "## One\n\nteh cat.\n"
+        )
+
+    def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/jobs/cancel", json={"path": str(self.manuscript)}
+        )
+        self.assertEqual(response.status_code, 404)
 
 
 def wait_for_blurb(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
