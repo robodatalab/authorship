@@ -3,19 +3,25 @@
 //
 // None of that environment can travel in the VSIX. torch, transformers and spacy
 // resolve to platform-specific wheels measured in gigabytes, and the interpreter
-// is not ours to ship either. What does travel is the server source, the
-// lockfile, and `uv` — a single static binary that installs both, fetching its
-// own CPython when the machine has none. So the install happens here, once,
-// after the extension is already running.
+// is not ours to ship either. What travels is the server source and the
+// lockfile, which are the same bytes everywhere; the machine-specific half —
+// uv, a CPython, and the wheels — is fetched here, once, for whatever machine
+// this turns out to be. That is what keeps the VSIX to one file for every
+// platform.
 
 import * as vscode from 'vscode';
 import { spawn } from 'node:child_process';
 import { chmod } from 'node:fs/promises';
 
+/** Pin a release by naming it here: `download/0.9.29` in place of `latest/download`. */
+const UV_RELEASE = 'latest/download';
+
 /** What provisioning leaves behind: an interpreter with the server's imports in it. */
 export interface Environment {
 	python: vscode.Uri;
 }
+
+type Report = vscode.Progress<{ message?: string }>;
 
 /**
  * Ensure the environment exists, building it if this version has not been
@@ -43,7 +49,6 @@ export async function provision(
 	}
 
 	await vscode.workspace.fs.createDirectory(home);
-	const uv = await executable(context);
 
 	// The whole environment lives under globalStorage rather than beside
 	// pyproject.toml, because the extension directory is deleted and rewritten on
@@ -62,13 +67,21 @@ export async function provision(
 		NO_COLOR: '1',
 	};
 
-	log.appendLine(`installing the model environment into ${venv.fsPath}`);
 	await vscode.window.withProgress(
 		{
 			location: vscode.ProgressLocation.Notification,
 			title: 'Authorship: installing the writing model',
 		},
-		(progress) => sync(uv.fsPath, context.extensionUri.fsPath, env, log, progress)
+		async (progress) => {
+			const uv = await installer(home, log, progress);
+			log.appendLine(`installing the model environment into ${venv.fsPath}`);
+			// `--frozen` is what makes this an install rather than a resolve: the
+			// lockfile shipped in the VSIX is taken as given, so what lands on a
+			// reader's machine is what was tested. `--no-dev` leaves out the
+			// notebook and plotting group, which is a large download nobody
+			// reading a novel needs.
+			await run(uv.fsPath, ['sync', '--frozen', '--no-dev'], context.extensionUri.fsPath, env, log, progress);
+		}
 	);
 
 	await vscode.workspace.fs.writeFile(stamp, new Uint8Array());
@@ -76,64 +89,98 @@ export async function provision(
 }
 
 /**
- * The bundled uv, made runnable.
+ * uv, downloaded for this machine and kept.
  *
- * Unpacking a VSIX does not preserve the executable bit, so a freshly installed
- * extension has a uv it cannot start until this has run.
+ * It outlives the extension version that fetched it — it is the thing that knows
+ * how to build environments, not part of any one of them.
  */
-async function executable(context: vscode.ExtensionContext): Promise<vscode.Uri> {
-	const uv = vscode.Uri.joinPath(
-		context.extensionUri,
-		'bin',
-		process.platform === 'win32' ? 'uv.exe' : 'uv'
-	);
-	if (!(await exists(uv))) {
-		throw new Error(
-			`no uv binary at ${uv.fsPath} — this VSIX was built without one, or for another platform`
-		);
+async function installer(
+	home: vscode.Uri,
+	log: vscode.OutputChannel,
+	progress: Report
+): Promise<vscode.Uri> {
+	const windows = process.platform === 'win32';
+	const into = vscode.Uri.joinPath(home, 'uv');
+	const uv = vscode.Uri.joinPath(into, windows ? 'uv.exe' : 'uv');
+	if (await exists(uv)) {
+		return uv;
 	}
-	if (process.platform !== 'win32') {
+
+	const name = `uv-${target()}${windows ? '.zip' : '.tar.gz'}`;
+	const url = `https://github.com/astral-sh/uv/releases/${UV_RELEASE}/${name}`;
+	log.appendLine(`fetching ${url}`);
+	progress.report({ message: 'fetching the installer' });
+
+	const response = await fetch(url);
+	if (!response.ok) {
+		throw new Error(`${url} answered ${response.status}`);
+	}
+	const archive = vscode.Uri.joinPath(home, name);
+	await vscode.workspace.fs.writeFile(archive, new Uint8Array(await response.arrayBuffer()));
+	await vscode.workspace.fs.createDirectory(into);
+
+	// `tar` reads both formats and ships with macOS, Linux and Windows alike, so
+	// unpacking needs nothing the machine does not already have. Only the tarball
+	// carries a directory to strip; the zip is flat.
+	const strip = windows ? [] : ['--strip-components=1'];
+	await run('tar', ['-xf', archive.fsPath, '-C', into.fsPath, ...strip], home.fsPath, process.env, log);
+	await vscode.workspace.fs.delete(archive);
+
+	if (!windows) {
 		await chmod(uv.fsPath, 0o755);
 	}
 	return uv;
 }
 
-/**
- * Run the install to completion.
- *
- * `--frozen` is what makes this an install rather than a resolve: the lockfile
- * shipped in the VSIX is taken as given, so what lands on a reader's machine is
- * what was tested, and a network that cannot reach an index fails here instead
- * of quietly resolving to something else. `--no-dev` leaves out the notebook
- * and plotting group, which is a large download nobody reading a novel needs.
- */
-function sync(
-	uv: string,
+/** The uv build for this machine, named the way its releases are. */
+function target(): string {
+	switch (`${process.platform}-${process.arch}`) {
+		case 'darwin-arm64':
+			return 'aarch64-apple-darwin';
+		case 'darwin-x64':
+			return 'x86_64-apple-darwin';
+		case 'linux-x64':
+			return 'x86_64-unknown-linux-gnu';
+		case 'linux-arm64':
+			return 'aarch64-unknown-linux-gnu';
+		case 'win32-x64':
+			return 'x86_64-pc-windows-msvc';
+		case 'win32-arm64':
+			return 'aarch64-pc-windows-msvc';
+		default:
+			throw new Error(`no uv build for ${process.platform}-${process.arch}`);
+	}
+}
+
+/** Run a command to completion, with everything it says going to the log. */
+function run(
+	command: string,
+	args: readonly string[],
 	cwd: string,
 	env: NodeJS.ProcessEnv,
 	log: vscode.OutputChannel,
-	progress: vscode.Progress<{ message?: string }>
+	progress?: Report
 ): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const child = spawn(uv, ['sync', '--frozen', '--no-dev'], { cwd, env });
+		const child = spawn(command, args, { cwd, env });
 
 		// uv reports progress on stderr and results on stdout; both are the same
 		// story to a reader waiting on a download, so both go to the log and the
 		// most recent line goes to the notification.
-		const report = (chunk: Buffer): void => {
+		const write = (chunk: Buffer): void => {
 			const text = chunk.toString();
 			log.append(text);
 			const last = text.trimEnd().split('\n').pop()?.trim();
 			if (last) {
-				progress.report({ message: last });
+				progress?.report({ message: last });
 			}
 		};
-		child.stdout.on('data', report);
-		child.stderr.on('data', report);
+		child.stdout.on('data', write);
+		child.stderr.on('data', write);
 
 		child.on('error', reject);
 		child.on('close', (code) =>
-			code === 0 ? resolve() : reject(new Error(`uv sync exited with ${code}`))
+			code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}`))
 		);
 	});
 }
