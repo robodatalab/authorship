@@ -9,6 +9,10 @@ node_modules: package.json
 	npm install
 	@touch node_modules
 
+# The bump rewrites package.json and the lock file, which would otherwise look
+# like a dependency change and force a reinstall on the next build.
 build: node_modules
+	npm version patch --no-git-tag-version
+	@touch node_modules
 	npm run package
 	npx @vscode/vsce package --no-dependencies --skip-license --out dist/authorship.vsix
