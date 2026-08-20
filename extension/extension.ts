@@ -4,6 +4,12 @@ import * as vscode from 'vscode';
 import { AuthorEditorProvider } from './author_editor/panel';
 import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
+import { ModelServer } from './server/process';
+
+// Fixed rather than ephemeral, so that a server the extension did not start —
+// the one under the debugger, or the one belonging to another window — is
+// somewhere it can be found.
+const PORT = 8765;
 
 // This method is called when your extension is activated, which happens the
 // first time the Authorship view becomes visible.
@@ -13,10 +19,20 @@ export function activate(context: vscode.ExtensionContext) {
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "authorship" is now active!');
 
+	// Everything the Python side says about itself, kept where a reader can be
+	// pointed at it when an install or a start goes wrong.
+	const log = vscode.window.createOutputChannel('Authorship');
+	context.subscriptions.push(log);
+
+	// Installs the model environment if this is the first run of this version,
+	// then starts the server. Both happen underneath: nothing below waits on it,
+	// and the status bar carries the news.
+	context.subscriptions.push(new ModelServer(context, PORT, log));
+
 	// The editor a `.author` file opens in. Declared in package.json under
 	// contributes.customEditors as the default for the extension, so opening one
 	// lands here rather than in the text editor.
-	const authorEditor = new AuthorEditorProvider(context, 8765);
+	const authorEditor = new AuthorEditorProvider(context, PORT);
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			AuthorEditorProvider.viewType,
@@ -47,16 +63,16 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			'authorship.manuscript',
-			new PublishView(context, 8765),
+			new PublishView(context, PORT),
 			// Keep the readings while the view is hidden, so switching away and
 			// back doesn't blank the plot.
 			{ webviewOptions: { retainContextWhenHidden: true } }
 		)
 	);
 
-	// Reflects the model server's own state in the status bar. The server is
-	// started by the launch configuration, not from here.
-	const health = new ModelHealth(8765);
+	// Reflects the model server's own state in the status bar, whether that
+	// server is the one started above or one already running.
+	const health = new ModelHealth(PORT);
 	context.subscriptions.push(health);
 
 }

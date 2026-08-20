@@ -8,4 +8,3 @@ out/
 __pycache__/
 .venv/
 *.pyc
-uv.lock
