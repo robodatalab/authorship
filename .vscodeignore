@@ -7,6 +7,10 @@ node_modules/**
 extension/**
 tests/**
 rfc/**
+# The pane fetches the screenshots from the repository over https, so the
+# copies on disk are for GitHub and the markdown preview, not for the VSIX.
+docs/**
+README.dev.md
 data/**
 training_data/**
 .venv/**

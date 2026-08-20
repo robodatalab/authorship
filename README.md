@@ -7,14 +7,14 @@ history. Authorship adds an editor that understands what a story is made of, a
 reader that tells you what is wrong with a passage, and a way out to an EPUB.
 Every model it uses runs on your machine; nothing you write is sent anywhere.
 
-<!-- CAPTURE hero.png — the whole VS Code window with a `.author` manuscript
+<!-- CAPTURE hero.webp — the whole VS Code window with a `.author` manuscript
      open: the toolbar across the top of the editor, three or four sections down
      the page (a Chapter section followed by prose), the sidebar open on
      the left, the status bar reading "Authorship: ok". Use a real story, not
      lorem ipsum. Full window, light or dark to taste — one screenshot in each
      theme is better if you have the patience. -->
 
-![Authorship open on a manuscript](docs/images/hero.png)
+![Authorship open on a manuscript](docs/images/hero.webp)
 
 ---
 
@@ -89,10 +89,10 @@ page, `##` is a part, `###` is a chapter — with the prose beneath each heading
 becoming the prose beneath each section. It replaces everything in the document,
 so it asks first, and one `Ctrl+Z` / `Cmd+Z` puts it back.
 
-<!-- CAPTURE import-markdown.png — the Import Markdown file picker open over the
+<!-- CAPTURE import-markdown.webp — the Import Markdown file picker open over the
      editor, with a real .md manuscript selected in the story's own folder. -->
 
-![Importing a markdown manuscript](docs/images/import-markdown.png)
+![Importing a markdown manuscript](docs/images/import-markdown.webp)
 
 ---
 
@@ -102,13 +102,13 @@ A `.author` file opens as a page of **sections**, laid out the way a notebook
 lays out cells: a narrow column down the left, the section filling the width
 beside it, and what the section is named quietly in its bottom corner.
 
-<!-- CAPTURE editor-anatomy.png — one screen of the editor showing, in one
+<!-- CAPTURE editor-anatomy.webp — one screen of the editor showing, in one
      frame: the toolbar, the run column on the left, a Chapter section, two
      prose sections under it, the kind label in a section's bottom corner, and
      the part · chapter line and word count in the toolbar. Annotate it with
      callouts if you like — this is the picture that explains the layout. -->
 
-![The parts of the editor](docs/images/editor-anatomy.png)
+![The parts of the editor](docs/images/editor-anatomy.webp)
 
 **Editing.** Double-click a section — or select it and press `Enter` — to type
 in it. `Esc` or `Shift+Enter` finishes; clicking elsewhere does the same. What
@@ -125,11 +125,11 @@ count sits at the other end.
 the nearest seam, with a button on it. Press it to cut the section in two there,
 or — at the seam above a section — to join it to the one before.
 
-<!-- CAPTURE split-seam.png — the seam line drawn between two paragraphs of a
+<!-- CAPTURE split-seam.webp — the seam line drawn between two paragraphs of a
      prose section, with its split icon and the "Split the section here" tooltip
      showing. Crop tight: two or three paragraphs, the seam, the button. -->
 
-![Splitting a section at a seam](docs/images/split-seam.png)
+![Splitting a section at a seam](docs/images/split-seam.webp)
 
 **Adding, moving, removing.** The strip in the gap between two sections adds
 one *there*, which is nearly always what "add a chapter" means: a button each for
@@ -137,48 +137,48 @@ the kinds you reach for while writing — Markdown, Chapter, Note, Part — and 
 for every other kind. A section you are on carries its own buttons at the top
 right: move up, move down, delete.
 
-<!-- CAPTURE insert-menu.png — the insert strip showing between two sections
+<!-- CAPTURE insert-menu.webp — the insert strip showing between two sections
      with its Markdown / Chapter / Note / Part buttons, and the `…` menu open
      beside it listing the remaining kinds (Title Page, Cover, Table of
      Contents, Disclaimer, About the Author, Blurb). -->
 
-![Adding a section](docs/images/insert-menu.png)
+![Adding a section](docs/images/insert-menu.webp)
 
-<!-- CAPTURE cell-actions.png — a section hovered, with the move up / move down
+<!-- CAPTURE cell-actions.webp — a section hovered, with the move up / move down
      / delete buttons visible at its top right. -->
 
-![Moving and deleting a section](docs/images/cell-actions.png)
+![Moving and deleting a section](docs/images/cell-actions.webp)
 
 **Find and replace.** `Ctrl+F` / `Cmd+F` opens find over the whole document, and
 `Ctrl+H` / `Cmd+Alt+F` opens replace under it. Match case, whole word and
 regular expressions are all there; `F3` and `Shift+F3` step through the matches,
 and the count tells you how many there are.
 
-<!-- CAPTURE find-replace.png — the find and replace bar open with a real query
+<!-- CAPTURE find-and-replace.webp — the find and replace bar open with a real query
      typed in, the match count showing, and matches highlighted in the prose
      behind it. -->
 
-![Find and replace](docs/images/find-replace.png)
+![Find and replace](docs/images/find-and-replace.webp)
 
 **Several cursors.** Select a word and press `Ctrl+D` / `Cmd+D` to put a cursor
 on the next place the section says the same thing, and again for the one after.
 Typing changes all of them at once; the arrow keys step them together; `Esc`
 gives them up.
 
-<!-- CAPTURE multi-cursor.png — a section open for editing with three cursors on
+<!-- CAPTURE multi-cursor.webp — a section open for editing with three cursors on
      three occurrences of the same name, mid-rename. -->
 
-![Typing in several places at once](docs/images/multi-cursor.png)
+![Typing in several places at once](docs/images/multi-cursor.webp)
 
 **The file underneath.** **View Source** in the toolbar opens the same file as
 plain text, in VS Code's own markdown editor. It is the same document — edits in
 either show up in the other, and git sees one file, not two.
 
-<!-- CAPTURE view-source.png — the .author file open as text beside the
+<!-- CAPTURE view-source.webp — the .author file open as text beside the
      Authorship editor in a split, the same passage visible in both, with the
      cell markers showing on the text side. -->
 
-![The same file as text](docs/images/view-source.png)
+![The same file as text](docs/images/view-source.webp)
 
 ---
 
@@ -203,10 +203,10 @@ chapter called "Disclaimer" is still a chapter.
 Sections with fields — a title page, a chapter, an about page — show them as
 labelled boxes rather than as prose you have to remember the shape of.
 
-<!-- CAPTURE title-page-fields.png — a Title Page section open, showing the
+<!-- CAPTURE title-page-fields.webp — a Title Page section open, showing the
      labelled fields filled in with a real book's details. -->
 
-![A title page and its fields](docs/images/title-page-fields.png)
+![A title page and its fields](docs/images/title-page-fields.webp)
 
 The order on the page is the order in the book. Move the disclaimer above the
 title page here and it is above it in the EPUB; there is no second list of front
@@ -221,11 +221,11 @@ opinion arriving mid-sentence is an opinion nobody wanted. Press **Check Prose**
 in the toolbar and Authorship reads the whole document once, then re-reads each
 paragraph as you finish writing it.
 
-<!-- CAPTURE check-prose.png — a paragraph with several different underlines in
+<!-- CAPTURE check-prose.webp — a paragraph with several different underlines in
      it at once, the Check Prose button in the toolbar showing as on. Choose a
      passage with a real filter word, a real echo and a real passive in it. -->
 
-![Prose underlined by the checks](docs/images/check-prose.png)
+![Prose underlined by the checks](docs/images/check-prose.webp)
 
 Two passes run: a set of rules that answers in milliseconds, and a grammar model
 that takes a few seconds. The rules draw first and the model adds to what they
@@ -270,15 +270,15 @@ this works on a novel and not only on a short story.
 The bar counts chapters, because that is the division the work actually has. You
 can go on writing elsewhere while it reads, and the square button stops it.
 
-<!-- CAPTURE blurb-writing.png — a Blurb section mid-generation: the progress
+<!-- CAPTURE blurb-writing.webp — a Blurb section mid-generation: the progress
      bar showing "3 of 21 chapters" or similar, the stop button in place of the
      run button. -->
 
-![A blurb being written](docs/images/blurb-writing.png)
+![A blurb being written](docs/images/blurb-writing.webp)
 
-<!-- CAPTURE blurb-done.png — the finished blurb sitting in its section. -->
+<!-- CAPTURE blurb-done.webp — the finished blurb sitting in its section. -->
 
-![The finished blurb](docs/images/blurb-done.png)
+![The finished blurb](docs/images/blurb-done.webp)
 
 The blurb is written from the story alone: the notes in your margin, the
 scaffolding of the format and any blurb already there are all kept out of it.
@@ -299,14 +299,14 @@ points at the art, the contents section asks for a table of contents, the
 chapters are the story, and the disclaimer and about pages open and close it.
 Notes and the blurb stay out. There is no second file carrying half the answer.
 
-<!-- CAPTURE export-epub.png — the "Exported story.epub" notification, with the
+<!-- CAPTURE export-epub.webp — the "Exported story.epub" notification, with the
      new .epub visible in the Explorer. A second shot of the book open in a
      reader (Apple Books, Calibre) showing the cover and the table of contents
      is worth having too — save it as epub-in-reader.png. -->
 
-![Exporting an EPUB](docs/images/export-epub.png)
+![Exporting an EPUB](docs/images/export-epub.webp)
 
-![The book in a reader](docs/images/epub-in-reader.png)
+![The book in a reader](docs/images/epub-in-reader.webp)
 
 **Export Markdown** writes the document out as one plain markdown manuscript —
 `story.author` becomes `story.md` beside it — for anywhere that wants a
@@ -328,12 +328,12 @@ other: it carries the book's furniture, its title page renumbered, and its share
 of the chapters — and it opens in this editor and exports to an EPUB by the same
 buttons.
 
-<!-- CAPTURE divide-parts.png — the "About how many words should a part be?"
+<!-- CAPTURE divide-parts.webp — the "About how many words should a part be?"
      prompt, ideally the quick-pick form with the "along the story's own parts"
      tick, and the parts/ folder with part_1.author … part_5.author showing in
      the Explorer behind or beside it. Two shots stitched is fine. -->
 
-![Dividing a story into parts](docs/images/divide-parts.png)
+![Dividing a story into parts](docs/images/divide-parts.webp)
 
 ---
 
@@ -344,11 +344,11 @@ reports on the machinery rather than on the book: which models are resident,
 what they are holding against what the machine has, and what work the server has
 in hand. A running job can be stopped from here.
 
-<!-- CAPTURE sidebar.png — the Authorship sidebar with all three drawers
+<!-- CAPTURE sidebar.webp — the Authorship sidebar with all three drawers
      populated: a model serving, a real memory reading, and at least one job in
      flight with its stop button. -->
 
-![The Manuscript sidebar](docs/images/sidebar.png)
+![The Manuscript sidebar](docs/images/sidebar.webp)
 
 ---
 
@@ -375,8 +375,6 @@ section is:
 The lantern had gone out again.
 
 <!-- cell: cover src="art/cover.jpg" -->
-
-![Cover](art/cover.jpg)
 ```
 
 Three things follow from that, and they are the reason for it:
@@ -397,10 +395,10 @@ And because the file is text and the editor edits the text, git behaves: a diff
 of a chapter is a diff of that chapter, `git blame` says who wrote which line,
 and a merge is a merge.
 
-<!-- CAPTURE git-diff.png — the VS Code diff view of a .author file with a real
+<!-- CAPTURE git-diff.webp — the VS Code diff view of a .author file with a real
      revision: a paragraph rewritten, the surrounding cell markers unchanged. -->
 
-![A revision, in the diff view](docs/images/git-diff.png)
+![A revision, in the diff view](docs/images/git-diff.webp)
 
 ---
 
@@ -431,10 +429,8 @@ Every toolbar button is also a command, so it is in the Command Palette
 - `Authorship: Divide into Parts`
 - `Authorship: View Source`
 
-<!-- CAPTURE command-palette.png — the Command Palette open with "Authorship"
+<!-- CAPTURE command-palette.webp — the Command Palette open with "Authorship"
      typed, showing all six commands. -->
-
-![The commands in the palette](docs/images/command-palette.png)
 
 ---
 
