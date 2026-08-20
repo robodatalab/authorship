@@ -154,11 +154,11 @@ right: move up, move down, delete.
 regular expressions are all there; `F3` and `Shift+F3` step through the matches,
 and the count tells you how many there are.
 
-<!-- CAPTURE find-replace.png — the find and replace bar open with a real query
+<!-- CAPTURE find-and-replace.png — the find and replace bar open with a real query
      typed in, the match count showing, and matches highlighted in the prose
      behind it. -->
 
-![Find and replace](docs/images/find-replace.png)
+![Find and replace](docs/images/find-and-replace.png)
 
 **Several cursors.** Select a word and press `Ctrl+D` / `Cmd+D` to put a cursor
 on the next place the section says the same thing, and again for the one after.
@@ -433,8 +433,6 @@ Every toolbar button is also a command, so it is in the Command Palette
 
 <!-- CAPTURE command-palette.png — the Command Palette open with "Authorship"
      typed, showing all six commands. -->
-
-![The commands in the palette](docs/images/command-palette.png)
 
 ---
 
