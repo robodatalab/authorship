@@ -7,10 +7,9 @@ node_modules/**
 extension/**
 tests/**
 rfc/**
-# The screenshots travel inside the generated readme as data: URIs; the pane
-# cannot read them from the package, so shipping them twice buys nothing.
+# The pane fetches the screenshots from the repository over https, so the
+# copies on disk are for GitHub and the markdown preview, not for the VSIX.
 docs/**
-README.md
 README.dev.md
 data/**
 training_data/**

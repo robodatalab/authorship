@@ -375,8 +375,6 @@ section is:
 The lantern had gone out again.
 
 <!-- cell: cover src="art/cover.jpg" -->
-
-![Cover](art/cover.jpg)
 ```
 
 Three things follow from that, and they are the reason for it:

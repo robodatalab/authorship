@@ -12,15 +12,13 @@ node_modules: package.json
 # The bump rewrites package.json and the lock file, which would otherwise look
 # like a dependency change and force a reinstall on the next build.
 #
-# The readme is packaged from a generated copy carrying its screenshots as
-# `data:` URIs, because the extension pane will read an image from nowhere
-# else — see bin/readme_for_vsix.py. `--no-rewrite-relative-links` is what
-# keeps vsce's hands off those URIs: it reads anything without a `://` as a
-# relative link and would prefix every one of them with a repository URL.
+# vsce rewrites the readme's relative image links to raw URLs on this
+# repository, which is the only form the extension pane will draw: it strips
+# the src from any image that is not http or https, and its content policy
+# then allows only https. So the screenshots have to be fetched from a public
+# `main`, and pushing them there is part of releasing.
 build: node_modules
 	npm version patch --no-git-tag-version
 	@touch node_modules
 	npm run package
-	python3 bin/readme_for_vsix.py README.md dist/readme.md
-	npx @vscode/vsce package --no-dependencies --skip-license --no-rewrite-relative-links \
-		--readme-path dist/readme.md --out dist/authorship.vsix
+	npx @vscode/vsce package --no-dependencies --skip-license --out dist/authorship.vsix
