@@ -11,6 +11,12 @@ node_modules: package.json
 
 # The bump rewrites package.json and the lock file, which would otherwise look
 # like a dependency change and force a reinstall on the next build.
+#
+# vsce rewrites the readme's relative image links to raw URLs on this
+# repository, which is the only form the extension pane will draw: it strips
+# the src from any image that is not http or https, and its content policy
+# then allows only https. So the screenshots have to be fetched from a public
+# `main`, and pushing them there is part of releasing.
 build: node_modules
 	npm version patch --no-git-tag-version
 	@touch node_modules
