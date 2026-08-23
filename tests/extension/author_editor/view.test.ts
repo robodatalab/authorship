@@ -15,7 +15,9 @@ import { BODY } from '../../../extension/author_editor/page';
 import {
 	chapter,
 	contents,
+	dumps,
 	markdown,
+	parse,
 	part,
 	type Cell,
 } from '../../../extension/storydoc/model';
@@ -45,6 +47,18 @@ function send(cells: Cell[]): void {
 	window.dispatchEvent(
 		new MessageEvent('message', { data: { type: 'cells', cells, base: '' } })
 	);
+}
+
+/**
+ * The echo of what the view just posted, as the host makes it.
+ *
+ * The host does not hand the cells back: it writes them to the document and
+ * parses the document again. That round trip is not the identity — it takes the
+ * blank lines off either end of a cell — so a test that sent the cells straight
+ * back would miss everything that goes wrong on the way through the file.
+ */
+function echo(): void {
+	send(parse(dumps(lastCells())));
 }
 
 /** What the host sends while the server writes a cell, and when it stops. */
@@ -321,14 +335,16 @@ describe('opening a cell', () => {
 	it('takes a change that came from somewhere else, even mid-edit', async () => {
 		// Reverting the file in git, a correction the server wrote, an edit in a
 		// text editor alongside — the document has moved on and the open cell is
-		// showing something that is no longer there.
+		// showing something that is no longer there. The text gives way; the
+		// author does not give up the cell over it.
 		await mount([markdown('edited')]);
 		shown()[0]
 			.querySelector('.rendered')!
 			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 		send([markdown('reverted')]);
-		expect(shown()[0].querySelector('textarea')).toBeNull();
-		expect(shown()[0].querySelector('.rendered')!.textContent).toContain('reverted');
+		const open = shown()[0].querySelector('textarea');
+		expect(open).not.toBeNull();
+		expect(open!.value).toBe('reverted');
 	});
 
 	it('does not write the abandoned text back over what arrived', async () => {
@@ -342,13 +358,220 @@ describe('opening a cell', () => {
 		send([markdown('reverted')]);
 		abandoned.dispatchEvent(new Event('blur'));
 		expect(lastCells().map((c) => c.source)).not.toContain('edited');
-		expect(shown()[0].querySelector('.rendered')!.textContent).toContain('reverted');
+		expect(shown()[0].querySelector('textarea')!.value).toBe('reverted');
+	});
+
+	it('stays open when a blank line at the foot of the cell comes back trimmed', async () => {
+		// Pressing Enter twice closed the cell. The document does not keep the
+		// blank lines at the ends of a cell — they are the file's shape, not the
+		// author's text — so what came back was not what went out, and the page
+		// read its own edit as an edit from somewhere else and rebuilt itself.
+		await mount([markdown('a')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const open = shown()[0].querySelector('textarea')!;
+		open.value = 'a\n\n';
+		open.dispatchEvent(new Event('input'));
+		await new Promise((wake) => setTimeout(wake, 450));
+
+		echo();
+
+		expect(shown()[0].querySelector('textarea')).toBe(open);
+		expect(open.value).toBe('a\n\n');
+	});
+
+	it('stays open when a trailing space comes back trimmed', async () => {
+		await mount([markdown('a')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const open = shown()[0].querySelector('textarea')!;
+		open.value = 'a word \n';
+		open.dispatchEvent(new Event('input'));
+		await new Promise((wake) => setTimeout(wake, 450));
+
+		echo();
+
+		expect(shown()[0].querySelector('textarea')).toBe(open);
+	});
+
+	it('stays open when the box loses the keyboard', async () => {
+		// Every click outside the box shut the cell: the toolbar, the find field,
+		// the editor alongside, another window. None of them is the author saying
+		// they have finished writing.
+		await mount([markdown('a')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const open = shown()[0].querySelector('textarea')!;
+		open.value = 'a and more';
+		open.dispatchEvent(new Event('input'));
+		open.dispatchEvent(new Event('blur'));
+
+		expect(shown()[0].querySelector('textarea')).toBe(open);
+		// And what was typed is written down all the same, since the timer that
+		// would have done it is no longer being waited on.
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+	});
+
+	it('stays open on Ctrl+S, and saves what has just been typed', async () => {
+		// The save is VS Code's and reads the document, which is behind the box —
+		// a cell reaches the document 400ms after the last keystroke.
+		await mount([markdown('a')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		const open = shown()[0].querySelector('textarea')!;
+		open.value = 'a and more';
+		open.dispatchEvent(new Event('input'));
+		open.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })
+		);
+
+		expect(shown()[0].querySelector('textarea')).toBe(open);
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+		expect(posted.at(-1)).toEqual({ type: 'save' });
+	});
+
+	it('carries the open cell with it when the cell is moved', async () => {
+		await mount([markdown('a'), markdown('b')]);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		(shown()[1].querySelector('[aria-label="Move up"]') as HTMLElement).click();
+		echo();
+		expect(shown()[0].querySelector('textarea')!.value).toBe('b');
+		expect(shown()[1].querySelector('textarea')).toBeNull();
+	});
+
+	it('gives up the cell when it is the one deleted', async () => {
+		await mount([markdown('a'), markdown('b')]);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		(
+			shown()[1].querySelector('[aria-label="Delete this section"]') as HTMLElement
+		).click();
+		echo();
+		expect(document.querySelector('textarea.source')).toBeNull();
 	});
 
 	it('redraws when the document has changed', async () => {
 		await mount([markdown('a')]);
 		send([markdown('a'), markdown('b')]);
 		expect(shown()).toHaveLength(2);
+	});
+});
+
+describe('leaving a cell', () => {
+	// Which keystrokes end the writing, and — the half that keeps going wrong —
+	// which ones only look as though they should. A cell is given up by accepting
+	// it or by opening another one, and by nothing else: everything that merely
+	// takes the keyboard away writes the cell down and leaves it open.
+
+	/** Open a cell the way the author does, and hand back the box. */
+	async function writing(source = 'a'): Promise<HTMLTextAreaElement> {
+		await mount([markdown(source)]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		return shown()[0].querySelector('textarea')!;
+	}
+
+	/** Type into the box the way the keyboard does, timer and all. */
+	function type(box: HTMLTextAreaElement, text: string): void {
+		box.value = text;
+		box.dispatchEvent(new Event('input'));
+	}
+
+	function press(box: HTMLElement, key: string, held: KeyboardEventInit = {}): void {
+		box.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...held }));
+	}
+
+	it('writes the cell down and shuts it on Escape', async () => {
+		const box = await writing();
+		type(box, 'a and more');
+		press(box, 'Escape');
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+	});
+
+	it('writes the cell down and shuts it on Shift+Enter', async () => {
+		// The way a notebook accepts a cell.
+		const box = await writing();
+		type(box, 'a and more');
+		press(box, 'Enter', { shiftKey: true });
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+	});
+
+	it('leaves plain Enter to do what Enter does in prose', async () => {
+		const box = await writing();
+		press(box, 'Enter');
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+	});
+
+	it('gives up the other cursors before it gives up the cell', async () => {
+		// Escape means one thing at a time. An author who has taken three places
+		// and changed their mind about the third has not finished with the cell.
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		expect(document.querySelectorAll('.source-cursors .at')).not.toHaveLength(0);
+
+		press(box, 'Escape');
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+		expect(document.querySelectorAll('.source-cursors .at')).toHaveLength(0);
+	});
+
+	it('shuts the cell on the Escape after that one', async () => {
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		press(box, 'Escape');
+		press(box, 'Escape');
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('keeps the other cursors through a save', async () => {
+		// Ctrl+S is answered before anything else in the box, and answering it is
+		// writing the cell down — not standing the author back on the page.
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		press(box, 's', { ctrlKey: true });
+
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+		expect(document.querySelectorAll('.source-cursors .at')).not.toHaveLength(0);
+	});
+
+	it('opens the cell the author is standing on, when Enter is pressed on the page', async () => {
+		await mount([markdown('a'), markdown('b')]);
+		shown()[1].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+		press(document.documentElement, 'Enter');
+
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('writes down the cell being left when another one is opened', async () => {
+		// The blur that closes the first box lands after the second is drawn, so
+		// what was typed has to be written down before the redraw rather than by it.
+		await mount([markdown('a'), markdown('b')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		type(shown()[0].querySelector('textarea')!, 'a and more');
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toEqual(['a and more', 'b']);
 	});
 });
 

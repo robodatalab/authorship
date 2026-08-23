@@ -56,107 +56,155 @@
         }
       }
     },
-    "customEditors": [
-      {
-        "viewType": "authorship.authorEditor",
-        "displayName": "Author",
-        "selector": [
-          {
-            "filenamePattern": "*.author"
-          }
-        ],
-        "priority": "default"
-      }
-    ],
-    "commands": [
-      {
-        "command": "authorship.author.runAll",
-        "title": "Run All",
-        "category": "Authorship",
-        "icon": "$(run-all)"
-      },
-      {
-        "command": "authorship.author.importMarkdown",
-        "title": "Import Markdown",
-        "category": "Authorship",
-        "icon": "$(authorship-import-markdown)"
-      },
-      {
-        "command": "authorship.author.exportMarkdown",
-        "title": "Export Markdown",
-        "category": "Authorship",
-        "icon": "$(authorship-export-markdown)"
-      },
-      {
-        "command": "authorship.author.exportEpub",
-        "title": "Export EPUB",
-        "category": "Authorship",
-        "icon": "$(authorship-export-epub)"
-      },
-      {
-        "command": "authorship.author.partition",
-        "title": "Divide into Parts",
-        "category": "Authorship",
-        "icon": "$(authorship-export-parts)"
-      },
-      {
-        "command": "authorship.author.viewSource",
-        "title": "View Source",
-        "category": "Authorship",
-        "icon": "$(file-code)"
-      }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "authorship",
-          "title": "Authorship",
-          "icon": "./media/icon.svg"
-        }
-      ]
+    "engines": {
+        "vscode": "^1.125.0"
     },
-    "views": {
-      "authorship": [
-        {
-          "id": "authorship.manuscript",
-          "name": "Manuscript",
-          "type": "webview",
-          "icon": "./media/icon.svg"
+    "icon": "media/icon.png",
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "markdown",
+                "extensions": [
+                    ".author"
+                ]
+            }
+        ],
+        "icons": {
+            "authorship-import-markdown": {
+                "description": "Import a markdown manuscript",
+                "default": {
+                    "fontPath": "media/authorship-icons.woff",
+                    "fontCharacter": "\\E001"
+                }
+            },
+            "authorship-export-markdown": {
+                "description": "Export as one markdown manuscript",
+                "default": {
+                    "fontPath": "media/authorship-icons.woff",
+                    "fontCharacter": "\\E002"
+                }
+            },
+            "authorship-export-epub": {
+                "description": "Export as an EPUB",
+                "default": {
+                    "fontPath": "media/authorship-icons.woff",
+                    "fontCharacter": "\\E003"
+                }
+            },
+            "authorship-export-parts": {
+                "description": "Export as markdown parts",
+                "default": {
+                    "fontPath": "media/authorship-icons.woff",
+                    "fontCharacter": "\\E004"
+                }
+            }
+        },
+        "customEditors": [
+            {
+                "viewType": "authorship.authorEditor",
+                "displayName": "Author",
+                "selector": [
+                    {
+                        "filenamePattern": "*.author"
+                    }
+                ],
+                "priority": "default"
+            }
+        ],
+        "commands": [
+            {
+                "command": "authorship.author.runAll",
+                "title": "Run All",
+                "category": "Authorship",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "authorship.author.importMarkdown",
+                "title": "Import Markdown",
+                "category": "Authorship",
+                "icon": "$(authorship-import-markdown)"
+            },
+            {
+                "command": "authorship.author.exportMarkdown",
+                "title": "Export Markdown",
+                "category": "Authorship",
+                "icon": "$(authorship-export-markdown)"
+            },
+            {
+                "command": "authorship.author.exportEpub",
+                "title": "Export EPUB",
+                "category": "Authorship",
+                "icon": "$(authorship-export-epub)"
+            },
+            {
+                "command": "authorship.author.partition",
+                "title": "Divide into Parts",
+                "category": "Authorship",
+                "icon": "$(authorship-export-parts)"
+            },
+            {
+                "command": "authorship.author.viewSource",
+                "title": "View Source",
+                "category": "Authorship",
+                "icon": "$(file-code)"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "authorship",
+                    "title": "Authorship",
+                    "icon": "./media/icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "authorship": [
+                {
+                    "id": "authorship.manuscript",
+                    "name": "Manuscript",
+                    "type": "webview",
+                    "icon": "./media/icon.svg"
+                }
+            ]
         }
-      ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "webpack",
+        "clean": "rm -rf dist out",
+        "rebuild": "npm run clean && npm run compile",
+        "watch": "webpack --watch",
+        "package": "webpack --mode production --devtool hidden-source-map",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "lint": "eslint extension tests/extension",
+        "test": "vitest run"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "24.x",
+        "@types/vscode": "^1.125.0",
+        "@vscode/codicons": "^0.0.46-24",
+        "eslint": "^10.5.0",
+        "happy-dom": "^20.11.2",
+        "ts-loader": "^9.6.2",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.61.1",
+        "vitest": "^3.2.4",
+        "webpack": "^5.107.2",
+        "webpack-cli": "^7.0.3"
+    },
+    "overrides": {
+        "diff": "^8.0.4",
+        "serialize-javascript": "^7.0.6"
+    },
+    "dependencies": {
+        "yaml": "^2.9.0"
     }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "webpack",
-    "clean": "rm -rf dist out",
-    "rebuild": "npm run clean && npm run compile",
-    "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "lint": "eslint extension tests/extension",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "24.x",
-    "@types/vscode": "^1.125.0",
-    "@vscode/codicons": "^0.0.46-24",
-    "eslint": "^10.5.0",
-    "happy-dom": "^20.11.2",
-    "ts-loader": "^9.6.2",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.1",
-    "vitest": "^3.2.4",
-    "webpack": "^5.107.2",
-    "webpack-cli": "^7.0.3"
-  },
-  "overrides": {
-    "diff": "^8.0.4",
-    "serialize-javascript": "^7.0.6"
-  },
-  "dependencies": {
-    "yaml": "^2.9.0"
-  }
 }
