@@ -1,0 +1,96 @@
+// What the surface currently holds, in one place because more than one part of
+// it needs the answer.
+//
+// The host owns the truth. A cell being typed into is the one exception — it
+// holds its own text until it settles, because a repaint mid-keystroke would
+// take the caret with it. Everything else here is drawn from what the host last
+// sent, and every field is written by exactly one part of the surface even
+// though several read it.
+//
+// A leaf, deliberately: it imports nothing that imports it back, so whatever
+// order the bundler settles on, this is standing before anything reads it.
+
+import { stored } from '../storydoc/model';
+import type { Cell } from '../storydoc/model';
+
+/**
+ * The cell the server is writing, and how far through the story it has read.
+ *
+ * The host says when it starts, how far it has got, and when it stops. Nothing
+ * here starts it or times it out — a view that decided for itself when a job was
+ * over would show a cell as finished while the model was still writing it.
+ */
+export interface Writing {
+	at: number;
+	written: number;
+	chapters: number;
+}
+
+/** The box open for typing, and which cell it belongs to. */
+export interface OpenBox {
+	input: HTMLTextAreaElement;
+	layer: HTMLElement;
+	index: number;
+}
+
+export const state: {
+	cells: Cell[];
+	base: string;
+	editing: number | null;
+	selected: number;
+	writing: Writing | null;
+	drawn: string;
+	generation: number;
+	openBox: OpenBox | null;
+	typingTimer: ReturnType<typeof setTimeout> | undefined;
+} = {
+	cells: [],
+	/** Where images in a cell resolve from; the host rewrites the folder for us. */
+	base: '',
+	/** The cell the caret is in, or null when none is open for editing. */
+	editing: null,
+	/** The cell the title-bar commands act on. */
+	selected: 0,
+	writing: null,
+	/**
+	 * What is on the page right now.
+	 *
+	 * The document comes back after every edit, and this is how the view tells an
+	 * echo it has already drawn from news it has not: a revert, a correction the
+	 * server wrote, an edit in a text editor alongside. Only the cell being typed
+	 * in is ahead of the document — the box on screen already says what was
+	 * typed — so only typing records what it sent. Everything else waits to be
+	 * told and draws what arrives.
+	 */
+	drawn: '',
+	/**
+	 * Bumped whenever the document changes underneath an open cell.
+	 *
+	 * The textarea's own handlers are still attached to a cell that no longer says
+	 * what it said, and letting their blur write back would put the author's
+	 * abandoned text over whatever arrived.
+	 */
+	generation: 0,
+	/**
+	 * The box open for typing, so its marks can be redrawn without the page being
+	 * rebuilt around it.
+	 */
+	openBox: null,
+	typingTimer: undefined,
+};
+
+/**
+ * What a list of cells amounts to, for telling our own edit from someone else's.
+ *
+ * Compared as the document will read it back rather than as it was typed. A cell
+ * goes to the file and is parsed out of it again, and the parse takes the blank
+ * lines off either end — so pressing Enter at the foot of a cell, or leaving a
+ * space at the end of a word and saving, sends something the document does not
+ * hand back verbatim. Compared raw, that echo read as news from somewhere else,
+ * and the page was rebuilt under the author mid-sentence.
+ */
+export function signatureOf(list: Cell[]): string {
+	return JSON.stringify(
+		list.map((cell) => ({ ...cell, source: stored(cell.source) }))
+	);
+}
