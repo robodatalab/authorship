@@ -464,6 +464,117 @@ describe('opening a cell', () => {
 	});
 });
 
+describe('leaving a cell', () => {
+	// Which keystrokes end the writing, and — the half that keeps going wrong —
+	// which ones only look as though they should. A cell is given up by accepting
+	// it or by opening another one, and by nothing else: everything that merely
+	// takes the keyboard away writes the cell down and leaves it open.
+
+	/** Open a cell the way the author does, and hand back the box. */
+	async function writing(source = 'a'): Promise<HTMLTextAreaElement> {
+		await mount([markdown(source)]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		return shown()[0].querySelector('textarea')!;
+	}
+
+	/** Type into the box the way the keyboard does, timer and all. */
+	function type(box: HTMLTextAreaElement, text: string): void {
+		box.value = text;
+		box.dispatchEvent(new Event('input'));
+	}
+
+	function press(box: HTMLElement, key: string, held: KeyboardEventInit = {}): void {
+		box.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...held }));
+	}
+
+	it('writes the cell down and shuts it on Escape', async () => {
+		const box = await writing();
+		type(box, 'a and more');
+		press(box, 'Escape');
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+	});
+
+	it('writes the cell down and shuts it on Shift+Enter', async () => {
+		// The way a notebook accepts a cell.
+		const box = await writing();
+		type(box, 'a and more');
+		press(box, 'Enter', { shiftKey: true });
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toContain('a and more');
+	});
+
+	it('leaves plain Enter to do what Enter does in prose', async () => {
+		const box = await writing();
+		press(box, 'Enter');
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+	});
+
+	it('gives up the other cursors before it gives up the cell', async () => {
+		// Escape means one thing at a time. An author who has taken three places
+		// and changed their mind about the third has not finished with the cell.
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		expect(document.querySelectorAll('.source-cursors .at')).not.toHaveLength(0);
+
+		press(box, 'Escape');
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+		expect(document.querySelectorAll('.source-cursors .at')).toHaveLength(0);
+	});
+
+	it('shuts the cell on the Escape after that one', async () => {
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		press(box, 'Escape');
+		press(box, 'Escape');
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('keeps the other cursors through a save', async () => {
+		// Ctrl+S is answered before anything else in the box, and answering it is
+		// writing the cell down — not standing the author back on the page.
+		const box = await writing('wren and wren');
+		box.setSelectionRange(0, 4);
+		press(box, 'd', { ctrlKey: true });
+		press(box, 's', { ctrlKey: true });
+
+		expect(shown()[0].querySelector('textarea')).toBe(box);
+		expect(document.querySelectorAll('.source-cursors .at')).not.toHaveLength(0);
+	});
+
+	it('opens the cell the author is standing on, when Enter is pressed on the page', async () => {
+		await mount([markdown('a'), markdown('b')]);
+		shown()[1].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+		press(document.documentElement, 'Enter');
+
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+
+	it('writes down the cell being left when another one is opened', async () => {
+		// The blur that closes the first box lands after the second is drawn, so
+		// what was typed has to be written down before the redraw rather than by it.
+		await mount([markdown('a'), markdown('b')]);
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		type(shown()[0].querySelector('textarea')!, 'a and more');
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+		expect(shown()[0].querySelector('textarea')).toBeNull();
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
+		expect(lastCells().map((cell) => cell.source)).toEqual(['a and more', 'b']);
+	});
+});
+
 describe('changing the document', () => {
 	it('puts a bar in every gap, the one above the first cell included', async () => {
 		// Without the leading one there is no way to put anything in front of what
