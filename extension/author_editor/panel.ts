@@ -183,6 +183,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 						this.write(document, message.cells as Cell[]).catch(() => undefined)
 					);
 					break;
+				case 'save':
+					void this.saveNow(document);
+					break;
 				case 'compile':
 					void this.write(document, compile(parse(document.getText())));
 					break;
@@ -230,6 +233,21 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				this.active = undefined;
 			}
 		});
+	}
+
+	/**
+	 * Save what the author has typed, rather than the cell as it was.
+	 *
+	 * Ctrl+S in the page is VS Code's own and saves the document as it stands,
+	 * which is behind the box being typed in — a cell reaches the document on a
+	 * timer. So the page settles the cell first and asks for a save of its own,
+	 * which waits for that write to land and then puts on disk what is on screen.
+	 */
+	private async saveNow(document: vscode.TextDocument): Promise<void> {
+		await this.writes.get(document.uri.toString());
+		if (document.isDirty) {
+			await document.save();
+		}
 	}
 
 	/**

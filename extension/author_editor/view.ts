@@ -60,6 +60,7 @@ import {
 	segmentsIn,
 	withoutBlock,
 } from './marks';
+import { stored } from '../storydoc/model';
 import type { CellField } from './model';
 import type { Cursor } from './cursors';
 import type { Match, Query } from './find';
@@ -194,8 +195,20 @@ let drawn = '';
  */
 let generation = 0;
 
+/**
+ * What a list of cells amounts to, for telling our own edit from someone else's.
+ *
+ * Compared as the document will read it back rather than as it was typed. A cell
+ * goes to the file and is parsed out of it again, and the parse takes the blank
+ * lines off either end — so pressing Enter at the foot of a cell, or leaving a
+ * space at the end of a word and saving, sends something the document does not
+ * hand back verbatim. Compared raw, that echo read as news from somewhere else,
+ * and the page was rebuilt under the author mid-sentence.
+ */
 function signatureOf(list: Cell[]): string {
-	return JSON.stringify(list);
+	return JSON.stringify(
+		list.map((cell) => ({ ...cell, source: stored(cell.source) }))
+	);
 }
 
 function commit(next: Cell[]): void {
@@ -273,6 +286,22 @@ function render(): void {
 	noteMarks();
 	// Rebuilding resets the scroll; the author was reading somewhere.
 	window.scrollTo({ top: wasAt });
+}
+
+/**
+ * Put the caret back where it was, after the page has been rebuilt around it.
+ *
+ * The box is a new element and starts at the top of its text; the author was in
+ * the middle of a sentence. Only as far as the text now goes — what arrived may
+ * be shorter than what they were typing into.
+ */
+function restoreCaret(at: number | null): void {
+	const input = openMarks?.input;
+	if (at === null || !input) {
+		return;
+	}
+	const place = Math.min(at, input.value.length);
+	input.setSelectionRange(place, place);
 }
 
 /** Redraw one cell in place, leaving every other element on the page alone. */
@@ -602,6 +631,17 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 		typeEverywhere(event, input, layer)
 	);
 	input.addEventListener('keydown', (event) => {
+		// Ctrl+S is VS Code's, and it saves the document as it stands — which is
+		// behind this box, since a cell reaches the document on a timer. The cell
+		// is written down now so what lands on disk is what is on the screen, and
+		// the save is asked for again behind that write.
+		if (isSaveKey(event)) {
+			if (opened === generation) {
+				flush(index, input.value);
+			}
+			vscode.postMessage({ type: 'save' });
+			return;
+		}
 		if (isCursorKey(event)) {
 			event.preventDefault();
 			addCursor(input, layer);
@@ -635,9 +675,15 @@ function sourceFor(cell: Cell, index: number): HTMLElement {
 	});
 	// Clicking is choosing one place to type in.
 	input.addEventListener('mousedown', () => dropCursors(layer));
+	// Losing the keyboard is not leaving the cell. A notebook keeps the author in
+	// the cell they are in, and almost nothing that takes the focus off this box
+	// is them saying they have finished with it: a click on the toolbar, the find
+	// field, the editor alongside, another window — or VS Code taking the focus
+	// back for a keystroke of its own, which is what Ctrl+S was doing. The cell is
+	// given up by accepting it or by opening another one, and by nothing else.
 	input.addEventListener('blur', () => {
 		if (opened === generation) {
-			accept(index, input.value);
+			flush(index, input.value);
 		}
 	});
 	// Both once the box is on the page: `scrollHeight` needs a laid-out element,
@@ -763,7 +809,22 @@ function insertBarFor(at: number): HTMLElement {
 /** Add a cell, and select it — it is the one the author is about to write in. */
 function insertCell(at: number, cell: Cell): void {
 	selected = at;
+	followEditing((open) => (open >= at ? open + 1 : open));
 	commit(insertAt(cells, at, cell));
+}
+
+/**
+ * Take a cell out, leaving the author on the one above it.
+ *
+ * A cell deleted out from under them is the one way, other than accepting it or
+ * opening another, that they stop writing one.
+ */
+function deleteCell(index: number): void {
+	selected = Math.max(0, index - 1);
+	followEditing((open) =>
+		open === index ? null : open > index ? open - 1 : open
+	);
+	commit(removeAt(cells, index));
 }
 
 /** Move a cell, keeping the selection on it rather than on where it used to be. */
@@ -773,6 +834,10 @@ function moveCell(index: number, by: number): void {
 		return;
 	}
 	selected = index + by;
+	// The two that swapped swap the box between them along with everything else.
+	followEditing((open) =>
+		open === index ? index + by : open === index + by ? index : open
+	);
 	commit(next);
 }
 
@@ -829,9 +894,13 @@ function seamFor(index: number): HTMLElement {
 		}
 		if (seamAt.merge) {
 			selected = index - 1;
+			// This cell is now the tail of the one above it, and so is the box.
+			followEditing((open) => (open >= index ? open - 1 : open));
 			commit(mergeAt(cells, index));
 		} else {
 			selected = index + 1;
+			// The box stays on the head of the split, which is where the caret was.
+			followEditing((open) => (open > index ? open + 1 : open));
 			commit(splitAt(cells, index, seamAt.line));
 		}
 	});
@@ -932,28 +1001,36 @@ function actionsFor(index: number): HTMLElement {
 	actions.append(
 		iconButton('chevron-up', 'Move up', () => moveCell(index, -1)),
 		iconButton('chevron-down', 'Move down', () => moveCell(index, 1)),
-		iconButton('trash', 'Delete this section', () => {
-			selected = Math.max(0, index - 1);
-			commit(removeAt(cells, index));
-		})
+		iconButton('trash', 'Delete this section', () => deleteCell(index))
 	);
 	return actions;
 }
 
-/** Open a cell for writing, if it is the author's to write. */
-function beginEditing(index: number): void {
+/** Whether a cell is the author's to type into at all. */
+function writable(index: number): boolean {
 	const cell = cells[index];
 	// A built cell is the document's to write, not the author's to type into.
 	if (!cell || isAutomated(cell.kind) || !hasProse(cell.kind)) {
-		return;
+		return false;
 	}
 	// Neither is one the server is writing, until it has finished: what is typed
 	// into it now is either lost under what comes back or written over it.
-	if (writing?.at === index) {
+	return writing?.at !== index;
+}
+
+/** Open a cell for writing, if it is the author's to write. */
+function beginEditing(index: number): void {
+	if (!writable(index)) {
 		return;
 	}
 	dropCursors();
 	const was = editing;
+	// What was typed in the cell being left is written down before that cell is
+	// drawn again, or it would be drawn from the text it held a moment ago —
+	// taking the box away fires its blur, and that lands after the redraw.
+	if (was !== null && was !== index && openMarks?.index === was) {
+		flush(was, openMarks.input.value);
+	}
 	editing = index;
 	selected = index;
 	if (was !== null && was !== index) {
@@ -963,24 +1040,50 @@ function beginEditing(index: number): void {
 }
 
 /**
- * Shut whatever cell is open for typing, and cut its box loose.
+ * Cut the open box loose, leaving the author in the cell.
  *
- * The textarea's own handlers are still attached to a cell that is about to say
- * something else, and letting their blur write back would put the author's
- * abandoned text over whatever arrived.
+ * For when the page is about to be rebuilt around them. The textarea's own
+ * handlers are still attached to a cell that is about to say something else, and
+ * letting their blur or their timer write back would put the author's abandoned
+ * text over whatever arrived.
  */
-function closeEditing(): void {
-	if (editing === null) {
-		return;
-	}
+function releaseBox(): void {
 	dropCursors();
 	hideTip();
 	openMarks = null;
 	generation += 1;
-	editing = null;
 	if (typingTimer !== undefined) {
 		clearTimeout(typingTimer);
 		typingTimer = undefined;
+	}
+}
+
+/** Shut whatever cell is open for typing, and cut its box loose. */
+function closeEditing(): void {
+	if (editing === null) {
+		return;
+	}
+	releaseBox();
+	editing = null;
+}
+
+/**
+ * Where the open cell has gone, now the shape of the document has changed.
+ *
+ * An author who moves, splits, or merges around the cell they are writing in has
+ * not stopped writing in it, so the box follows its cell rather than staying at
+ * an index that now means some other cell. Only the cell being deleted out from
+ * under them takes them out of it.
+ */
+function followEditing(to: (at: number) => number | null): void {
+	if (editing === null) {
+		return;
+	}
+	const at = to(editing);
+	if (at === null) {
+		closeEditing();
+	} else {
+		editing = at;
 	}
 }
 
@@ -996,6 +1099,22 @@ function settle(index: number, source: string): void {
 		commit(next);
 		recheckBlock(index, source);
 	}
+}
+
+/**
+ * Write down what is in the box without leaving the cell.
+ *
+ * The author who clicked the toolbar, opened find, pressed Ctrl+S, or went to
+ * another window is still writing this cell — they have only stopped touching
+ * the keyboard for a moment. What they have typed goes to the document, because
+ * nothing is watching for it any more, and the box stays where it is.
+ */
+function flush(index: number, source: string): void {
+	if (typingTimer !== undefined) {
+		clearTimeout(typingTimer);
+		typingTimer = undefined;
+	}
+	settle(index, source);
 }
 
 function accept(index: number, source: string): void {
@@ -1627,6 +1746,17 @@ function selectedText(): string {
 	return text.includes('\n') ? '' : text;
 }
 
+/**
+ * Ctrl+S, and Cmd+S on a Mac.
+ *
+ * Not ours to act on — VS Code holds the save and gets the keystroke whatever we
+ * do with it. It is caught here only so the cell being typed in can be written
+ * to the document before the save reads it.
+ */
+function isSaveKey(event: KeyboardEvent): boolean {
+	return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's';
+}
+
 /** Ctrl+F, and Cmd+F on a Mac. */
 function isFindKey(event: KeyboardEvent): boolean {
 	return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f';
@@ -1946,10 +2076,7 @@ function openCellMenu(x: number, y: number, index: number): void {
 	menuEl.append(
 		menuItem('Move up', () => moveCell(index, -1)),
 		menuItem('Move down', () => moveCell(index, 1)),
-		menuItem('Delete', () => {
-			selected = Math.max(0, index - 1);
-			commit(removeAt(cells, index));
-		})
+		menuItem('Delete', () => deleteCell(index))
 	);
 	placeMenu(x, y);
 }
@@ -2002,6 +2129,19 @@ window.addEventListener('scroll', () => {
 document.addEventListener('click', (event) => {
 	if (!menuEl.hidden && !menuEl.contains(event.target as Node)) {
 		closeMenu();
+	}
+});
+
+// A cell stays open when the page loses the keyboard, so it takes the keyboard
+// back when the page has it again — the author who pressed Ctrl+S, or came back
+// from another window, carries on typing where they were. Only when nothing else
+// on the page has claimed it in the meantime.
+window.addEventListener('focus', () => {
+	const input = openMarks?.input;
+	const idle =
+		document.activeElement === null || document.activeElement === document.body;
+	if (input && idle) {
+		input.focus({ preventScroll: true });
 	}
 });
 
@@ -2077,14 +2217,21 @@ window.addEventListener('message', (event) => {
 			return;
 		}
 		// The document says something the view did not write — reverted, corrected,
-		// or edited elsewhere. That wins over anything open: a cell left showing
-		// the old text would write it back the moment the author clicked away.
+		// or edited elsewhere. That wins over the text in an open box, which would
+		// otherwise write the old words back the moment the author clicked away.
+		// It does not win over the author being in the cell: the page is rebuilt
+		// around them and the box opened again on what the document now says, with
+		// the caret where they left it. A rebuild is not a reason to stop writing.
+		const at = editing;
+		const caret = openMarks?.input.selectionStart ?? null;
+		releaseBox();
 		cells = incoming;
 		selected = Math.min(selected, Math.max(0, cells.length - 1));
-		closeEditing();
+		editing = at !== null && writable(at) ? at : null;
 		refind();
 		showCount();
 		render();
+		restoreCaret(caret);
 	} else if (message?.type === 'checking') {
 		checking = message.on as boolean;
 		checkEl.classList.toggle('on', checking);

@@ -90,7 +90,10 @@ export function parse(text: string): Cell[] {
 	return cells;
 }
 
-/** The document as text, such that `parse(dumps(cells))` equals `cells`. */
+/**
+ * The document as text, such that `parse(dumps(cells))` equals `cells` — with
+ * every source read back as `stored` leaves it, since that is the round trip.
+ */
 export function dumps(cells: Cell[]): string {
 	const out: string[] = [];
 	for (const cell of cells) {
@@ -207,6 +210,20 @@ function hasAny(attrs: Record<string, string>): boolean {
 }
 
 /** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
+/**
+ * A cell's text as the document reads it back.
+ *
+ * A cell is written to the file with a blank line under it and parsed out of it
+ * again, and the parse takes the blank lines off either end — they belong to the
+ * shape of the file rather than to the cell. So this is what a cell's text
+ * becomes the moment it is written down, and anything comparing what it holds
+ * against what the document says has to compare against this and not against
+ * what was typed.
+ */
+export function stored(source: string): string {
+	return source.replace(/^\n+/, '').replace(/\n+$/, '');
+}
+
 function trimBlankEnds(body: string[]): string {
-	return body.join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
+	return stored(body.join('\n'));
 }
