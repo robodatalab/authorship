@@ -25,6 +25,9 @@ export function post(message: Record<string, unknown> & { type: string }): void 
 export const cellsEl = document.getElementById('cells') as HTMLElement;
 export const menuEl = document.getElementById('menu') as HTMLElement;
 export const toolbarEl = document.getElementById('toolbar') as HTMLElement;
+/** The toolbar and the job bar under it: everything that stays put when the
+ *  manuscript scrolls, and so everything a cell can be hidden behind. */
+export const topbarEl = document.getElementById('topbar') as HTMLElement;
 export const statusEl = document.getElementById('doc-status') as HTMLElement;
 export const whereEl = document.getElementById('doc-where') as HTMLElement;
 export const findEl = document.getElementById('find') as HTMLElement;
@@ -35,4 +38,9 @@ export const countEl = document.getElementById('find-count') as HTMLElement;
 export const replaceRowEl = document.getElementById('find-replace-row') as HTMLElement;
 export const replaceToggleEl = document.getElementById('find-toggle') as HTMLElement;
 export const checkEl = document.getElementById('check') as HTMLElement;
+export const styleEl = document.getElementById('fix-style') as HTMLElement;
+export const jobEl = document.getElementById('job') as HTMLElement;
+export const jobFillEl = document.getElementById('job-fill') as HTMLElement;
+export const jobSaidEl = document.getElementById('job-said') as HTMLElement;
+export const jobStopEl = document.getElementById('job-stop') as HTMLElement;
 export const tipEl = document.getElementById('mark-tip') as HTMLElement;

@@ -70,6 +70,27 @@ function writes(at: number | null, written = 0, chapters = 0): void {
 	);
 }
 
+/** What the host says about the tools that are not always there. */
+function features(styleFix: boolean): void {
+	window.dispatchEvent(
+		new MessageEvent('message', { data: { type: 'features', styleFix } })
+	);
+}
+
+/** What the host sends while a pass corrects the document, and when it stops. */
+function styles(
+	on: boolean,
+	written = 0,
+	chapters = 0,
+	note: string | null = null
+): void {
+	window.dispatchEvent(
+		new MessageEvent('message', {
+			data: { type: 'styling', on, written, chapters, note },
+		})
+	);
+}
+
 function shown(): Element[] {
 	return [...document.querySelectorAll('.cell')];
 }
@@ -1010,6 +1031,173 @@ describe('a cell the server is writing', () => {
 			.querySelector('.rendered')!
 			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 		expect(shown()[0].querySelector('textarea')).toBeNull();
+	});
+});
+
+describe('the experiment switch', () => {
+	// Correcting the style with Gemini is the one thing here that leaves the
+	// machine, so it is off until it is asked for — and off means absent rather
+	// than greyed out.
+
+	function sparkle(): HTMLElement {
+		return document.getElementById('fix-style') as HTMLElement;
+	}
+
+	it('hides the tool until the host says the experiment is on', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		expect(sparkle().hidden).toBe(true);
+	});
+
+	it('shows it once the experiment is on', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		expect(sparkle().hidden).toBe(false);
+	});
+
+	it('takes it away again when the experiment is switched off', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		features(false);
+		expect(sparkle().hidden).toBe(true);
+	});
+
+	it('asks the host to fix the style when it is pressed', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		sparkle().dispatchEvent(new MouseEvent('click'));
+		expect(posted.map((m) => m.type)).toContain('fixStyle');
+	});
+});
+
+describe('a pass over the whole document', () => {
+	// Correcting the style of a manuscript is minutes of work on every section at
+	// once, so unlike a blurb it is not one cell that is taken away — it is the
+	// page. What the author is left with is a bar that moves and a way to stop it.
+
+	function bar(): HTMLElement {
+		return document.getElementById('job') as HTMLElement;
+	}
+
+	it('shows nothing until the host says a pass has started', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		expect(bar().hidden).toBe(true);
+		expect(document.body.classList.contains('locked')).toBe(false);
+	});
+
+	it('draws how far through the chapters it has got', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 3, 14);
+		expect(bar().hidden).toBe(false);
+		const fill = document.getElementById('job-fill') as HTMLElement;
+		expect(Math.round(parseFloat(fill.style.width))).toBe(21);
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 4 of 14'
+		);
+	});
+
+	it('says only that it is working until it knows how long the book is', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 0, 0);
+		expect((document.getElementById('job-fill') as HTMLElement).style.width).toBe('0%');
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar…'
+		);
+	});
+
+	it('does not name a chapter after the last one', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 14, 14);
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 14 of 14'
+		);
+	});
+
+	it('says why nothing is moving when the model has told it to wait', async () => {
+		// A chapter is one request, so between them the bar stands still for
+		// minutes. Silence there is indistinguishable from a crash — which is
+		// exactly how a rate-limited pass looked before it said anything.
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 0, 5, 'gemini-3.7-flash is rate limited — waiting 47s (try 2 of 6)');
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 1 of 5 · gemini-3.7-flash is rate limited — waiting 47s (try 2 of 6)'
+		);
+		expect(bar().classList.contains('held')).toBe(true);
+	});
+
+	it('drops the notice once it is working again', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 0, 5, 'waiting');
+		styles(true, 1, 5);
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 2 of 5'
+		);
+		expect(bar().classList.contains('held')).toBe(false);
+	});
+
+	it('stops the pass rather than starting a second one', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 1, 14);
+		document.getElementById('job-stop')!.dispatchEvent(new MouseEvent('click'));
+		expect(posted.at(-1)).toEqual({ type: 'stop' });
+	});
+
+	it('refuses to open any cell for typing while it runs', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 1, 14);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[1].querySelector('textarea')).toBeNull();
+	});
+
+	it('takes a cell back off the author if they were already typing in it', async () => {
+		// What they have typed is about to be corrected out from under them, and
+		// leaving the box open would let its blur put the draft back on top.
+		await mount([chapter('One'), markdown('a')]);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
+		styles(true, 1, 14);
+		expect(shown()[1].querySelector('textarea')).toBeNull();
+	});
+
+	it('lets nothing change the document, whichever way it is asked', async () => {
+		// The toolbar is drawn as unavailable, but a keystroke and a replace-all
+		// do not go through the toolbar — so the refusal is where every change is.
+		await mount([markdown('a'), markdown('b')]);
+		styles(true, 1, 2);
+		posted = [];
+		shown()[1].querySelector<HTMLElement>('.actions button')!.click();
+		expect(posted.filter((m) => m.type === 'cells')).toHaveLength(0);
+	});
+
+	it('keeps the bar and the lock while the corrections land underneath', async () => {
+		// Each chapter is put into the document as it comes back, so the page is
+		// rebuilt from the host several times over while the pass is still running.
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 1, 3);
+		send([chapter('One'), markdown('A, corrected.')]);
+		expect(bar().hidden).toBe(false);
+		expect(document.body.classList.contains('locked')).toBe(true);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[1].querySelector('textarea')).toBeNull();
+	});
+
+	it('gives the document back when the pass stops', async () => {
+		// Stopping is the same news as finishing: no pass is running, and the
+		// manuscript is the author's again.
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 2, 3);
+		styles(false);
+		expect(bar().hidden).toBe(true);
+		expect(document.body.classList.contains('locked')).toBe(false);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[1].querySelector('textarea')).not.toBeNull();
 	});
 });
 

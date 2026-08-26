@@ -11,7 +11,7 @@
 
 import { countWords, isStale, placeOf, wordsIn } from './model';
 import { cellElement, insertBarFor } from './cell_view';
-import { cellsEl, statusEl, toolbarEl, whereEl } from './elements';
+import { cellsEl, statusEl, topbarEl, whereEl } from './elements';
 import { forgetSeam } from './seam_view';
 import { noteMarks } from './find_bar';
 import { signatureOf, state } from './state';
@@ -104,7 +104,7 @@ export function showWhere(): void {
  * of sight behind it.
  */
 function cellAtTop(): number {
-	const line = toolbarEl.getBoundingClientRect().bottom;
+	const line = topbarEl.getBoundingClientRect().bottom;
 	let at = 0;
 	cellsEl.querySelectorAll('.cell').forEach((row, index) => {
 		if (row.getBoundingClientRect().top <= line) {

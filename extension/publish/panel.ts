@@ -6,9 +6,21 @@
 // never about a particular book: which models are resident, what they are
 // holding, and what work the server has in hand.
 //
-// So this owns no files and edits nothing. It polls, and it draws what it hears.
+// So this owns no files and edits nothing. It polls, and it draws what it hears —
+// with one exception. The Gemini account is here too, at the top, because this
+// drawer is already the answer to "what can Authorship reach, and what state is
+// it in", and an account that sends the manuscript off this machine is the most
+// important entry that question has. VS Code's own Accounts menu lists a session
+// once there is one, which is no help at all to somebody looking for where to
+// make one.
 
 import * as vscode from "vscode";
+
+import {
+    GeminiAccount,
+    configuredModel,
+    styleFixEnabled,
+} from "../gemini/account";
 
 /** How often the drawers refresh. */
 const STATUS_POLL_MS = 1500;
@@ -20,9 +32,24 @@ export class PublishView implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private pollTimer?: ReturnType<typeof setInterval>;
 
+    private watching?: vscode.Disposable;
+    private settings?: vscode.Disposable;
+
+    /**
+     * The models this key can reach, once they have been asked for.
+     *
+     * Held for as long as the panel is, because the list is a question for
+     * Google and the drawer is repainted whenever anything about the account
+     * changes — including changing which model is chosen, which is no reason to
+     * ask again. Dropped on signing out, since the next key may see other models.
+     */
+    private models?: GeminiModel[];
+    private shipped = "";
+
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly port: number,
+        private readonly account: GeminiAccount,
     ) {}
 
     resolveWebviewView(view: vscode.WebviewView): void {
@@ -39,8 +66,31 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.poll();
+                void this.showAccount();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
+            } else if (message?.type === "signInGemini") {
+                void this.account.require();
+            } else if (message?.type === "signOutGemini") {
+                void this.account.forget();
+            } else if (message?.type === "setGeminiModel") {
+                void this.setModel(message.model as string);
+            } else if (message?.type === "refreshGeminiModels") {
+                void this.showAccount(true);
+            }
+        });
+
+        // The account is news rather than a reading, so it is not polled: signing
+        // in or out says so, and nothing else changes it.
+        this.watching = this.account.onDidChangeSessions(
+            () => void this.showAccount(),
+        );
+        // The model can also be changed from the settings editor or the command,
+        // and a dropdown showing something other than the truth is worse than no
+        // dropdown at all.
+        this.settings = vscode.workspace.onDidChangeConfiguration((changed) => {
+            if (changed.affectsConfiguration("authorship")) {
+                void this.showAccount();
             }
         });
 
@@ -52,8 +102,89 @@ export class PublishView implements vscode.WebviewViewProvider {
                 clearInterval(this.pollTimer);
                 this.pollTimer = undefined;
             }
+            this.watching?.dispose();
+            this.watching = undefined;
+            this.settings?.dispose();
+            this.settings = undefined;
             this.view = undefined;
         });
+    }
+
+    /**
+     * Say whether there is a Gemini account, and what it is called.
+     *
+     * The key itself never leaves the host: what the drawer is told is the label
+     * VS Code would show, which is the masked tail and nothing more.
+     */
+    private async showAccount(refresh = false): Promise<void> {
+        if (!this.view) {
+            return;
+        }
+        // The account exists for the style pass and for nothing else, so with
+        // the experiment off the drawer is about a feature that is not there.
+        if (!styleFixEnabled()) {
+            void this.view.webview.postMessage({ type: "account", off: true });
+            return;
+        }
+        const [session] = await this.account.getSessions();
+        if (!session) {
+            // The next key may not see the same models.
+            this.models = undefined;
+        } else if (refresh || this.models === undefined) {
+            await this.loadModels(session.accessToken);
+        }
+        void this.view.webview.postMessage({
+            type: "account",
+            account: session ? session.account.label : null,
+            // What the setting holds; empty is "whichever one Authorship ships
+            // with", which is a choice and not the absence of one.
+            model: configuredModel() ?? "",
+            shipped: this.shipped,
+            models: this.models ?? [],
+        });
+    }
+
+    /**
+     * Ask which models this key can write with.
+     *
+     * Failure is quiet. The drawer draws the dropdown from whatever it has, and
+     * a server that is still starting up is not worth a dialog over — the list
+     * fills in the next time the account is looked at.
+     */
+    private async loadModels(key: string): Promise<void> {
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:${this.port}/gemini/models`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ key, model: configuredModel() }),
+                    signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+                },
+            );
+            if (!response.ok) {
+                return;
+            }
+            const body = (await response.json()) as {
+                default?: string;
+                models?: GeminiModel[];
+            };
+            this.shipped = body.default ?? "";
+            this.models = body.models ?? [];
+        } catch {
+            // Said by the offline notice beside this, if it is that.
+        }
+    }
+
+    /** Remember which Gemini to use. Empty is back to the one we ship with. */
+    private async setModel(model: string): Promise<void> {
+        await vscode.workspace
+            .getConfiguration("authorship")
+            .update(
+                "gemini.model",
+                model,
+                vscode.ConfigurationTarget.Global,
+            );
     }
 
     private async poll(): Promise<void> {
@@ -199,6 +330,12 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<title>Authorship</title>
 </head>
 <body>
+	<details class="drawer" id="account-drawer" open>
+		<summary>Account</summary>
+		<div class="body">
+			<div id="account" class="account"></div>
+		</div>
+	</details>
 	<details class="drawer" id="serving-status-drawer" open>
 		<summary>Serving Status</summary>
 		<div class="body">
@@ -221,6 +358,13 @@ export class PublishView implements vscode.WebviewViewProvider {
 </body>
 </html>`;
     }
+}
+
+/** One Gemini the account can write with, as the drawer lists it. */
+interface GeminiModel {
+    model: string;
+    label: string;
+    detail: string;
 }
 
 /** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */

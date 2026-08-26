@@ -178,6 +178,11 @@ export function writable(index: number): boolean {
 	if (!cell || isAutomated(cell.kind) || !hasProse(cell.kind)) {
 		return false;
 	}
+	// Nor is any of them while a pass is correcting the whole document: every
+	// section is about to be replaced in turn.
+	if (state.styling !== null) {
+		return false;
+	}
 	// Neither is one the server is writing, until it has finished: what is typed
 	// into it now is either lost under what comes back or written over it.
 	return state.writing?.at !== index;

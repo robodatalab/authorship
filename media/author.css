@@ -19,10 +19,19 @@
 
 /* --- the toolbar --- */
 
-.toolbar {
+/* Everything that stays at the top while the manuscript scrolls: the tools, and
+   under them the bar for a pass over the whole document. One sticky element
+   rather than two, so the second never has to be told how tall the first is. */
+.topbar {
 	position: sticky;
 	top: 0;
 	z-index: 3;
+	background: var(--vscode-editor-background);
+}
+
+/* Positioned, but in the flow: the find widget hangs off its underside. */
+.toolbar {
+	position: relative;
 	display: flex;
 	gap: 2px;
 	align-items: center;
@@ -56,6 +65,85 @@
 
 .tool:hover {
 	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+/* --- a pass over the whole document ---
+   Drawn like the bar in a cell being written, because it is the same news about
+   a larger thing — but under the toolbar rather than in the manuscript, since
+   every section of the manuscript is what it is about. */
+
+.job {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 12px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+}
+
+.job[hidden] {
+	display: none;
+}
+
+/* Dimmed by its own colour rather than by opacity — the fill sits inside it, and
+   a transparent track would take the fill down with it. */
+.job-track {
+	flex: 1;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--vscode-widget-border, var(--vscode-editorWidget-border));
+}
+
+.job-fill {
+	height: 100%;
+	border-radius: 1px;
+	background: var(--vscode-progressBar-background, var(--vscode-focusBorder));
+	/* The chapters arrive one at a time and minutes apart; a bar that jumped
+	   would read as a redraw rather than as progress. */
+	transition: width 0.3s ease-out;
+}
+
+.job-said {
+	flex: 0 0 auto;
+	font-size: 0.85em;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Held up rather than working. Coloured as a warning because the difference
+   between "this is slow" and "this is stuck" is the whole question the author
+   is asking, and the bar has to answer it without being read closely. */
+.job.held .job-said {
+	color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+}
+
+.job.held .job-fill {
+	background: var(--vscode-editorWarning-foreground, var(--vscode-progressBar-background));
+}
+
+.job-stop {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 4px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.job-stop:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+/* The manuscript while it is being corrected. Nothing in it is the author's to
+   change: every section is about to be replaced in turn, so what they typed
+   would land either under the correction or over it. Drawn as unavailable as
+   well as made so, because a page that silently ignores clicks reads as a page
+   that has crashed. */
+body.locked .cells,
+body.locked .toolbar .tool {
+	pointer-events: none;
+	opacity: 0.55;
 }
 
 /* Where in the book the author has got to. Set apart from the counts beside it,

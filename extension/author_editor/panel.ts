@@ -37,8 +37,14 @@ const POLLS_UNANSWERED = 5;
 const JOB_TIMEOUT_MS = 180_000;
 
 import { divideManuscript } from '../parts/divide';
+import {
+	GeminiAccount,
+	STYLE_FIX_SETTING,
+	configuredModel,
+	styleFixEnabled,
+} from '../gemini/account';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { PART, dumps, has, parse, type Cell } from '../storydoc/model';
+import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -63,6 +69,15 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	private readonly writing = new Map<string, Writing>();
 
 	/**
+	 * The pass correcting each document, per document, while it runs.
+	 *
+	 * Held for the same reason a blurb's progress is: the bar is not in the file,
+	 * so a page rebuilt under a running pass — reloaded, reopened, or simply
+	 * asking again on start-up — has to be told about it a second time.
+	 */
+	private readonly styling = new Map<string, Styling>();
+
+	/**
 	 * The documents being checked, for as long as this editor is open.
 	 *
 	 * Kept here and written nowhere. What a check found is what something thinks
@@ -85,7 +100,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly port: number
+		private readonly port: number,
+		private readonly account: GeminiAccount
 	) {}
 
 	/** The commands the editor title bar shows, by the name they are bound to. */
@@ -102,6 +118,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				}),
 			exportEpub: () => this.onActive((d) => this.exportEpub(d)),
 			partition: () => this.onActive((d) => this.partition(d)),
+			fixStyle: () =>
+				this.onActive((d) => this.fixStyle(d, this.active?.panel)),
 			viewSource: () =>
 				this.onActive(async (d) => {
 					await vscode.commands.executeCommand('vscode.openWith', d.uri, 'default');
@@ -157,6 +175,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					.toString(),
 			});
 
+		// Turning the experiment on or off changes what the toolbar carries, and
+		// an author who has just switched it should not have to reopen the file.
+		const switched = vscode.workspace.onDidChangeConfiguration((changed) => {
+			if (changed.affectsConfiguration(STYLE_FIX_SETTING)) {
+				this.sayFeatures(panel);
+			}
+		});
+
 		const watching = vscode.workspace.onDidChangeTextDocument((event) => {
 			// A change from anywhere — this view, the text editor beside it, or a
 			// tool — is the same news, and the view is repainted from the document.
@@ -169,7 +195,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			switch (message?.type) {
 				case 'ready':
 					send();
+					this.sayFeatures(panel);
 					this.resume(document, panel);
+					this.resumeStyling(document, panel);
 					// A page rebuilt under the author — reloaded, or reopened — knows
 					// nothing about the checks it was showing a moment ago.
 					this.sayChecking(document, panel);
@@ -216,6 +244,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'partition':
 					void this.partition(document);
 					break;
+				case 'fixStyle':
+					// The panel is taken from here rather than looked up as it goes:
+					// the author is free to click into another editor while the model
+					// reads, and the bar belongs to this one either way.
+					void this.fixStyle(document, panel).catch((err: unknown) =>
+						vscode.window.showErrorMessage(describe(err))
+					);
+					break;
 				case 'openAsText':
 					void vscode.commands.executeCommand(
 						'vscode.openWith',
@@ -228,6 +264,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 		panel.onDidDispose(() => {
 			watching.dispose();
+			switched.dispose();
 			focusing.dispose();
 			if (this.active?.panel === panel) {
 				this.active = undefined;
@@ -295,6 +332,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		this.checking.add(key);
 		this.sayChecking(document, panel);
 		void this.check(document, panel, null, true);
+	}
+
+	/** Which of the tools that are not always there this page should draw. */
+	private sayFeatures(panel: vscode.WebviewPanel): void {
+		void panel.webview.postMessage({
+			type: 'features',
+			styleFix: styleFixEnabled(),
+		});
 	}
 
 	private sayChecking(
@@ -599,6 +644,313 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		}
 	}
 
+	/**
+	 * Correct the style and grammar of the whole manuscript.
+	 *
+	 * The one tool here that does not run on this machine. Style is a property of
+	 * a chapter rather than of a sentence — whether a scene keeps its tense,
+	 * whether a name is spelt as it was spelt in chapter one — so the pass reads
+	 * the corrected book so far in front of each chapter, which needs a context
+	 * length the local models do not have. It goes to Gemini, on the author's own
+	 * account, which is why this is the one thing they have to sign in for.
+	 */
+	private async fixStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined
+	): Promise<void> {
+		// Off is the feature not being there. The button is hidden, so this is
+		// only reachable from the Command Palette — which lists every contributed
+		// command whether or not the extension wants it run.
+		if (!styleFixEnabled()) {
+			const open = await vscode.window.showInformationMessage(
+				'Fixing style and grammar with Gemini is an experimental feature, and is off.',
+				'Open Settings'
+			);
+			if (open === 'Open Settings') {
+				await vscode.commands.executeCommand(
+					'workbench.action.openSettings',
+					STYLE_FIX_SETTING
+				);
+			}
+			return;
+		}
+		// Signing in comes first for an author who has not: being told a manuscript
+		// is about to be sent somewhere is no use to someone who has nowhere to
+		// send it, and the key is what makes the warning about a real thing.
+		const key = await this.account.require();
+		if (!key) {
+			// They were asked and said no. That is an answer, not a failure.
+			return;
+		}
+		if (!(await this.confirmSending(document))) {
+			return;
+		}
+		if (document.isDirty) {
+			// The server reads the file, so what is on screen has to be on disk.
+			await document.save();
+		}
+		const started = await fetch(`http://127.0.0.1:${this.port}/fix/style`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				path: document.uri.fsPath,
+				key,
+				model: configuredModel(),
+			}),
+		});
+		if (!started.ok) {
+			throw new Error(await detailOf(started));
+		}
+		await this.watchStyle(document, panel);
+	}
+
+	/**
+	 * Say plainly that this one leaves the machine, and let the author call it off.
+	 *
+	 * Every time it is asked for, and not once when they sign in. Everything else
+	 * Authorship does runs on this computer, so an author who has used the other
+	 * tools has every reason to assume this one does too — and the moment to say
+	 * otherwise is the moment they press the button, not a paragraph of a readme
+	 * they last looked at when they installed it. It is the only warning that
+	 * arrives before a manuscript is sent rather than after.
+	 *
+	 * Modal on purpose. A notification for this would be a notification behind
+	 * the editor, read after the first chapter was already in Google's hands.
+	 */
+	private async confirmSending(document: vscode.TextDocument): Promise<boolean> {
+		const send = 'Send to Gemini';
+		const confirmed = await vscode.window.showWarningMessage(
+			`Send the chapters of ${basename(document.uri)} to Google Gemini?`,
+			{
+				modal: true,
+				detail:
+					'Fixing style and grammar is the one tool in Authorship that does ' +
+					'not run on your machine. The chapter titles and the prose written ' +
+					'under them are sent over the internet to the Gemini API, on your ' +
+					'own account, and are billed to it.\n\n' +
+					'Your notes, blurb, cover, title page and table of contents are ' +
+					'not sent. Nothing else Authorship does leaves this computer.',
+			},
+			send
+		);
+		return confirmed === send;
+	}
+
+	/**
+	 * Follow a pass over a document, putting each corrected section in as it lands.
+	 *
+	 * As with a blurb, apart from starting the job this is the whole of the work,
+	 * and for the same reason it is not part of starting one: a pass over a novel
+	 * outlives the click that began it, and an editor coming back to a document
+	 * being corrected has to pick the job up rather than start a second.
+	 *
+	 * The corrections are put in a chapter at a time rather than all at the end.
+	 * A pass over a book is minutes long, and an author watching it work is owed
+	 * the chapters as they are done — and a pass that fails at chapter forty
+	 * should leave thirty-nine corrected chapters behind rather than nothing.
+	 */
+	private async watchStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined
+	): Promise<void> {
+		const key = document.uri.toString();
+		const tell = (message: unknown): void => void panel?.webview.postMessage(message);
+		const reached = (
+			written: number,
+			chapters: number,
+			note: string | null = null
+		): void => {
+			this.styling.set(key, { written, chapters, note });
+			tell({ type: 'styling', on: true, written, chapters, note });
+		};
+
+		// How many of the corrected sections are already in the document. The
+		// server hands back every one it has done on every poll, rather than only
+		// the new ones — a poll that went astray would otherwise lose a chapter's
+		// corrections for good — so this is what tells them apart.
+		let applied = 0;
+		let last: JobStatus | undefined;
+
+		reached(0, 0);
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Fixing the style and grammar of ${basename(document.uri)}…`,
+					cancellable: true,
+				},
+				async (report, token) => {
+					// A job that finished between the click and this is no failure,
+					// and there is nobody to tell either way — the pass itself says
+					// what happened, a moment later, when it stops.
+					token.onCancellationRequested(
+						() => void this.stop(document).catch(() => undefined)
+					);
+					// VS Code is told what has happened since the last poll rather
+					// than how far along the job is, so the share already shown is
+					// kept here to subtract. The page is told the count itself.
+					let shown = 0;
+					return await this.awaitJob(
+						'/fix/style/status',
+						document.uri.fsPath,
+						(written, chapters) => {
+							const share = (100 * written) / chapters;
+							report.report({
+								increment: share - shown,
+								message: `chapter ${Math.min(written + 1, chapters)} of ${chapters}`,
+							});
+							shown = share;
+						},
+						async (body) => {
+							last = body;
+							// Told on every poll rather than only when a chapter
+							// lands, because what this is for is the stretches
+							// where no chapter is landing.
+							const { written = 0, chapters = 0 } = body.progress ?? {};
+							reached(written, chapters, body.note ?? null);
+							const sections = body.sections ?? [];
+							if (sections.length > applied) {
+								const fresh = sections.slice(applied);
+								applied = sections.length;
+								await this.applySections(document, fresh);
+							}
+						}
+					);
+				}
+			);
+			// A chapter left as it was is the right answer to an answer that could
+			// not be trusted, and an invisible one: the document looks exactly as
+			// it would if the chapter had needed no correcting. So it is said out
+			// loud, with the reason, once the pass is over.
+			this.reportLeftAlone(last?.leftAlone ?? []);
+		} catch (err: unknown) {
+			// A model the account's plan does not include is not a key problem, and
+			// signing in again would fix nothing — the answer is a different model,
+			// or billing on the account. Offered as the button, since the command
+			// that lists what the key can actually use is the one thing that helps.
+			if (last?.noQuota) {
+				const chose = await vscode.window.showWarningMessage(
+					describe(err),
+					'Choose a model'
+				);
+				if (chose === 'Choose a model') {
+					await vscode.commands.executeCommand('authorship.gemini.chooseModel');
+				}
+				return;
+			}
+			// A key Gemini has stopped taking is stored truth that has gone stale.
+			// Left there, every pass from now on fails the same way, and the way
+			// out is a command the author has no reason to go looking for.
+			if (last?.unauthorized) {
+				await this.account.forget();
+				const again = await vscode.window.showWarningMessage(
+					'Gemini would not take the key Authorship had. Sign in again to correct the style.',
+					'Sign in'
+				);
+				if (again === 'Sign in') {
+					// Through the same door the button uses, rather than a second way
+					// in: the account is now signed out, so asking for the key is
+					// asking for a new one.
+					await this.account.require();
+				}
+				return;
+			}
+			throw err;
+		} finally {
+			this.styling.delete(key);
+			tell({ type: 'styling', on: false });
+		}
+	}
+
+	/**
+	 * Say which chapters were left as they were, and why.
+	 *
+	 * Not a dialog for each: a pass over a novel that hit a rough patch could
+	 * name a dozen, and twelve dialogs is a pass nobody finishes dismissing.
+	 */
+	private reportLeftAlone(skipped: { chapter: string; why: string }[]): void {
+		if (skipped.length === 0) {
+			return;
+		}
+		const named = skipped
+			.map((one) => `“${one.chapter}” — ${one.why}`)
+			.join('; ');
+		void vscode.window.showWarningMessage(
+			skipped.length === 1
+				? `One chapter was left as you wrote it: ${named}`
+				: `${skipped.length} chapters were left as you wrote them: ${named}`
+		);
+	}
+
+	/**
+	 * Put corrected sections into the document, as one edit.
+	 *
+	 * The server names the cell each correction belongs to rather than the lines
+	 * it covers: a line span would name the wrong place by the time the chapter
+	 * after it is done, and the whole point of a pass is that it takes minutes.
+	 *
+	 * A cell that is no longer the markdown it was is left alone. The document
+	 * cannot be edited while a pass runs, but it can be reverted, or written to
+	 * by something else — and a correction for a chapter that is not there any
+	 * more belongs nowhere.
+	 */
+	private async applySections(
+		document: vscode.TextDocument,
+		sections: { index: number; source: string }[]
+	): Promise<void> {
+		const cells = parse(document.getText());
+		let changed = false;
+		for (const { index, source } of sections) {
+			const cell = cells[index];
+			if (!cell || cell.kind !== MARKDOWN || cell.source === source) {
+				continue;
+			}
+			cells[index] = { ...cell, source };
+			changed = true;
+		}
+		if (changed) {
+			await this.write(document, cells);
+		}
+	}
+
+	/**
+	 * Tell a page that has just come up about a pass over its document.
+	 *
+	 * The same two ways in as a blurb: the page may have been rebuilt under a
+	 * wait this editor is still holding, in which case it only has to be told
+	 * again — or this editor is new to a job the server never stopped doing, and
+	 * nobody is waiting to put the corrections anywhere.
+	 */
+	private resumeStyling(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		const held = this.styling.get(document.uri.toString());
+		if (held) {
+			void panel.webview.postMessage({ type: 'styling', on: true, ...held });
+			return;
+		}
+		void this.reattachStyle(document, panel).catch(() => {
+			// A document with no pass on it is the usual answer, and no news.
+		});
+	}
+
+	private async reattachStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): Promise<void> {
+		const response = await fetch(
+			`http://127.0.0.1:${this.port}/fix/style/status?id=${encodeURIComponent(document.uri.fsPath)}`
+		);
+		if (!response.ok) {
+			return;
+		}
+		if (!((await response.json()) as JobStatus).running) {
+			return;
+		}
+		await this.watchStyle(document, panel);
+	}
+
 	/** Ask the server to stop whatever it is writing for this document. */
 	private async stop(document: vscode.TextDocument): Promise<void> {
 		const response = await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
@@ -620,11 +972,18 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * A job that counts what it has done says so on every poll, and what that is
 	 * drawn as belongs to whoever asked — a notification wants the change since
 	 * last time, a cell wants the count. This one only passes on what it heard.
+	 *
+	 * `each` is for a job that hands back its work as it goes rather than at the
+	 * end. It is awaited and it is given the whole answer, because putting a
+	 * chapter into the document is an edit and the next poll must not overtake
+	 * it. It runs before a failure is raised, so the chapters a job did finish
+	 * survive the one that went wrong.
 	 */
 	private async awaitJob(
 		status: string,
 		id: string,
-		progress?: (written: number, chapters: number) => void
+		progress?: (written: number, chapters: number) => void,
+		each?: (body: JobStatus) => Promise<void> | void
 	): Promise<JobStatus> {
 		const deadline = progress ? Infinity : Date.now() + JOB_TIMEOUT_MS;
 		let unanswered = 0;
@@ -649,6 +1008,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			}
 			unanswered = 0;
 			const body = (await response.json()) as JobStatus;
+			if (each) {
+				await each(body);
+			}
 			if (body.error) {
 				throw new Error(body.error);
 			}
@@ -839,6 +1201,14 @@ interface Writing {
 	chapters: number;
 }
 
+/** A pass over the whole document, and how far through its chapters it is. */
+interface Styling {
+	written: number;
+	chapters: number;
+	/** What it is doing when it is not writing — waiting out a rate limit. */
+	note?: string | null;
+}
+
 /**
  * What a job's status endpoint answers, whichever job it is.
  *
@@ -855,6 +1225,16 @@ interface JobStatus {
 	findings?: unknown[];
 	replacement?: string;
 	verified?: boolean;
+	/** Every section a style pass has corrected so far, by the cell it belongs to. */
+	sections?: { index: number; source: string }[];
+	/** Whether what stopped a style pass was the key rather than the work. */
+	unauthorized?: boolean;
+	/** Whether it was the model: one the account's plan does not include. */
+	noQuota?: boolean;
+	/** What a style pass is doing while no chapter is landing. */
+	note?: string | null;
+	/** Chapters the pass could not use an answer for, and why. */
+	leftAlone?: { chapter: string; why: string }[];
 }
 
 /**

@@ -6,7 +6,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Extension",
+			// The extension alone, with no Python behind it. `ModelServer` refuses
+			// to spawn a server in a development host — it would take the port
+			// from the one under the debugger, and the breakpoints with it — so
+			// this configuration leaves the status bar reading `offline` and every
+			// tool that needs a model doing nothing. Named for what it does not
+			// start, because chosen by accident it looks like a broken extension.
+			// "Extension + Server", at the bottom of the dropdown, is the one to run.
+			"name": "Extension only (no model server)",
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
@@ -43,7 +50,7 @@
 		{
 			"name": "Extension + Server",
 			"configurations": [
-				"Run Extension",
+				"Extension only (no model server)",
 				"Story Model Server"
 			],
 			"stopAll": true

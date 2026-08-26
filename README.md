@@ -26,6 +26,7 @@ Every model it uses runs on your machine; nothing you write is sent anywhere.
 - [Sections](#sections)
 - [Checking the prose](#checking-the-prose)
 - [Writing a blurb](#writing-a-blurb)
+- [Fixing style and grammar](#fixing-style-and-grammar)
 - [Building the book](#building-the-book)
 - [Dividing a long story into parts](#dividing-a-long-story-into-parts)
 - [The Authorship sidebar](#the-authorship-sidebar)
@@ -286,6 +287,117 @@ It is copy for a shop listing, so it is not printed in the book.
 
 ---
 
+## Fixing style and grammar
+
+> **Experimental, and off until you turn it on.** Everything else in Authorship
+> runs on your machine; this does not. Open **Settings**, search for
+> `authorship`, and tick **Experimental › Use Gemini For Style Correction**.
+> Until you do, the tool is not in the toolbar, the Gemini account is not in the
+> sidebar, and nothing is ever sent anywhere.
+
+<!-- CAPTURE gemini-experimental.webp — the VS Code Settings editor filtered to
+     `authorship`, showing the Experimental section and the tickbox. -->
+
+*Generative AI disclosure*: unlike everything else here, this one sends your
+manuscript to Google's Gemini API, on your own account. Read
+[Privacy](#privacy) before you use it, and treat what comes back as an edit to
+review rather than an edit to accept.
+
+**Fix Style & Grammar** — the sparkle in the toolbar, next to **Check Prose** —
+reads the whole manuscript and corrects it, a chapter at a time. Where a check
+underlines what it thinks is wrong and leaves the prose alone, this rewrites it:
+clumsy sentences, wrong words, tangled clauses, punctuation.
+
+It works a chapter at a time and each chapter goes to the model with every
+chapter already corrected in front of it — so the second half of the book is
+edited towards the first half as this pass left it, and a name spelt one way in
+chapter one is spelt that way in chapter forty. That context is the reason this
+tool needs an API rather than the model beside your editor: no model small
+enough to run on a laptop can hold a novel while it reads.
+
+A bar under the toolbar counts the chapters, and the square button stops it. The
+manuscript is locked while it runs — every section is about to be replaced in
+turn — and each chapter's corrections land as they come back, so a pass you stop
+halfway leaves the chapters it finished corrected. It all lands as ordinary
+edits: `Ctrl+Z` walks the pass back like anything else, and nothing is written
+to disk until you save.
+
+Authorship asks Gemini to relax its adjustable safety filters, since a novel is
+the author's own work being copy-edited rather than anything the model is being
+asked to invent. Google's prohibited-content policy sits behind those filters
+and is not adjustable; a manuscript it refuses cannot be corrected this way.
+
+A chapter is only written back if what came back is plausibly that chapter:
+about as long as it went in, ending where a sentence ends, and in the same
+number of sections it was cut into. Anything else — a model that ran out of
+room, that stopped against a filter, that summarised instead of edited — is
+thrown away and the chapter is left exactly as you wrote it. Authorship says
+afterwards which chapters those were and why, because a chapter left alone looks
+in the document exactly like a chapter that needed nothing.
+
+Only the story goes: the chapters' titles and the markdown written under them.
+Your notes, the blurb, the cover, the title page and the table of contents stay
+here — they are about the book rather than in it.
+
+### Signing in, and being asked
+
+The first time you press it, Authorship asks for a Gemini API key. You can make
+one for free at [Google AI Studio](https://aistudio.google.com/apikey); usage is
+billed to that account, and a long novel is not free. The key is checked before
+it is kept, and it is kept in this machine's keychain — VS Code's secret store —
+not in your settings and not in a file beside your manuscript.
+
+Gemini is a VS Code account like any other, so the **Accounts** menu — the
+avatar at the foot of the activity bar — is where it lives. Before you have
+signed in it carries a badge and an entry offering to sign in for Authorship;
+afterwards it lists *Google Gemini* with the last few characters of the key,
+beside your GitHub account and anything else, and signing out is there too.
+
+Three other ways in, all the same account: the **Account** drawer at the top of
+the [Authorship sidebar](#the-authorship-sidebar), which also says what the key
+is for and what it costs you in privacy; pressing **Fix Style & Grammar**, which
+asks if you have not signed in; and `Authorship: Sign in to Gemini` in the
+Command Palette.
+
+Then — and every time you press the button after that, signed in or not — a
+dialog names the document and asks whether to send its chapters to Google. It
+says what goes and what stays. Nothing leaves your machine until you answer it,
+and answering it is the only way this tool runs: there is no *don't ask again*,
+because everything else here is local and that is worth being reminded of.
+
+<!-- CAPTURE gemini-confirm.webp — the modal dialog naming the document, with
+     the Send to Gemini and Cancel buttons. -->
+
+<!-- CAPTURE gemini-account.webp — the Accounts menu open, showing "Google
+     Gemini" with the masked key beside the GitHub account. -->
+
+`Authorship: Sign in to Gemini` and `Authorship: Sign out of Gemini` do the same
+from the Command Palette.
+
+### Choosing the model
+
+Authorship ships with a Gemini model it has been written against, and signing in
+*writes* with that model rather than merely checking the key — the smallest
+generation there is. So a name Google has retired, and a model your plan does not
+include, are both caught in the sign-in box rather than forty minutes into a
+manuscript. Note that the strongest models are generally not on the free tier.
+
+Google does retire them, and keeps its strongest models off the free tier. So
+which model this is pointed at is worth being able to see and change: the
+**Account** drawer in the [Authorship sidebar](#the-authorship-sidebar) carries a
+**Model** dropdown listing what your key can actually write with. The list comes
+from Google when the drawer is drawn — not from anything shipped in here, which
+is the part that goes stale — and the ↻ beside it asks again.
+
+Picked rather than guessed. Which model corrects your book changes both the prose
+and the bill, so Authorship never moves you onto another one on its own; the
+list is only ordered with the newest first.
+
+`Authorship: Choose Gemini Model` does the same from the Command Palette, and
+both write `authorship.gemini.model`, which you can also edit by hand.
+
+---
+
 ## Building the book
 
 **Run All** builds every section that is built rather than written — today that
@@ -340,13 +452,20 @@ buttons.
 ## The Authorship sidebar
 
 The Authorship icon in the activity bar opens the **Manuscript** view, which
-reports on the machinery rather than on the book: which models are resident,
-what they are holding against what the machine has, and what work the server has
-in hand. A running job can be stopped from here.
+reports on the machinery rather than on the book: whether there is a Gemini
+account and which model it will use — only once the experiment is on — which
+local models are resident, what they are holding against what the
+machine has, and what work the server has in hand. A running job can be stopped
+from here, and Gemini can be signed in and out of.
 
-<!-- CAPTURE sidebar.webp — the Authorship sidebar with all three drawers
-     populated: a model serving, a real memory reading, and at least one job in
-     flight with its stop button. -->
+**Account** is first because it is the only drawer about something outside this
+machine. Everything below it — the models, their memory, the queue — is local,
+which is the whole reason the one thing that is not gets the top of the panel
+rather than a line in a readme.
+
+<!-- CAPTURE sidebar.webp — the Authorship sidebar with all four drawers
+     populated: the account signed in, a model serving, a real memory reading,
+     and at least one job in flight with its stop button. -->
 
 ![The Manuscript sidebar](docs/images/sidebar.webp)
 
@@ -427,21 +546,45 @@ Every toolbar button is also a command, so it is in the Command Palette
 - `Authorship: Export Markdown`
 - `Authorship: Export EPUB`
 - `Authorship: Divide into Parts`
+- `Authorship: Fix Style and Grammar`
 - `Authorship: View Source`
 
+And two that have no button, because they are about your account rather than
+about a document:
+
+- `Authorship: Sign in to Gemini`
+- `Authorship: Sign out of Gemini`
+- `Authorship: Choose Gemini Model`
+
 <!-- CAPTURE command-palette.webp — the Command Palette open with "Authorship"
-     typed, showing all six commands. -->
+     typed, showing every command. -->
 
 ---
 
 ## Privacy
 
-Everything runs on your machine. The models are downloaded once and then run
-locally, against a server the extension starts on `127.0.0.1:8765` and talks to
-over the loopback interface. Your manuscript is never uploaded, never sent to an
-API, and never used to train anything. The only thing that goes out over the
-network is the download itself: the installer, the Python packages and the model
-weights.
+Everything runs on your machine, with one exception, and the exception is opt-in.
+
+The models are downloaded once and then run locally, against a server the
+extension starts on `127.0.0.1:8765` and talks to over the loopback interface.
+Writing, checking the prose, correcting a paragraph, writing a blurb, building
+the book and dividing it into parts all happen there. Your manuscript is not
+uploaded, and the only thing that goes out over the network is the download
+itself: the installer, the Python packages and the model weights.
+
+**Fix Style & Grammar is the exception**, and it is switched off until you
+switch it on: **Experimental › Use Gemini For Style Correction** in Settings. It
+sends the chapters of the document it is run on to Google's Gemini API, over the
+internet, on your own API key. It
+sends the chapter titles and the markdown written under them, and nothing else —
+your notes, blurb, cover, title page and contents stay here. Nothing is sent
+until you press the button, and Authorship asks you to sign in before it will
+send anything at all. What Google does with it is governed by the terms of the
+account the key belongs to, not by this extension.
+
+Your key is kept in this machine's keychain, through VS Code's secret store. It
+is not written to settings, does not sync, and never goes anywhere except to the
+local server that uses it. `Authorship: Sign out of Gemini` deletes it.
 
 ---
 
@@ -459,6 +602,55 @@ is on; the output channel shows all of them. It happens once per version.
 **A check found nothing.** Checks are off until you press **Check Prose**. If
 they are on and nothing is underlined, look at the status bar: the first check
 after a start has to load a model, and the models are large.
+
+**There is no sparkle in the toolbar.** The feature is experimental and off by
+default. Settings → search `authorship` → **Experimental › Use Gemini For Style
+Correction**. The Account drawer in the sidebar appears at the same time.
+
+**Gemini would not read a chapter (`PROHIBITED_CONTENT`).** Google's usage
+policy for the Gemini API, not one of the adjustable filters — Authorship
+already asks for those to be relaxed as far as the API allows, because fiction
+contains violence and cruelty and sex and a corrector that refuses a thriller
+for its murders is no use. The prohibited-content line sits behind them and
+cannot be moved by this extension or by anything in your account. A manuscript
+Gemini will not read has to be corrected by a model that will, and for now that
+means not using this tool on it. Other chapters in the same document still run;
+the ones refused are named at the end and left exactly as you wrote them.
+
+**A chapter came back unchanged.** The pass refuses an answer that is not
+plausibly the chapter — too short, too long, cut off mid-sentence, or in the
+wrong number of sections — and leaves your text alone rather than putting a
+fragment in the document. The message at the end names the chapters and the
+reason. Running it again often settles it; a chapter that fails repeatedly is
+usually one long enough to exhaust the model's output budget.
+
+**Gemini says a model is no longer available.** Google retires model names.
+Pick another from the **Model** dropdown in the Account drawer — the refusal
+also names its replacement, if you would rather type it into
+`authorship.gemini.model` yourself. Nothing is wrong with your key.
+
+**Gemini says the quota is exceeded, with `limit: 0`.** That is not an allowance
+you have used up — it is a model your plan does not include at all, and waiting
+will not help. The best models are usually paid-tier only. Either pick another
+from the **Model** dropdown in the Account drawer, or enable billing on the
+Google Cloud project the key belongs to. Authorship offers you the picker when a
+pass fails this way.
+
+**The pass paused and carried on.** Every tier is rate-limited and a novel is
+dozens of requests in a row, so being told to slow down is ordinary. Authorship
+waits as long as Google asks and offers the chapter again, up to five times
+before giving up. Stopping the pass ends the wait as well.
+
+**Gemini would not take my key.** The key is checked when you sign in, so a key
+that worked and has stopped working has usually been revoked or has run out of
+quota — the message says which. Authorship forgets a key Gemini rejects and asks
+for a new one; `Authorship: Sign in to Gemini` asks again at any time.
+
+**Fixing the style left a chapter untouched.** A chapter is often several
+sections, and they have to come back as the same several. When the model runs
+them together the chapter cannot be put back where it came from, so it is left
+exactly as you wrote it rather than have its seams moved for you. Running the
+pass again usually settles it.
 
 **Export failed.** Exporting an EPUB is done by the local server, so it needs
 the server up — see `offline`, above. Exporting markdown and dividing into parts
