@@ -50,14 +50,28 @@ _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(?P<body>.*)\n```\s*\Z", re.DOTALL)
 # heading the author wrote inside their own prose is theirs.
 _HEADING = re.compile(r"\A[ \t]*#{1,6}[ \t]*(?P<said>.+?)[ \t]*(?:\n|\Z)")
 
-# What a corrected chapter is allowed to run to, over the length it went in as.
+# What the ceiling has to cover beyond the chapter itself.
 #
-# Generous rather than tight, and counted in characters against a budget in
-# tokens — which is about four times the room the chapter actually needs. A
-# ceiling is what keeps a model that has started repeating itself from doing it
-# for an hour; it is not a target, and a chapter that came back truncated is a
-# chapter that cannot be put back at all.
-CHAPTER_HEADROOM = 2048
+# A chapter's length in characters is already about four times the tokens its
+# prose needs, so on its own it looks like ample room. It is not: a reasoning
+# model spends output budget thinking before it writes a word, and a ceiling
+# that only covers the prose is one the answer is cut off against. That is not
+# a slow chapter or a short one — it is the opening paragraph of the right
+# answer, arriving as if it were the whole of it.
+THINKING_HEADROOM = 8192
+
+# How far a corrected chapter may be from the length it went in as.
+#
+# Copy-editing is not summarising. A chapter that comes back at half its length
+# has not been tightened, it has been cut off or thrown away, and the only safe
+# reading of it is that something went wrong. Wide enough that real editing
+# never trips it, narrow enough that losing half a chapter always does.
+SHORTEST = 0.6
+LONGEST = 1.8
+
+# What the end of a finished piece of prose looks like: sentence-ending
+# punctuation, or one of the marks that legitimately close over it.
+_FINISHED = tuple(".!?\u2026\"'\u201d\u2019\u00bb)]}*_`")
 
 
 # How much corrected book is carried in front of the chapter being corrected.
@@ -167,6 +181,7 @@ def fix_style(
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, chapters: None,
     revised: Callable[[int, str], None] = lambda index, source: None,
+    left_alone: Callable[[str, str], None] = lambda title, why: None,
 ) -> None:
     """Correct the style and grammar of every chapter, in the order they are read.
 
@@ -193,17 +208,14 @@ def fix_style(
     for fixed, chapter in enumerate(chapters, start=1):
         if cancelled():
             return
-        answer = model.complete(
-            STYLE_INSTRUCTION,
-            _reading(corrected, chapter),
-            max(CHAPTER_HEADROOM, len(chapter.text)),
-        )
+        sections, why = _corrected(model, corrected, chapter)
         if cancelled():
             return
-        sections = _sections_of(answer, chapter)
-        # A chapter whose seams did not come back is one we cannot put back
-        # where it came from. It is carried as the author wrote it, so the
-        # chapters after it still read in a book that makes sense.
+        if why:
+            left_alone(chapter.title, why)
+        # A chapter we cannot put back where it came from is carried as the
+        # author wrote it, so the chapters after it still read in a book that
+        # makes sense.
         corrected.append(
             (chapter.title, chapter.plain if sections is None else "\n\n".join(sections))
         )
@@ -212,6 +224,33 @@ def fix_style(
                 if source != section.source:
                     revised(section.index, source)
         progress(fixed, len(chapters))
+
+
+def _corrected(
+    model: Editor, corrected: list[tuple[str, str]], chapter: Chapter
+) -> tuple[list[str] | None, str]:
+    """One chapter's sections back from the model, or why they are not.
+
+    An answer the model could not finish is one chapter's problem and not the
+    pass's: a novel is dozens of chapters and losing the other thirty-nine
+    because the fortieth ran out of room would be a poor trade. Anything else
+    that goes wrong — a key, a quota, a network — is not about this chapter and
+    is left to end the job.
+    """
+    try:
+        answer = model.complete(
+            STYLE_INSTRUCTION,
+            _reading(corrected, chapter),
+            len(chapter.text) + THINKING_HEADROOM,
+        )
+    except Exception as err:
+        # Duck-typed on purpose: what this needs to know is whether the answer
+        # was cut short, and a model that is not Gemini says so its own way or
+        # not at all. Anything that does not claim to be truncated is fatal.
+        if not getattr(err, "truncated", False):
+            raise
+        return None, str(err)
+    return _sections_of(answer, chapter)
 
 
 def _reading(corrected: list[tuple[str, str]], chapter: Chapter) -> str:
@@ -253,8 +292,8 @@ def _within_budget(corrected: list[tuple[str, str]]) -> list[tuple[str, str]]:
     return list(reversed(kept))
 
 
-def _sections_of(answer: str, chapter: Chapter) -> list[str] | None:
-    """The corrected chapter cut back into its sections, or None if it cannot be.
+def _sections_of(answer: str, chapter: Chapter) -> tuple[list[str] | None, str]:
+    """The corrected chapter cut back into its sections, or why it cannot be.
 
     None is not a failure of the job — it is one chapter that came back in a
     shape it cannot be put back in. Guessing where the seams should have gone
@@ -265,8 +304,42 @@ def _sections_of(answer: str, chapter: Chapter) -> list[str] | None:
     said = _unheaded(said, chapter.title)
     sections = [part.strip("\n") for part in _SEAM_LINE.split(said)]
     if len(sections) != len(chapter.sections) or not all(sections):
+        return None, (
+            f"it came back as {len(sections)} section(s) where the chapter has "
+            f"{len(chapter.sections)}"
+        )
+    wrong = _unfinished(sections, chapter)
+    if wrong:
+        return None, wrong
+    return sections, ""
+
+
+def _unfinished(sections: list[str], chapter: Chapter) -> str | None:
+    """Why this answer is not the chapter, or None if it might be.
+
+    The seams tell us the answer has the right number of pieces. They say nothing
+    about whether those pieces are whole, and an answer cut off against the token
+    ceiling has exactly the right number of pieces when the chapter is one
+    section — which is most of them.
+
+    Two questions, both about shape rather than about prose, because the thing
+    being guarded against is not a bad edit but a fragment. Is it about as long
+    as what went in — copy-editing is not summarising — and does it end where a
+    sentence ends rather than in the middle of one.
+    """
+    was = len(chapter.plain)
+    now = sum(len(section) for section in sections)
+    if not was:
         return None
-    return sections
+    if now < SHORTEST * was:
+        return f"it came back {now * 100 // was}% of the length it went in as"
+    if now > LONGEST * was:
+        return f"it came back {now * 100 // was}% of the length it went in as"
+    for section in sections:
+        ended = section.rstrip()
+        if ended and ended[-1] not in _FINISHED:
+            return f"it ends mid-sentence, on \u201c{ended[-40:]}\u201d"
+    return None
 
 
 def _unfenced(answer: str) -> str:

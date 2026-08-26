@@ -16,7 +16,11 @@
 
 import * as vscode from "vscode";
 
-import { GeminiAccount, configuredModel } from "../gemini/account";
+import {
+    GeminiAccount,
+    configuredModel,
+    styleFixEnabled,
+} from "../gemini/account";
 
 /** How often the drawers refresh. */
 const STATUS_POLL_MS = 1500;
@@ -85,7 +89,7 @@ export class PublishView implements vscode.WebviewViewProvider {
         // and a dropdown showing something other than the truth is worse than no
         // dropdown at all.
         this.settings = vscode.workspace.onDidChangeConfiguration((changed) => {
-            if (changed.affectsConfiguration("authorship.gemini.model")) {
+            if (changed.affectsConfiguration("authorship")) {
                 void this.showAccount();
             }
         });
@@ -114,6 +118,12 @@ export class PublishView implements vscode.WebviewViewProvider {
      */
     private async showAccount(refresh = false): Promise<void> {
         if (!this.view) {
+            return;
+        }
+        // The account exists for the style pass and for nothing else, so with
+        // the experiment off the drawer is about a feature that is not there.
+        if (!styleFixEnabled()) {
+            void this.view.webview.postMessage({ type: "account", off: true });
             return;
         }
         const [session] = await this.account.getSessions();

@@ -62,6 +62,12 @@ checkEl.addEventListener('click', () => post({ type: 'checkToggle' }));
 // Correcting the whole manuscript. Its own button rather than a section's run
 // button, because it is the one tool here that is about the document rather than
 // about a cell of it — and the host, not this, is what asks Gemini.
+//
+// Hidden until the host says otherwise: it is an experimental feature and off by
+// default, and a tool that is off should not be a tool that is greyed out. The
+// page starts with it hidden rather than waiting to be told, so it never flashes
+// into view on a document opened with the experiment off.
+styleEl.hidden = true;
 styleEl.addEventListener('click', () => post({ type: 'fixStyle' }));
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
@@ -153,9 +159,12 @@ window.addEventListener('message', (event) => {
 				? {
 						written: (message.written as number) ?? 0,
 						chapters: (message.chapters as number) ?? 0,
+						note: (message.note as string | null) ?? null,
 					}
 				: null
 		);
+	} else if (message?.type === 'features') {
+		styleEl.hidden = !message.styleFix;
 	} else if (message?.type === 'checking') {
 		setChecking(message.on as boolean);
 	} else if (message?.type === 'marks') {

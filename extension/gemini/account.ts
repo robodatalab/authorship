@@ -43,6 +43,24 @@ const STUDIO = 'https://aistudio.google.com/apikey';
 const CHECK_TIMEOUT_MS = 20_000;
 
 /**
+ * Whether the author has turned the Gemini style pass on.
+ *
+ * Off by default, and off is the whole of the feature being absent: no button in
+ * the toolbar, no account in the sidebar, nothing sent anywhere. It is the one
+ * thing Authorship does that leaves the machine, so it is the one thing that has
+ * to be asked for rather than merely not used.
+ */
+export function styleFixEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration('authorship')
+		.get<boolean>('experimental.useGeminiForStyleCorrection', false);
+}
+
+/** Where the switch for it lives, for the button that offers to go there. */
+export const STYLE_FIX_SETTING =
+	'authorship.experimental.useGeminiForStyleCorrection';
+
+/**
  * Which Gemini the author has asked for, or nothing for the one we ship with.
  *
  * Read here and passed with every request rather than left to the server's own

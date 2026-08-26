@@ -33,6 +33,8 @@ interface JobStatus {
 
 /** The Gemini account as the drawer draws it. */
 interface Account {
+	/** Whether the experiment this account is for is switched off. */
+	off: boolean;
 	/** The key's masked tail, or null when nobody is signed in. */
 	label: string | null;
 	/** The model in force; empty is whichever one Authorship ships with. */
@@ -59,6 +61,7 @@ interface Sample {
 const vscode = acquireVsCodeApi();
 
 const account = document.getElementById('account') as HTMLElement;
+const accountDrawer = document.getElementById('account-drawer') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
@@ -74,6 +77,12 @@ const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
  */
 function renderAccount(state: Account): void {
 	account.textContent = '';
+	// The whole drawer, not merely its contents: with the experiment off there
+	// is no account to have, and a heading over nothing is worse than no heading.
+	accountDrawer.hidden = state.off;
+	if (state.off) {
+		return;
+	}
 	const { label } = state;
 
 	const row = document.createElement('div');
@@ -445,6 +454,7 @@ window.addEventListener('message', (event) => {
 	const message = event.data;
 	if (message?.type === 'account') {
 		renderAccount({
+			off: Boolean(message.off),
 			label: message.account as string | null,
 			model: (message.model as string) ?? '',
 			shipped: (message.shipped as string) ?? '',

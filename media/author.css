@@ -109,6 +109,17 @@
 	color: var(--vscode-descriptionForeground);
 }
 
+/* Held up rather than working. Coloured as a warning because the difference
+   between "this is slow" and "this is stuck" is the whole question the author
+   is asking, and the bar has to answer it without being read closely. */
+.job.held .job-said {
+	color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+}
+
+.job.held .job-fill {
+	background: var(--vscode-editorWarning-foreground, var(--vscode-progressBar-background));
+}
+
 .job-stop {
 	display: inline-flex;
 	align-items: center;

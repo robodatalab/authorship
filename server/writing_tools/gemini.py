@@ -91,9 +91,14 @@ class GeminiError(RuntimeError):
         unauthorized: bool = False,
         no_quota: bool = False,
         retry_after: float | None = None,
+        truncated: bool = False,
     ) -> None:
         super().__init__(detail)
         self.unauthorized = unauthorized
+        # The answer was cut off against the token ceiling. What came back is
+        # real text and is the beginning of the right answer, which is exactly
+        # what makes it dangerous: it looks usable and is half a chapter.
+        self.truncated = truncated
         # The plan allows none of this model at all — `limit: 0` — as opposed to
         # an allowance that has been used up for the minute.
         self.no_quota = no_quota
@@ -126,6 +131,7 @@ class Gemini:
         model: str = DEFAULT_MODEL,
         timeout: float = TIMEOUT_S,
         cancelled: Callable[[], bool] = lambda: False,
+        waiting: Callable[[str | None], None] = lambda note: None,
     ) -> None:
         self.api_key = api_key
         self.model_id = model
@@ -133,6 +139,11 @@ class Gemini:
         # Waiting out a rate limit can be a minute, and an author who pressed
         # stop should not watch the bar sit there for it.
         self.cancelled = cancelled
+        # Said out loud while it waits, and unsaid when it stops. A pass that
+        # holds a chapter back for ten minutes without a word is a pass that has
+        # crashed as far as anyone watching it can tell — which is exactly how
+        # this looked the first time it happened.
+        self.waiting = waiting
 
     def complete(
         self,
@@ -249,8 +260,15 @@ class Gemini:
                 waited = min(
                     err.retry_after or max(FIRST_WAIT_S, waited * 2), MAX_WAIT_S
                 )
-                _log_wait(self.model_id, waited, attempt + 1)
-                self._hold(waited)
+                _log_wait(self.model_id, waited, attempt + 1, retries)
+                self.waiting(
+                    f"{self.model_id} is rate limited — waiting {waited:.0f}s "
+                    f"(try {attempt + 2} of {retries + 1})"
+                )
+                try:
+                    self._hold(waited)
+                finally:
+                    self.waiting(None)
         raise AssertionError("unreachable")
 
     def _hold(self, seconds: float) -> None:
@@ -343,19 +361,28 @@ def _retry_after(error: dict[str, Any]) -> float:
     return FIRST_WAIT_S
 
 
-def _log_wait(model: str, seconds: float, attempt: int) -> None:
+def _log_wait(model: str, seconds: float, attempt: int, of: int) -> None:
     _log.info(
-        "%s asked us to slow down; holding %.0fs before try %d", model, seconds, attempt
+        "%s asked us to slow down; holding %.0fs before try %d of %d",
+        model,
+        seconds,
+        attempt + 1,
+        of + 1,
     )
 
 
 def _answer(body: dict[str, Any]) -> str:
-    """The text out of the response, or an explanation of why there is none.
+    """The text out of the response, or why there is none — or none worth having.
 
-    A candidate that came back without text has a `finishReason` saying why —
-    the safety filters, or the token ceiling — and that is worth passing on. A
-    job that reports "the model said nothing" for a chapter that tripped a filter
-    sends the author looking in the wrong place.
+    `finishReason` is read whether or not there is text, and that is the whole
+    point of this function. An answer stopped against the token ceiling comes
+    back as real text: the opening of the right answer, correctly written, and
+    missing everything after it. Returned, it reads as a corrected chapter and
+    replaces one — which is how a chapter of a manuscript once became the words
+    "Come closer" and nothing else.
+
+    Anything other than `STOP` means the model did not finish saying what it had
+    to say, and nothing it managed to say is usable as a chapter.
     """
     candidates = body.get("candidates") or []
     if not candidates:
@@ -368,9 +395,24 @@ def _answer(body: dict[str, Any]) -> str:
     candidate = candidates[0]
     parts = (candidate.get("content") or {}).get("parts") or []
     said = "".join(part.get("text", "") for part in parts)
-    if not said.strip():
+    reason = str(candidate.get("finishReason") or "")
+
+    if reason == "MAX_TOKENS":
         raise GeminiError(
-            f"Gemini returned nothing ({candidate.get('finishReason', 'no reason given')})"
+            "Gemini ran out of room and stopped mid-answer. What it had written "
+            "is the opening of the chapter and not the chapter, so it has been "
+            "thrown away rather than put in the document.",
+            truncated=True,
+        )
+    if not said.strip():
+        raise GeminiError(f"Gemini returned nothing ({reason or 'no reason given'})")
+    # Every other reason a model stops early — a filter, a stop sequence, a
+    # recitation block — leaves the same half-answer behind.
+    if reason not in ("", "STOP"):
+        raise GeminiError(
+            f"Gemini stopped before it had finished ({reason}), so what it wrote "
+            "is part of a chapter and has been thrown away.",
+            truncated=True,
         )
     return said
 

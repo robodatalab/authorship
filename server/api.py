@@ -433,7 +433,12 @@ class StyleFixJob(Job):
         # Built here rather than handed in, so that being told to stop reaches
         # the client while it is holding a chapter back for a rate limit — which
         # Google can ask for a minute of.
-        self._model = Gemini(key, model, cancelled=lambda: self.cancelled)
+        self._model = Gemini(
+            key,
+            model,
+            cancelled=lambda: self.cancelled,
+            waiting=self._waiting,
+        )
         self._document = document
         # Every section corrected so far, by the cell it belongs to. Read from
         # the thread answering the status endpoint while the worker adds to it,
@@ -449,6 +454,15 @@ class StyleFixJob(Job):
         # does not include. A different failure with a different answer — choose
         # another model, or pay for this one — and the editor offers both.
         self.no_quota = False
+        # What the pass is doing when it is not writing — waiting out a rate
+        # limit, mostly. A bar that only moves once a chapter is done says
+        # nothing for minutes at a time, and silence reads as a crash.
+        self.note: str | None = None
+        # The chapters that came back in a state they could not be put back in,
+        # and why. Left as the author wrote them, which is right — and silent,
+        # which is not: from the document alone it looks like a chapter that
+        # needed nothing doing to it.
+        self.left_alone: list[dict[str, str]] = []
 
     def execute(self) -> None:
         try:
@@ -458,6 +472,7 @@ class StyleFixJob(Job):
                 lambda: self.cancelled,
                 self._reached,
                 self._revised,
+                self._left_alone,
             )
         except GeminiError as err:
             self.unauthorized = err.unauthorized
@@ -467,8 +482,14 @@ class StyleFixJob(Job):
     def _reached(self, fixed: int, chapters: int) -> None:
         self.fixed, self.chapters = fixed, chapters
 
+    def _waiting(self, note: str | None) -> None:
+        self.note = note
+
     def _revised(self, index: int, source: str) -> None:
         self.sections.append({"index": index, "source": source})
+
+    def _left_alone(self, title: str, why: str) -> None:
+        self.left_alone.append({"chapter": title, "why": why})
 
 
 @app.post("/fix/style", status_code=202)
@@ -508,6 +529,8 @@ def fix_style_status(id: str) -> dict[str, Any]:
         "error": job.error,
         "unauthorized": job.unauthorized,
         "noQuota": job.no_quota,
+        "note": job.note,
+        "leftAlone": list(job.left_alone),
         "sections": list(job.sections),
         "progress": {"written": job.fixed, "chapters": job.chapters},
     }

@@ -37,7 +37,12 @@ const POLLS_UNANSWERED = 5;
 const JOB_TIMEOUT_MS = 180_000;
 
 import { divideManuscript } from '../parts/divide';
-import { GeminiAccount, configuredModel } from '../gemini/account';
+import {
+	GeminiAccount,
+	STYLE_FIX_SETTING,
+	configuredModel,
+	styleFixEnabled,
+} from '../gemini/account';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
 import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
@@ -170,6 +175,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					.toString(),
 			});
 
+		// Turning the experiment on or off changes what the toolbar carries, and
+		// an author who has just switched it should not have to reopen the file.
+		const switched = vscode.workspace.onDidChangeConfiguration((changed) => {
+			if (changed.affectsConfiguration(STYLE_FIX_SETTING)) {
+				this.sayFeatures(panel);
+			}
+		});
+
 		const watching = vscode.workspace.onDidChangeTextDocument((event) => {
 			// A change from anywhere — this view, the text editor beside it, or a
 			// tool — is the same news, and the view is repainted from the document.
@@ -182,6 +195,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			switch (message?.type) {
 				case 'ready':
 					send();
+					this.sayFeatures(panel);
 					this.resume(document, panel);
 					this.resumeStyling(document, panel);
 					// A page rebuilt under the author — reloaded, or reopened — knows
@@ -250,6 +264,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 		panel.onDidDispose(() => {
 			watching.dispose();
+			switched.dispose();
 			focusing.dispose();
 			if (this.active?.panel === panel) {
 				this.active = undefined;
@@ -317,6 +332,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		this.checking.add(key);
 		this.sayChecking(document, panel);
 		void this.check(document, panel, null, true);
+	}
+
+	/** Which of the tools that are not always there this page should draw. */
+	private sayFeatures(panel: vscode.WebviewPanel): void {
+		void panel.webview.postMessage({
+			type: 'features',
+			styleFix: styleFixEnabled(),
+		});
 	}
 
 	private sayChecking(
@@ -635,6 +658,22 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		document: vscode.TextDocument,
 		panel: vscode.WebviewPanel | undefined
 	): Promise<void> {
+		// Off is the feature not being there. The button is hidden, so this is
+		// only reachable from the Command Palette — which lists every contributed
+		// command whether or not the extension wants it run.
+		if (!styleFixEnabled()) {
+			const open = await vscode.window.showInformationMessage(
+				'Fixing style and grammar with Gemini is an experimental feature, and is off.',
+				'Open Settings'
+			);
+			if (open === 'Open Settings') {
+				await vscode.commands.executeCommand(
+					'workbench.action.openSettings',
+					STYLE_FIX_SETTING
+				);
+			}
+			return;
+		}
 		// Signing in comes first for an author who has not: being told a manuscript
 		// is about to be sent somewhere is no use to someone who has nowhere to
 		// send it, and the key is what makes the warning about a real thing.
@@ -716,9 +755,13 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	): Promise<void> {
 		const key = document.uri.toString();
 		const tell = (message: unknown): void => void panel?.webview.postMessage(message);
-		const reached = (written: number, chapters: number): void => {
-			this.styling.set(key, { written, chapters });
-			tell({ type: 'styling', on: true, written, chapters });
+		const reached = (
+			written: number,
+			chapters: number,
+			note: string | null = null
+		): void => {
+			this.styling.set(key, { written, chapters, note });
+			tell({ type: 'styling', on: true, written, chapters, note });
 		};
 
 		// How many of the corrected sections are already in the document. The
@@ -757,10 +800,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 								message: `chapter ${Math.min(written + 1, chapters)} of ${chapters}`,
 							});
 							shown = share;
-							reached(written, chapters);
 						},
 						async (body) => {
 							last = body;
+							// Told on every poll rather than only when a chapter
+							// lands, because what this is for is the stretches
+							// where no chapter is landing.
+							const { written = 0, chapters = 0 } = body.progress ?? {};
+							reached(written, chapters, body.note ?? null);
 							const sections = body.sections ?? [];
 							if (sections.length > applied) {
 								const fresh = sections.slice(applied);
@@ -771,6 +818,11 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					);
 				}
 			);
+			// A chapter left as it was is the right answer to an answer that could
+			// not be trusted, and an invisible one: the document looks exactly as
+			// it would if the chapter had needed no correcting. So it is said out
+			// loud, with the reason, once the pass is over.
+			this.reportLeftAlone(last?.leftAlone ?? []);
 		} catch (err: unknown) {
 			// A model the account's plan does not include is not a key problem, and
 			// signing in again would fix nothing — the answer is a different model,
@@ -808,6 +860,26 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			this.styling.delete(key);
 			tell({ type: 'styling', on: false });
 		}
+	}
+
+	/**
+	 * Say which chapters were left as they were, and why.
+	 *
+	 * Not a dialog for each: a pass over a novel that hit a rough patch could
+	 * name a dozen, and twelve dialogs is a pass nobody finishes dismissing.
+	 */
+	private reportLeftAlone(skipped: { chapter: string; why: string }[]): void {
+		if (skipped.length === 0) {
+			return;
+		}
+		const named = skipped
+			.map((one) => `“${one.chapter}” — ${one.why}`)
+			.join('; ');
+		void vscode.window.showWarningMessage(
+			skipped.length === 1
+				? `One chapter was left as you wrote it: ${named}`
+				: `${skipped.length} chapters were left as you wrote them: ${named}`
+		);
 	}
 
 	/**
@@ -1133,6 +1205,8 @@ interface Writing {
 interface Styling {
 	written: number;
 	chapters: number;
+	/** What it is doing when it is not writing — waiting out a rate limit. */
+	note?: string | null;
 }
 
 /**
@@ -1157,6 +1231,10 @@ interface JobStatus {
 	unauthorized?: boolean;
 	/** Whether it was the model: one the account's plan does not include. */
 	noQuota?: boolean;
+	/** What a style pass is doing while no chapter is landing. */
+	note?: string | null;
+	/** Chapters the pass could not use an answer for, and why. */
+	leftAlone?: { chapter: string; why: string }[];
 }
 
 /**

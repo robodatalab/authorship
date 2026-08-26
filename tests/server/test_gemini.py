@@ -70,10 +70,17 @@ def exhausted() -> httpx.Response:
     )
 
 
-def answering(*parts: str) -> httpx.Response:
+def answering(*parts: str, reason: str = "STOP") -> httpx.Response:
     return build_response(
         200,
-        {"candidates": [{"content": {"parts": [{"text": part} for part in parts]}}]},
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": part} for part in parts]},
+                    "finishReason": reason,
+                }
+            ]
+        },
     )
 
 
@@ -120,6 +127,28 @@ class Complete(unittest.TestCase):
             with self.assertRaises(GeminiError) as caught:
                 Gemini("k").complete("i", "s")
         self.assertFalse(caught.exception.unauthorized)
+
+    def test_an_answer_cut_off_against_the_ceiling_is_thrown_away(self) -> None:
+        # The one that reached a manuscript. A model out of room answers with
+        # the opening of the right chapter — real text, correctly written, and
+        # missing everything after it. Returned, it replaces a chapter.
+        cut = answering('She said, "Come closer', reason="MAX_TOKENS")
+        with mock.patch("httpx.request", return_value=cut):
+            with self.assertRaises(GeminiError) as caught:
+                Gemini("k").complete("i", "s")
+        self.assertTrue(caught.exception.truncated)
+        self.assertNotIn("Come closer", str(caught.exception))
+
+    def test_any_other_early_stop_is_thrown_away_too(self) -> None:
+        stopped = answering("Half a chapter", reason="RECITATION")
+        with mock.patch("httpx.request", return_value=stopped):
+            with self.assertRaises(GeminiError) as caught:
+                Gemini("k").complete("i", "s")
+        self.assertTrue(caught.exception.truncated)
+
+    def test_a_finished_answer_is_kept(self) -> None:
+        with mock.patch("httpx.request", return_value=answering("Fixed.")):
+            self.assertEqual(Gemini("k").complete("i", "s"), "Fixed.")
 
     def test_an_answer_stopped_by_a_filter_says_why_it_is_empty(self) -> None:
         stopped = build_response(

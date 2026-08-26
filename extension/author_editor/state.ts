@@ -36,6 +36,15 @@ export interface Writing {
 export interface Styling {
 	written: number;
 	chapters: number;
+	/**
+	 * What the pass is doing while no chapter is landing.
+	 *
+	 * A chapter is one request, so the bar only moves when one finishes — and
+	 * when the model is rate limited that can be minutes apart. Without
+	 * something said in between, a pass that is waiting and a pass that has
+	 * died look exactly alike.
+	 */
+	note?: string | null;
 }
 
 /** The box open for typing, and which cell it belongs to. */

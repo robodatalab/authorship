@@ -289,6 +289,15 @@ It is copy for a shop listing, so it is not printed in the book.
 
 ## Fixing style and grammar
 
+> **Experimental, and off until you turn it on.** Everything else in Authorship
+> runs on your machine; this does not. Open **Settings**, search for
+> `authorship`, and tick **Experimental › Use Gemini For Style Correction**.
+> Until you do, the tool is not in the toolbar, the Gemini account is not in the
+> sidebar, and nothing is ever sent anywhere.
+
+<!-- CAPTURE gemini-experimental.webp — the VS Code Settings editor filtered to
+     `authorship`, showing the Experimental section and the tickbox. -->
+
 *Generative AI disclosure*: unlike everything else here, this one sends your
 manuscript to Google's Gemini API, on your own account. Read
 [Privacy](#privacy) before you use it, and treat what comes back as an edit to
@@ -312,6 +321,14 @@ turn — and each chapter's corrections land as they come back, so a pass you st
 halfway leaves the chapters it finished corrected. It all lands as ordinary
 edits: `Ctrl+Z` walks the pass back like anything else, and nothing is written
 to disk until you save.
+
+A chapter is only written back if what came back is plausibly that chapter:
+about as long as it went in, ending where a sentence ends, and in the same
+number of sections it was cut into. Anything else — a model that ran out of
+room, that stopped against a filter, that summarised instead of edited — is
+thrown away and the chapter is left exactly as you wrote it. Authorship says
+afterwards which chapters those were and why, because a chapter left alone looks
+in the document exactly like a chapter that needed nothing.
 
 Only the story goes: the chapters' titles and the markdown written under them.
 Your notes, the blurb, the cover, the title page and the table of contents stay
@@ -431,7 +448,8 @@ buttons.
 
 The Authorship icon in the activity bar opens the **Manuscript** view, which
 reports on the machinery rather than on the book: whether there is a Gemini
-account and which model it will use, which local models are resident, what they are holding against what the
+account and which model it will use — only once the experiment is on — which
+local models are resident, what they are holding against what the
 machine has, and what work the server has in hand. A running job can be stopped
 from here, and Gemini can be signed in and out of.
 
@@ -549,8 +567,10 @@ the book and dividing it into parts all happen there. Your manuscript is not
 uploaded, and the only thing that goes out over the network is the download
 itself: the installer, the Python packages and the model weights.
 
-**Fix Style & Grammar is the exception.** It sends the chapters of the document
-it is run on to Google's Gemini API, over the internet, on your own API key. It
+**Fix Style & Grammar is the exception**, and it is switched off until you
+switch it on: **Experimental › Use Gemini For Style Correction** in Settings. It
+sends the chapters of the document it is run on to Google's Gemini API, over the
+internet, on your own API key. It
 sends the chapter titles and the markdown written under them, and nothing else —
 your notes, blurb, cover, title page and contents stay here. Nothing is sent
 until you press the button, and Authorship asks you to sign in before it will
@@ -577,6 +597,17 @@ is on; the output channel shows all of them. It happens once per version.
 **A check found nothing.** Checks are off until you press **Check Prose**. If
 they are on and nothing is underlined, look at the status bar: the first check
 after a start has to load a model, and the models are large.
+
+**There is no sparkle in the toolbar.** The feature is experimental and off by
+default. Settings → search `authorship` → **Experimental › Use Gemini For Style
+Correction**. The Account drawer in the sidebar appears at the same time.
+
+**A chapter came back unchanged.** The pass refuses an answer that is not
+plausibly the chapter — too short, too long, cut off mid-sentence, or in the
+wrong number of sections — and leaves your text alone rather than putting a
+fragment in the document. The message at the end names the chapters and the
+reason. Running it again often settles it; a chapter that fails repeatedly is
+usually one long enough to exhaust the model's output budget.
 
 **Gemini says a model is no longer available.** Google retires model names.
 Pick another from the **Model** dropdown in the Account drawer — the refusal

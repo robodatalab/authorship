@@ -70,11 +70,23 @@ function writes(at: number | null, written = 0, chapters = 0): void {
 	);
 }
 
+/** What the host says about the tools that are not always there. */
+function features(styleFix: boolean): void {
+	window.dispatchEvent(
+		new MessageEvent('message', { data: { type: 'features', styleFix } })
+	);
+}
+
 /** What the host sends while a pass corrects the document, and when it stops. */
-function styles(on: boolean, written = 0, chapters = 0): void {
+function styles(
+	on: boolean,
+	written = 0,
+	chapters = 0,
+	note: string | null = null
+): void {
 	window.dispatchEvent(
 		new MessageEvent('message', {
-			data: { type: 'styling', on, written, chapters },
+			data: { type: 'styling', on, written, chapters, note },
 		})
 	);
 }
@@ -133,7 +145,6 @@ describe('the toolbar', () => {
 	// Every one of these was wired by hand at some point and one of them was not.
 	const wiring: [string, string][] = [
 		['run-all', 'compile'],
-		['fix-style', 'fixStyle'],
 		['import-markdown', 'importMarkdown'],
 		['export-markdown', 'exportMarkdown'],
 		['export-epub', 'exportEpub'],
@@ -1023,6 +1034,41 @@ describe('a cell the server is writing', () => {
 	});
 });
 
+describe('the experiment switch', () => {
+	// Correcting the style with Gemini is the one thing here that leaves the
+	// machine, so it is off until it is asked for — and off means absent rather
+	// than greyed out.
+
+	function sparkle(): HTMLElement {
+		return document.getElementById('fix-style') as HTMLElement;
+	}
+
+	it('hides the tool until the host says the experiment is on', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		expect(sparkle().hidden).toBe(true);
+	});
+
+	it('shows it once the experiment is on', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		expect(sparkle().hidden).toBe(false);
+	});
+
+	it('takes it away again when the experiment is switched off', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		features(false);
+		expect(sparkle().hidden).toBe(true);
+	});
+
+	it('asks the host to fix the style when it is pressed', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		features(true);
+		sparkle().dispatchEvent(new MouseEvent('click'));
+		expect(posted.map((m) => m.type)).toContain('fixStyle');
+	});
+});
+
 describe('a pass over the whole document', () => {
 	// Correcting the style of a manuscript is minutes of work on every section at
 	// once, so unlike a blurb it is not one cell that is taken away — it is the
@@ -1064,6 +1110,28 @@ describe('a pass over the whole document', () => {
 		expect(document.getElementById('job-said')!.textContent).toBe(
 			'Fixing style and grammar — chapter 14 of 14'
 		);
+	});
+
+	it('says why nothing is moving when the model has told it to wait', async () => {
+		// A chapter is one request, so between them the bar stands still for
+		// minutes. Silence there is indistinguishable from a crash — which is
+		// exactly how a rate-limited pass looked before it said anything.
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 0, 5, 'gemini-3.7-flash is rate limited — waiting 47s (try 2 of 6)');
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 1 of 5 · gemini-3.7-flash is rate limited — waiting 47s (try 2 of 6)'
+		);
+		expect(bar().classList.contains('held')).toBe(true);
+	});
+
+	it('drops the notice once it is working again', async () => {
+		await mount([chapter('One'), markdown('a')]);
+		styles(true, 0, 5, 'waiting');
+		styles(true, 1, 5);
+		expect(document.getElementById('job-said')!.textContent).toBe(
+			'Fixing style and grammar — chapter 2 of 5'
+		);
+		expect(bar().classList.contains('held')).toBe(false);
 	});
 
 	it('stops the pass rather than starting a second one', async () => {

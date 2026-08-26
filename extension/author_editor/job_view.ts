@@ -55,8 +55,12 @@ export function drawJob(): void {
 		? `${(100 * styling.written) / styling.chapters}%`
 		: '0%';
 	// The bar is what is finished; the words are what is being worked on, which
-	// is the chapter after the last one done — until there is none after it.
-	jobSaidEl.textContent = styling.chapters
+	// is the chapter after the last one done — until there is none after it. And
+	// where the pass has something to say about why nothing is moving, that is
+	// the more useful half of the line.
+	const where = styling.chapters
 		? `Fixing style and grammar — chapter ${Math.min(styling.written + 1, styling.chapters)} of ${styling.chapters}`
 		: 'Fixing style and grammar…';
+	jobSaidEl.textContent = styling.note ? `${where} · ${styling.note}` : where;
+	jobEl.classList.toggle('held', Boolean(styling.note));
 }

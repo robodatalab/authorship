@@ -524,6 +524,11 @@ class ExportEpub(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+# What the stubbed Gemini answers with: a plausible correction of the sections
+# in the document below, rather than a token that the length check refuses.
+CORRECTED = "The door had swung open."
+
+
 def wait_for_style(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -560,7 +565,10 @@ class FixStyle(unittest.TestCase):
         app.state.jobs = ParallelJobsManager()
 
         self.model = mock.MagicMock()
-        self.model.complete.return_value = "Corrected."
+        # About as long as the sections it replaces, and ending where a sentence
+        # ends. A stub any shorter is refused by the checks that keep a chapter
+        # cut off mid-answer out of the document, which is as it should be.
+        self.model.complete.return_value = CORRECTED
         patched = mock.patch(
             "server.api.Gemini", return_value=self.model
         )
@@ -586,7 +594,10 @@ class FixStyle(unittest.TestCase):
         self.assertIsNone(status["error"])
         self.assertEqual(
             status["sections"],
-            [{"index": 2, "source": "Corrected."}, {"index": 4, "source": "Corrected."}],
+            [
+                {"index": 2, "source": CORRECTED},
+                {"index": 4, "source": CORRECTED},
+            ],
         )
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
@@ -616,6 +627,20 @@ class FixStyle(unittest.TestCase):
         self.assertEqual(started.status_code, 202)
         wait_for_style(client, started.json()["id"])
         self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
+
+    def test_names_the_chapters_it_left_as_the_author_wrote_them(self) -> None:
+        # A chapter the pass could not use an answer for is left alone, which is
+        # right and is invisible — the document looks as it would if the chapter
+        # had needed nothing. The editor is told so it can say so.
+        self.model.complete.side_effect = [
+            'She reached for it and said, "Come closer',
+            CORRECTED,
+        ]
+        status = self.start()
+        self.assertEqual(status["sections"], [{"index": 4, "source": CORRECTED}])
+        self.assertEqual(len(status["leftAlone"]), 1)
+        self.assertEqual(status["leftAlone"][0]["chapter"], "One")
+        self.assertIn("mid-sentence", status["leftAlone"][0]["why"])
 
     def test_a_missing_document_is_a_bad_request(self) -> None:
         client = TestClient(app)
