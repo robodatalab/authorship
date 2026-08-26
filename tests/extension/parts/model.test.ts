@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	DEFAULT_PART_WORDS,
-	countWords,
 	furnitureOf,
 	intoParts,
 	partCells,
@@ -32,22 +31,6 @@ function weighing(words: number, title = 'One'): Section {
 function prose(words: number): Cell {
 	return markdown(Array.from({ length: words }, () => 'word').join(' '));
 }
-
-describe('countWords — words as a reader counts them', () => {
-	it('counts whitespace-separated runs', () => {
-		expect(countWords('It was a warm, sunny day.')).toBe(6);
-	});
-
-	it('ignores runs carrying neither letter nor digit', () => {
-		expect(countWords('***')).toBe(0);
-		expect(countWords('She stopped — and turned.')).toBe(4);
-	});
-
-	it('an empty line weighs nothing', () => {
-		expect(countWords('')).toBe(0);
-		expect(countWords('   ')).toBe(0);
-	});
-});
 
 describe('sectionsOf — the sections a division cuts along', () => {
 	it('makes a section of each chapter and the cells written under it', () => {

@@ -12,7 +12,7 @@
 // without launching an editor. Everything here deals in cells and counts;
 // divide.ts turns the parts into files.
 
-import { isAside, isMatter, isUnpublished } from '../author_editor/model';
+import { countWords, isAside, isMatter, isUnpublished } from '../author_editor/model';
 import {
 	CHAPTER,
 	COVER,
@@ -335,12 +335,4 @@ export function partNumber(name: string): number | null {
 export function quotaOf(raw: unknown): number {
 	const words = Math.floor(Number(raw));
 	return Number.isFinite(words) && words > 0 ? words : DEFAULT_PART_WORDS;
-}
-
-/**
- * Words as a reader counts them: whitespace-separated runs carrying a letter or
- * a digit, so a scene break or a lone dash weighs nothing.
- */
-export function countWords(text: string): number {
-	return (text.match(/\S+/g) ?? []).filter((run) => /[\p{L}\p{N}]/u.test(run)).length;
 }
