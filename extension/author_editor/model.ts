@@ -514,6 +514,34 @@ function contentsListing(cells: Cell[]): string {
 		.join('\n');
 }
 
+/**
+ * Words as a reader counts them: whitespace-separated runs carrying a letter or
+ * a digit, so a scene break or a lone dash weighs nothing.
+ */
+export function countWords(text: string): number {
+	return (text.match(/\S+/g) ?? []).filter((run) => /[\p{L}\p{N}]/u.test(run)).length;
+}
+
+/**
+ * What the story weighs: the words in the markdown sections and nowhere else.
+ *
+ * The markdown *is* the story. Everything else in the document is either a fact
+ * about the book — a chapter's title, a cover's path, what the title page prints
+ * — or something written about the story rather than in it, like a note. None of
+ * it is prose the reader reads, so counting any of it would give an author a
+ * number that went up when they had written nothing.
+ *
+ * `except` leaves one section out, for a caller that already holds a newer copy
+ * of it than the document does.
+ */
+export function wordsIn(cells: readonly Cell[], except: number | null = null): number {
+	return cells.reduce(
+		(total, cell, at) =>
+			at === except || cell.kind !== MARKDOWN ? total : total + countWords(cell.source),
+		0
+	);
+}
+
 /** Where in the book a cell stands. Either level may be missing. */
 export interface Place {
 	part: string | null;

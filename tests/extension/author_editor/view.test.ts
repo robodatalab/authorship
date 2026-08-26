@@ -83,6 +83,25 @@ function shown(): Element[] {
 	return [...document.querySelectorAll('.cell')];
 }
 
+/** What the right-hand end of the toolbar says about the document. */
+function status(): string {
+	return document.getElementById('doc-status')!.textContent ?? '';
+}
+
+/** Open a section for typing, the way an author does. */
+function opened(index: number): HTMLTextAreaElement {
+	shown()[index]
+		.querySelector('.rendered')!
+		.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+	return shown()[index].querySelector('textarea')!;
+}
+
+/** Type into an open box the way a browser does: the value, then the event. */
+function typeInto(box: HTMLTextAreaElement, text: string): void {
+	box.value = text;
+	box.dispatchEvent(new Event('input'));
+}
+
 /** The strips between the cells, in the order the gaps come. */
 function bars(): Element[] {
 	return [...document.querySelectorAll('.insert-bar')];
@@ -175,6 +194,115 @@ describe('the toolbar', () => {
 		expect(document.getElementById('doc-where')!.textContent).toBe(
 			'The First Night'
 		);
+	});
+});
+
+describe('the word count', () => {
+	/** Prose of a known length, so the number read back is the one under test. */
+	function prose(words: number): Cell {
+		return markdown(Array.from({ length: words }, () => 'word').join(' '));
+	}
+
+	it('says what the story weighs, beside what it is made of', async () => {
+		await mount([chapter('One'), markdown('The lantern had gone out again.')]);
+		expect(status()).toBe('1 chapter · 6 words');
+	});
+
+	it('adds up every markdown section in the document', async () => {
+		await mount([prose(40), chapter('Two'), prose(60)]);
+		expect(status()).toContain('100 words');
+	});
+
+	it('counts nothing but the markdown — a title is not writing', async () => {
+		await mount([part('Day One'), chapter('The First Night')]);
+		expect(status()).toContain('0 words');
+	});
+
+	it('counts nothing in a note, which is written about the story', async () => {
+		await mount([
+			prose(3),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		]);
+		expect(status()).toContain('3 words');
+	});
+
+	it('counts nothing in the pages the book is wrapped in', async () => {
+		await mount([
+			{ kind: 'title-page', source: '', attrs: { title: 'The Long Night' } },
+			blurb('A lantern goes out and a girl goes after it.'),
+			prose(3),
+			{ kind: 'about', source: 'She lives by the sea.', attrs: {} },
+		]);
+		expect(status()).toContain('3 words');
+	});
+
+	it('marks the thousands, since a manuscript is six digits long', async () => {
+		await mount([prose(1234)]);
+		expect(status()).toContain('1,234 words');
+	});
+
+	it('says one word rather than one words', async () => {
+		await mount([markdown('Alone.')]);
+		expect(status()).toContain('1 word');
+		expect(status()).not.toContain('1 words');
+	});
+
+	it('keeps its place among the rest of what the bar says', async () => {
+		await mount([chapter('One'), prose(2), contents()]);
+		expect(status()).toBe('1 chapter · 2 words · 1 to run');
+	});
+
+	it('follows the document as sections arrive', async () => {
+		await mount([prose(2)]);
+		send([prose(2), prose(5)]);
+		expect(status()).toContain('7 words');
+	});
+
+	it('follows the document as sections go', async () => {
+		await mount([prose(2), prose(5)]);
+		send([prose(2)]);
+		expect(status()).toContain('2 words');
+	});
+
+	it('keeps up with the keys, rather than with the document', async () => {
+		// A cell is written back 400ms after the last keystroke. A count that
+		// waited for that would sit still through a sentence and then jump.
+		await mount([markdown('one two')]);
+		typeInto(opened(0), 'one two three four');
+		expect(status()).toContain('4 words');
+	});
+
+	it('does not count the open section twice while it is being typed in', async () => {
+		// The document still holds what the box said when it was opened, and the
+		// box holds what it says now; only one of them is the story.
+		await mount([prose(10), markdown('one two')]);
+		typeInto(opened(1), 'one two three');
+		expect(status()).toContain('13 words');
+	});
+
+	it('still stands once what was typed reaches the document', async () => {
+		await mount([markdown('one two')]);
+		typeInto(opened(0), 'one two three four');
+		await new Promise((wake) => setTimeout(wake, 450));
+		echo();
+		expect(status()).toContain('4 words');
+	});
+
+	it('counts what was typed into the section it was typed into', async () => {
+		// The kept count is the document with the open section left out of it, so
+		// moving to another section has to throw it away — or the words of the one
+		// left behind go missing the moment the next is typed in.
+		await mount([markdown('one two'), markdown('three four five')]);
+		typeInto(opened(0), 'one two six');
+		expect(status()).toContain('6 words');
+		typeInto(opened(1), 'three four five seven');
+		expect(status()).toContain('7 words');
+	});
+
+	it('counts a section typed empty as nothing', async () => {
+		await mount([markdown('one two')]);
+		typeInto(opened(0), '');
+		expect(status()).toContain('0 words');
 	});
 });
 

@@ -4,6 +4,7 @@ import {
 	KINDS,
 	builtSource,
 	compile,
+	countWords,
 	divisionsOf,
 	fromMarkdown,
 	insertAt,
@@ -30,6 +31,7 @@ import {
 	splitAt,
 	toMarkdown,
 	withDefaultCell,
+	wordsIn,
 } from '../../../extension/author_editor/model';
 import {
 	chapter,
@@ -464,6 +466,83 @@ describe('placeOf — where in the book a cell stands', () => {
 
 	it('reports nowhere for a cell that is not in the document', () => {
 		expect(placeOf([], 0)).toEqual({ part: null, chapter: null });
+	});
+});
+
+describe('countWords — words as a reader counts them', () => {
+	it('counts whitespace-separated runs', () => {
+		expect(countWords('It was a warm, sunny day.')).toBe(6);
+	});
+
+	it('ignores runs carrying neither letter nor digit', () => {
+		expect(countWords('***')).toBe(0);
+		expect(countWords('She stopped — and turned.')).toBe(4);
+	});
+
+	it('an empty line weighs nothing', () => {
+		expect(countWords('')).toBe(0);
+		expect(countWords('   ')).toBe(0);
+	});
+
+	it('counts across the lines of a paragraph as one run of prose', () => {
+		expect(countWords('The lantern\nhad gone out\n\nagain.')).toBe(6);
+	});
+});
+
+describe('wordsIn — what the story weighs', () => {
+	it('counts the prose', () => {
+		expect(wordsIn([markdown('The lantern had gone out again.')])).toBe(6);
+	});
+
+	it('adds up every markdown section in the document', () => {
+		expect(wordsIn([markdown('one two'), markdown('three four five')])).toBe(5);
+	});
+
+	it('counts nothing in a document with no prose in it', () => {
+		expect(wordsIn([chapter('The First Night'), contents()])).toBe(0);
+		expect(wordsIn([])).toBe(0);
+	});
+
+	it('does not count a chapter or part title, which names the book', () => {
+		// A title is a fact about the book rather than writing, and an author who
+		// renames a chapter has not written four words.
+		expect(
+			wordsIn([part('Day One'), chapter('The First Night'), markdown('one two')])
+		).toBe(2);
+	});
+
+	it('does not count a note, which is written about the story', () => {
+		const cells: Cell[] = [
+			markdown('one two'),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		];
+		expect(wordsIn(cells)).toBe(2);
+	});
+
+	it('does not count the book\u2019s own pages', () => {
+		const cells: Cell[] = [
+			{ kind: 'title-page', source: '', attrs: { title: 'The Long Night' } },
+			{ kind: 'cover', source: '![Cover](art/cover.jpg)', attrs: { src: 'art/cover.jpg' } },
+			{ kind: 'disclaimer', source: 'All persons are fictitious.', attrs: {} },
+			{ kind: 'about', source: 'She lives by the sea.', attrs: {} },
+			{ kind: 'blurb', source: 'A lantern goes out.', attrs: {} },
+			markdown('one two'),
+		];
+		expect(wordsIn(cells)).toBe(2);
+	});
+
+	it('counts nothing in a kind it has never heard of', () => {
+		const cells: Cell[] = [{ kind: 'epigraph', source: 'a b c', attrs: {} }];
+		expect(wordsIn(cells)).toBe(0);
+	});
+
+	it('leaves out the one section the caller says it holds a newer copy of', () => {
+		const cells = [markdown('one two'), markdown('three four five')];
+		expect(wordsIn(cells, 1)).toBe(2);
+	});
+
+	it('leaves out nothing for an index that is not in the document', () => {
+		expect(wordsIn([markdown('one two')], 7)).toBe(2);
 	});
 });
 
