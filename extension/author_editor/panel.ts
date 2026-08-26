@@ -37,8 +37,9 @@ const POLLS_UNANSWERED = 5;
 const JOB_TIMEOUT_MS = 180_000;
 
 import { divideManuscript } from '../parts/divide';
+import { GeminiAccount } from '../gemini/account';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { PART, dumps, has, parse, type Cell } from '../storydoc/model';
+import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -63,6 +64,15 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	private readonly writing = new Map<string, Writing>();
 
 	/**
+	 * The pass correcting each document, per document, while it runs.
+	 *
+	 * Held for the same reason a blurb's progress is: the bar is not in the file,
+	 * so a page rebuilt under a running pass — reloaded, reopened, or simply
+	 * asking again on start-up — has to be told about it a second time.
+	 */
+	private readonly styling = new Map<string, Styling>();
+
+	/**
 	 * The documents being checked, for as long as this editor is open.
 	 *
 	 * Kept here and written nowhere. What a check found is what something thinks
@@ -85,7 +95,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly port: number
+		private readonly port: number,
+		private readonly account: GeminiAccount
 	) {}
 
 	/** The commands the editor title bar shows, by the name they are bound to. */
@@ -102,6 +113,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				}),
 			exportEpub: () => this.onActive((d) => this.exportEpub(d)),
 			partition: () => this.onActive((d) => this.partition(d)),
+			fixStyle: () =>
+				this.onActive((d) => this.fixStyle(d, this.active?.panel)),
 			viewSource: () =>
 				this.onActive(async (d) => {
 					await vscode.commands.executeCommand('vscode.openWith', d.uri, 'default');
@@ -170,6 +183,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				case 'ready':
 					send();
 					this.resume(document, panel);
+					this.resumeStyling(document, panel);
 					// A page rebuilt under the author — reloaded, or reopened — knows
 					// nothing about the checks it was showing a moment ago.
 					this.sayChecking(document, panel);
@@ -215,6 +229,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					break;
 				case 'partition':
 					void this.partition(document);
+					break;
+				case 'fixStyle':
+					// The panel is taken from here rather than looked up as it goes:
+					// the author is free to click into another editor while the model
+					// reads, and the bar belongs to this one either way.
+					void this.fixStyle(document, panel).catch((err: unknown) =>
+						vscode.window.showErrorMessage(describe(err))
+					);
 					break;
 				case 'openAsText':
 					void vscode.commands.executeCommand(
@@ -599,6 +621,205 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		}
 	}
 
+	/**
+	 * Correct the style and grammar of the whole manuscript.
+	 *
+	 * The one tool here that does not run on this machine. Style is a property of
+	 * a chapter rather than of a sentence — whether a scene keeps its tense,
+	 * whether a name is spelt as it was spelt in chapter one — so the pass reads
+	 * the corrected book so far in front of each chapter, which needs a context
+	 * length the local models do not have. It goes to Gemini, on the author's own
+	 * account, which is why this is the one thing they have to sign in for.
+	 */
+	private async fixStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined
+	): Promise<void> {
+		const key = await this.account.require();
+		if (!key) {
+			// They were asked and said no. That is an answer, not a failure.
+			return;
+		}
+		if (document.isDirty) {
+			// The server reads the file, so what is on screen has to be on disk.
+			await document.save();
+		}
+		const started = await fetch(`http://127.0.0.1:${this.port}/fix/style`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ path: document.uri.fsPath, key }),
+		});
+		if (!started.ok) {
+			throw new Error(await detailOf(started));
+		}
+		await this.watchStyle(document, panel);
+	}
+
+	/**
+	 * Follow a pass over a document, putting each corrected section in as it lands.
+	 *
+	 * As with a blurb, apart from starting the job this is the whole of the work,
+	 * and for the same reason it is not part of starting one: a pass over a novel
+	 * outlives the click that began it, and an editor coming back to a document
+	 * being corrected has to pick the job up rather than start a second.
+	 *
+	 * The corrections are put in a chapter at a time rather than all at the end.
+	 * A pass over a book is minutes long, and an author watching it work is owed
+	 * the chapters as they are done — and a pass that fails at chapter forty
+	 * should leave thirty-nine corrected chapters behind rather than nothing.
+	 */
+	private async watchStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined
+	): Promise<void> {
+		const key = document.uri.toString();
+		const tell = (message: unknown): void => void panel?.webview.postMessage(message);
+		const reached = (written: number, chapters: number): void => {
+			this.styling.set(key, { written, chapters });
+			tell({ type: 'styling', on: true, written, chapters });
+		};
+
+		// How many of the corrected sections are already in the document. The
+		// server hands back every one it has done on every poll, rather than only
+		// the new ones — a poll that went astray would otherwise lose a chapter's
+		// corrections for good — so this is what tells them apart.
+		let applied = 0;
+		let last: JobStatus | undefined;
+
+		reached(0, 0);
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Fixing the style and grammar of ${basename(document.uri)}…`,
+					cancellable: true,
+				},
+				async (report, token) => {
+					// A job that finished between the click and this is no failure,
+					// and there is nobody to tell either way — the pass itself says
+					// what happened, a moment later, when it stops.
+					token.onCancellationRequested(
+						() => void this.stop(document).catch(() => undefined)
+					);
+					// VS Code is told what has happened since the last poll rather
+					// than how far along the job is, so the share already shown is
+					// kept here to subtract. The page is told the count itself.
+					let shown = 0;
+					return await this.awaitJob(
+						'/fix/style/status',
+						document.uri.fsPath,
+						(written, chapters) => {
+							const share = (100 * written) / chapters;
+							report.report({
+								increment: share - shown,
+								message: `chapter ${Math.min(written + 1, chapters)} of ${chapters}`,
+							});
+							shown = share;
+							reached(written, chapters);
+						},
+						async (body) => {
+							last = body;
+							const sections = body.sections ?? [];
+							if (sections.length > applied) {
+								const fresh = sections.slice(applied);
+								applied = sections.length;
+								await this.applySections(document, fresh);
+							}
+						}
+					);
+				}
+			);
+		} catch (err: unknown) {
+			// A key Gemini has stopped taking is stored truth that has gone stale.
+			// Left there, every pass from now on fails the same way, and the way
+			// out is a command the author has no reason to go looking for.
+			if (last?.unauthorized) {
+				await this.account.forget();
+				const again = await vscode.window.showWarningMessage(
+					'Gemini would not take the key Authorship had. Sign in again to correct the style.',
+					'Sign in'
+				);
+				if (again === 'Sign in') {
+					await this.account.signIn();
+				}
+				return;
+			}
+			throw err;
+		} finally {
+			this.styling.delete(key);
+			tell({ type: 'styling', on: false });
+		}
+	}
+
+	/**
+	 * Put corrected sections into the document, as one edit.
+	 *
+	 * The server names the cell each correction belongs to rather than the lines
+	 * it covers: a line span would name the wrong place by the time the chapter
+	 * after it is done, and the whole point of a pass is that it takes minutes.
+	 *
+	 * A cell that is no longer the markdown it was is left alone. The document
+	 * cannot be edited while a pass runs, but it can be reverted, or written to
+	 * by something else — and a correction for a chapter that is not there any
+	 * more belongs nowhere.
+	 */
+	private async applySections(
+		document: vscode.TextDocument,
+		sections: { index: number; source: string }[]
+	): Promise<void> {
+		const cells = parse(document.getText());
+		let changed = false;
+		for (const { index, source } of sections) {
+			const cell = cells[index];
+			if (!cell || cell.kind !== MARKDOWN || cell.source === source) {
+				continue;
+			}
+			cells[index] = { ...cell, source };
+			changed = true;
+		}
+		if (changed) {
+			await this.write(document, cells);
+		}
+	}
+
+	/**
+	 * Tell a page that has just come up about a pass over its document.
+	 *
+	 * The same two ways in as a blurb: the page may have been rebuilt under a
+	 * wait this editor is still holding, in which case it only has to be told
+	 * again — or this editor is new to a job the server never stopped doing, and
+	 * nobody is waiting to put the corrections anywhere.
+	 */
+	private resumeStyling(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		const held = this.styling.get(document.uri.toString());
+		if (held) {
+			void panel.webview.postMessage({ type: 'styling', on: true, ...held });
+			return;
+		}
+		void this.reattachStyle(document, panel).catch(() => {
+			// A document with no pass on it is the usual answer, and no news.
+		});
+	}
+
+	private async reattachStyle(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): Promise<void> {
+		const response = await fetch(
+			`http://127.0.0.1:${this.port}/fix/style/status?id=${encodeURIComponent(document.uri.fsPath)}`
+		);
+		if (!response.ok) {
+			return;
+		}
+		if (!((await response.json()) as JobStatus).running) {
+			return;
+		}
+		await this.watchStyle(document, panel);
+	}
+
 	/** Ask the server to stop whatever it is writing for this document. */
 	private async stop(document: vscode.TextDocument): Promise<void> {
 		const response = await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
@@ -620,11 +841,18 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * A job that counts what it has done says so on every poll, and what that is
 	 * drawn as belongs to whoever asked — a notification wants the change since
 	 * last time, a cell wants the count. This one only passes on what it heard.
+	 *
+	 * `each` is for a job that hands back its work as it goes rather than at the
+	 * end. It is awaited and it is given the whole answer, because putting a
+	 * chapter into the document is an edit and the next poll must not overtake
+	 * it. It runs before a failure is raised, so the chapters a job did finish
+	 * survive the one that went wrong.
 	 */
 	private async awaitJob(
 		status: string,
 		id: string,
-		progress?: (written: number, chapters: number) => void
+		progress?: (written: number, chapters: number) => void,
+		each?: (body: JobStatus) => Promise<void> | void
 	): Promise<JobStatus> {
 		const deadline = progress ? Infinity : Date.now() + JOB_TIMEOUT_MS;
 		let unanswered = 0;
@@ -649,6 +877,9 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			}
 			unanswered = 0;
 			const body = (await response.json()) as JobStatus;
+			if (each) {
+				await each(body);
+			}
 			if (body.error) {
 				throw new Error(body.error);
 			}
@@ -839,6 +1070,12 @@ interface Writing {
 	chapters: number;
 }
 
+/** A pass over the whole document, and how far through its chapters it is. */
+interface Styling {
+	written: number;
+	chapters: number;
+}
+
 /**
  * What a job's status endpoint answers, whichever job it is.
  *
@@ -855,6 +1092,10 @@ interface JobStatus {
 	findings?: unknown[];
 	replacement?: string;
 	verified?: boolean;
+	/** Every section a style pass has corrected so far, by the cell it belongs to. */
+	sections?: { index: number; source: string }[];
+	/** Whether what stopped a style pass was the key rather than the work. */
+	unauthorized?: boolean;
 }
 
 /**

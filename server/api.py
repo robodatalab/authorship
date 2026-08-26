@@ -12,7 +12,13 @@ from server.publishing import authorship
 from server.publishing.epub_exporter import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
-from server.writing_tools import grammar_check, prose_check
+from server.writing_tools import grammar_check, prose_check, style
+from server.writing_tools.gemini import (
+    Gemini,
+    GeminiError,
+    configured_key,
+    configured_model,
+)
 from vramen import (
     CausalModel,
     InferenceModelResourceManager,
@@ -332,6 +338,137 @@ def generate_blurb_status(id: str) -> dict[str, Any]:
         "error": job.error,
         "blurb": job.blurb,
         "progress": {"written": job.written, "chapters": job.chapters},
+    }
+
+
+# --- correcting the whole manuscript ---------------------------------------
+#
+# The one thing here that does not run on this machine. Style is a property of a
+# chapter rather than of a sentence, and a pass that reads the corrected book so
+# far needs a context length no model that fits beside the others has — so this
+# one goes to the author's own Gemini account, with the author's own key.
+#
+# The key arrives with the request. The editor holds it in the VS Code secret
+# store, which is the right place for it: this server is a local process with no
+# store of its own, and a key written into a config file beside the manuscript
+# is a key that ends up in the author's git history.
+
+
+class GeminiKeyRequest(BaseModel):
+    # The key to try. Never stored here — this only says whether it opens the API.
+    key: str
+    model: str | None = None
+
+
+@app.post("/auth/gemini")
+def check_gemini(request: GeminiKeyRequest) -> dict[str, Any]:
+    """Whether that key opens the Gemini API.
+
+    Asked when the author signs in, so a mistyped key is answered in the box
+    they typed it into rather than by a pass over the novel that fails a minute
+    later, halfway through chapter one.
+    """
+    try:
+        Gemini(request.key, configured_model(request.model)).verify()
+    except GeminiError as err:
+        return {"ok": False, "detail": str(err)}
+    return {"ok": True, "detail": None}
+
+
+class StyleFixRequest(BaseModel):
+    # Path of the document to correct.
+    path: str
+    # The author's Gemini key. Omitted, the environment is asked — which is how a
+    # server somebody started themselves is given one.
+    key: str | None = None
+    # Which Gemini to use, for an author who would rather pay for a different one.
+    model: str | None = None
+
+
+class StyleFixJob(Job):
+    """The style pass over a whole document, chapter by chapter.
+
+    Unlike the grammar pass this writes nothing. The corrected sections are
+    handed back and the editor puts them in, so the pass lands as ordinary edits
+    the author can undo, and a document open with unsaved changes is not written
+    over from underneath.
+    """
+
+    kind = "style fix"
+
+    def __init__(self, model: Gemini, document: Document) -> None:
+        super().__init__(str(document.path))
+        self._model = model
+        self._document = document
+        # Every section corrected so far, by the cell it belongs to. Read from
+        # the thread answering the status endpoint while the worker adds to it,
+        # so it is only ever appended to and never rewritten in place.
+        self.sections: list[dict[str, Any]] = []
+        self.fixed = 0
+        self.chapters = 0
+        # Whether what stopped it was the key rather than the work. The editor
+        # holds the key and is the only thing that can do anything about it, so
+        # this failure is reported apart from every other one.
+        self.unauthorized = False
+
+    def execute(self) -> None:
+        try:
+            style.fix_style(
+                self._model,
+                self._document,
+                lambda: self.cancelled,
+                self._reached,
+                self._revised,
+            )
+        except GeminiError as err:
+            self.unauthorized = err.unauthorized
+            raise
+
+    def _reached(self, fixed: int, chapters: int) -> None:
+        self.fixed, self.chapters = fixed, chapters
+
+    def _revised(self, index: int, source: str) -> None:
+        self.sections.append({"index": index, "source": source})
+
+
+@app.post("/fix/style", status_code=202)
+def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
+    """Start correcting the style of every chapter; poll /fix/style/status.
+
+    401 rather than 400 for a request with no key: the editor turns that one
+    answer into an invitation to sign in, and every other failure into a message.
+    """
+    key = configured_key(request.key)
+    if not key:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in to Gemini to correct the style of a manuscript.",
+        )
+    document = _document(request.path)
+    job = StyleFixJob(Gemini(key, configured_model(request.model)), document)
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+@app.get("/fix/style/status")
+def fix_style_status(id: str) -> dict[str, Any]:
+    """How far the style pass has read, and every section it has corrected.
+
+    Every section rather than the ones since the last poll: a poll that went
+    astray would otherwise lose a chapter's corrections for good, and the whole
+    list is a few pages of text where the alternative is a protocol that has to
+    be right every time. The editor writes back only what it has not written.
+    """
+    job = app.state.jobs.get(id)
+    if not isinstance(job, StyleFixJob):
+        raise HTTPException(status_code=404, detail=f"No style pass for {id}")
+    return {
+        "running": not job.done,
+        "cancelled": job.cancelled,
+        "error": job.error,
+        "unauthorized": job.unauthorized,
+        "sections": list(job.sections),
+        "progress": {"written": job.fixed, "chapters": job.chapters},
     }
 
 

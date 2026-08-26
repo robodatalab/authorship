@@ -26,6 +26,18 @@ export interface Writing {
 	chapters: number;
 }
 
+/**
+ * A pass over the whole document, and how far through the chapters it is.
+ *
+ * Unlike `Writing`, which belongs to one cell, this belongs to the document —
+ * every section of it is in the model's hands until it finishes, so nothing on
+ * the page is the author's to change while it runs.
+ */
+export interface Styling {
+	written: number;
+	chapters: number;
+}
+
 /** The box open for typing, and which cell it belongs to. */
 export interface OpenBox {
 	input: HTMLTextAreaElement;
@@ -39,6 +51,7 @@ export const state: {
 	editing: number | null;
 	selected: number;
 	writing: Writing | null;
+	styling: Styling | null;
 	drawn: string;
 	generation: number;
 	openBox: OpenBox | null;
@@ -52,6 +65,15 @@ export const state: {
 	/** The cell the title-bar commands act on. */
 	selected: 0,
 	writing: null,
+	/**
+	 * The pass correcting the whole manuscript, while there is one.
+	 *
+	 * The host says when it starts, how far it has got and when it stops, exactly
+	 * as it does for a cell being written. What it means here is that the surface
+	 * is locked: the sections are being replaced under the author, and anything
+	 * they typed would land either under what arrives or over it.
+	 */
+	styling: null,
 	/**
 	 * What is on the page right now.
 	 *

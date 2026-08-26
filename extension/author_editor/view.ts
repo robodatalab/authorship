@@ -13,6 +13,7 @@
 //   seam_view.ts    dividing a section, or joining it to the one above
 //   find_bar.ts     the find widget, since Ctrl+F does not reach a webview
 //   marks_view.ts   what the checks found, drawn and explained and fixable
+//   job_view.ts     a pass over the whole document, drawn and stoppable
 //   cursors_view.ts typing into several places in one cell at once
 //   menu_view.ts    the menu on a right-click and on the insert bar's "…"
 //   dom.ts          the small pieces all of them build out of
@@ -29,8 +30,9 @@
 // take the caret with it. Everything else is drawn from what the host last sent.
 
 import { withDefaultCell } from './model';
-import { checkEl, post, toolbarEl } from './elements';
+import { checkEl, post, styleEl, toolbarEl } from './elements';
 import { closeFind, openFind, refind, searching, showCount, step } from './find_bar';
+import { drawJob, setStyling } from './job_view';
 import { closeMenu, menuHolds, menuIsOpen } from './menu_view';
 import { isFindKey, isReplaceKey } from './keys';
 import { applyFix, receiveFindings, setChecking } from './marks_view';
@@ -56,6 +58,11 @@ for (const [id, type] of [
 // Turning the checks on is the author saying they want to be told. Drafting is
 // the other half of writing, and nothing is checked until they ask.
 checkEl.addEventListener('click', () => post({ type: 'checkToggle' }));
+
+// Correcting the whole manuscript. Its own button rather than a section's run
+// button, because it is the one tool here that is about the document rather than
+// about a cell of it — and the host, not this, is what asks Gemini.
+styleEl.addEventListener('click', () => post({ type: 'fixStyle' }));
 
 // Keep a click on the toolbar from also being the click that dismisses a menu.
 toolbarEl.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -140,6 +147,15 @@ window.addEventListener('message', (event) => {
 		writingChanged(message);
 	} else if (message?.type === 'cells') {
 		cellsArrived(message);
+	} else if (message?.type === 'styling') {
+		setStyling(
+			message.on
+				? {
+						written: (message.written as number) ?? 0,
+						chapters: (message.chapters as number) ?? 0,
+					}
+				: null
+		);
 	} else if (message?.type === 'checking') {
 		setChecking(message.on as boolean);
 	} else if (message?.type === 'marks') {
@@ -201,6 +217,9 @@ function cellsArrived(message: Record<string, unknown>): void {
 	refind();
 	showCount();
 	render();
+	// The bar is the host's news rather than the document's, so a rebuild has to
+	// put back the lock the rebuild just cleared off the page.
+	drawJob();
 	restoreCaret(caret);
 }
 

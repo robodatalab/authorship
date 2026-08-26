@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { AuthorEditorProvider } from './author_editor/panel';
+import { GeminiAccount } from './gemini/account';
 import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
 import { ModelServer } from './server/process';
@@ -29,10 +30,20 @@ export function activate(context: vscode.ExtensionContext) {
 	// and the status bar carries the news.
 	context.subscriptions.push(new ModelServer(context, PORT, log));
 
+	// The author's Gemini account — an API key in this machine's keychain. Only
+	// one tool needs it: correcting the style of a manuscript is the one thing
+	// here that cannot be done by a model running beside the editor.
+	const gemini = new GeminiAccount(context, PORT);
+	for (const [name, run] of Object.entries(gemini.commands)) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand(`authorship.gemini.${name}`, run)
+		);
+	}
+
 	// The editor a `.author` file opens in. Declared in package.json under
 	// contributes.customEditors as the default for the extension, so opening one
 	// lands here rather than in the text editor.
-	const authorEditor = new AuthorEditorProvider(context, PORT);
+	const authorEditor = new AuthorEditorProvider(context, PORT, gemini);
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			AuthorEditorProvider.viewType,

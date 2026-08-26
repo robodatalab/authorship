@@ -17,6 +17,13 @@ import { state } from './state';
 import type { Cell } from '../storydoc/model';
 
 export function commit(next: Cell[]): void {
+	// Nothing on the page is the author's to change while a pass is correcting
+	// the whole of it. Refused here rather than at each button, because this is
+	// the one place every change goes through — and a replace-all that got past a
+	// disabled toolbar would otherwise write over the chapter being corrected.
+	if (state.styling !== null) {
+		return;
+	}
 	state.cells = next;
 	post({ type: 'cells', cells: next });
 	// What was found is found in the document, so it is asked again whenever the

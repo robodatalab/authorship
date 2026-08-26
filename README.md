@@ -26,6 +26,7 @@ Every model it uses runs on your machine; nothing you write is sent anywhere.
 - [Sections](#sections)
 - [Checking the prose](#checking-the-prose)
 - [Writing a blurb](#writing-a-blurb)
+- [Fixing style and grammar](#fixing-style-and-grammar)
 - [Building the book](#building-the-book)
 - [Dividing a long story into parts](#dividing-a-long-story-into-parts)
 - [The Authorship sidebar](#the-authorship-sidebar)
@@ -286,6 +287,48 @@ It is copy for a shop listing, so it is not printed in the book.
 
 ---
 
+## Fixing style and grammar
+
+*Generative AI disclosure*: unlike everything else here, this one sends your
+manuscript to Google's Gemini API, on your own account. Read
+[Privacy](#privacy) before you use it, and treat what comes back as an edit to
+review rather than an edit to accept.
+
+**Fix Style & Grammar** — the sparkle in the toolbar, next to **Check Prose** —
+reads the whole manuscript and corrects it, a chapter at a time. Where a check
+underlines what it thinks is wrong and leaves the prose alone, this rewrites it:
+clumsy sentences, wrong words, tangled clauses, punctuation.
+
+It works a chapter at a time and each chapter goes to the model with every
+chapter already corrected in front of it — so the second half of the book is
+edited towards the first half as this pass left it, and a name spelt one way in
+chapter one is spelt that way in chapter forty. That context is the reason this
+tool needs an API rather than the model beside your editor: no model small
+enough to run on a laptop can hold a novel while it reads.
+
+A bar under the toolbar counts the chapters, and the square button stops it. The
+manuscript is locked while it runs — every section is about to be replaced in
+turn — and each chapter's corrections land as they come back, so a pass you stop
+halfway leaves the chapters it finished corrected. It all lands as ordinary
+edits: `Ctrl+Z` walks the pass back like anything else, and nothing is written
+to disk until you save.
+
+Only the story goes: the chapters' titles and the markdown written under them.
+Your notes, the blurb, the cover, the title page and the table of contents stay
+here — they are about the book rather than in it.
+
+### Signing in
+
+The first time you press it, Authorship asks for a Gemini API key. You can make
+one for free at [Google AI Studio](https://aistudio.google.com/apikey); usage is
+billed to that account, and a long novel is not free. The key is checked before
+it is kept, and it is kept in this machine's keychain — VS Code's secret store —
+not in your settings and not in a file beside your manuscript.
+
+`Authorship: Sign out of Gemini` forgets it again.
+
+---
+
 ## Building the book
 
 **Run All** builds every section that is built rather than written — today that
@@ -427,21 +470,42 @@ Every toolbar button is also a command, so it is in the Command Palette
 - `Authorship: Export Markdown`
 - `Authorship: Export EPUB`
 - `Authorship: Divide into Parts`
+- `Authorship: Fix Style and Grammar`
 - `Authorship: View Source`
 
+And two that have no button, because they are about your account rather than
+about a document:
+
+- `Authorship: Sign in to Gemini`
+- `Authorship: Sign out of Gemini`
+
 <!-- CAPTURE command-palette.webp — the Command Palette open with "Authorship"
-     typed, showing all six commands. -->
+     typed, showing every command. -->
 
 ---
 
 ## Privacy
 
-Everything runs on your machine. The models are downloaded once and then run
-locally, against a server the extension starts on `127.0.0.1:8765` and talks to
-over the loopback interface. Your manuscript is never uploaded, never sent to an
-API, and never used to train anything. The only thing that goes out over the
-network is the download itself: the installer, the Python packages and the model
-weights.
+Everything runs on your machine, with one exception, and the exception is opt-in.
+
+The models are downloaded once and then run locally, against a server the
+extension starts on `127.0.0.1:8765` and talks to over the loopback interface.
+Writing, checking the prose, correcting a paragraph, writing a blurb, building
+the book and dividing it into parts all happen there. Your manuscript is not
+uploaded, and the only thing that goes out over the network is the download
+itself: the installer, the Python packages and the model weights.
+
+**Fix Style & Grammar is the exception.** It sends the chapters of the document
+it is run on to Google's Gemini API, over the internet, on your own API key. It
+sends the chapter titles and the markdown written under them, and nothing else —
+your notes, blurb, cover, title page and contents stay here. Nothing is sent
+until you press the button, and Authorship asks you to sign in before it will
+send anything at all. What Google does with it is governed by the terms of the
+account the key belongs to, not by this extension.
+
+Your key is kept in this machine's keychain, through VS Code's secret store. It
+is not written to settings, does not sync, and never goes anywhere except to the
+local server that uses it. `Authorship: Sign out of Gemini` deletes it.
 
 ---
 
@@ -459,6 +523,17 @@ is on; the output channel shows all of them. It happens once per version.
 **A check found nothing.** Checks are off until you press **Check Prose**. If
 they are on and nothing is underlined, look at the status bar: the first check
 after a start has to load a model, and the models are large.
+
+**Gemini would not take my key.** The key is checked when you sign in, so a key
+that worked and has stopped working has usually been revoked or has run out of
+quota — the message says which. Authorship forgets a key Gemini rejects and asks
+for a new one; `Authorship: Sign in to Gemini` asks again at any time.
+
+**Fixing the style left a chapter untouched.** A chapter is often several
+sections, and they have to come back as the same several. When the model runs
+them together the chapter cannot be put back where it came from, so it is left
+exactly as you wrote it rather than have its seams moved for you. Running the
+pass again usually settles it.
 
 **Export failed.** Exporting an EPUB is done by the local server, so it needs
 the server up — see `offline`, above. Exporting markdown and dividing into parts

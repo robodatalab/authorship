@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import tempfile
 import threading
@@ -9,6 +10,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
+from server.writing_tools.gemini import GeminiError
 from vramen.resource_manager import (
     MemoryReading,
     ModelKind,
@@ -520,6 +522,131 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document.with_name("nope.author"))},
         )
         self.assertEqual(response.status_code, 400)
+
+
+def wait_for_style(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get("/fix/style/status", params={"id": job_id})
+        if response.status_code == 200 and not response.json()["running"]:
+            return response.json()
+        time.sleep(0.005)
+    raise AssertionError(f"style job {job_id} did not finish within {timeout}s")
+
+
+class FixStyle(unittest.TestCase):
+    """The pass that goes to Gemini rather than to a model on this machine.
+
+    Gemini itself is stood in for: what is under test is the job around it — that
+    the key is required, that the corrected sections come back named by the cell
+    they belong to, and that the file is not written.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        self.written = storydoc.dumps(
+            [
+                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
+                storydoc.chapter("One"),
+                storydoc.markdown("The lantern had gone out."),
+                storydoc.chapter("Two"),
+                storydoc.markdown("The door stood open."),
+            ]
+        )
+        self.document.write_text(self.written, encoding="utf-8")
+        app.state.jobs = ParallelJobsManager()
+
+        self.model = mock.MagicMock()
+        self.model.complete.return_value = "Corrected."
+        patched = mock.patch(
+            "server.api.Gemini", return_value=self.model
+        )
+        self.gemini = patched.start()
+        self.addCleanup(patched.stop)
+        # A key in the environment would answer for a request that carried none,
+        # which is the case these tests are about.
+        cleared = mock.patch.dict(os.environ, {}, clear=False)
+        cleared.start()
+        os.environ.pop("GEMINI_API_KEY", None)
+        self.addCleanup(cleared.stop)
+
+    def start(self, **asked: object) -> dict:
+        client = TestClient(app)
+        started = client.post(
+            "/fix/style", json={"path": str(self.document), "key": "k", **asked}
+        )
+        self.assertEqual(started.status_code, 202)
+        return wait_for_style(client, started.json()["id"])
+
+    def test_hands_back_each_corrected_section_by_the_cell_it_belongs_to(self) -> None:
+        status = self.start()
+        self.assertIsNone(status["error"])
+        self.assertEqual(
+            status["sections"],
+            [{"index": 2, "source": "Corrected."}, {"index": 4, "source": "Corrected."}],
+        )
+        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+
+    def test_leaves_the_document_alone(self) -> None:
+        self.start()
+        self.assertEqual(self.document.read_text(), self.written)
+
+    def test_opens_gemini_with_the_key_the_editor_sent(self) -> None:
+        self.start(model="gemini-flash")
+        self.assertEqual(self.gemini.call_args.args, ("k", "gemini-flash"))
+
+    def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
+        client = TestClient(app)
+        response = client.post("/fix/style", json={"path": str(self.document)})
+        self.assertEqual(response.status_code, 401)
+
+    def test_the_environment_answers_for_a_server_somebody_started(self) -> None:
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "from-the-shell"}):
+            client = TestClient(app)
+            started = client.post("/fix/style", json={"path": str(self.document)})
+        self.assertEqual(started.status_code, 202)
+        wait_for_style(client, started.json()["id"])
+        self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
+
+    def test_a_missing_document_is_a_bad_request(self) -> None:
+        client = TestClient(app)
+        response = client.post(
+            "/fix/style",
+            json={"path": str(self.document.with_name("nope.author")), "key": "k"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
+        client = TestClient(app)
+        response = client.get("/fix/style/status", params={"id": "nothing"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_document_with_no_chapters_fails_the_job_rather_than_the_request(
+        self,
+    ) -> None:
+        self.document.write_text(
+            storydoc.dumps([storydoc.markdown("Just prose.")]), encoding="utf-8"
+        )
+        status = self.start()
+        self.assertIn("no chapters", status["error"])
+
+    def test_a_signed_in_key_is_checked_before_it_is_used(self) -> None:
+        client = TestClient(app)
+        self.assertEqual(
+            client.post("/auth/gemini", json={"key": "k"}).json(),
+            {"ok": True, "detail": None},
+        )
+        self.model.verify.assert_called_once()
+
+    def test_a_key_gemini_refuses_is_reported_rather_than_raised(self) -> None:
+        self.model.verify.side_effect = GeminiError("Gemini refused (400)")
+        client = TestClient(app)
+        answer = client.post("/auth/gemini", json={"key": "no"}).json()
+        self.assertFalse(answer["ok"])
+        self.assertIn("refused", answer["detail"])
 
 
 if __name__ == "__main__":
