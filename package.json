@@ -1,60 +1,12 @@
 {
-  "name": "authorship",
-  "displayName": "Authorship",
-  "description": "Tools for creative writing",
-  "version": "0.0.5",
-  "publisher": "RoboDataLab",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/robodatalab/writer.git"
-  },
-  "engines": {
-    "vscode": "^1.125.0"
-  },
-  "icon": "media/icon.png",
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "languages": [
-      {
-        "id": "markdown",
-        "extensions": [
-          ".author"
-        ]
-      }
-    ],
-    "icons": {
-      "authorship-import-markdown": {
-        "description": "Import a markdown manuscript",
-        "default": {
-          "fontPath": "media/authorship-icons.woff",
-          "fontCharacter": "\\E001"
-        }
-      },
-      "authorship-export-markdown": {
-        "description": "Export as one markdown manuscript",
-        "default": {
-          "fontPath": "media/authorship-icons.woff",
-          "fontCharacter": "\\E002"
-        }
-      },
-      "authorship-export-epub": {
-        "description": "Export as an EPUB",
-        "default": {
-          "fontPath": "media/authorship-icons.woff",
-          "fontCharacter": "\\E003"
-        }
-      },
-      "authorship-export-parts": {
-        "description": "Export as markdown parts",
-        "default": {
-          "fontPath": "media/authorship-icons.woff",
-          "fontCharacter": "\\E004"
-        }
-      }
+    "name": "authorship",
+    "displayName": "Authorship",
+    "description": "Tools for creative writing",
+    "version": "0.0.7",
+    "publisher": "RoboDataLab",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/robodatalab/writer.git"
     },
     "engines": {
         "vscode": "^1.125.0"
