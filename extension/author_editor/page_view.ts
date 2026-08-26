@@ -9,12 +9,13 @@
 //
 // What a cell is made of is cell_view.ts; this is the page around them.
 
-import { isStale, placeOf } from './model';
+import { countWords, isStale, placeOf, wordsIn } from './model';
 import { cellElement, insertBarFor } from './cell_view';
 import { cellsEl, statusEl, toolbarEl, whereEl } from './elements';
 import { forgetSeam } from './seam_view';
 import { noteMarks } from './find_bar';
 import { signatureOf, state } from './state';
+import { MARKDOWN, type Cell } from '../storydoc/model';
 
 /**
  * Redraw the whole page.
@@ -34,7 +35,7 @@ export function render(): void {
 	// the document has one — including the gap above the first cell, which is the
 	// only way a cover gets in front of a title page that is already written.
 	cellsEl.append(insertBarFor(state.cells.length));
-	statusEl.textContent = documentStatus();
+	showStatus();
 	showWhere();
 	state.drawn = signatureOf(state.cells);
 	forgetSeam();
@@ -51,7 +52,7 @@ export function redrawCell(index: number): void {
 		return;
 	}
 	existing.replaceWith(cellElement(state.cells[index], index));
-	statusEl.textContent = documentStatus();
+	showStatus();
 	showWhere();
 	state.drawn = signatureOf(state.cells);
 	forgetSeam();
@@ -113,11 +114,86 @@ function cellAtTop(): number {
 	return at;
 }
 
+/**
+ * Redraw what the toolbar says about the document.
+ *
+ * Drawn on its own as well as with the page, because the count in it moves with
+ * the keys and the page does not: a rebuild mid-keystroke would take the caret
+ * with it, and this is one line of text.
+ */
+export function showStatus(): void {
+	statusEl.textContent = documentStatus();
+}
+
 function documentStatus(): string {
 	const chapters = state.cells.filter((cell) => cell.kind === 'chapter').length;
 	const stale = state.cells.filter((_cell, index) => isStale(state.cells, index)).length;
-	const counted = `${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`;
-	return stale > 0 ? `${counted} · ${stale} to run` : counted;
+	const words = wordsNow();
+	const said = [
+		`${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`,
+		`${grouped(words)} ${words === 1 ? 'word' : 'words'}`,
+	];
+	if (stale > 0) {
+		said.push(`${stale} to run`);
+	}
+	return said.join(' · ');
+}
+
+/**
+ * The last count of the story, and the document and open cell it was made from.
+ *
+ * `wordsNow` says what it is for, and is the only thing that reads or writes it.
+ */
+let counted: { cells: Cell[]; editing: number | null; words: number } | null = null;
+
+/**
+ * What the story weighs right now, counting the open box as it stands rather
+ * than as the document last heard it.
+ *
+ * A cell is written back to the document 400ms after the last keystroke, and a
+ * count that waited for that would sit still through a sentence and then jump.
+ * The number an author watches while they write is the one thing on the page
+ * that has to keep up with the keys.
+ *
+ * So the rest of the document is counted once and kept, and only the box being
+ * typed in is counted again on each keystroke: a chapter's worth of words per
+ * key instead of a novel's. The kept count is thrown away by the two things that
+ * can invalidate it — a new document, since `state.cells` is replaced and never
+ * changed in place, and a different cell being opened.
+ */
+function wordsNow(): number {
+	const { cells, editing } = state;
+	if (!counted || counted.cells !== cells || counted.editing !== editing) {
+		counted = { cells, editing, words: wordsIn(cells, editing) };
+	}
+	return counted.words + wordsTyping();
+}
+
+/**
+ * The words in the box open for typing, which the document does not have yet.
+ *
+ * Nothing but markdown is counted anywhere, so a title being typed into weighs
+ * nothing here either — `wordsIn` left the cell out, and this puts back only
+ * what it would have counted.
+ */
+function wordsTyping(): number {
+	const { cells, editing, openBox } = state;
+	if (editing === null || openBox?.index !== editing) {
+		return 0;
+	}
+	return cells[editing]?.kind === MARKDOWN ? countWords(openBox.input.value) : 0;
+}
+
+/**
+ * A count with its thousands marked, because a manuscript's is six digits long
+ * and nobody reads `127450` at a glance.
+ *
+ * Punctuated here rather than by `toLocaleString`, so the number does not change
+ * its shape with the machine the editor was opened on while the words beside it
+ * stay English.
+ */
+function grouped(count: number): string {
+	return String(count).replace(/\B(?=(\d{3})+$)/g, ',');
 }
 
 /** Move the selection, without rebuilding either cell to say so. */

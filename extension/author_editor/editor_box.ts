@@ -30,7 +30,7 @@ import {
 } from './marks_view';
 import { commit } from './edits';
 import { post } from './elements';
-import { redrawCell } from './page_view';
+import { redrawCell, showStatus } from './page_view';
 import { signatureOf, state } from './state';
 import type { Cell } from '../storydoc/model';
 
@@ -73,6 +73,9 @@ export function sourceFor(cell: Cell, index: number): HTMLElement {
 		was = input.value;
 		drawMarks(input, marksLayer, index);
 		drawCursors(input, layer);
+		// The document hears about this cell 400ms from now; the count in the
+		// toolbar hears about it as it is typed.
+		showStatus();
 		if (state.typingTimer !== undefined) {
 			clearTimeout(state.typingTimer);
 		}
