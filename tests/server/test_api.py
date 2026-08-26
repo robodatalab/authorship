@@ -594,9 +594,15 @@ class FixStyle(unittest.TestCase):
         self.start()
         self.assertEqual(self.document.read_text(), self.written)
 
-    def test_opens_gemini_with_the_key_the_editor_sent(self) -> None:
+    def test_opens_gemini_with_the_key_and_model_the_editor_sent(self) -> None:
         self.start(model="gemini-flash")
-        self.assertEqual(self.gemini.call_args.args, ("k", "gemini-flash"))
+        self.assertEqual(self.gemini.call_args.args[:2], ("k", "gemini-flash"))
+
+    def test_the_client_can_tell_when_the_job_has_been_stopped(self) -> None:
+        # It waits out rate limits, and an author who pressed stop should not be
+        # made to wait out one too.
+        self.start()
+        self.assertTrue(callable(self.gemini.call_args.kwargs["cancelled"]))
 
     def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
         client = TestClient(app)

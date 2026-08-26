@@ -375,6 +375,38 @@ def check_gemini(request: GeminiKeyRequest) -> dict[str, Any]:
     return {"ok": True, "detail": None}
 
 
+@app.post("/gemini/models")
+def gemini_models(request: GeminiKeyRequest) -> dict[str, Any]:
+    """Every Gemini this key can write with, newest-looking first.
+
+    A POST because the key is in the body: a key in a query string is a key in
+    an access log. Asked of Google every time rather than remembered, since the
+    whole reason this exists is that the answer changes.
+    """
+    key = configured_key(request.key)
+    if not key:
+        raise HTTPException(status_code=401, detail="Sign in to Gemini first.")
+    try:
+        found = Gemini(key).models()
+    except GeminiError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
+    return {
+        # What a request that names no model would reach, so the editor's "use
+        # the one Authorship ships with" can say which one that is.
+        "default": configured_model(None),
+        "models": [
+            {
+                # `models/gemini-3.1-pro` is what the API answers to, and the
+                # bare name is what a setting holds.
+                "model": str(model.get("name", "")).removeprefix("models/"),
+                "label": model.get("displayName") or model.get("name"),
+                "detail": model.get("description") or "",
+            }
+            for model in found
+        ]
+    }
+
+
 class StyleFixRequest(BaseModel):
     # Path of the document to correct.
     path: str
@@ -396,9 +428,12 @@ class StyleFixJob(Job):
 
     kind = "style fix"
 
-    def __init__(self, model: Gemini, document: Document) -> None:
+    def __init__(self, key: str, model: str, document: Document) -> None:
         super().__init__(str(document.path))
-        self._model = model
+        # Built here rather than handed in, so that being told to stop reaches
+        # the client while it is holding a chapter back for a rate limit — which
+        # Google can ask for a minute of.
+        self._model = Gemini(key, model, cancelled=lambda: self.cancelled)
         self._document = document
         # Every section corrected so far, by the cell it belongs to. Read from
         # the thread answering the status endpoint while the worker adds to it,
@@ -410,6 +445,10 @@ class StyleFixJob(Job):
         # holds the key and is the only thing that can do anything about it, so
         # this failure is reported apart from every other one.
         self.unauthorized = False
+        # Whether it was the model rather than the key: one the account's plan
+        # does not include. A different failure with a different answer — choose
+        # another model, or pay for this one — and the editor offers both.
+        self.no_quota = False
 
     def execute(self) -> None:
         try:
@@ -422,6 +461,7 @@ class StyleFixJob(Job):
             )
         except GeminiError as err:
             self.unauthorized = err.unauthorized
+            self.no_quota = err.no_quota
             raise
 
     def _reached(self, fixed: int, chapters: int) -> None:
@@ -445,7 +485,7 @@ def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
             detail="Sign in to Gemini to correct the style of a manuscript.",
         )
     document = _document(request.path)
-    job = StyleFixJob(Gemini(key, configured_model(request.model)), document)
+    job = StyleFixJob(key, configured_model(request.model), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -467,6 +507,7 @@ def fix_style_status(id: str) -> dict[str, Any]:
         "cancelled": job.cancelled,
         "error": job.error,
         "unauthorized": job.unauthorized,
+        "noQuota": job.no_quota,
         "sections": list(job.sections),
         "progress": {"written": job.fixed, "chapters": job.chapters},
     }

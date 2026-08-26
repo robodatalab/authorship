@@ -4,6 +4,11 @@
 //
 // Three readings and nothing to fill in: what is loaded, what it is holding, and
 // what work is queued. The book itself is edited in the .author editor.
+//
+// Above them, the one thing here that is not a reading: whether there is a Gemini
+// account, and the button that makes one. Everything else Authorship can reach
+// runs on this machine and needs no account, so the drawer that lists what it can
+// reach is where a person goes looking for the one that does.
 
 interface VsCodeApi {
 	postMessage(message: unknown): void;
@@ -26,6 +31,17 @@ interface JobStatus {
 	cancelled: boolean;
 }
 
+/** The Gemini account as the drawer draws it. */
+interface Account {
+	/** The key's masked tail, or null when nobody is signed in. */
+	label: string | null;
+	/** The model in force; empty is whichever one Authorship ships with. */
+	model: string;
+	/** What that one is called, so the default option can name it. */
+	shipped: string;
+	models: { model: string; label: string; detail: string }[];
+}
+
 interface Memory {
 	gpu: { used: number; limit: number };
 	process: number;
@@ -42,9 +58,138 @@ interface Sample {
 
 const vscode = acquireVsCodeApi();
 
+const account = document.getElementById('account') as HTMLElement;
 const modelStatus = document.getElementById('model-status') as HTMLElement;
 const memory = document.getElementById('memory') as HTMLElement;
 const jobsStatus = document.getElementById('jobs-status') as HTMLElement;
+
+/**
+ * The Gemini account, the model it will use, and the way in or out.
+ *
+ * `null` is signed out, which is the state this starts in and the state most
+ * authors will stay in — so it says what the account is *for* rather than only
+ * that there isn't one. Signed in, the model matters as much as the key does:
+ * Google retires names and keeps the best models off the free tier, so which
+ * one this is pointed at is a thing that goes wrong and has to be visible.
+ */
+function renderAccount(state: Account): void {
+	account.textContent = '';
+	const { label } = state;
+
+	const row = document.createElement('div');
+	row.className = label ? 'account-row signed-in' : 'account-row';
+
+	const name = document.createElement('span');
+	name.className = 'name';
+	name.textContent = 'Google Gemini';
+
+	const said = document.createElement('span');
+	said.className = 'phase';
+	said.textContent = label ?? 'signed out';
+	said.title = label
+		? 'Signed in. Fixing style and grammar will use this key.'
+		: 'Fixing style and grammar needs a Gemini API key.';
+
+	row.append(name, said);
+
+	const why = document.createElement('div');
+	why.className = 'why';
+	why.textContent = label
+		? 'Fixing style and grammar sends chapters to Google. Everything else runs on this machine.'
+		: 'Only needed to fix style and grammar, which is the one tool that does not run on this machine.';
+
+	const action = document.createElement('button');
+	action.type = 'button';
+	action.className = 'account-action';
+	action.textContent = label ? 'Sign out' : 'Sign in';
+	action.addEventListener('click', () =>
+		vscode.postMessage({ type: label ? 'signOutGemini' : 'signInGemini' })
+	);
+
+	account.append(row, why);
+	if (label) {
+		account.append(modelChoice(state));
+	}
+	account.append(action);
+}
+
+/**
+ * Which Gemini corrects the chapters, as a list of the ones this key can reach.
+ *
+ * The list comes from Google when the account is looked at, so it is what the
+ * key can actually use today rather than anything written into this extension —
+ * which is the part that kept going stale.
+ *
+ * The chosen model is always among the options even when the list does not have
+ * it: a name typed into settings by hand, or a list that could not be fetched,
+ * still has to be shown, because a dropdown displaying something other than what
+ * is in force is worse than no dropdown at all.
+ */
+function modelChoice(state: Account): HTMLElement {
+	const holder = document.createElement('div');
+	holder.className = 'account-model';
+
+	const label = document.createElement('label');
+	label.className = 'account-model-label';
+	label.textContent = 'Model';
+	label.htmlFor = 'gemini-model';
+
+	const choose = document.createElement('select');
+	choose.className = 'account-model-select';
+	choose.id = 'gemini-model';
+
+	const shipped = document.createElement('option');
+	shipped.value = '';
+	shipped.textContent = state.shipped
+		? `Default (${state.shipped})`
+		: 'Default';
+	choose.append(shipped);
+
+	const offered = state.models.map((one) => one.model);
+	// A name in force that Google did not list — typed by hand, retired, or the
+	// list never arrived. Shown first among the rest so it is not silently lost.
+	if (state.model && !offered.includes(state.model)) {
+		const stray = document.createElement('option');
+		stray.value = state.model;
+		stray.textContent = `${state.model} (not listed for this key)`;
+		choose.append(stray);
+	}
+	for (const one of state.models) {
+		const option = document.createElement('option');
+		option.value = one.model;
+		option.textContent = one.model;
+		option.title = one.detail || one.label;
+		choose.append(option);
+	}
+	choose.value = state.model;
+	choose.addEventListener('change', () =>
+		vscode.postMessage({ type: 'setGeminiModel', model: choose.value })
+	);
+
+	holder.append(label, choose);
+
+	// The list is fetched when the account is looked at, so a model added since
+	// then — or one that was not there because the server was still starting —
+	// needs a way to be asked for again that is not signing out and back in.
+	const again = document.createElement('button');
+	again.type = 'button';
+	again.className = 'account-refresh';
+	again.title = 'Ask Gemini for the list of models again';
+	again.textContent = '\u21bb';
+	again.addEventListener('click', () =>
+		vscode.postMessage({ type: 'refreshGeminiModels' })
+	);
+	holder.append(again);
+
+	if (state.models.length === 0) {
+		const none = document.createElement('div');
+		none.className = 'why';
+		none.textContent =
+			'Could not list the models for this key. The default is still used.';
+		holder.append(none);
+	}
+	return holder;
+}
 
 /** null means the server did not answer; a list is its models and which is resident. */
 function renderModels(models: ModelStatus[] | null): void {
@@ -298,7 +443,14 @@ function renderJobs(jobs: JobStatus[] | null): void {
 
 window.addEventListener('message', (event) => {
 	const message = event.data;
-	if (message?.type === 'models') {
+	if (message?.type === 'account') {
+		renderAccount({
+			label: message.account as string | null,
+			model: (message.model as string) ?? '',
+			shipped: (message.shipped as string) ?? '',
+			models: (message.models as Account['models']) ?? [],
+		});
+	} else if (message?.type === 'models') {
 		renderModels(message.models as ModelStatus[] | null);
 	} else if (message?.type === 'memory') {
 		renderMemory(message.memory as Memory | null);

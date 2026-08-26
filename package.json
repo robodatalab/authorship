@@ -120,6 +120,28 @@
                 "command": "authorship.gemini.signOut",
                 "title": "Sign out of Gemini",
                 "category": "Authorship"
+            },
+            {
+                "command": "authorship.gemini.chooseModel",
+                "title": "Choose Gemini Model",
+                "category": "Authorship"
+            }
+        ],
+        "configuration": {
+            "title": "Authorship",
+            "properties": {
+                "authorship.gemini.model": {
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "Which Gemini model fixes style and grammar. Left empty, Authorship uses the one it ships with. Google retires model names from time to time; when a pass fails with *no longer available*, the error names its replacement — put that name here.",
+                    "scope": "window"
+                }
+            }
+        },
+        "authentication": [
+            {
+                "id": "gemini",
+                "label": "Google Gemini"
             }
         ],
         "viewsContainers": {

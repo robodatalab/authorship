@@ -317,7 +317,7 @@ Only the story goes: the chapters' titles and the markdown written under them.
 Your notes, the blurb, the cover, the title page and the table of contents stay
 here — they are about the book rather than in it.
 
-### Signing in
+### Signing in, and being asked
 
 The first time you press it, Authorship asks for a Gemini API key. You can make
 one for free at [Google AI Studio](https://aistudio.google.com/apikey); usage is
@@ -325,7 +325,54 @@ billed to that account, and a long novel is not free. The key is checked before
 it is kept, and it is kept in this machine's keychain — VS Code's secret store —
 not in your settings and not in a file beside your manuscript.
 
-`Authorship: Sign out of Gemini` forgets it again.
+Gemini is a VS Code account like any other, so the **Accounts** menu — the
+avatar at the foot of the activity bar — is where it lives. Before you have
+signed in it carries a badge and an entry offering to sign in for Authorship;
+afterwards it lists *Google Gemini* with the last few characters of the key,
+beside your GitHub account and anything else, and signing out is there too.
+
+Three other ways in, all the same account: the **Account** drawer at the top of
+the [Authorship sidebar](#the-authorship-sidebar), which also says what the key
+is for and what it costs you in privacy; pressing **Fix Style & Grammar**, which
+asks if you have not signed in; and `Authorship: Sign in to Gemini` in the
+Command Palette.
+
+Then — and every time you press the button after that, signed in or not — a
+dialog names the document and asks whether to send its chapters to Google. It
+says what goes and what stays. Nothing leaves your machine until you answer it,
+and answering it is the only way this tool runs: there is no *don't ask again*,
+because everything else here is local and that is worth being reminded of.
+
+<!-- CAPTURE gemini-confirm.webp — the modal dialog naming the document, with
+     the Send to Gemini and Cancel buttons. -->
+
+<!-- CAPTURE gemini-account.webp — the Accounts menu open, showing "Google
+     Gemini" with the masked key beside the GitHub account. -->
+
+`Authorship: Sign in to Gemini` and `Authorship: Sign out of Gemini` do the same
+from the Command Palette.
+
+### Choosing the model
+
+Authorship ships with a Gemini model it has been written against, and signing in
+*writes* with that model rather than merely checking the key — the smallest
+generation there is. So a name Google has retired, and a model your plan does not
+include, are both caught in the sign-in box rather than forty minutes into a
+manuscript. Note that the strongest models are generally not on the free tier.
+
+Google does retire them, and keeps its strongest models off the free tier. So
+which model this is pointed at is worth being able to see and change: the
+**Account** drawer in the [Authorship sidebar](#the-authorship-sidebar) carries a
+**Model** dropdown listing what your key can actually write with. The list comes
+from Google when the drawer is drawn — not from anything shipped in here, which
+is the part that goes stale — and the ↻ beside it asks again.
+
+Picked rather than guessed. Which model corrects your book changes both the prose
+and the bill, so Authorship never moves you onto another one on its own; the
+list is only ordered with the newest first.
+
+`Authorship: Choose Gemini Model` does the same from the Command Palette, and
+both write `authorship.gemini.model`, which you can also edit by hand.
 
 ---
 
@@ -383,13 +430,19 @@ buttons.
 ## The Authorship sidebar
 
 The Authorship icon in the activity bar opens the **Manuscript** view, which
-reports on the machinery rather than on the book: which models are resident,
-what they are holding against what the machine has, and what work the server has
-in hand. A running job can be stopped from here.
+reports on the machinery rather than on the book: whether there is a Gemini
+account and which model it will use, which local models are resident, what they are holding against what the
+machine has, and what work the server has in hand. A running job can be stopped
+from here, and Gemini can be signed in and out of.
 
-<!-- CAPTURE sidebar.webp — the Authorship sidebar with all three drawers
-     populated: a model serving, a real memory reading, and at least one job in
-     flight with its stop button. -->
+**Account** is first because it is the only drawer about something outside this
+machine. Everything below it — the models, their memory, the queue — is local,
+which is the whole reason the one thing that is not gets the top of the panel
+rather than a line in a readme.
+
+<!-- CAPTURE sidebar.webp — the Authorship sidebar with all four drawers
+     populated: the account signed in, a model serving, a real memory reading,
+     and at least one job in flight with its stop button. -->
 
 ![The Manuscript sidebar](docs/images/sidebar.webp)
 
@@ -478,6 +531,7 @@ about a document:
 
 - `Authorship: Sign in to Gemini`
 - `Authorship: Sign out of Gemini`
+- `Authorship: Choose Gemini Model`
 
 <!-- CAPTURE command-palette.webp — the Command Palette open with "Authorship"
      typed, showing every command. -->
@@ -523,6 +577,23 @@ is on; the output channel shows all of them. It happens once per version.
 **A check found nothing.** Checks are off until you press **Check Prose**. If
 they are on and nothing is underlined, look at the status bar: the first check
 after a start has to load a model, and the models are large.
+
+**Gemini says a model is no longer available.** Google retires model names.
+Pick another from the **Model** dropdown in the Account drawer — the refusal
+also names its replacement, if you would rather type it into
+`authorship.gemini.model` yourself. Nothing is wrong with your key.
+
+**Gemini says the quota is exceeded, with `limit: 0`.** That is not an allowance
+you have used up — it is a model your plan does not include at all, and waiting
+will not help. The best models are usually paid-tier only. Either pick another
+from the **Model** dropdown in the Account drawer, or enable billing on the
+Google Cloud project the key belongs to. Authorship offers you the picker when a
+pass fails this way.
+
+**The pass paused and carried on.** Every tier is rate-limited and a novel is
+dozens of requests in a row, so being told to slow down is ordinary. Authorship
+waits as long as Google asks and offers the chapter again, up to five times
+before giving up. Stopping the pass ends the wait as well.
 
 **Gemini would not take my key.** The key is checked when you sign in, so a key
 that worked and has stopped working has usually been revoked or has run out of

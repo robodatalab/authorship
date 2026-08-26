@@ -16,10 +16,6 @@ const PORT = 8765;
 // first time the Authorship view becomes visible.
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "authorship" is now active!');
-
 	// Everything the Python side says about itself, kept where a reader can be
 	// pointed at it when an install or a start goes wrong.
 	const log = vscode.window.createOutputChannel('Authorship');
@@ -34,6 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// one tool needs it: correcting the style of a manuscript is the one thing
 	// here that cannot be done by a model running beside the editor.
 	const gemini = new GeminiAccount(context, PORT);
+	context.subscriptions.push(gemini);
 	for (const [name, run] of Object.entries(gemini.commands)) {
 		context.subscriptions.push(
 			vscode.commands.registerCommand(`authorship.gemini.${name}`, run)
@@ -74,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			'authorship.manuscript',
-			new PublishView(context, PORT),
+			new PublishView(context, PORT, gemini),
 			// Keep the readings while the view is hidden, so switching away and
 			// back doesn't blank the plot.
 			{ webviewOptions: { retainContextWhenHidden: true } }

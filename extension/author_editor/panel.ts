@@ -37,7 +37,7 @@ const POLLS_UNANSWERED = 5;
 const JOB_TIMEOUT_MS = 180_000;
 
 import { divideManuscript } from '../parts/divide';
-import { GeminiAccount } from '../gemini/account';
+import { GeminiAccount, configuredModel } from '../gemini/account';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
 import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
@@ -635,9 +635,15 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		document: vscode.TextDocument,
 		panel: vscode.WebviewPanel | undefined
 	): Promise<void> {
+		// Signing in comes first for an author who has not: being told a manuscript
+		// is about to be sent somewhere is no use to someone who has nowhere to
+		// send it, and the key is what makes the warning about a real thing.
 		const key = await this.account.require();
 		if (!key) {
 			// They were asked and said no. That is an answer, not a failure.
+			return;
+		}
+		if (!(await this.confirmSending(document))) {
 			return;
 		}
 		if (document.isDirty) {
@@ -647,12 +653,48 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		const started = await fetch(`http://127.0.0.1:${this.port}/fix/style`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path: document.uri.fsPath, key }),
+			body: JSON.stringify({
+				path: document.uri.fsPath,
+				key,
+				model: configuredModel(),
+			}),
 		});
 		if (!started.ok) {
 			throw new Error(await detailOf(started));
 		}
 		await this.watchStyle(document, panel);
+	}
+
+	/**
+	 * Say plainly that this one leaves the machine, and let the author call it off.
+	 *
+	 * Every time it is asked for, and not once when they sign in. Everything else
+	 * Authorship does runs on this computer, so an author who has used the other
+	 * tools has every reason to assume this one does too — and the moment to say
+	 * otherwise is the moment they press the button, not a paragraph of a readme
+	 * they last looked at when they installed it. It is the only warning that
+	 * arrives before a manuscript is sent rather than after.
+	 *
+	 * Modal on purpose. A notification for this would be a notification behind
+	 * the editor, read after the first chapter was already in Google's hands.
+	 */
+	private async confirmSending(document: vscode.TextDocument): Promise<boolean> {
+		const send = 'Send to Gemini';
+		const confirmed = await vscode.window.showWarningMessage(
+			`Send the chapters of ${basename(document.uri)} to Google Gemini?`,
+			{
+				modal: true,
+				detail:
+					'Fixing style and grammar is the one tool in Authorship that does ' +
+					'not run on your machine. The chapter titles and the prose written ' +
+					'under them are sent over the internet to the Gemini API, on your ' +
+					'own account, and are billed to it.\n\n' +
+					'Your notes, blurb, cover, title page and table of contents are ' +
+					'not sent. Nothing else Authorship does leaves this computer.',
+			},
+			send
+		);
+		return confirmed === send;
 	}
 
 	/**
@@ -730,6 +772,20 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				}
 			);
 		} catch (err: unknown) {
+			// A model the account's plan does not include is not a key problem, and
+			// signing in again would fix nothing — the answer is a different model,
+			// or billing on the account. Offered as the button, since the command
+			// that lists what the key can actually use is the one thing that helps.
+			if (last?.noQuota) {
+				const chose = await vscode.window.showWarningMessage(
+					describe(err),
+					'Choose a model'
+				);
+				if (chose === 'Choose a model') {
+					await vscode.commands.executeCommand('authorship.gemini.chooseModel');
+				}
+				return;
+			}
 			// A key Gemini has stopped taking is stored truth that has gone stale.
 			// Left there, every pass from now on fails the same way, and the way
 			// out is a command the author has no reason to go looking for.
@@ -740,7 +796,10 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					'Sign in'
 				);
 				if (again === 'Sign in') {
-					await this.account.signIn();
+					// Through the same door the button uses, rather than a second way
+					// in: the account is now signed out, so asking for the key is
+					// asking for a new one.
+					await this.account.require();
 				}
 				return;
 			}
@@ -1096,6 +1155,8 @@ interface JobStatus {
 	sections?: { index: number; source: string }[];
 	/** Whether what stopped a style pass was the key rather than the work. */
 	unauthorized?: boolean;
+	/** Whether it was the model: one the account's plan does not include. */
+	noQuota?: boolean;
 }
 
 /**

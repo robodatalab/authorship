@@ -448,3 +448,101 @@ textarea:focus {
 .jobs .offline {
 	color: var(--vscode-errorForeground);
 }
+
+/* --- the Gemini account ---
+   Drawn like a model row, because that is what it is from the author's side: one
+   more thing Authorship can reach, with a state beside its name. What it does not
+   share with a model row is the sentence under it — every other entry in this
+   panel runs on this machine, and the one that does not has to say so where it
+   is switched on rather than only in a readme. */
+
+.account {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.account-row {
+	display: flex;
+	gap: 8px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.account-row .name {
+	font-weight: 600;
+}
+
+.account-row .phase {
+	font-size: 0.9em;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+
+.account-row.signed-in .phase {
+	color: var(--vscode-charts-green, var(--vscode-testing-iconPassed));
+}
+
+.account .why {
+	font-size: 0.9em;
+	line-height: 1.4;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Which Gemini corrects the chapters. A row rather than a line, because the
+   refresh belongs beside the list it refreshes. */
+.account-model {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.account-model-label {
+	font-size: 0.9em;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Model names are long and the sidebar is narrow, so the box takes what is left
+   and the name inside it is allowed to be cut rather than widen the panel. */
+.account-model-select {
+	flex: 1;
+	min-width: 0;
+	padding: 2px 4px;
+	color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+	background: var(--vscode-dropdown-background, var(--vscode-input-background));
+	border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
+	border-radius: 2px;
+}
+
+.account-refresh {
+	flex: 0 0 auto;
+	padding: 1px 6px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.account-refresh:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.account-model .why {
+	flex: 1 0 100%;
+}
+
+.account-action {
+	align-self: flex-start;
+	padding: 3px 12px;
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+	border: none;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.account-action:hover {
+	background: var(--vscode-button-hoverBackground);
+}
