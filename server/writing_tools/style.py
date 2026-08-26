@@ -244,10 +244,12 @@ def _corrected(
             len(chapter.text) + THINKING_HEADROOM,
         )
     except Exception as err:
-        # Duck-typed on purpose: what this needs to know is whether the answer
-        # was cut short, and a model that is not Gemini says so its own way or
-        # not at all. Anything that does not claim to be truncated is fatal.
-        if not getattr(err, "truncated", False):
+        # Duck-typed on purpose: what this needs to know is whether the fault
+        # was with this one answer — cut short, or refused for what it said —
+        # and a model that is not Gemini says so its own way or not at all.
+        # Anything that does not claim to be about this chapter is fatal, since
+        # a key or a quota will fail the next chapter identically.
+        if not getattr(err, "one_chapter", False):
             raise
         return None, str(err)
     return _sections_of(answer, chapter)

@@ -54,6 +54,26 @@ MODEL_VARIABLE = "GEMINI_MODEL"
 # again, so the wait is nothing like an ordinary HTTP call's.
 TIMEOUT_S = 600.0
 
+# The filters this API lets a caller set, turned down as far as it allows.
+#
+# A novel is not a chat assistant. Fiction contains violence, cruelty, sex and
+# people saying appalling things to each other, and a manuscript is the author's
+# own work being copy-edited rather than anything the model is being asked to
+# invent. A corrector that refuses a thriller for its murders is not a corrector.
+#
+# These four are the adjustable ones. Google's own policy sits behind them and is
+# not adjustable by anybody — a chapter refused as PROHIBITED_CONTENT is refused
+# whatever is set here, and no arrangement of this request will change that.
+SAFETY_SETTINGS = [
+    {"category": category, "threshold": "BLOCK_NONE"}
+    for category in (
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+    )
+]
+
 # The listing is paged. Asked for in one go, with the loop there anyway because
 # a page size is a request and not a promise.
 _PAGE = 1000
@@ -92,6 +112,7 @@ class GeminiError(RuntimeError):
         no_quota: bool = False,
         retry_after: float | None = None,
         truncated: bool = False,
+        refused: bool = False,
     ) -> None:
         super().__init__(detail)
         self.unauthorized = unauthorized
@@ -99,6 +120,8 @@ class GeminiError(RuntimeError):
         # real text and is the beginning of the right answer, which is exactly
         # what makes it dangerous: it looks usable and is half a chapter.
         self.truncated = truncated
+        # Google would not read this chapter, or would not answer about it.
+        self.refused = refused
         # The plan allows none of this model at all — `limit: 0` — as opposed to
         # an allowance that has been used up for the minute.
         self.no_quota = no_quota
@@ -110,6 +133,17 @@ class GeminiError(RuntimeError):
     def transient(self) -> bool:
         """Whether offering the same request again could plausibly work."""
         return self.retry_after is not None and not self.no_quota
+
+    @property
+    def one_chapter(self) -> bool:
+        """Whether this went wrong with the answer rather than with the account.
+
+        A chapter that came back cut off, or that Google would not read at all,
+        says nothing about the chapter after it — so a pass over a novel carries
+        on and reports it. A key, a quota or a network says everything about the
+        chapter after it, and the pass stops.
+        """
+        return self.truncated or self.refused
 
 
 def configured_key(given: str | None = None) -> str | None:
@@ -162,6 +196,7 @@ class Gemini:
         body: dict[str, Any] = {
             "systemInstruction": {"parts": [{"text": instruction}]},
             "contents": [{"role": "user", "parts": [{"text": said}]}],
+            "safetySettings": SAFETY_SETTINGS,
             # Low rather than zero: prose corrected at zero comes back flattened,
             # every sentence reaching for the same construction.
             "generationConfig": {"temperature": temperature},
@@ -387,11 +422,9 @@ def _answer(body: dict[str, Any]) -> str:
     candidates = body.get("candidates") or []
     if not candidates:
         blocked = (body.get("promptFeedback") or {}).get("blockReason")
-        raise GeminiError(
-            f"Gemini returned nothing ({blocked})"
-            if blocked
-            else "Gemini returned nothing."
-        )
+        if blocked:
+            raise GeminiError(_refused_reading(str(blocked)), refused=True)
+        raise GeminiError("Gemini returned nothing.")
     candidate = candidates[0]
     parts = (candidate.get("content") or {}).get("parts") or []
     said = "".join(part.get("text", "") for part in parts)
@@ -415,6 +448,32 @@ def _answer(body: dict[str, Any]) -> str:
             truncated=True,
         )
     return said
+
+
+def _refused_reading(blocked: str) -> str:
+    """Why Google would not read the chapter, said so the author can act on it.
+
+    The distinction that matters is whether anything can be done. The adjustable
+    filters are already turned down as far as the API allows, so a chapter
+    refused under Google's own policy is refused for good — and an author told
+    only `PROHIBITED_CONTENT` will reasonably go looking for the setting that
+    fixes it. There is not one.
+    """
+    if blocked == "PROHIBITED_CONTENT":
+        return (
+            "Google would not read this chapter: it falls under the Gemini API's "
+            "prohibited-content policy, which is Google's own and cannot be "
+            "turned off by this extension or by any setting in your account. "
+            "Authorship already asks for the adjustable safety filters to be "
+            "relaxed as far as the API allows. Fiction that Gemini will not "
+            "read has to be corrected by a model that will."
+        )
+    if blocked in ("SAFETY", "IMAGE_SAFETY"):
+        return (
+            f"Gemini's safety filters stopped this chapter ({blocked}), despite "
+            "Authorship asking for them to be relaxed as far as the API allows."
+        )
+    return f"Gemini would not read this chapter ({blocked})."
 
 
 # `limit: 0` in the prose of a refusal, for when the structured detail is absent.

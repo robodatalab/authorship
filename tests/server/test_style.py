@@ -277,7 +277,7 @@ class FixStyle(unittest.TestCase):
         # A novel is dozens of chapters, and losing the rest of them because one
         # ran out of room would be a poor trade.
         class Truncated(RuntimeError):
-            truncated = True
+            one_chapter = True
 
         model = build_model()
         model.complete.side_effect = [Truncated("ran out of room"), THIRD_FIXED]
@@ -291,6 +291,24 @@ class FixStyle(unittest.TestCase):
         )
         self.assertEqual(revised, {8: THIRD_FIXED})
         self.assertEqual(told, [("The First Night", "ran out of room")])
+
+    def test_a_chapter_the_model_would_not_read_costs_one_chapter_too(self) -> None:
+        # A filter that refused chapter three says nothing about chapter four.
+        class Refused(RuntimeError):
+            one_chapter = True
+
+        model = build_model()
+        model.complete.side_effect = [
+            Refused("Google would not read this chapter"),
+            THIRD_FIXED,
+        ]
+        told: list[tuple[str, str]] = []
+        fix_style(
+            model,
+            Document(STORY),
+            left_alone=lambda title, why: told.append((title, why)),
+        )
+        self.assertEqual(told, [("The First Night", "Google would not read this chapter")])
 
     def test_a_failure_that_is_not_about_the_chapter_ends_the_pass(self) -> None:
         # A key, a quota or a network is not something the next chapter will do

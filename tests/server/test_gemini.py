@@ -161,8 +161,38 @@ class Complete(unittest.TestCase):
     def test_a_prompt_that_was_blocked_outright_says_so(self) -> None:
         blocked = build_response(200, {"promptFeedback": {"blockReason": "OTHER"}})
         with mock.patch("httpx.request", return_value=blocked):
-            with self.assertRaisesRegex(GeminiError, "OTHER"):
+            with self.assertRaisesRegex(GeminiError, "OTHER") as caught:
                 Gemini("k").complete("i", "s")
+        self.assertTrue(caught.exception.one_chapter)
+
+    def test_prohibited_content_says_that_no_setting_will_help(self) -> None:
+        # The author is otherwise left hunting for a switch that does not exist:
+        # this one is Google's own policy, behind the adjustable filters.
+        blocked = build_response(
+            200, {"promptFeedback": {"blockReason": "PROHIBITED_CONTENT"}}
+        )
+        with mock.patch("httpx.request", return_value=blocked):
+            with self.assertRaises(GeminiError) as caught:
+                Gemini("k").complete("i", "s")
+        said = str(caught.exception)
+        self.assertIn("cannot be turned off", said)
+        self.assertTrue(caught.exception.refused)
+        self.assertTrue(caught.exception.one_chapter)
+        # Not a key problem, and not worth retrying.
+        self.assertFalse(caught.exception.unauthorized)
+        self.assertFalse(caught.exception.transient)
+
+    def test_asks_for_the_adjustable_filters_to_be_relaxed(self) -> None:
+        # A novel contains violence, cruelty and sex, and is the author's own
+        # work being copy-edited rather than anything the model is inventing.
+        with mock.patch("httpx.request", return_value=answering("Fixed.")) as sent:
+            Gemini("k").complete("i", "s")
+        settings = sent.call_args.kwargs["json"]["safetySettings"]
+        self.assertEqual({one["threshold"] for one in settings}, {"BLOCK_NONE"})
+        self.assertIn(
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            {one["category"] for one in settings},
+        )
 
     def test_a_network_that_did_not_answer_is_a_gemini_error_like_any_other(self) -> None:
         with mock.patch("httpx.request", side_effect=httpx.ConnectError("no route")):

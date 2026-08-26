@@ -322,6 +322,11 @@ halfway leaves the chapters it finished corrected. It all lands as ordinary
 edits: `Ctrl+Z` walks the pass back like anything else, and nothing is written
 to disk until you save.
 
+Authorship asks Gemini to relax its adjustable safety filters, since a novel is
+the author's own work being copy-edited rather than anything the model is being
+asked to invent. Google's prohibited-content policy sits behind those filters
+and is not adjustable; a manuscript it refuses cannot be corrected this way.
+
 A chapter is only written back if what came back is plausibly that chapter:
 about as long as it went in, ending where a sentence ends, and in the same
 number of sections it was cut into. Anything else — a model that ran out of
@@ -601,6 +606,16 @@ after a start has to load a model, and the models are large.
 **There is no sparkle in the toolbar.** The feature is experimental and off by
 default. Settings → search `authorship` → **Experimental › Use Gemini For Style
 Correction**. The Account drawer in the sidebar appears at the same time.
+
+**Gemini would not read a chapter (`PROHIBITED_CONTENT`).** Google's usage
+policy for the Gemini API, not one of the adjustable filters — Authorship
+already asks for those to be relaxed as far as the API allows, because fiction
+contains violence and cruelty and sex and a corrector that refuses a thriller
+for its murders is no use. The prohibited-content line sits behind them and
+cannot be moved by this extension or by anything in your account. A manuscript
+Gemini will not read has to be corrected by a model that will, and for now that
+means not using this tool on it. Other chapters in the same document still run;
+the ones refused are named at the end and left exactly as you wrote them.
 
 **A chapter came back unchanged.** The pass refuses an answer that is not
 plausibly the chapter — too short, too long, cut off mid-sentence, or in the
