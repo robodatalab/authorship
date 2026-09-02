@@ -18,7 +18,9 @@ import {
 	fromMarkdown,
 	generatedCell,
 	isGenerated,
+	labelOf,
 	toMarkdown,
+	unfilledFields,
 	writesOf,
 } from './model';
 import { BODY } from './page';
@@ -538,6 +540,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		document: vscode.TextDocument,
 		at: number
 	): Promise<void> {
+		// Whatever the page last changed has to be in the document before it is
+		// read, exactly as a check does. The click that starts this is the click
+		// that closed the box the author was typing in — the page settles the
+		// field and asks for the writing in the same breath — so the edit carrying
+		// what they typed is still on its way here. Read the document before it
+		// lands and the section is written from the parameters as they were, or,
+		// the first time anyone fills the box in, from none at all.
+		await this.writes.get(document.uri.toString());
 		if (document.isDirty) {
 			// It is written from what is in the documents, so what is on screen has
 			// to be on disk — this one and, for a recap, the ones it names.
@@ -546,6 +556,18 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		const cell = parse(document.getText())[at];
 		if (!cell || !isGenerated(cell.kind)) {
 			return;
+		}
+		// Refused here rather than by the server, because the answer is about a
+		// box on the page and the page is where the boxes are named. The server
+		// answers the same question in its own words for anything that reaches it
+		// another way; this is the one an author actually reads.
+		const unfilled = unfilledFields(cell);
+		if (unfilled.length > 0) {
+			throw new Error(
+				`${labelOf(cell.kind)} has nothing in ${unfilled
+					.map((field) => field.label)
+					.join(', ')} — fill it in and run the section again.`
+			);
 		}
 		const started = await fetch(
 			`http://127.0.0.1:${this.port}/generate/${cell.kind}`,

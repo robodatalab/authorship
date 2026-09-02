@@ -1251,6 +1251,39 @@ describe('the story so far', () => {
 		expect(cell.querySelector('.rendered')).toBeNull();
 	});
 
+	it('sends the author to the box rather than inviting them to write', async () => {
+		// What went wrong in the field: the empty body said "double-click to
+		// write", so the paths were typed into the place the recap was going to
+		// land on and the Documents box stayed empty.
+		await mount([recap()]);
+		expect(shown()[0].querySelector('.rendered')!.textContent).toBe(
+			'Empty — fill in Documents above, then run this section.'
+		);
+	});
+
+	it('goes back to inviting writing once the box is filled in', async () => {
+		await mount([recap('a.author')]);
+		expect(shown()[0].querySelector('.rendered')!.textContent).toBe(
+			'Empty — double-click to write.'
+		);
+	});
+
+	it('draws an unfilled parameter as a box rather than as a caption', async () => {
+		await mount([recap(), recap('a.author')]);
+		expect(
+			shown()[0].querySelector('.cell-field')!.classList.contains('needed')
+		).toBe(true);
+		expect(
+			shown()[1].querySelector('.cell-field')!.classList.contains('needed')
+		).toBe(false);
+	});
+
+	it('leaves the fields of a section nobody generates alone', async () => {
+		// A title page is empty for weeks and has no run button to fail.
+		await mount([{ kind: 'title-page', source: '', attrs: {} }]);
+		expect(shown()[0].querySelector('.cell-field.needed')).toBeNull();
+	});
+
 	it('opens for the author to edit, as a first draft rather than an answer', async () => {
 		await mount([recap('a.author', 'She has lost her name.')]);
 		const box = opened(0);

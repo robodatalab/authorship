@@ -38,6 +38,7 @@ import {
 	splitAt,
 	saidWords,
 	toMarkdown,
+	unfilledFields,
 	withDefaultCell,
 	writesOf,
 	writtenFrom,
@@ -151,6 +152,32 @@ describe('the kinds a section can be', () => {
 		// How an editor that comes back to a job somebody else started asks.
 		expect(generatedCell([markdown('a'), blurb()], -1, 'blurb')).toBe(1);
 		expect(generatedCell([markdown('a'), recap('a.author')], -1, 'recap')).toBe(1);
+	});
+
+	it('says which parameters a section cannot be run without', () => {
+		// The bug this exists for: the Documents box is drawn like every other
+		// field — no border, grey placeholder — with a large "double-click to
+		// write" area under it, so the paths get typed into the body instead and
+		// the run button can only fail.
+		expect(unfilledFields(recap()).map((field) => field.name)).toEqual([
+			'documents',
+		]);
+		expect(unfilledFields(recap('a.author'))).toEqual([]);
+	});
+
+	it('counts a box holding only spaces as unfilled', () => {
+		expect(unfilledFields(recap('   ')).map((f) => f.name)).toEqual(['documents']);
+	});
+
+	it('asks nothing of a section that is written from the story it stands in', () => {
+		expect(unfilledFields(blurb())).toEqual([]);
+	});
+
+	it('asks nothing of a section nobody generates', () => {
+		// A title page has empty fields all the time and no run button to fail.
+		expect(
+			unfilledFields({ kind: 'title-page', source: '', attrs: {} })
+		).toEqual([]);
 	});
 
 	it('reads the documents a story so far is written from', () => {

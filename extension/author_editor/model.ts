@@ -490,6 +490,32 @@ export function writtenFrom(kind: string): string {
 }
 
 /**
+ * The fields a section still needs filled in before running it can mean
+ * anything.
+ *
+ * Only asked of a section the server writes, and only about the facts it is
+ * written *from* — a blurb needs nothing and answers with none. A section with
+ * one of these empty has a run button that cannot do anything but fail, so the
+ * page says so where the author is looking and the host refuses before it asks
+ * the server.
+ *
+ * Kind-agnostic on purpose: it reads the fields the kind declares rather than
+ * naming any kind, so the next generated section with a parameter is covered by
+ * the code that is already here.
+ */
+export function unfilledFields(cell: Cell): CellField[] {
+	if (!isGenerated(cell.kind)) {
+		return [];
+	}
+	return fieldsOf(cell.kind).filter(
+		(field) =>
+			!field.optional &&
+			!field.toggle &&
+			!(cell.attrs[field.name] ?? '').trim()
+	);
+}
+
+/**
  * The cell a job of this kind that started at `at` is writing, or -1 for none in
  * the list.
  *
