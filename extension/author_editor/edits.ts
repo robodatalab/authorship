@@ -9,7 +9,7 @@
 // moved. Each of them says where the author should be left afterwards, because
 // an author who moves a cell has not stopped writing in it.
 
-import { insertAt, moveBy, removeAt } from './model';
+import { foldAt, foldEvery, insertAt, moveBy, removeAt } from './model';
 import { post } from './elements';
 import { refind, showCount } from './find_bar';
 import { followEditing } from './editor_box';
@@ -52,6 +52,36 @@ export function deleteCell(index: number): void {
 		open === index ? null : open > index ? open - 1 : open
 	);
 	commit(removeAt(state.cells, index));
+}
+
+/**
+ * Fold a section away to its heading, or unfold it.
+ *
+ * A change to the document like any other, because that is where the fold is
+ * kept — so it undoes, it saves, and it travels with the cell when the cell is
+ * moved. A section folded while it was open for writing closes: the box it was
+ * being typed in is the very thing folding it takes away.
+ */
+export function foldCell(index: number, on: boolean): void {
+	if (on && state.editing === index) {
+		followEditing(() => null);
+	}
+	commit(foldAt(state.cells, index, on));
+}
+
+/**
+ * Fold every section away, or unfold every one.
+ *
+ * Two buttons rather than one that changes its mind. A single toggle has to be
+ * read before it can be pressed — the author has to work out which way it is
+ * pointing this time — and a toolbar is a place for buttons that always do the
+ * same thing.
+ */
+export function foldAllCells(on: boolean): void {
+	if (on && state.editing !== null) {
+		followEditing(() => null);
+	}
+	commit(foldEvery(state.cells, on));
 }
 
 /** Move a cell, keeping the selection on it rather than on where it used to be. */

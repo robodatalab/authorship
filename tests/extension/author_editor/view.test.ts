@@ -160,6 +160,28 @@ describe('the toolbar', () => {
 		});
 	}
 
+	it('puts folding beside View Source, where the layout tools are', async () => {
+		await mount([markdown('a')]);
+		for (const id of ['fold-all', 'unfold-all']) {
+			expect(document.getElementById(id), id).not.toBeNull();
+		}
+	});
+
+	it('wears the same icons on the toolbar as on a section', async () => {
+		// Folding one section and folding the document are the same idea, so at a
+		// glance they have to look like it.
+		await mount([markdown('a')]);
+		const glyph = (id: string): string | undefined =>
+			document.getElementById(id)!.querySelector('i')!.className.split(' ').pop();
+		expect(glyph('fold-all')).toBe('codicon-fold-up');
+		expect(glyph('unfold-all')).toBe('codicon-fold-down');
+
+		const onCell = shown()[0].querySelector<HTMLElement>(
+			'.actions [aria-label="Fold this section away"] i'
+		)!;
+		expect(onCell.className).toContain('codicon-fold-up');
+	});
+
 	it('has a button on the page for every tool the view wires up', async () => {
 		await mount();
 		for (const [id] of wiring) {
@@ -404,46 +426,72 @@ describe('drawing cells', () => {
 		expect(cell.querySelector('.cell-name')).toBeNull();
 	});
 
-	it('gives a folded cover the same heading every other section has', async () => {
+	it('gives a folded section the same heading every other section has', async () => {
 		// The bug this exists for: folded, the cover kept only the whisper in its
 		// bottom corner and drew as a hairline the author had to hunt for.
-		await mount([{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} }]);
-		window.dispatchEvent(
-			new MessageEvent('message', { data: { type: 'minimized', kinds: ['cover'] } })
-		);
+		await mount([
+			{ kind: 'cover', source: '![Cover](art.jpg)', attrs: { folded: 'true' } },
+		]);
 		const cell = shown()[0];
-		expect(cell.classList.contains('minimized')).toBe(true);
+		expect(cell.classList.contains('folded')).toBe(true);
 		expect(cell.querySelector('.cell-name')!.textContent).toBe('Cover');
 		// The picture is the whole of what folding it takes away.
 		expect(cell.querySelector('.rendered')).toBeNull();
 	});
 
-	it('unfolds the cover again when the host says so', async () => {
-		await mount([{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} }]);
-		const fold = (kinds: string[]): void => {
-			window.dispatchEvent(
-				new MessageEvent('message', { data: { type: 'minimized', kinds } })
-			);
-		};
-		fold(['cover']);
-		fold([]);
-		const cell = shown()[0];
-		expect(cell.classList.contains('minimized')).toBe(false);
-		expect(cell.querySelector('.rendered')).not.toBeNull();
-		expect(cell.querySelector('.cell-name')).toBeNull();
+	it('folds a section down to what names it', async () => {
+		await mount([
+			{ kind: 'chapter', source: '', attrs: { title: 'One', folded: 'true' } },
+			{ kind: 'markdown', source: 'The lantern had gone out.', attrs: { folded: 'true' } },
+		]);
+		expect(shown().map((c) => c.querySelector('.cell-name')!.textContent)).toEqual([
+			'One',
+			'The lantern had gone out.',
+		]);
+		// A folded chapter keeps no box to type its title into either.
+		expect(shown()[0].querySelector('.cell-title')).toBeNull();
 	});
 
-	it('folds nothing but the cover, whatever the host names', async () => {
-		// A chapter nobody can unfold is a chapter nobody can read.
-		await mount([chapter('One'), markdown('The lantern.')]);
-		window.dispatchEvent(
-			new MessageEvent('message', {
-				data: { type: 'minimized', kinds: ['chapter', 'markdown'] },
-			})
-		);
-		for (const cell of shown()) {
-			expect(cell.classList.contains('minimized')).toBe(false);
-		}
+	it('asks the host to fold a section when the fold button is pressed', async () => {
+		await mount([markdown('The lantern.')]);
+		shown()[0]
+			.querySelector<HTMLElement>('.actions [aria-label="Fold this section away"]')!
+			.click();
+		expect(lastCells()[0].attrs.folded).toBe('true');
+	});
+
+	it('unfolds it again from the same place', async () => {
+		await mount([{ kind: 'markdown', source: 'a', attrs: { folded: 'true' } }]);
+		shown()[0]
+			.querySelector<HTMLElement>('.actions [aria-label="Unfold this section"]')!
+			.click();
+		expect(lastCells()[0].attrs.folded).toBeUndefined();
+	});
+
+	it('folds the whole document from the toolbar', async () => {
+		await mount([chapter('One'), markdown('a'), markdown('b')]);
+		document.getElementById('fold-all')!.click();
+		expect(lastCells().every((c) => c.attrs.folded === 'true')).toBe(true);
+	});
+
+	it('unfolds the whole document from its own button', async () => {
+		// Two buttons rather than one that changes its mind: neither has to be
+		// read before it is pressed.
+		await mount([
+			{ kind: 'markdown', source: 'a', attrs: { folded: 'true' } },
+			{ kind: 'markdown', source: 'b', attrs: { folded: 'true' } },
+		]);
+		document.getElementById('unfold-all')!.click();
+		expect(lastCells().some((c) => c.attrs.folded)).toBe(false);
+	});
+
+	it('folds what is open without unfolding what is not', async () => {
+		await mount([
+			{ kind: 'markdown', source: 'a', attrs: { folded: 'true' } },
+			markdown('b'),
+		]);
+		document.getElementById('fold-all')!.click();
+		expect(lastCells().every((c) => c.attrs.folded === 'true')).toBe(true);
 	});
 
 	it('renders prose as markdown rather than as its source', async () => {
@@ -825,7 +873,7 @@ describe('changing the document', () => {
 
 	it('moves a cell down', async () => {
 		await mount([markdown('a'), markdown('b')]);
-		shown()[0].querySelectorAll<HTMLElement>('.actions .icon')[1].click();
+		shown()[0].querySelector<HTMLElement>('.actions [aria-label="Move down"]')!.click();
 		expect(lastCells().map((c) => c.source)).toEqual(['b', 'a']);
 	});
 
@@ -834,7 +882,7 @@ describe('changing the document', () => {
 		// already drawn, so the document coming back was taken for the view's own
 		// echo and dismissed. The cells moved in the file and never on screen.
 		await mount([markdown('a'), markdown('b')]);
-		shown()[0].querySelectorAll<HTMLElement>('.actions .icon')[1].click();
+		shown()[0].querySelector<HTMLElement>('.actions [aria-label="Move down"]')!.click();
 		send(lastCells());
 		expect(shown().map((c) => c.querySelector('.rendered')!.textContent)).toEqual([
 			'b',

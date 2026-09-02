@@ -405,15 +405,25 @@ body {
 	border-color: var(--vscode-focusBorder);
 }
 
-/* A section folded away to its heading. What it loses is the picture — the one
-   part of a cover that costs a screenful of scrolling on the way to the writing;
-   what it keeps is its name, its fields and every button that acts on it, so it
-   can be moved, deleted and unfolded exactly as it could before.
+/* A section folded away to its heading. It keeps its name, its place and every
+   button that acts on it, and loses everything that takes room: the writing, the
+   picture, the boxes. Folded, a manuscript reads as an outline of itself.
 
-   It keeps a section's full height rather than shrinking to a rule: a fold the
-   author has to hunt for is a fold they will not use, and the heading is what
-   tells them which section they are looking at. */
-.cell.minimized .cell-kind {
+   The heading is the whole of what is left, so it is read at a glance and not
+   hunted for — smaller than a section's full heading, because twenty of those is
+   not an outline, but in the document's own foreground and not dimmed. */
+.cell.folded .cell-name {
+	font-size: 1.25em;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	padding-top: 6px;
+	padding-bottom: 6px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.cell.folded .cell-kind {
 	opacity: 1;
 }
 

@@ -25,6 +25,10 @@ export const BODY = `	<div class="topbar" id="topbar">
 			<span class="divider"></span>
 			<button class="tool" id="as-text" type="button"
 				data-tip="View Source — open the same file as plain text"><i class="codicon codicon-file-code"></i></button>
+			<button class="tool" id="fold-all" type="button"
+				data-tip="Fold All — fold every section away to its heading"><i class="codicon codicon-fold-up"></i></button>
+			<button class="tool" id="unfold-all" type="button"
+				data-tip="Unfold All — open every section again"><i class="codicon codicon-fold-down"></i></button>
 			<span class="spacer"></span>
 			<span class="doc-where" id="doc-where"></span>
 			<span class="spacer"></span>

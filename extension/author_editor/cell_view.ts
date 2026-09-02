@@ -21,8 +21,9 @@ import {
 	isGenerated,
 	isNamed,
 	isStale,
-	isMinimizable,
+	isFolded,
 	labelOf,
+	summaryOf,
 	renderMarkdown,
 	runCell,
 } from './model';
@@ -31,7 +32,7 @@ import { iconButton, insertButton, withBase } from './dom';
 import { markedProse } from './marks';
 import { fencedFor, wireMarks } from './marks_view';
 import { beginEditing, sourceFor } from './editor_box';
-import { commit, deleteCell, insertCell, moveCell } from './edits';
+import { commit, deleteCell, foldCell, insertCell, moveCell } from './edits';
 import { current, found, foundIn } from './find_bar';
 import { hideSeam, seamFor, showSeam } from './seam_view';
 import { openCellMenu, openInsertMenu } from './menu_view';
@@ -63,8 +64,8 @@ export function cellElement(cell: Cell, index: number): HTMLElement {
 	if (state.wanting.has(cell.kind)) {
 		row.classList.add('wanting');
 	}
-	if (minimized(cell)) {
-		row.classList.add('minimized');
+	if (isFolded(cell)) {
+		row.classList.add('folded');
 	}
 	row.addEventListener('mousedown', () => select(index));
 	row.addEventListener('contextmenu', (event) => {
@@ -159,15 +160,15 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	// the only thing left of it. A fold with nothing but the label in its corner
 	// is a hairline the author has to go looking for; it should read as the
 	// section it is, in the same hand as every other section's heading.
-	if (isNamed(cell.kind) || minimized(cell)) {
+	if (isNamed(cell.kind) || isFolded(cell)) {
 		const name = document.createElement('div');
 		name.className = 'cell-name';
-		name.textContent = labelOf(cell.kind);
+		name.textContent = isFolded(cell) ? summaryOf(cell) : labelOf(cell.kind);
 		body.append(name);
 	}
 
 	const fields = fieldsOf(cell.kind);
-	if (fields.length > 0) {
+	if (fields.length > 0 && !isFolded(cell)) {
 		body.append(fieldsFor(cell, index, fields));
 	}
 
@@ -180,7 +181,7 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	// A chapter is its title and nothing else — there is no prose in it to show,
 	// and the writing beneath it is markdown cells of its own. A section folded
 	// away shows none either: that is what folding it is for.
-	if (hasProse(cell.kind) && !minimized(cell)) {
+	if (hasProse(cell.kind) && !isFolded(cell)) {
 		body.append(
 			state.editing === index ? sourceFor(cell, index) : renderedFor(cell, index)
 		);
@@ -319,16 +320,14 @@ function kindLabelFor(cell: Cell): HTMLElement {
 function actionsFor(cell: Cell, index: number): HTMLElement {
 	const actions = document.createElement('div');
 	actions.className = 'actions';
-	if (isMinimizable(cell.kind)) {
-		const folded = minimized(cell);
-		actions.append(
-			iconButton(
-				folded ? 'fold-down' : 'fold-up',
-				folded ? `Show the ${labelOf(cell.kind).toLowerCase()}` : `Fold the ${labelOf(cell.kind).toLowerCase()} away`,
-				() => post({ type: 'minimize', kind: cell.kind, on: !folded })
-			)
-		);
-	}
+	const folded = isFolded(cell);
+	actions.append(
+		iconButton(
+			folded ? 'fold-down' : 'fold-up',
+			folded ? 'Unfold this section' : 'Fold this section away',
+			() => foldCell(index, !folded)
+		)
+	);
 	actions.append(
 		iconButton('chevron-up', 'Move up', () => moveCell(index, -1)),
 		iconButton('chevron-down', 'Move down', () => moveCell(index, 1)),
@@ -337,15 +336,6 @@ function actionsFor(cell: Cell, index: number): HTMLElement {
 	return actions;
 }
 
-/**
- * Whether this section is folded away.
- *
- * Only a kind that may be: a document written by hand could carry the state for
- * anything, and a chapter nobody can unfold is a chapter nobody can read.
- */
-function minimized(cell: Cell): boolean {
-	return isMinimizable(cell.kind) && state.minimized.has(cell.kind);
-}
 
 /**
  * The strip in a gap between cells, where a cell is added at `at`.

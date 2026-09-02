@@ -68,7 +68,6 @@ export const state: {
 	writing: Writing | null;
 	styling: Styling | null;
 	wanting: Set<string>;
-	minimized: Set<string>;
 	drawn: string;
 	generation: number;
 	openBox: OpenBox | null;
@@ -100,15 +99,6 @@ export const state: {
 	 * these and an index would name the wrong section by the time it was drawn.
 	 */
 	wanting: new Set<string>(),
-	/**
-	 * The sections folded away to their heading, by kind.
-	 *
-	 * The host holds this between sittings — it is about how the author likes to
-	 * look at their manuscript, not about the manuscript, so it is kept beside the
-	 * document rather than in it. By kind for the same reason the marks are: an
-	 * index names a different section as soon as one is added above it.
-	 */
-	minimized: new Set<string>(),
 	/**
 	 * What is on the page right now.
 	 *

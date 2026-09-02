@@ -15,8 +15,11 @@ import {
 	isDivisible,
 	isGenerated,
 	isMatter,
-	isMinimizable,
+	foldAt,
+	foldEvery,
+	isFolded,
 	isNamed,
+	summaryOf,
 	isStale,
 	isUnpublished,
 	fieldsOf,
@@ -227,15 +230,6 @@ describe('the kinds a section can be', () => {
 		expect(fields.every((f) => f.optional)).toBe(true);
 		// The blurb about the author is prose, so it is written not typed in.
 		expect(hasProse('about')).toBe(true);
-	});
-
-	it('lets the cover be folded away and nothing else', () => {
-		// The one section that is decided early and then sits at the top of the
-		// manuscript costing a screenful of scrolling on the way to the writing.
-		expect(isMinimizable('cover')).toBe(true);
-		for (const kind of ['markdown', 'chapter', 'part', 'title-page', 'contents', 'about', 'blurb', 'note', 'disclaimer', 'epigraph']) {
-			expect(isMinimizable(kind), kind).toBe(false);
-		}
 	});
 
 	it('names the sections the reader meets by name and no others', () => {
@@ -990,5 +984,73 @@ describe('joining a section to the one above it', () => {
 	it('leaves a document it cannot join alone', () => {
 		const cells = [chapter('One'), markdown('b')];
 		expect(mergeAt(cells, 1)).toBe(cells);
+	});
+});
+
+describe('folding a section away', () => {
+	it('keeps the fold on the cell, so it travels when the cell does', () => {
+		const folded = foldAt([chapter('One'), chapter('Two')], 1, true);
+		expect(isFolded(folded[1])).toBe(true);
+		expect(folded[1].attrs.title).toBe('Two');
+		// Moving it takes the fold with it: the state is the cell's, not a place's.
+		expect(isFolded(moveBy(folded, 1, -1)[0])).toBe(true);
+	});
+
+	it('takes the attribute out again rather than writing false', () => {
+		// A document full of folded="false" is a document full of noise.
+		const folded = foldAt([chapter('One')], 0, true);
+		expect(foldAt(folded, 0, false)[0].attrs).toEqual({ title: 'One' });
+	});
+
+	it('answers the same list when there is nothing to do', () => {
+		// No edit, so no undo step, so no dirty document for a button that
+		// changed nothing.
+		const cells = [chapter('One')];
+		expect(foldAt(cells, 0, false)).toBe(cells);
+		expect(foldAt(cells, 7, true)).toBe(cells);
+		expect(foldEvery(foldEvery(cells, true), true)).toEqual(
+			foldEvery(cells, true)
+		);
+	});
+
+	it('folds every section, and unfolds every one', () => {
+		const cells = [chapter('One'), markdown('The lantern.'), contents()];
+		expect(foldEvery(cells, true).every(isFolded)).toBe(true);
+		expect(foldEvery(foldEvery(cells, true), false).some(isFolded)).toBe(false);
+	});
+
+});
+
+describe('summaryOf — what a folded section says it is', () => {
+	it('is the title where the cell has one', () => {
+		expect(summaryOf(chapter('The First Night'))).toBe('The First Night');
+	});
+
+	it('is the first line of the writing where it has no title', () => {
+		expect(summaryOf(markdown('The lantern had gone out.\n\nAgain.'))).toBe(
+			'The lantern had gone out.'
+		);
+	});
+
+	it('skips the blank lines above the writing', () => {
+		expect(summaryOf(markdown('\n\n  Once, in Beijing.'))).toBe('Once, in Beijing.');
+	});
+
+	it('reads a heading as what it says, not as its markup', () => {
+		expect(summaryOf(markdown('## Part One'))).toBe('Part One');
+	});
+
+	it('falls back to the kind for a section that says nothing', () => {
+		expect(summaryOf(markdown(''))).toBe('Markdown');
+		expect(summaryOf({ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} })).toBe(
+			'Cover'
+		);
+		expect(summaryOf({ kind: 'epigraph', source: '', attrs: {} })).toBe('epigraph');
+	});
+
+	it('cuts a long line rather than drawing a paragraph', () => {
+		const said = summaryOf(markdown('x'.repeat(200)));
+		expect(said).toHaveLength(80);
+		expect(said.endsWith('…')).toBe(true);
 	});
 });

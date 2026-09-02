@@ -112,14 +112,6 @@ export interface CellKind {
 	 * page is called.
 	 */
 	named?: boolean;
-	/**
-	 * Can be folded away to its heading, and left that way.
-	 *
-	 * For a section that is large on the page and settled early. Cover art is the
-	 * one that really is: it is decided once and then sits at the top of the
-	 * manuscript taking a screenful of scrolling on the way to the writing.
-	 */
-	minimizable?: boolean;
 	/** Offered in the toolbar itself rather than behind the overflow menu. */
 	primary: boolean;
 	/** What a cell of this kind starts life as. */
@@ -220,7 +212,6 @@ export const KINDS: CellKind[] = [
 		label: 'Cover',
 		automated: false,
 		matter: true,
-		minimizable: true,
 		primary: false,
 		blank: () => ({
 			kind: COVER,
@@ -315,14 +306,86 @@ export function isAutomated(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.automated ?? false;
 }
 
+/**
+ * The attribute that says a section is folded away to its heading.
+ *
+ * Written in the document rather than kept beside it, which is the one piece of
+ * how-it-looks that the file carries. It is here because it belongs to the cell
+ * and not to a place in the list: an author who folds four chapters and then
+ * moves one expects the fold to travel with it, and an index kept anywhere else
+ * would fold whatever slid into the gap. It survives being reopened, being
+ * checked out somewhere else, and being edited as text.
+ */
+export const FOLDED = 'folded';
+
+/** Whether this section is folded away to its heading. */
+export function isFolded(cell: Cell): boolean {
+	return cell.attrs[FOLDED] === 'true';
+}
+
+/**
+ * What a folded section says it is.
+ *
+ * A fold is only worth having if the author can tell what they folded. So it
+ * shows whatever names the cell: the title where the cell has one, the first
+ * line of the writing where it does not — which is what makes folding the whole
+ * document an outline of it rather than a stack of identical bars — and the
+ * kind's own name only where the cell says nothing at all.
+ */
+export function summaryOf(cell: Cell): string {
+	const titled = cell.attrs.title?.trim();
+	if (titled) {
+		return titled;
+	}
+	const first = cell.source
+		.split('\n')
+		.map((line) => line.trim())
+		.find((line) => line !== '');
+	if (!first) {
+		return labelOf(cell.kind);
+	}
+	const said = first.replace(/^#{1,6}\s+/, '').replace(/^!\[[^\]]*\]\(.*$/, '');
+	return said.length > 80 ? said.slice(0, 79).trimEnd() + '…' : said || labelOf(cell.kind);
+}
+
+/** This section folded, or unfolded — the attribute goes when it is not set. */
+export function foldedCell(cell: Cell, on: boolean): Cell {
+	const attrs = { ...cell.attrs };
+	if (on) {
+		attrs[FOLDED] = 'true';
+	} else {
+		delete attrs[FOLDED];
+	}
+	return { ...cell, attrs };
+}
+
+/** The document with one section folded, or unfolded. */
+export function foldAt(cells: Cell[], index: number, on: boolean): Cell[] {
+	const cell = cells[index];
+	if (!cell || isFolded(cell) === on) {
+		return cells;
+	}
+	const next = [...cells];
+	next[index] = foldedCell(cell, on);
+	return next;
+}
+
+/**
+ * Every section folded, or every one unfolded.
+ *
+ * Answers the same list when there is nothing to do, so a toolbar button cannot
+ * make an edit — and an undo step — out of folding a document that is already
+ * folded.
+ */
+export function foldEvery(cells: Cell[], on: boolean): Cell[] {
+	return cells.some((cell) => isFolded(cell) !== on)
+		? cells.map((cell) => foldedCell(cell, on))
+		: cells;
+}
+
 /** Whether this kind's label is printed as the section's heading. */
 export function isNamed(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.named ?? false;
-}
-
-/** Whether this kind can be folded away to its heading and left that way. */
-export function isMinimizable(kind: string): boolean {
-	return KINDS.find((k) => k.kind === kind)?.minimizable ?? false;
 }
 
 /** Whether the server writes this kind on request. */
