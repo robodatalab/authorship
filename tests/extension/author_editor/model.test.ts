@@ -189,9 +189,20 @@ describe('the kinds a section can be', () => {
 		const hints = Object.fromEntries(
 			fieldsOf('title-page').map((f) => [f.name, f.hint])
 		);
+		// A hint has to be unmistakably not a value. `YYYY-MM-DD` is a shape, and
+		// the rest say `e.g.` outright — a bare `1.0` sitting in an empty box
+		// reads as a version somebody typed, which is how an empty field came to
+		// look like a filled one.
 		expect(hints.date).toBe('YYYY-MM-DD');
-		expect(hints.version).toBe('1.0');
-		expect(hints.isbn).toBeTruthy();
+		expect(hints.version).toBe('e.g. 1.0');
+		expect(hints.isbn).toBe('e.g. 978-0-000-00000-0');
+		for (const [name, hint] of Object.entries(hints)) {
+			if (hint !== undefined) {
+				expect(/^(e\.g\. |[A-Z-]+$|https?:)|…/.test(hint), `${name}: ${hint}`).toBe(
+					true
+				);
+			}
+		}
 		// A title is a title; there is nothing a hint would add.
 		expect(hints.title).toBeUndefined();
 		expect(hints.author).toBeUndefined();
@@ -224,8 +235,13 @@ describe('the kinds a section can be', () => {
 		expect(isNamed('markdown')).toBe(false);
 	});
 
-	it('marks only the ISBN optional', () => {
+	it('marks the facts about an edition optional', () => {
+		// Which fields are optional is what an export waits for: everything else
+		// on a title page has to be filled in before a book will bind, so this
+		// list and `TITLE_PAGE_FIELDS` in server/publishing/epub_exporter.py are
+		// two halves of one rule and have to be changed together.
 		expect(fieldsOf('title-page').filter((f) => f.optional).map((f) => f.name)).toEqual([
+			'version',
 			'isbn',
 		]);
 	});

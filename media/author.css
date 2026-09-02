@@ -405,6 +405,26 @@ body {
 	border-color: var(--vscode-focusBorder);
 }
 
+/* A section the book needs that has nothing in it yet. The exporter says which
+   these are when an export is asked for, and they stay marked until the next
+   export finds them written. After `.editing`, so a section still wanting stays
+   marked while it is worked on — being in it is not the same as having filled
+   it in. */
+.cell.wanting {
+	border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+/* The name is normally a whisper in the corner on hover. On one of these it is
+   the whole point: it says which section is still to write. */
+.cell.wanting .cell-kind {
+	opacity: 1;
+	color: var(--vscode-errorForeground);
+}
+
+.cell.wanting .cell-name {
+	color: var(--vscode-errorForeground);
+}
+
 /* --- the run column --- */
 
 .run-column {

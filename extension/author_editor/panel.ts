@@ -44,6 +44,13 @@ import {
 	styleFixEnabled,
 } from '../gemini/account';
 import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
+import {
+	applyPlan,
+	askOf,
+	doneOf,
+	wantingKinds,
+	type Report,
+} from '../publish/layout';
 import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
@@ -116,7 +123,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 						`Exported ${basename(uri)}`
 					);
 				}),
-			exportEpub: () => this.onActive((d) => this.exportEpub(d)),
+			exportEpub: () =>
+				this.onActive((d) => this.exportEpub(d, this.active?.panel)),
 			partition: () => this.onActive((d) => this.partition(d)),
 			fixStyle: () =>
 				this.onActive((d) => this.fixStyle(d, this.active?.panel)),
@@ -233,7 +241,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					this.onActive((d) => this.stop(d));
 					break;
 				case 'exportEpub':
-					void this.exportEpub(document);
+					void this.exportEpub(document, panel);
 					break;
 				case 'exportMarkdown':
 					void this.exportMarkdown(document);
@@ -1155,7 +1163,11 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * markdown has no way to carry that — a title page flattened to a `#` line is
 	 * a book with no title, no cover and no chapters, only one long page.
 	 */
-	private async exportEpub(document: vscode.TextDocument): Promise<void> {
+	private async exportEpub(
+		document: vscode.TextDocument,
+		panel?: vscode.WebviewPanel,
+		force = false
+	): Promise<void> {
 		try {
 			if (document.isDirty) {
 				// The server reads the file from disk, so what is on screen has to
@@ -1165,7 +1177,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			const response = await fetch(`http://127.0.0.1:${this.port}/export/epub`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: document.uri.fsPath }),
+				body: JSON.stringify({ path: document.uri.fsPath, force }),
 			});
 			if (!response.ok) {
 				void vscode.window.showErrorMessage(
@@ -1173,15 +1185,78 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				);
 				return;
 			}
-			const { path } = (await response.json()) as { path: string };
-			void vscode.window.showInformationMessage(
-				`Exported ${basename(vscode.Uri.file(path))}`
-			);
+			const report = (await response.json()) as Report;
+			// Whatever came of the request, the answer says which sections are
+			// still to write — so the marks are put up before anything else is
+			// decided, including when the book bound anyway.
+			this.sayWanting(panel, report);
+
+			if (report.path) {
+				void vscode.window.showInformationMessage(
+					`Exported ${basename(vscode.Uri.file(report.path))}`
+				);
+				return;
+			}
+			await this.putLayout(document, panel, report);
 		} catch (err) {
 			void vscode.window.showErrorMessage(
 				`Export failed — is the model server running? (${describe(err)})`
 			);
 		}
+	}
+
+	/**
+	 * Put to the author a book the server would not bind.
+	 *
+	 * **Fix does not export.** A section written in is an empty section, and a
+	 * book bound straight over one has a blank page where its cover should be —
+	 * so fixing lays the document out, leaves what is still wanting marked, and
+	 * hands it back. Only Export Anyway binds what is there, and only because the
+	 * author was shown what was missing and asked for the file regardless.
+	 *
+	 * Nothing here decides what a book needs. The plan, the names and the reasons
+	 * all came from the exporter; this carries them into the document.
+	 */
+	private async putLayout(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined,
+		report: Report
+	): Promise<void> {
+		const name = basename(document.uri);
+		const { message, detail } = askOf(name, report);
+		const answer = await vscode.window.showWarningMessage(
+			message,
+			{ modal: true, detail },
+			'Fix',
+			'Export Anyway'
+		);
+		if (answer === 'Export Anyway') {
+			await this.exportEpub(document, panel, true);
+			return;
+		}
+		if (answer !== 'Fix') {
+			return;
+		}
+		// One edit, so one undo walks all of it back.
+		await this.write(document, applyPlan(parse(document.getText()), report.plan));
+		void vscode.window.showInformationMessage(doneOf(name, report));
+	}
+
+	/**
+	 * Tell the page which sections are still to write.
+	 *
+	 * By kind rather than by index: the author is about to add, move and delete
+	 * cells around these, and an index would name the wrong one by the time they
+	 * looked. A kind names the same section for as long as the section exists.
+	 */
+	private sayWanting(
+		panel: vscode.WebviewPanel | undefined,
+		report: Report
+	): void {
+		void panel?.webview.postMessage({
+			type: 'wanting',
+			kinds: wantingKinds(report),
+		});
 	}
 
 	private html(webview: vscode.Webview): string {

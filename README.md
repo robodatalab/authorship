@@ -411,6 +411,26 @@ points at the art, the contents section asks for a table of contents, the
 chapters are the story, and the disclaimer and about pages open and close it.
 Notes and the blurb stay out. There is no second file carrying half the answer.
 
+**A book that is not ready is not bound.** Ask for the export and the answer is
+either the file or what is standing in the way of it: sections that are missing,
+sections a reader would not find where they are, and sections that are there
+with nothing in them. That last one is worth saying plainly — adding a title page
+does not give a book a title, and a cover pointing at art nobody has drawn is no
+more a cover than none at all. The five the book waits for are **Cover**, **Title
+Page**, **Table of Contents** and **Blurb** opening the document, and **About the
+Author** closing it.
+
+**Fix** lays the sections out — writing in what is absent, moving what is out of
+place, and leaving everything you wrote exactly as you wrote it — then marks in
+red what is still to write and stops. No book is bound. **Export Anyway** binds
+what is there, because it is your book and you have been shown what is missing. A
+fix goes in as one edit, so a single undo takes it back out, and the marks lift
+at the next export that finds those sections written.
+
+All of that is decided where the book is bound, in `server/publishing/`, by the
+same code that does the binding — so what stops an export is exactly what would
+have been left out of the book.
+
 <!-- CAPTURE export-epub.webp — the "Exported story.epub" notification, with the
      new .epub visible in the Explorer. A second shot of the book open in a
      reader (Apple Books, Calibre) showing the cover and the table of contents

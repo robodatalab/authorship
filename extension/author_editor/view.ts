@@ -167,6 +167,12 @@ window.addEventListener('message', (event) => {
 		styleEl.hidden = !message.styleFix;
 	} else if (message?.type === 'checking') {
 		setChecking(message.on as boolean);
+	} else if (message?.type === 'minimized') {
+		state.minimized = new Set(message.kinds as string[]);
+		render();
+	} else if (message?.type === 'wanting') {
+		state.wanting = new Set(message.kinds as string[]);
+		render();
 	} else if (message?.type === 'marks') {
 		receiveFindings(message.findings as Finding[], Boolean(message.whole));
 	} else if (message?.type === 'fixed') {

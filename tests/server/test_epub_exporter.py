@@ -12,10 +12,17 @@ import zipfile
 from pathlib import Path
 
 from server.publishing.epub_exporter import (
+    ART,
+    CLOSING,
+    OPENING,
+    REQUIRED,
+    TEXT,
     _inline,
     blocks_to_xhtml,
     build_epub,
     chapters_of,
+    read_book,
+    report_of,
 )
 from server import storydoc
 from server.storydoc import Cell, Document
@@ -626,6 +633,248 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("OEBPS/disclaimer.xhtml", names)
         self.assertIn("OEBPS/disclaimer_2.xhtml", names)
         self.assertEqual(opf.count('idref="disclaimer"'), 1)
+
+
+def placed(root: Path, *cells: Cell, name: str = "story") -> Document:
+    """A document on disk, so the cover art it points at can be looked for."""
+    path = root / f"{name}{storydoc.EXTENSION}"
+    storydoc.save(path, list(cells))
+    return Document.load(path)
+
+
+def filled_title_page(**over: str) -> Cell:
+    said = {
+        "title": "Book",
+        "subtitle": "A Story",
+        "author": "A. Writer",
+        "publisher": "A Press",
+        "date": "2026-09-02",
+    }
+    said.update(over)
+    return title_page(**said)
+
+
+class WhatTheBindingCouldNotPrint(unittest.TestCase):
+    """The judgements `read_book` already makes, now that it keeps them.
+
+    Every one of these was decided while binding and thrown away: a book went out
+    short of a section and said nothing about it.
+    """
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.root = Path(self._dir.name)
+
+    def wanting(self, *cells: Cell) -> dict[str, tuple[str, ...]]:
+        book = read_book(placed(self.root, *cells))
+        return {item.kind: item.needs for item in book.wanting}
+
+    def test_a_cover_pointing_at_art_nobody_drew(self) -> None:
+        # `_art_of` already returns None here and the page is silently dropped.
+        said = self.wanting(Cell(storydoc.COVER, "", {"src": "cover.jpg"}))
+        self.assertEqual(said[storydoc.COVER], (ART,))
+
+    def test_a_cover_pointing_at_real_art_is_not_wanting(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        said = self.wanting(Cell(storydoc.COVER, "", {"src": "art.png"}))
+        self.assertNotIn(storydoc.COVER, said)
+
+    def test_a_title_page_nobody_filled_in(self) -> None:
+        said = self.wanting(title_page(title="Untitled"))
+        self.assertEqual(
+            said[storydoc.TITLE_PAGE],
+            ("title", "subtitle", "author", "publisher", "date"),
+        )
+
+    def test_it_names_only_the_fields_that_are_empty(self) -> None:
+        said = self.wanting(filled_title_page(author="", date="   "))
+        self.assertEqual(said[storydoc.TITLE_PAGE], ("author", "date"))
+
+    def test_a_cover_whose_marker_and_markdown_disagree(self) -> None:
+        # The author repointed the image and the attribute kept the name the
+        # section was started with. The editor draws the markdown, so the book
+        # has to find it there too rather than binding coverless in silence.
+        (self.root / "real.png").write_bytes(b"png")
+        said = self.wanting(
+            Cell(storydoc.COVER, "![Cover](real.png)", {"src": "cover.jpg"})
+        )
+        self.assertNotIn(storydoc.COVER, said)
+
+    def test_a_cover_whose_every_name_is_missing(self) -> None:
+        said = self.wanting(
+            Cell(storydoc.COVER, "![Cover](nope.png)", {"src": "cover.jpg"})
+        )
+        self.assertEqual(said[storydoc.COVER], (ART,))
+
+    def test_a_version_is_never_wanted(self) -> None:
+        # A fact about an edition, like an ISBN, not a thing a book waits for.
+        said = self.wanting(filled_title_page(version=""))
+        self.assertNotIn(storydoc.TITLE_PAGE, said)
+
+    def test_an_isbn_is_never_wanted(self) -> None:
+        # Many editions have none, so it is not a fact a book waits for.
+        said = self.wanting(filled_title_page())
+        self.assertNotIn(storydoc.TITLE_PAGE, said)
+
+    def test_an_about_page_with_nothing_on_it(self) -> None:
+        # `build_about_page` already answers None here.
+        said = self.wanting(Cell(storydoc.ABOUT, ""))
+        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+
+    def test_an_about_page_with_only_a_link_is_written(self) -> None:
+        said = self.wanting(Cell(storydoc.ABOUT, "", {"website": "https://x.com"}))
+        self.assertNotIn(storydoc.ABOUT, said)
+
+    def test_an_empty_blurb(self) -> None:
+        said = self.wanting(Cell(storydoc.BLURB, ""))
+        self.assertEqual(said[storydoc.BLURB], (TEXT,))
+
+    def test_the_table_of_contents_is_never_wanting(self) -> None:
+        # It is built from the chapters whatever the cell holds.
+        said = self.wanting(storydoc.contents())
+        self.assertNotIn(storydoc.CONTENTS, said)
+
+    def test_a_section_that_is_not_there_wants_everything(self) -> None:
+        said = self.wanting(storydoc.chapter("One"))
+        self.assertEqual(said[storydoc.COVER], (ART,))
+        self.assertEqual(said[storydoc.BLURB], (TEXT,))
+        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+
+    def test_a_disclaimer_is_not_a_section_the_book_requires(self) -> None:
+        said = self.wanting(Cell(storydoc.DISCLAIMER, ""), storydoc.chapter("One"))
+        self.assertNotIn(storydoc.DISCLAIMER, said)
+
+
+class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.root = Path(self._dir.name)
+
+    def test_a_bare_story_is_missing_all_five(self) -> None:
+        found = report_of(placed(self.root, storydoc.chapter("One")))
+        self.assertEqual(found.added, REQUIRED)
+        self.assertFalse(found.ready)
+
+    def test_the_plan_opens_and_closes_the_document(self) -> None:
+        found = report_of(placed(self.root, storydoc.chapter("One")))
+        self.assertEqual(
+            [slot.kind for slot in found.plan],
+            [*OPENING, storydoc.CHAPTER, *CLOSING],
+        )
+
+    def test_a_section_already_there_is_carried_by_index(self) -> None:
+        found = report_of(
+            placed(
+                self.root,
+                storydoc.chapter("One"),
+                Cell(storydoc.COVER, "", {"src": "art.png"}),
+            )
+        )
+        self.assertNotIn(storydoc.COVER, found.added)
+        self.assertEqual(found.plan[0].at, 1)
+
+    def test_the_story_keeps_the_order_it_was_written_in(self) -> None:
+        found = report_of(
+            placed(
+                self.root,
+                storydoc.chapter("One"),
+                storydoc.markdown("The lantern."),
+                storydoc.chapter("Two"),
+            )
+        )
+        self.assertEqual([s.at for s in found.plan if s.at is not None], [0, 1, 2])
+
+    def test_a_section_that_passed_the_story_has_moved(self) -> None:
+        found = report_of(
+            placed(self.root, storydoc.chapter("One"), storydoc.contents())
+        )
+        self.assertIn(storydoc.CONTENTS, found.moved)
+
+    def test_writing_a_section_in_moves_nothing(self) -> None:
+        # The about page is last before and last after; only its index changed.
+        found = report_of(
+            placed(
+                self.root,
+                storydoc.chapter("One"),
+                Cell(storydoc.ABOUT, "I live by the sea."),
+            )
+        )
+        self.assertEqual(found.moved, ())
+
+    def test_a_front_matter_written_back_to_front_has_all_of_it_moved(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        found = report_of(
+            placed(
+                self.root,
+                Cell(storydoc.ABOUT, "I live by the sea."),
+                Cell(storydoc.BLURB, "A lantern, and a stair."),
+                storydoc.contents(),
+                filled_title_page(),
+                Cell(storydoc.COVER, "", {"src": "art.png"}),
+                storydoc.chapter("One"),
+            )
+        )
+        self.assertEqual(found.added, ())
+        self.assertEqual(found.moved, REQUIRED)
+
+    def test_the_disclaimer_keeps_the_place_the_author_gave_it(self) -> None:
+        found = report_of(
+            placed(
+                self.root,
+                Cell(storydoc.DISCLAIMER, "All fiction."),
+                storydoc.chapter("One"),
+            )
+        )
+        self.assertEqual(
+            [slot.kind for slot in found.plan],
+            [*OPENING, storydoc.DISCLAIMER, storydoc.CHAPTER, *CLOSING],
+        )
+
+    def test_only_the_first_of_a_kind_is_claimed(self) -> None:
+        found = report_of(
+            placed(
+                self.root,
+                storydoc.chapter("One"),
+                storydoc.contents(),
+                storydoc.contents(),
+            )
+        )
+        self.assertEqual(found.plan[2].at, 1)
+        self.assertIn(2, [slot.at for slot in found.plan[4:]])
+
+    def test_everything_present_and_one_of_them_empty_is_not_ready(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        found = report_of(
+            placed(
+                self.root,
+                Cell(storydoc.COVER, "", {"src": "art.png"}),
+                filled_title_page(),
+                storydoc.contents(),
+                Cell(storydoc.BLURB, ""),  # written in, never filled
+                storydoc.chapter("One"),
+                Cell(storydoc.ABOUT, "I live by the sea."),
+            )
+        )
+        self.assertEqual(found.added, ())
+        self.assertEqual(found.moved, ())
+        self.assertFalse(found.ready)
+
+    def test_a_document_with_everything_written_is_ready(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        found = report_of(
+            placed(
+                self.root,
+                Cell(storydoc.COVER, "", {"src": "art.png"}),
+                filled_title_page(),
+                storydoc.contents(),
+                Cell(storydoc.BLURB, "A lantern, and a stair."),
+                storydoc.chapter("One"),
+                Cell(storydoc.ABOUT, "I live by the sea."),
+            )
+        )
+        self.assertTrue(found.ready)
 
 
 if __name__ == "__main__":

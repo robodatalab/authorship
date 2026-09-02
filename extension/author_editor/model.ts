@@ -112,6 +112,14 @@ export interface CellKind {
 	 * page is called.
 	 */
 	named?: boolean;
+	/**
+	 * Can be folded away to its heading, and left that way.
+	 *
+	 * For a section that is large on the page and settled early. Cover art is the
+	 * one that really is: it is decided once and then sits at the top of the
+	 * manuscript taking a screenful of scrolling on the way to the writing.
+	 */
+	minimizable?: boolean;
 	/** Offered in the toolbar itself rather than behind the overflow menu. */
 	primary: boolean;
 	/** What a cell of this kind starts life as. */
@@ -194,12 +202,16 @@ export const KINDS: CellKind[] = [
 			{ name: 'author', label: 'Author' },
 			{ name: 'publisher', label: 'Publisher' },
 			{ name: 'date', label: 'Date', hint: 'YYYY-MM-DD' },
-			{ name: 'version', label: 'Version', hint: '1.0' },
-			{ name: 'isbn', label: 'ISBN', hint: '978-0-000-00000-0', optional: true },
+			{ name: 'version', label: 'Version', hint: 'e.g. 1.0', optional: true },
+			{ name: 'isbn', label: 'ISBN', hint: 'e.g. 978-0-000-00000-0', optional: true },
 		],
 		matter: true,
 		primary: false,
-		blank: () => ({ kind: TITLE_PAGE, source: '', attrs: { title: 'Untitled' } }),
+		blank: () => ({
+			kind: TITLE_PAGE,
+			source: '',
+			attrs: { title: 'Untitled', version: '1.0' },
+		}),
 	},
 	{
 		kind: COVER,
@@ -208,6 +220,7 @@ export const KINDS: CellKind[] = [
 		label: 'Cover',
 		automated: false,
 		matter: true,
+		minimizable: true,
 		primary: false,
 		blank: () => ({
 			kind: COVER,
@@ -285,6 +298,18 @@ export function labelOf(kind: string): string {
 	return KINDS.find((k) => k.kind === kind)?.label ?? kind;
 }
 
+/**
+ * A blank cell of this kind, as the menus make one.
+ *
+ * What the editor writes in for a section the book needs and the document has
+ * not got. A kind nobody has heard of has no shape to start from, so it begins
+ * as an empty cell of that kind rather than as nothing.
+ */
+export function blankOf(kind: string): Cell {
+	const known = KINDS.find((k) => k.kind === kind);
+	return known ? known.blank() : { kind, source: '', attrs: {} };
+}
+
 /** Whether running this cell writes it, in which case the author does not. */
 export function isAutomated(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.automated ?? false;
@@ -293,6 +318,11 @@ export function isAutomated(kind: string): boolean {
 /** Whether this kind's label is printed as the section's heading. */
 export function isNamed(kind: string): boolean {
 	return KINDS.find((k) => k.kind === kind)?.named ?? false;
+}
+
+/** Whether this kind can be folded away to its heading and left that way. */
+export function isMinimizable(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.minimizable ?? false;
 }
 
 /** Whether the server writes this kind on request. */
@@ -607,7 +637,7 @@ export function withDefaultCell(cells: Cell[]): Cell[] {
 	if (cells.length > 0) {
 		return cells;
 	}
-	return [KINDS.find((kind) => kind.kind === MARKDOWN)!.blank()];
+	return [blankOf(MARKDOWN)];
 }
 
 /**
