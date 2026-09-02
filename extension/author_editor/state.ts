@@ -67,6 +67,7 @@ export const state: {
 	selected: number;
 	writing: Writing | null;
 	styling: Styling | null;
+	wanting: Set<string>;
 	drawn: string;
 	generation: number;
 	openBox: OpenBox | null;
@@ -89,6 +90,15 @@ export const state: {
 	 * they typed would land either under what arrives or over it.
 	 */
 	styling: null,
+	/**
+	 * The sections the book still wants, by kind.
+	 *
+	 * Decided by the exporter and arriving with the answer to an export — nothing
+	 * on this side has an opinion about what a book needs. By kind rather than by
+	 * index, because the author goes on adding, moving and deleting cells around
+	 * these and an index would name the wrong section by the time it was drawn.
+	 */
+	wanting: new Set<string>(),
 	/**
 	 * What is on the page right now.
 	 *

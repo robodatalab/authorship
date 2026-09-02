@@ -54,6 +54,21 @@ class Writing(unittest.TestCase):
         written = storydoc.dumps([storydoc.part("Book One")])
         self.assertEqual(written, '<!-- cell: part title="Book One" -->\n')
 
+    def test_an_unprinted_part_says_it_prints_nothing(self) -> None:
+        # The seam an author cuts the files at: a part in every way but the page
+        # the reader would otherwise turn to.
+        written = storydoc.dumps([storydoc.part("Break", printed=False)])
+        self.assertEqual(written, '<!-- cell: part title="Break" print="no" -->\n')
+
+    def test_whether_a_part_prints_survives_the_round_trip(self) -> None:
+        back = storydoc.parse(storydoc.dumps([storydoc.part("Break", printed=False)]))
+        self.assertFalse(storydoc.prints_page(back[0]))
+
+    def test_a_part_that_says_nothing_about_printing_prints(self) -> None:
+        # Every part written before there was anything to say about it.
+        self.assertTrue(storydoc.prints_page(storydoc.part("Book One")))
+        self.assertTrue(storydoc.prints_page(Cell(storydoc.PART, "", {})))
+
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
         self.assertEqual(storydoc.dumps([storydoc.contents()]), "<!-- cell: contents -->\n")
 

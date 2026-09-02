@@ -38,11 +38,21 @@ import { isFindKey, isReplaceKey } from './keys';
 import { applyFix, receiveFindings, setChecking } from './marks_view';
 import { beginEditing, closeEditing, releaseBox, writable } from './editor_box';
 import { redrawCell, render, restoreCaret, showWhere } from './page_view';
+import { foldAllCells } from './edits';
 import { signatureOf, state } from './state';
 import type { Cell } from '../storydoc/model';
 import type { Finding } from './marks';
 
 // --- the toolbar ---
+
+// Folding is an edit the page makes for itself, like moving a cell — it does
+// not go out to the host and come back.
+for (const [id, on] of [
+	['fold-all', true],
+	['unfold-all', false],
+] as const) {
+	document.getElementById(id)!.addEventListener('click', () => foldAllCells(on));
+}
 
 for (const [id, type] of [
 	['run-all', 'compile'],
@@ -167,6 +177,9 @@ window.addEventListener('message', (event) => {
 		styleEl.hidden = !message.styleFix;
 	} else if (message?.type === 'checking') {
 		setChecking(message.on as boolean);
+	} else if (message?.type === 'wanting') {
+		state.wanting = new Set(message.kinds as string[]);
+		render();
 	} else if (message?.type === 'marks') {
 		receiveFindings(message.findings as Finding[], Boolean(message.whole));
 	} else if (message?.type === 'fixed') {

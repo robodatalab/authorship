@@ -505,23 +505,84 @@ class ExportEpub(unittest.TestCase):
             ],
         )
 
+    def _ready(self) -> None:
+        """Write the document out with every section a book needs filled in."""
+        (Path(self._dir.name) / "art.png").write_bytes(b"png")
+        storydoc.save(
+            self.document,
+            [
+                storydoc.Cell(storydoc.COVER, "", {"src": "art.png"}),
+                storydoc.Cell(
+                    storydoc.TITLE_PAGE,
+                    "",
+                    {
+                        "title": "Book",
+                        "subtitle": "A Story",
+                        "author": "A. Writer",
+                        "publisher": "A Press",
+                        "date": "2026-09-02",
+                    },
+                ),
+                storydoc.contents(),
+                storydoc.Cell(storydoc.BLURB, "A lantern, and a stair."),
+                storydoc.chapter("One"),
+                storydoc.markdown("prose"),
+                storydoc.Cell(storydoc.ABOUT, "I live by the sea."),
+            ],
+        )
+
     def test_writes_the_epub_beside_the_document(self) -> None:
+        self._ready()
         client = TestClient(app)
         response = client.post("/export/epub", json={"path": str(self.document)})
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ready"])
 
         written = Path(response.json()["path"])
         self.assertEqual(written, self.document.with_suffix(".epub"))
         self.assertTrue(written.exists())
         self.assertTrue(zipfile.is_zipfile(written))
 
-    def test_a_missing_document_is_a_bad_request(self) -> None:
+    def test_a_document_that_is_not_ready_is_not_bound(self) -> None:
+        # The document written in setUp has a title page and nothing else: no
+        # cover, no blurb, no author page, and a title page with one field on it.
+        client = TestClient(app)
+        response = client.post("/export/epub", json={"path": str(self.document)})
+        self.assertEqual(response.status_code, 200)
+
+        said = response.json()
+        self.assertFalse(said["ready"])
+        self.assertNotIn("path", said)
+        self.assertFalse(self.document.with_suffix(".epub").exists())
+
+    def test_it_says_what_is_missing_rather_than_only_refusing(self) -> None:
+        client = TestClient(app)
+        said = client.post(
+            "/export/epub", json={"path": str(self.document)}
+        ).json()
+        self.assertEqual(
+            said["added"], [storydoc.COVER, storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+        )
+        wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
+        # The title page is there, in place, and still not filled in — which is
+        # the fault a document can have while looking complete.
+        self.assertEqual(
+            wanting[storydoc.TITLE_PAGE],
+            ["subtitle", "author", "publisher", "date"],
+        )
+
+    def test_force_binds_a_book_that_is_not_ready(self) -> None:
         client = TestClient(app)
         response = client.post(
-            "/export/epub",
-            json={"path": str(self.document.with_name("nope.author"))},
+            "/export/epub", json={"path": str(self.document), "force": True}
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+
+        said = response.json()
+        self.assertFalse(said["ready"])
+        written = Path(said["path"])
+        self.assertTrue(written.exists())
+        self.assertTrue(zipfile.is_zipfile(written))
 
 
 # What the stubbed Gemini answers with: a plausible correction of the sections

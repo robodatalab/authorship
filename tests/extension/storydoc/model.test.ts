@@ -20,6 +20,7 @@ import {
 	markdown,
 	parse,
 	part,
+	printsPage,
 	titleOf,
 	type Cell,
 } from '../../../extension/storydoc/model';
@@ -74,6 +75,12 @@ describe('writing', () => {
 
 	it('writes a part as its marker alone, since it too is only a name', () => {
 		expect(dumps([part('Book One')])).toBe('<!-- cell: part title="Book One" -->\n');
+	});
+
+	it('writes an unprinted part as one that says it prints nothing', () => {
+		expect(dumps([part('Break', false)])).toBe(
+			'<!-- cell: part title="Break" print="no" -->\n'
+		);
 	});
 
 	it('writes a cell with no text as its marker alone', () => {
@@ -148,5 +155,27 @@ describe('authorPathFor', () => {
 		expect(authorPathFor('/work/notes.md/chapter.md')).toBe(
 			`/work/notes.md/chapter${EXTENSION}`
 		);
+	});
+});
+
+
+describe('printsPage — whether a part is a page or only a seam', () => {
+	it('prints a part that says nothing about it', () => {
+		// Every part written before there was anything to say is one the book
+		// prints, and stays one.
+		expect(printsPage(part('Book One'))).toBe(true);
+		expect(printsPage({ kind: 'part', source: '', attrs: {} })).toBe(true);
+	});
+
+	it('prints no page where the author said not to', () => {
+		expect(printsPage(part('Break', false))).toBe(false);
+		expect(
+			printsPage({ kind: 'part', source: '', attrs: { title: 'B', print: 'no' } })
+		).toBe(false);
+	});
+
+	it('survives the round trip through the file', () => {
+		const back = parse(dumps([part('Break', false)]));
+		expect(printsPage(back[0])).toBe(false);
 	});
 });

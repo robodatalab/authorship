@@ -43,8 +43,14 @@ import {
 	configuredModel,
 	styleFixEnabled,
 } from '../gemini/account';
-import { DEFAULT_PART_WORDS, quotaOf } from '../parts/model';
-import { MARKDOWN, PART, dumps, has, parse, type Cell } from '../storydoc/model';
+import {
+	applyPlan,
+	askOf,
+	doneOf,
+	wantingKinds,
+	type Report,
+} from '../publish/layout';
+import { MARKDOWN, dumps, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -116,7 +122,8 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 						`Exported ${basename(uri)}`
 					);
 				}),
-			exportEpub: () => this.onActive((d) => this.exportEpub(d)),
+			exportEpub: () =>
+				this.onActive((d) => this.exportEpub(d, this.active?.panel)),
 			partition: () => this.onActive((d) => this.partition(d)),
 			fixStyle: () =>
 				this.onActive((d) => this.fixStyle(d, this.active?.panel)),
@@ -233,7 +240,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					this.onActive((d) => this.stop(d));
 					break;
 				case 'exportEpub':
-					void this.exportEpub(document);
+					void this.exportEpub(document, panel);
 					break;
 				case 'exportMarkdown':
 					void this.exportMarkdown(document);
@@ -1117,33 +1124,20 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	/**
 	 * Cut the story into `parts/part_1.author`, `part_2.author`… beside it.
 	 *
-	 * How long a part should be is always asked; whether to keep the story's own
-	 * Parts whole is asked only of a story that has them, since in one that has
-	 * none the tick changes nothing. The cuts fall between chapters either way, so
-	 * a part never opens mid-scene and the lengths land near the quota rather than
-	 * on it.
+	 * Nothing is asked, because the author has already said it: the cuts fall
+	 * where they put the Parts, one file each. A Part they would rather the reader
+	 * did not meet is marked unprinted and divides the files just the same, so
+	 * saying where a story breaks costs the book nothing.
 	 *
 	 * A part is a story document like any other, so exporting one to an EPUB or to
 	 * markdown is the export that already exists.
 	 */
 	private async partition(document: vscode.TextDocument): Promise<void> {
 		const cells = parse(document.getText());
-		// The tick is only worth putting to a story that has Parts of its own; one
-		// that has none is divided identically either way, and is asked the one
-		// question it has an answer to.
-		const asked = has(cells, PART) ? await askHowToDivide() : await askHowLong();
-		if (asked === undefined) {
-			return;
-		}
-		const { folder, parts } = await divideManuscript(
-			document.uri,
-			cells,
-			asked.quota,
-			asked.alongParts
-		);
+		const { folder, parts } = await divideManuscript(document.uri, cells);
 		void vscode.window.showInformationMessage(
 			parts === 0
-				? 'Nothing to divide — the document has no chapters.'
+				? `Nothing to divide — add a Part where ${basename(document.uri)} should break.`
 				: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`
 		);
 	}
@@ -1155,7 +1149,11 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * markdown has no way to carry that — a title page flattened to a `#` line is
 	 * a book with no title, no cover and no chapters, only one long page.
 	 */
-	private async exportEpub(document: vscode.TextDocument): Promise<void> {
+	private async exportEpub(
+		document: vscode.TextDocument,
+		panel?: vscode.WebviewPanel,
+		force = false
+	): Promise<void> {
 		try {
 			if (document.isDirty) {
 				// The server reads the file from disk, so what is on screen has to
@@ -1165,7 +1163,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			const response = await fetch(`http://127.0.0.1:${this.port}/export/epub`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: document.uri.fsPath }),
+				body: JSON.stringify({ path: document.uri.fsPath, force }),
 			});
 			if (!response.ok) {
 				void vscode.window.showErrorMessage(
@@ -1173,15 +1171,78 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 				);
 				return;
 			}
-			const { path } = (await response.json()) as { path: string };
-			void vscode.window.showInformationMessage(
-				`Exported ${basename(vscode.Uri.file(path))}`
-			);
+			const report = (await response.json()) as Report;
+			// Whatever came of the request, the answer says which sections are
+			// still to write — so the marks are put up before anything else is
+			// decided, including when the book bound anyway.
+			this.sayWanting(panel, report);
+
+			if (report.path) {
+				void vscode.window.showInformationMessage(
+					`Exported ${basename(vscode.Uri.file(report.path))}`
+				);
+				return;
+			}
+			await this.putLayout(document, panel, report);
 		} catch (err) {
 			void vscode.window.showErrorMessage(
 				`Export failed — is the model server running? (${describe(err)})`
 			);
 		}
+	}
+
+	/**
+	 * Put to the author a book the server would not bind.
+	 *
+	 * **Fix does not export.** A section written in is an empty section, and a
+	 * book bound straight over one has a blank page where its cover should be —
+	 * so fixing lays the document out, leaves what is still wanting marked, and
+	 * hands it back. Only Export Anyway binds what is there, and only because the
+	 * author was shown what was missing and asked for the file regardless.
+	 *
+	 * Nothing here decides what a book needs. The plan, the names and the reasons
+	 * all came from the exporter; this carries them into the document.
+	 */
+	private async putLayout(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel | undefined,
+		report: Report
+	): Promise<void> {
+		const name = basename(document.uri);
+		const { message, detail } = askOf(name, report);
+		const answer = await vscode.window.showWarningMessage(
+			message,
+			{ modal: true, detail },
+			'Fix',
+			'Export Anyway'
+		);
+		if (answer === 'Export Anyway') {
+			await this.exportEpub(document, panel, true);
+			return;
+		}
+		if (answer !== 'Fix') {
+			return;
+		}
+		// One edit, so one undo walks all of it back.
+		await this.write(document, applyPlan(parse(document.getText()), report.plan));
+		void vscode.window.showInformationMessage(doneOf(name, report));
+	}
+
+	/**
+	 * Tell the page which sections are still to write.
+	 *
+	 * By kind rather than by index: the author is about to add, move and delete
+	 * cells around these, and an index would name the wrong one by the time they
+	 * looked. A kind names the same section for as long as the section exists.
+	 */
+	private sayWanting(
+		panel: vscode.WebviewPanel | undefined,
+		report: Report
+	): void {
+		void panel?.webview.postMessage({
+			type: 'wanting',
+			kinds: wantingKinds(report),
+		});
 	}
 
 	private html(webview: vscode.Webview): string {
@@ -1262,79 +1323,6 @@ interface JobStatus {
 	note?: string | null;
 	/** Chapters the pass could not use an answer for, and why. */
 	leftAlone?: { chapter: string; why: string }[];
-}
-
-/**
- * The one thing a division has to be told beyond how long a part should be.
- *
- * Asked as a tick rather than as two lines to choose between, because it is one
- * question with an answer either way. `alwaysShow`, because the box above it is
- * the one the length is typed into and would otherwise filter it away.
- */
-const ALONG_THE_PARTS = {
-	label: 'Divide along Parts',
-	description: 'a Part longer than the quota is still cut by length, inside it',
-	alwaysShow: true,
-};
-
-const HOW_LONG = `About how many words should a part be? (${DEFAULT_PART_WORDS} unless you say)`;
-
-/** What a division was asked for. */
-interface HowToDivide {
-	quota: number;
-	alongParts: boolean;
-}
-
-/**
- * Both halves of the question in one form: the length in the box, and whether to
- * keep the story's own Parts whole as a tick under it.
- *
- * A quick pick rather than an input box, because only a quick pick carries both.
- * Resolves to undefined for a form the author dismissed rather than answered —
- * a division nobody asked for is a folder of files they have to delete.
- */
-function askHowToDivide(): Promise<HowToDivide | undefined> {
-	return new Promise((resolve) => {
-		const form = vscode.window.createQuickPick();
-		form.title = 'Divide into Parts';
-		form.placeholder = HOW_LONG;
-		form.canSelectMany = true;
-		form.items = [ALONG_THE_PARTS];
-		form.selectedItems = form.items;
-
-		let answered: HowToDivide | undefined;
-		form.onDidAccept(() => {
-			// An empty box is the author taking the length offered rather than
-			// naming one, which is what `quotaOf` reads it as.
-			answered = {
-				quota: quotaOf(form.value),
-				alongParts: form.selectedItems.length > 0,
-			};
-			form.hide();
-		});
-		// Both endings arrive here — accepted or dismissed — so the form is
-		// disposed of once and the answer is whatever accepting left behind.
-		form.onDidHide(() => {
-			form.dispose();
-			resolve(answered);
-		});
-		form.show();
-	});
-}
-
-/** The length alone, which is the whole of the question in a story with no
- *  Parts to keep whole. */
-async function askHowLong(): Promise<HowToDivide | undefined> {
-	const asked = await vscode.window.showInputBox({
-		title: 'Divide into Parts',
-		prompt: 'About how many words should a part be?',
-		value: String(DEFAULT_PART_WORDS),
-		validateInput: (raw) =>
-			Number(raw) > 0 ? null : 'A part is some positive number of words.',
-	});
-	return asked === undefined
-		? undefined
-		: { quota: quotaOf(asked), alongParts: false };
 }
 
 /**

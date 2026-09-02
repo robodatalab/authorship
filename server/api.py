@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from server import log
 from server.publishing import authorship
-from server.publishing.epub_exporter import build_epub
+from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.grammar import correct_span
 from server.writing_tools import grammar_check, prose_check, style
@@ -202,6 +202,23 @@ class EpubExportRequest(BaseModel):
     # title page, its cover, its disclaimer, where to find the author — is in
     # the document's own cells.
     path: str
+    # Bind the book though sections of it are missing or empty. The author has
+    # been shown what is wanting and asked for the file anyway, which is theirs
+    # to ask for; nothing else may skip the reading.
+    force: bool = False
+
+
+def _said(found: Report) -> dict[str, Any]:
+    """A report as the editor reads it."""
+    return {
+        "ready": found.ready,
+        "plan": [{"kind": slot.kind, "at": slot.at} for slot in found.plan],
+        "added": list(found.added),
+        "moved": list(found.moved),
+        "wanting": [
+            {"kind": item.kind, "needs": list(item.needs)} for item in found.wanting
+        ],
+    }
 
 
 @app.get("/authorship")
@@ -222,13 +239,21 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     """Export a document to an EPUB written beside it, as `<name>.epub`.
 
     The document is the whole of the book, so there is nothing to fetch from
-    beside it and nothing that can disagree with it. A document missing a
-    section simply publishes without that section.
+    beside it and nothing that can disagree with it.
+
+    A document that is not ready is not bound: it answers what is wanting and
+    writes nothing. An EPUB with a blank title page and no cover is not a lesser
+    book, it is a file nobody can sell, and it used to be written without a word
+    said. `force` is how the author, having been shown what is missing, says they
+    want the file regardless.
     """
     document = _document(request.path)
+    found = report_of(document)
+    if not (found.ready or request.force):
+        return _said(found)
     out_path = document.beside(".epub")
     build_epub(document, out_path)
-    return {"path": str(out_path)}
+    return {**_said(found), "path": str(out_path)}
 
 
 class LineSelection(BaseModel):

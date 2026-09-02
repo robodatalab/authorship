@@ -15,10 +15,15 @@ import {
 	isDivisible,
 	isGenerated,
 	isMatter,
+	foldAt,
+	foldEvery,
+	isFolded,
 	isNamed,
 	isStale,
 	isUnpublished,
 	fieldsOf,
+	headingsOver,
+	isHeading,
 	labelOf,
 	mergeAt,
 	mergesUp,
@@ -30,8 +35,10 @@ import {
 	safeUrl,
 	sourceLinesOf,
 	splitAt,
+	saidWords,
 	toMarkdown,
 	withDefaultCell,
+	wordsByHeading,
 	wordsIn,
 } from '../../../extension/author_editor/model';
 import {
@@ -159,8 +166,13 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('markdown')).toBe(true);
 	});
 
-	it('gives a part the same shape as a chapter — a name and nothing else', () => {
-		expect(fieldsOf('part').map((f) => f.name)).toEqual(['title']);
+	it('gives a part a name, and a box saying whether the book prints it', () => {
+		// A chapter's shape with one thing added: a part is also where the story
+		// may be cut into files, and an author who wants the cut without the page
+		// unticks the box. A new part is one the book prints, which is what saying
+		// nothing about it means.
+		expect(fieldsOf('part').map((f) => f.name)).toEqual(['title', 'print']);
+		expect(fieldsOf('part').map((f) => f.toggle)).toEqual([undefined, true]);
 		expect(hasProse('part')).toBe(false);
 		expect(isAutomated('part')).toBe(false);
 		expect(KINDS.find((k) => k.kind === 'part')!.blank()).toEqual({
@@ -189,9 +201,20 @@ describe('the kinds a section can be', () => {
 		const hints = Object.fromEntries(
 			fieldsOf('title-page').map((f) => [f.name, f.hint])
 		);
+		// A hint has to be unmistakably not a value. `YYYY-MM-DD` is a shape, and
+		// the rest say `e.g.` outright — a bare `1.0` sitting in an empty box
+		// reads as a version somebody typed, which is how an empty field came to
+		// look like a filled one.
 		expect(hints.date).toBe('YYYY-MM-DD');
-		expect(hints.version).toBe('1.0');
-		expect(hints.isbn).toBeTruthy();
+		expect(hints.version).toBe('e.g. 1.0');
+		expect(hints.isbn).toBe('e.g. 978-0-000-00000-0');
+		for (const [name, hint] of Object.entries(hints)) {
+			if (hint !== undefined) {
+				expect(/^(e\.g\. |[A-Z-]+$|https?:)|…/.test(hint), `${name}: ${hint}`).toBe(
+					true
+				);
+			}
+		}
 		// A title is a title; there is nothing a hint would add.
 		expect(hints.title).toBeUndefined();
 		expect(hints.author).toBeUndefined();
@@ -224,8 +247,13 @@ describe('the kinds a section can be', () => {
 		expect(isNamed('markdown')).toBe(false);
 	});
 
-	it('marks only the ISBN optional', () => {
+	it('marks the facts about an edition optional', () => {
+		// Which fields are optional is what an export waits for: everything else
+		// on a title page has to be filled in before a book will bind, so this
+		// list and `TITLE_PAGE_FIELDS` in server/publishing/epub_exporter.py are
+		// two halves of one rule and have to be changed together.
 		expect(fieldsOf('title-page').filter((f) => f.optional).map((f) => f.name)).toEqual([
+			'version',
 			'isbn',
 		]);
 	});
@@ -483,6 +511,19 @@ describe('placeOf — where in the book a cell stands', () => {
 		expect(placeOf(cells, 3)).toEqual({ part: null, chapter: 'Two' });
 	});
 
+	it('walks past a seam to the part that names this stretch of the story', () => {
+		// A part the book does not print is not a place anyone stands: the author
+		// writing after the break is still writing in Day One.
+		const cells = [
+			part('Day One'),
+			chapter('One'),
+			part('Break', false),
+			chapter('Two'),
+			markdown('a'),
+		];
+		expect(placeOf(cells, 4)).toEqual({ part: 'Day One', chapter: 'Two' });
+	});
+
 	it('leaves the chapter behind at a part heading, which ended it', () => {
 		const cells = [part('Day One'), chapter('One'), part('Day Two'), markdown('a')];
 		expect(placeOf(cells, 3)).toEqual({ part: 'Day Two', chapter: null });
@@ -522,6 +563,128 @@ describe('countWords — words as a reader counts them', () => {
 
 	it('counts across the lines of a paragraph as one run of prose', () => {
 		expect(countWords('The lantern\nhad gone out\n\nagain.')).toBe(6);
+	});
+});
+
+describe('wordsByHeading — what each part and chapter weighs', () => {
+	/** Prose of a known length, so the number read back is the one under test. */
+	function prose(words: number): Cell {
+		return markdown(Array.from({ length: words }, () => 'word').join(' '));
+	}
+
+	it('gives a chapter the words written under it', () => {
+		const cells = [chapter('One'), prose(10), prose(5)];
+		expect(wordsByHeading(cells)).toEqual([15, 0, 0]);
+	});
+
+	it('stops a chapter at the next chapter', () => {
+		const cells = [chapter('One'), prose(10), chapter('Two'), prose(5)];
+		expect(wordsByHeading(cells)).toEqual([10, 0, 5, 0]);
+	});
+
+	it('gives a part what the chapters under it weigh together', () => {
+		const cells = [
+			part('Day One'),
+			chapter('One'),
+			prose(10),
+			chapter('Two'),
+			prose(5),
+		];
+		expect(wordsByHeading(cells)).toEqual([15, 10, 0, 5, 0]);
+	});
+
+	it('stops a part at the next part, and the chapter with it', () => {
+		const cells = [
+			part('Day One'),
+			chapter('One'),
+			prose(10),
+			part('Day Two'),
+			prose(5),
+			chapter('Two'),
+			prose(3),
+		];
+		// The prose after the second part is the part's and no chapter's — the
+		// chapter above it ended where the part began.
+		expect(wordsByHeading(cells)).toEqual([10, 10, 0, 8, 0, 3, 0]);
+	});
+
+	it('counts prose under a part before its first chapter into the part', () => {
+		const cells = [part('Day One'), prose(4), chapter('One'), prose(6)];
+		expect(wordsByHeading(cells)).toEqual([10, 0, 6, 0]);
+	});
+
+	it('counts the same words the document counts, and no others', () => {
+		// One rule, two readings of it: a chapter that disagreed with the number in
+		// the toolbar would make an author doubt both.
+		const cells: Cell[] = [
+			{ kind: 'title-page', source: '', attrs: { title: 'The Long Night' } },
+			part('Day One'),
+			chapter('The First Night'),
+			prose(10),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+			{ kind: 'about', source: 'She lives by the sea.', attrs: {} },
+		];
+		expect(wordsByHeading(cells)[1]).toBe(wordsIn(cells));
+		expect(wordsByHeading(cells)[2]).toBe(10);
+	});
+
+	it('weighs nothing for the prose written before any heading', () => {
+		expect(wordsByHeading([prose(10)])).toEqual([0]);
+	});
+
+	it('leaves out the section a caller holds a newer copy of', () => {
+		const cells = [chapter('One'), prose(10), prose(5)];
+		expect(wordsByHeading(cells, 1)).toEqual([5, 0, 0]);
+	});
+
+	it('counts nothing in a document with nothing in it', () => {
+		expect(wordsByHeading([])).toEqual([]);
+	});
+});
+
+describe('headingsOver — the counts a keystroke can change', () => {
+	it('names the chapter and the part a section stands under', () => {
+		const cells = [part('Day One'), chapter('One'), markdown('a')];
+		expect(headingsOver(cells, 2)).toEqual([1, 0]);
+	});
+
+	it('names the part alone where no chapter has opened yet', () => {
+		const cells = [part('Day One'), markdown('a')];
+		expect(headingsOver(cells, 1)).toEqual([0]);
+	});
+
+	it('names nothing above prose that stands under neither', () => {
+		expect(headingsOver([markdown('a')], 0)).toEqual([]);
+		expect(headingsOver([markdown('a')], null)).toEqual([]);
+	});
+
+	it('names the chapter the words are counted into, not one a part ended', () => {
+		// The same rule `wordsByHeading` walks: a chapter above a part does not
+		// reach past it.
+		const cells = [chapter('One'), part('Day Two'), markdown('a')];
+		expect(headingsOver(cells, 2)).toEqual([1]);
+	});
+});
+
+describe('saidWords — a count as it is said', () => {
+	it('marks the thousands, since a manuscript is six digits long', () => {
+		expect(saidWords(1234)).toBe('1,234 words');
+		expect(saidWords(127450)).toBe('127,450 words');
+	});
+
+	it('says one word rather than one words', () => {
+		expect(saidWords(1)).toBe('1 word');
+		expect(saidWords(0)).toBe('0 words');
+	});
+});
+
+describe('isHeading — what stands over the writing under it', () => {
+	it('is the two levels of the story and nothing else', () => {
+		expect(isHeading('chapter')).toBe(true);
+		expect(isHeading('part')).toBe(true);
+		expect(isHeading('markdown')).toBe(false);
+		expect(isHeading('title-page')).toBe(false);
+		expect(isHeading('epigraph')).toBe(false);
 	});
 });
 
@@ -735,6 +898,17 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 			markdown('a'),
 		]);
 		expect(written).toBe('# Book\n\n## One\n\n### The First Night\n\na\n');
+	});
+
+	it('leaves out a part the book does not print', () => {
+		// It says where the story divides into files, and a manuscript is one file.
+		const written = toMarkdown([
+			chapter('One'),
+			markdown('a'),
+			part('Break', false),
+			chapter('Two'),
+		]);
+		expect(written).toBe('### One\n\na\n\n### Two\n');
 	});
 
 	it('writes a part with no name of its own under a placeholder', () => {
@@ -966,3 +1140,37 @@ describe('joining a section to the one above it', () => {
 		expect(mergeAt(cells, 1)).toBe(cells);
 	});
 });
+
+describe('folding a section away', () => {
+	it('keeps the fold on the cell, so it travels when the cell does', () => {
+		const folded = foldAt([chapter('One'), chapter('Two')], 1, true);
+		expect(isFolded(folded[1])).toBe(true);
+		expect(folded[1].attrs.title).toBe('Two');
+		// Moving it takes the fold with it: the state is the cell's, not a place's.
+		expect(isFolded(moveBy(folded, 1, -1)[0])).toBe(true);
+	});
+
+	it('takes the attribute out again rather than writing false', () => {
+		// A document full of folded="false" is a document full of noise.
+		const folded = foldAt([chapter('One')], 0, true);
+		expect(foldAt(folded, 0, false)[0].attrs).toEqual({ title: 'One' });
+	});
+
+	it('answers the same list when there is nothing to do', () => {
+		// No edit, so no undo step, so no dirty document for a button that
+		// changed nothing.
+		const cells = [chapter('One')];
+		expect(foldAt(cells, 0, false)).toBe(cells);
+		expect(foldAt(cells, 7, true)).toBe(cells);
+		expect(foldEvery(foldEvery(cells, true), true)).toEqual(
+			foldEvery(cells, true)
+		);
+	});
+
+	it('folds every section, and unfolds every one', () => {
+		const cells = [chapter('One'), markdown('The lantern.'), contents()];
+		expect(foldEvery(cells, true).every(isFolded)).toBe(true);
+		expect(foldEvery(foldEvery(cells, true), false).some(isFolded)).toBe(false);
+	});
+});
+
