@@ -12,7 +12,15 @@
 
 import * as vscode from 'vscode';
 
-import { compile, fromMarkdown, generatedCell, toMarkdown } from './model';
+import {
+	compile,
+	documentsOf,
+	fromMarkdown,
+	generatedCell,
+	isGenerated,
+	toMarkdown,
+	writesOf,
+} from './model';
 import { BODY } from './page';
 
 /** How often a running job is asked whether it has finished. */
@@ -50,7 +58,7 @@ import {
 	wantingKinds,
 	type Report,
 } from '../publish/layout';
-import { MARKDOWN, dumps, parse, type Cell } from '../storydoc/model';
+import { MARKDOWN, RECAP, dumps, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';
@@ -65,7 +73,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	private active?: { document: vscode.TextDocument; panel: vscode.WebviewPanel };
 
 	/**
-	 * The cell a blurb is being written into, per document, while it is written.
+	 * The cell being written into, per document, while it is written.
 	 *
 	 * The page is a view and can be rebuilt under the author — reloaded, reopened,
 	 * or simply asking again on start-up — so the one thing it shows that is not
@@ -513,53 +521,76 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	}
 
 	/**
-	 * Write the blurb, and put it in the cell that asked for it.
+	 * Write a section from the story, and put it in the cell that asked for it.
 	 *
-	 * The blurb comes back rather than being written into the file: a cell's text
-	 * is the editor's to write, and an empty cell occupies no lines for the server
-	 * to replace. So this lands the same way any other edit does, and undo walks
-	 * it back like any other.
+	 * Two sections are written this way and the difference between them is what
+	 * they are written out of: a blurb from the document it stands in, the story
+	 * so far from the earlier documents that section names. The kind is taken from
+	 * the cell rather than from the click, and it is what names the endpoint —
+	 * `blurb` and `recap` are the kinds and the routes both.
+	 *
+	 * What comes back comes back rather than being written into the file: a cell's
+	 * text is the editor's to write, and an empty cell occupies no lines for the
+	 * server to replace. So this lands the same way any other edit does, and undo
+	 * walks it back like any other.
 	 */
 	private async generate(
 		document: vscode.TextDocument,
 		at: number
 	): Promise<void> {
 		if (document.isDirty) {
-			// It is written from the story, so what is on screen has to be on disk.
+			// It is written from what is in the documents, so what is on screen has
+			// to be on disk — this one and, for a recap, the ones it names.
 			await document.save();
 		}
-		const started = await fetch(`http://127.0.0.1:${this.port}/generate/blurb`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ path: document.uri.fsPath }),
-		});
+		const cell = parse(document.getText())[at];
+		if (!cell || !isGenerated(cell.kind)) {
+			return;
+		}
+		const started = await fetch(
+			`http://127.0.0.1:${this.port}/generate/${cell.kind}`,
+			{
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(
+					cell.kind === RECAP
+						? { path: document.uri.fsPath, documents: documentsOf(cell) }
+						: { path: document.uri.fsPath }
+				),
+			}
+		);
 		if (!started.ok) {
 			throw new Error(await detailOf(started));
 		}
 		// The panel is held rather than looked up as it goes: the author is free to
 		// click into another editor while the model writes, and the cell waiting for
-		// the blurb is in this one whether or not it is still the active panel.
-		await this.watch(document, at, this.active?.panel);
+		// the answer is in this one whether or not it is still the active panel.
+		await this.watch(document, at, cell.kind, this.active?.panel);
 	}
 
 	/**
-	 * Follow the blurb being written for a document until it lands in its cell.
+	 * Follow the section being written for a document until it lands in its cell.
 	 *
-	 * Apart from starting the job this is the whole of writing a blurb, which is
-	 * why it is not part of starting one: a job outlives the click that began it,
-	 * and an editor that comes back to a document being written has to be able to
-	 * pick the job up rather than start a second.
+	 * Apart from starting the job this is the whole of writing one, which is why
+	 * it is not part of starting one: a job outlives the click that began it, and
+	 * an editor that comes back to a document being written has to be able to pick
+	 * the job up rather than start a second.
 	 *
-	 * Where the cell is, is not settled by the click that started this. A blurb
+	 * Where the cell is, is not settled by the click that started this. Writing
 	 * takes minutes and the document around it stays the author's the whole time,
-	 * so a cell added or taken out above the blurb moves it and the index stops
-	 * naming it. It is found again from the document on every tick and once more
-	 * before the blurb lands, because an index that is only ever right at the
-	 * start is an index that writes the blurb over whatever moved into the slot.
+	 * so a cell added or taken out above it moves it and the index stops naming
+	 * it. It is found again from the document on every tick and once more before
+	 * the writing lands, because an index that is only ever right at the start is
+	 * an index that writes over whatever moved into the slot.
+	 *
+	 * Found by `kind`, which is why the kind is carried this far: a document may
+	 * hold a blurb and a story so far, and an answer that fell back to whichever
+	 * generated cell came first would land in the wrong one.
 	 */
 	private async watch(
 		document: vscode.TextDocument,
 		at: number,
+		kind: string,
 		panel: vscode.WebviewPanel | undefined
 	): Promise<void> {
 		const key = document.uri.toString();
@@ -573,18 +604,18 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			// nobody asked for.
 			if (document.version !== read) {
 				read = document.version;
-				into = generatedCell(parse(document.getText()), into);
+				into = generatedCell(parse(document.getText()), into, kind);
 			}
-			this.writing.set(key, { at: into, written, chapters });
-			tell({ type: 'writing', at: into, written, chapters });
+			this.writing.set(key, { at: into, kind, written, chapters });
+			tell({ type: 'writing', at: into, kind, written, chapters });
 		};
 
 		reached(0, 0);
 		try {
-			const blurb = await vscode.window.withProgress(
+			const answer = await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
-					title: `Writing the blurb for ${basename(document.uri)}…`,
+					title: `Writing ${writesOf(kind)} for ${basename(document.uri)}…`,
 				},
 				async (report) => {
 					// VS Code is told what has happened since the last poll rather
@@ -592,7 +623,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					// kept here to subtract. The cell is told the count itself.
 					let shown = 0;
 					const done = await this.awaitJob(
-						'/generate/blurb/status',
+						'/generate/status',
 						document.uri.fsPath,
 						(written, chapters) => {
 							const share = (100 * written) / chapters;
@@ -604,27 +635,28 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 							reached(written, chapters);
 						}
 					);
-					return done.blurb ?? '';
+					return done.text ?? '';
 				}
 			);
 
 			const cells = parse(document.getText());
-			// A cancelled job hands back nothing rather than a blurb for half the
-			// book, and nothing is not what to put in the author's cell.
-			if (!blurb) {
+			// A cancelled job hands back nothing rather than the story so far as
+			// far as it had got, and nothing is not what to put in the author's
+			// cell.
+			if (!answer) {
 				return;
 			}
 			// Looked for once more, and not taken from the last poll: the author
 			// can move it in the moment between the model finishing and this. The
-			// cell can also be gone — deleted while the model wrote — and a blurb
+			// cell can also be gone — deleted while the model wrote — and writing
 			// with nowhere to go goes nowhere. Written into whatever now stands at
 			// that index it would take a page of the book away to make room for
-			// itself, which is the one outcome worse than no blurb at all.
-			const cell = generatedCell(cells, into);
+			// itself, which is the one outcome worse than no answer at all.
+			const cell = generatedCell(cells, into, kind);
 			if (cell < 0) {
 				return;
 			}
-			cells[cell] = { ...cells[cell], source: blurb };
+			cells[cell] = { ...cells[cell], source: answer };
 			await this.write(document, cells);
 		} finally {
 			this.writing.delete(key);
@@ -639,7 +671,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * already running on it. The page may have been rebuilt under a wait this
 	 * editor is still holding — then what it needs is only to be told again. Or
 	 * the editor itself is new to a job the server never stopped doing, in which
-	 * case nobody is waiting for the blurb and it would be written to nobody.
+	 * case nobody is waiting for the answer and it would be written to nobody.
 	 */
 	private resume(
 		document: vscode.TextDocument,
@@ -660,21 +692,22 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		panel: vscode.WebviewPanel
 	): Promise<void> {
 		const response = await fetch(
-			`http://127.0.0.1:${this.port}/generate/blurb/status?id=${encodeURIComponent(document.uri.fsPath)}`
+			`http://127.0.0.1:${this.port}/generate/status?id=${encodeURIComponent(document.uri.fsPath)}`
 		);
 		if (!response.ok) {
 			return;
 		}
 		const body = (await response.json()) as JobStatus;
-		if (!body.running) {
+		if (!body.running || !body.kind) {
 			return;
 		}
 		// Which cell it is going into is not the server's to know — it writes the
-		// blurb and the editor places it — but a document has one blurb cell, and
-		// that is the one that asked.
-		const at = generatedCell(parse(document.getText()), -1);
+		// section and the editor places it — but it does say which kind of section
+		// it is writing, and a document has one cell of that kind: the one that
+		// asked.
+		const at = generatedCell(parse(document.getText()), -1, body.kind);
 		if (at >= 0) {
-			await this.watch(document, at, panel);
+			await this.watch(document, at, body.kind, panel);
 		}
 	}
 
@@ -1282,9 +1315,10 @@ interface Markdown {
 	uri: vscode.Uri;
 }
 
-/** A cell being written, and how far into the story the writing has read. */
+/** A cell being written, which kind it is, and how far the writing has read. */
 interface Writing {
 	at: number;
+	kind: string;
 	written: number;
 	chapters: number;
 }
@@ -1301,13 +1335,16 @@ interface Styling {
  * What a job's status endpoint answers, whichever job it is.
  *
  * A grammar pass leaves its result in the file and has nothing to hand back; a
- * blurb is handed back for the editor to place. Both are polled the same way,
- * and a job divided into pieces says how many of them it has finished.
+ * written section is handed back for the editor to place, and says which kind of
+ * cell it belongs in. Both are polled the same way, and a job divided into pieces
+ * says how many of them it has finished.
  */
 interface JobStatus {
 	running: boolean;
 	error: string | null;
-	blurb?: string;
+	/** What a written section came to, and the kind of cell it goes in. */
+	text?: string;
+	kind?: string;
 	progress?: { written: number; chapters: number };
 	cancelled?: boolean;
 	findings?: unknown[];

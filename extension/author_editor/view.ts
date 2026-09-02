@@ -190,7 +190,7 @@ window.addEventListener('message', (event) => {
 /** The server has started, moved on with, or finished writing a cell. */
 function writingChanged(message: Record<string, unknown>): void {
 	const was = state.writing?.at ?? null;
-	// No cell reads the same as no job. The host says which cell the blurb is
+	// No cell reads the same as no job. The host says which cell the writing is
 	// going into by looking for it, and a job whose cell the author has deleted
 	// is a job with nowhere to draw a bar — there is no section left to draw it
 	// above, whatever the server is still doing about it.
@@ -200,12 +200,13 @@ function writingChanged(message: Record<string, unknown>): void {
 			? null
 			: {
 					at,
+					kind: (message.kind as string) ?? '',
 					written: (message.written as number) ?? 0,
 					chapters: (message.chapters as number) ?? 0,
 				};
 	// A cell open for typing when the server starts writing it is taken away
 	// from the author, box and all — leaving it open would be inviting them
-	// to write something the blurb is about to land on top of.
+	// to write something the answer is about to land on top of.
 	if (state.writing !== null && state.editing === state.writing.at) {
 		closeEditing();
 	}
@@ -257,11 +258,12 @@ function cellsArrived(message: Record<string, unknown>): void {
 /**
  * Keep the bar on the cell being written, wherever the document has moved it to.
  *
- * A blurb takes minutes, and the document around it stays the author's the whole
- * time — so the cell being written into can be pushed down by one added above
- * it, pulled up by one taken out, or carried off by a split. The index alone
- * does not survive that: left where it was it names whatever cell has moved into
- * the slot, and the bar, the stop button and the write-lock all go to that one.
+ * Writing a section takes minutes, and the document around it stays the author's
+ * the whole time — so the cell being written into can be pushed down by one
+ * added above it, pulled up by one taken out, or carried off by a split. The
+ * index alone does not survive that: left where it was it names whatever cell
+ * has moved into the slot, and the bar, the stop button and the write-lock all
+ * go to that one.
  *
  * Found by kind rather than followed through each edit. The kind is what the job
  * is actually for and a document has one cell of it, so this is right about
@@ -270,9 +272,9 @@ function cellsArrived(message: Record<string, unknown>): void {
  * by each command would be right about the commands it was taught and quietly
  * wrong about the next one added.
  *
- * The host looks the same cell up for itself before it puts the blurb anywhere;
- * this is the half of it the author can see, and it is done here because a
- * chapter is minutes and the bar cannot wait that long to be right.
+ * The host looks the same cell up for itself before it puts the writing
+ * anywhere; this is the half of it the author can see, and it is done here
+ * because a chapter is minutes and the bar cannot wait that long to be right.
  */
 function followWriting(cells: Cell[]): void {
 	const writing = state.writing;
@@ -281,7 +283,7 @@ function followWriting(cells: Cell[]): void {
 	}
 	// The rule the host places the writing by, so the bar is drawn on the cell
 	// the writing is actually going into rather than beside it.
-	const at = generatedCell(cells, writing.at);
+	const at = generatedCell(cells, writing.at, writing.kind);
 	state.writing = at < 0 ? null : { ...writing, at };
 }
 

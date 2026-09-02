@@ -6,10 +6,10 @@ comes back is the blurb the book has earned by that point. The last chapter's
 answer is the blurb. Nothing ever has to hold the whole manuscript at once, which
 is what makes a novel writable on a machine that fits one chapter in a prompt.
 
-What goes in is the story and only the story. The markers are the format's, the
-notes in the margin are the author's, a table of contents is written rather than
-told, and a blurb already in the document is this tool's own last word — none of
-them are what the book is about.
+What goes in is the story and only the story, which is `reading.chapters_of`'s
+answer rather than this module's: the markers, the notes in the margin, the table
+of contents and a blurb already in the document are all left out there, for every
+tool that reads a book rather than for this one.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from collections.abc import Callable
 
 from vramen import CausalModel
 
-from server import storydoc
 from server.storydoc import Document
+from server.writing_tools.reading import chapters_of
 
 # A blurb that runs longer than this has stopped being a blurb.
 BLURB_TOKENS = 320
@@ -54,7 +54,7 @@ def write_blurb(
     Raises `ValueError` if the document has no chapters with prose in them: a
     blurb for an empty book is one the model has to invent.
     """
-    chapters = _chapters(document)
+    chapters = chapters_of(document)
     if not chapters:
         raise ValueError("There is no story there to write a blurb for.")
 
@@ -91,39 +91,3 @@ def _reading(book: str, blurb: str, title: str, prose: str) -> str:
         "holds and drop what the chapter has overtaken. It is a blurb for the "
         "book, not for the chapter."
     )
-
-
-def _chapters(document: Document) -> list[tuple[str, str]]:
-    """Each chapter that has prose under it, and that prose.
-
-    The document is asked which of its lines are story rather than read for it
-    here — a second reader of the format is a second thing to keep in step, and
-    this one would have to know about comments and built cells to get it right.
-
-    What stands before the first chapter is a title page, a cover, a dedication.
-    It is about the book and belongs to no chapter, so it is not read.
-    """
-    found: list[tuple[str, list[tuple[int, str]]]] = []
-    for placed in document.placed:
-        if placed.cell.kind == storydoc.CHAPTER:
-            found.append((placed.cell.title or f"Chapter {len(found) + 1}", []))
-        elif found and placed.at and placed.cell.kind not in storydoc.PRIVATE_KINDS:
-            found[-1][1].extend(document.story_lines(*placed.at))
-    return [(title, _prose(lines)) for title, lines in found if lines]
-
-
-def _prose(lines: list[tuple[int, str]]) -> str:
-    """Those lines with the breaks between their paragraphs put back.
-
-    The story comes back as the lines that carry it, so where a paragraph ended
-    survives only as the gap in their numbering. Run together without it a
-    chapter arrives as one block, and reads to the model as one thought.
-    """
-    written: list[str] = []
-    previous: int | None = None
-    for index, said in lines:
-        if previous is not None and index != previous + 1:
-            written.append("")
-        written.append(said)
-        previous = index
-    return "\n".join(written)

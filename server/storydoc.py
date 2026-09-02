@@ -51,6 +51,7 @@ DISCLAIMER = "disclaimer"
 ABOUT = "about"
 BLURB = "blurb"
 NOTE = "note"
+RECAP = "recap"
 
 # What an attribute says when the answer to it is no, and the attribute a part
 # says it of: whether the book prints a page where the part stands.
@@ -260,10 +261,11 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 BUILT_KINDS = frozenset({CONTENTS})
 
 # Kept in the working document and printed in no book. What the author writes
-# *about* the story — the blurb for a shop page, a covering letter, a note on
-# where the plot is going — belongs beside it and never inside it, so it is
-# written here and published nowhere.
-PRIVATE_KINDS = frozenset({BLURB, NOTE})
+# *about* the story — the blurb for a shop page, the story so far for a reader
+# coming to this volume from the last one, a covering letter, a note on where
+# the plot is going — belongs beside it and never inside it, so it is written
+# here and published nowhere.
+PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP})
 
 
 @dataclass(frozen=True)

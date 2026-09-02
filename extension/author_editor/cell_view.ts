@@ -27,6 +27,8 @@ import {
 	saidWords,
 	renderMarkdown,
 	runCell,
+	writesOf,
+	writtenFrom,
 } from './model';
 import { marked } from './find';
 import { iconButton, insertButton, withBase } from './dom';
@@ -114,11 +116,14 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	const run = document.createElement('button');
 	run.type = 'button';
 	run.className = running ? 'run running' : 'run';
+	// A built section is spoken of by its label; a written one has words of its
+	// own, because "Stop writing this the story so far" is what a label makes of
+	// a name that is already a sentence.
 	run.dataset.tip = running
-		? `Stop writing this ${named}`
+		? `Stop writing ${writesOf(cell.kind)}`
 		: built
 			? `Build this ${named} from the document`
-			: `Write this ${named} from the story`;
+			: `Write ${writesOf(cell.kind)} from ${writtenFrom(cell.kind)}`;
 	const glyph = document.createElement('i');
 	glyph.className = running
 		? 'codicon codicon-primitive-square'
@@ -434,7 +439,7 @@ function renderedFor(cell: Cell, index: number): HTMLElement {
 	} else {
 		rendered.classList.add('blank');
 		rendered.textContent = state.writing?.at === index
-			? 'Being written from the story…'
+			? `Being written from ${writtenFrom(cell.kind)}…`
 			: isAutomated(cell.kind)
 				? 'Empty — run this section to build it.'
 				: 'Empty — double-click to write.';

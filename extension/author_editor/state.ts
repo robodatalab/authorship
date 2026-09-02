@@ -23,11 +23,14 @@ import type { Cell } from '../storydoc/model';
  * `at` is the exception to the host owning this: the job runs for minutes while
  * the document around it stays the author's, so a cell added or taken out above
  * this one moves it, and the index is found again from every document that
- * arrives rather than waiting for the host's next word about it. See
- * `followWriting` in view.ts.
+ * arrives rather than waiting for the host's next word about it. `kind` is what
+ * it is found by — a document may hold a blurb and a story so far, and only one
+ * of them asked. See `followWriting` in view.ts.
  */
 export interface Writing {
 	at: number;
+	/** The kind of section being written, which is what names it in the document. */
+	kind: string;
 	written: number;
 	chapters: number;
 }

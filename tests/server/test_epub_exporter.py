@@ -639,6 +639,31 @@ class BuildEpub(unittest.TestCase):
 
         self.assertNotIn("A woman loses her name.", everything)
 
+    def test_the_story_so_far_reaches_no_part_of_the_book(self) -> None:
+        # A recap of the volumes before this one is written for a reader, but it
+        # is written about the story rather than in it — so it stays beside the
+        # manuscript with the blurb and is bound into nothing.
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            Cell(
+                storydoc.RECAP,
+                "She has lost her name.",
+                {"documents": "a.author, b.author"},
+            ),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            everything = "".join(
+                z.read(name).decode("utf-8")
+                for name in z.namelist()
+                if name.endswith((".xhtml", ".opf", ".ncx"))
+            )
+
+        self.assertNotIn("She has lost her name.", everything)
+
     def test_a_note_reaches_no_part_of_the_book(self) -> None:
         # What the author left themselves about the plot stands in the middle of
         # the story and is printed nowhere in it.

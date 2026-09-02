@@ -317,14 +317,15 @@ class Jobs(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
 
-def wait_for_blurb(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    """The finished answer of whichever section is being written for a document."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        response = client.get("/generate/blurb/status", params={"id": job_id})
+        response = client.get("/generate/status", params={"id": job_id})
         if response.status_code == 200 and not response.json()["running"]:
             return response.json()
         time.sleep(0.005)
-    raise AssertionError(f"blurb job {job_id} did not finish within {timeout}s")
+    raise AssertionError(f"writing job {job_id} did not finish within {timeout}s")
 
 
 class GenerateBlurb(unittest.TestCase):
@@ -360,9 +361,10 @@ class GenerateBlurb(unittest.TestCase):
         started = client.post("/generate/blurb", json={"path": str(self.document)})
         self.assertEqual(started.status_code, 202)
 
-        status = wait_for_blurb(client, started.json()["id"])
+        status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
-        self.assertEqual(status["blurb"], "A woman loses her name.")
+        self.assertEqual(status["text"], "A woman loses her name.")
+        self.assertEqual(status["kind"], storydoc.BLURB)
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_leaves_the_document_alone(self) -> None:
@@ -370,13 +372,13 @@ class GenerateBlurb(unittest.TestCase):
         # the file would be writing a cell the editor owns.
         client = TestClient(app)
         started = client.post("/generate/blurb", json={"path": str(self.document)})
-        wait_for_blurb(client, started.json()["id"])
+        wait_for_writing(client, started.json()["id"])
         self.assertEqual(self.document.read_text(), self.written)
 
     def test_is_dropped_from_the_work_in_hand_once_it_has_finished(self) -> None:
         client = TestClient(app)
         started = client.post("/generate/blurb", json={"path": str(self.document)})
-        wait_for_blurb(client, started.json()["id"])
+        wait_for_writing(client, started.json()["id"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
 
     def test_a_missing_document_is_a_bad_request(self) -> None:
@@ -389,7 +391,7 @@ class GenerateBlurb(unittest.TestCase):
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
         client = TestClient(app)
-        response = client.get("/generate/blurb/status", params={"id": "nothing"})
+        response = client.get("/generate/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
 
     def test_says_how_much_of_the_story_it_has_read_while_it_reads(self) -> None:
@@ -410,14 +412,14 @@ class GenerateBlurb(unittest.TestCase):
         self.assertTrue(entered.acquire(timeout=5))
 
         status = client.get(
-            "/generate/blurb/status", params={"id": started.json()["id"]}
+            "/generate/status", params={"id": started.json()["id"]}
         )
         self.assertTrue(status.json()["running"])
         self.assertEqual(status.json()["progress"], {"written": 0, "chapters": 2})
 
         release.set()
         self.assertEqual(
-            wait_for_blurb(client, started.json()["id"])["progress"],
+            wait_for_writing(client, started.json()["id"])["progress"],
             {"written": 2, "chapters": 2},
         )
 
@@ -442,9 +444,9 @@ class GenerateBlurb(unittest.TestCase):
         self.assertEqual(cancelled.status_code, 200)
         release.set()
 
-        status = wait_for_blurb(client, started.json()["id"])
+        status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
-        self.assertEqual(status["blurb"], "")
+        self.assertEqual(status["text"], "")
         # The second chapter was never read: stopping is what it did, not merely
         # what it was told.
         self.assertEqual(app.state.causal_model.complete.call_count, 1)
@@ -467,7 +469,7 @@ class GenerateBlurb(unittest.TestCase):
         self.assertTrue(entered.acquire(timeout=5))
         client.post("/jobs/cancel", json={"path": str(self.document)})
         release.set()
-        wait_for_blurb(client, started.json()["id"])
+        wait_for_writing(client, started.json()["id"])
 
         self.assertEqual(self.document.read_text(), self.written)
 
@@ -484,10 +486,170 @@ class GenerateBlurb(unittest.TestCase):
         # who pressed stop wanted a job that is not running.
         client = TestClient(app)
         started = client.post("/generate/blurb", json={"path": str(self.document)})
-        wait_for_blurb(client, started.json()["id"])
+        wait_for_writing(client, started.json()["id"])
 
         cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
         self.assertEqual(cancelled.status_code, 200)
+
+
+class GenerateRecap(unittest.TestCase):
+    """The story so far, written out of the documents the section names.
+
+    Where a blurb is written from the document it stands in, this one is written
+    from the ones before it — so what is tested here beyond the blurb's own is
+    how those are named, resolved and ordered.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.folder = Path(self._dir.name)
+        self.document = self.folder / f"story{storydoc.EXTENSION}"
+        storydoc.save(
+            self.document,
+            [
+                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona III"}),
+                storydoc.Cell(storydoc.RECAP, "", {"documents": "a.author, b.author"}),
+                storydoc.chapter("One"),
+                storydoc.markdown("The road ended at a gate."),
+            ],
+        )
+        self.written = self.document.read_text()
+        for name, title, prose in [
+            ("a.author", "Veriona", "The lantern had gone out."),
+            ("b.author", "Veriona II", "The door stood open."),
+        ]:
+            storydoc.save(
+                self.folder / name,
+                [
+                    storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": title}),
+                    storydoc.chapter("One"),
+                    storydoc.markdown(prose),
+                ],
+            )
+
+        def _restore_model():
+            app.state.causal_model = None
+
+        self.addCleanup(_restore_model)
+
+        app.state.causal_model = build_fake_completion_model(
+            reply="She has lost her name."
+        )
+        app.state.jobs = ParallelJobsManager()
+
+    def start(self, *documents: str):
+        return TestClient(app).post(
+            "/generate/recap",
+            json={"path": str(self.document), "documents": list(documents)},
+        )
+
+    def test_runs_as_a_job_and_hands_the_story_so_far_back(self) -> None:
+        client = TestClient(app)
+        started = self.start("a.author", "b.author")
+        self.assertEqual(started.status_code, 202)
+
+        status = wait_for_writing(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(status["text"], "She has lost her name.")
+        self.assertEqual(status["kind"], storydoc.RECAP)
+        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+
+    def test_says_which_section_is_being_written(self) -> None:
+        # A document may hold a blurb and a story so far, and only one of them
+        # asked — so the editor is told which cell the answer belongs in.
+        client = TestClient(app)
+        started = self.start("a.author")
+        self.assertEqual(
+            wait_for_writing(client, started.json()["id"])["kind"], storydoc.RECAP
+        )
+
+    def test_the_documents_are_named_beside_the_one_that_asks(self) -> None:
+        # A relative path is what the section carries, so the story survives being
+        # moved, checked out somewhere else, or written on another machine.
+        client = TestClient(app)
+        started = self.start("a.author")
+        wait_for_writing(client, started.json()["id"])
+        said = app.state.causal_model.complete.call_args_list[0].args[1]
+        self.assertIn("The lantern had gone out.", said)
+
+    def test_they_are_read_in_alphabetical_order_however_they_were_named(self) -> None:
+        client = TestClient(app)
+        started = self.start("b.author", "a.author")
+        wait_for_writing(client, started.json()["id"])
+        first, second = (
+            call.args[1] for call in app.state.causal_model.complete.call_args_list
+        )
+        self.assertIn("The lantern had gone out.", first)
+        self.assertIn("The door stood open.", second)
+
+    def test_a_tenth_volume_is_read_after_the_second_and_not_before_it(self) -> None:
+        # `part_10` sorts between `part_1` and `part_2` alphabetically, which
+        # would hand the model the story out of order — and a serial long enough
+        # to need a recap is exactly the one with ten parts.
+        for name, prose in [
+            ("part_2.author", "The door stood open."),
+            ("part_10.author", "The gate was shut."),
+        ]:
+            storydoc.save(
+                self.folder / name,
+                [storydoc.chapter("One"), storydoc.markdown(prose)],
+            )
+        client = TestClient(app)
+        started = self.start("part_10.author", "part_2.author")
+        wait_for_writing(client, started.json()["id"])
+        first, second = (
+            call.args[1] for call in app.state.causal_model.complete.call_args_list
+        )
+        self.assertIn("The door stood open.", first)
+        self.assertIn("The gate was shut.", second)
+
+    def test_a_document_named_twice_is_read_once(self) -> None:
+        client = TestClient(app)
+        started = self.start("a.author", "a.author")
+        wait_for_writing(client, started.json()["id"])
+        self.assertEqual(app.state.causal_model.complete.call_count, 1)
+
+    def test_leaves_every_document_alone(self) -> None:
+        # The recap comes back for the editor to place, exactly as a blurb does.
+        client = TestClient(app)
+        started = self.start("a.author", "b.author")
+        wait_for_writing(client, started.json()["id"])
+        self.assertEqual(self.document.read_text(), self.written)
+
+    def test_a_section_naming_no_documents_is_a_bad_request(self) -> None:
+        # Nothing to read is not an empty recap; it is a section nobody filled in.
+        self.assertEqual(self.start().status_code, 400)
+
+    def test_a_document_that_is_not_there_is_a_bad_request(self) -> None:
+        # Said before the model is loaded rather than a minute into the reading.
+        self.assertEqual(self.start("a.author", "gone.author").status_code, 400)
+
+    def test_stopping_it_leaves_the_story_so_far_unwritten(self) -> None:
+        entered = threading.Semaphore(0)
+        release = threading.Event()
+
+        def complete(*_args, **_kwargs) -> str:
+            entered.release()
+            release.wait(timeout=5)
+            return "She has lost her name."
+
+        app.state.causal_model.complete.side_effect = complete
+        client = TestClient(app)
+
+        started = self.start("a.author", "b.author")
+        self.assertTrue(entered.acquire(timeout=5))
+        self.assertEqual(
+            client.post("/jobs/cancel", json={"path": str(self.document)}).status_code,
+            200,
+        )
+        release.set()
+
+        status = wait_for_writing(client, started.json()["id"])
+        self.assertIsNone(status["error"])
+        self.assertEqual(status["text"], "")
+        self.assertEqual(app.state.causal_model.complete.call_count, 1)
 
 
 class ExportEpub(unittest.TestCase):

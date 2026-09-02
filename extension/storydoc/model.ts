@@ -42,6 +42,7 @@ export const DISCLAIMER = 'disclaimer';
 export const ABOUT = 'about';
 export const BLURB = 'blurb';
 export const NOTE = 'note';
+export const RECAP = 'recap';
 
 /**
  * One thing the document is made of, and what it says it is.

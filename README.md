@@ -26,6 +26,7 @@ Every model it uses runs on your machine; nothing you write is sent anywhere.
 - [Sections](#sections)
 - [Checking the prose](#checking-the-prose)
 - [Writing a blurb](#writing-a-blurb)
+- [The story so far](#the-story-so-far)
 - [Fixing style and grammar](#fixing-style-and-grammar)
 - [Building the book](#building-the-book)
 - [Dividing a long story into parts](#dividing-a-long-story-into-parts)
@@ -220,6 +221,7 @@ chapter called "Disclaimer" is still a chapter.
 | **Disclaimer** | The copyright and fiction notice, opening the book. |
 | **About the Author** | Your own page, with optional links to KDP, a website, a Substack. |
 | **Blurb** | The copy that sells the book. Written from the story, and not printed in it. |
+| **The Story So Far** | A recap of the earlier volumes of a serial, written from the documents you name. Not printed in the book. |
 
 Sections with fields — a title page, a chapter, an about page — show them as
 labelled boxes rather than as prose you have to remember the shape of.
@@ -304,6 +306,47 @@ can go on writing elsewhere while it reads, and the square button stops it.
 The blurb is written from the story alone: the notes in your margin, the
 scaffolding of the format and any blurb already there are all kept out of it.
 It is copy for a shop listing, so it is not printed in the book.
+
+---
+
+## The story so far
+
+*Generative AI disclosure*: this functionality uses a locally running AI to
+create a draft of the recap. It is highly advised to treat the generated recap
+as a working draft rather than a finished section.
+
+The blurb's near relation, for a serial. Add a **The Story So Far** section,
+write the earlier documents into its **Documents** box — separated by commas,
+named the way they sit beside this one — and press the run button beside it.
+
+```
+parts/part_1.author, parts/part_2.author
+```
+
+They are read in alphabetical order — with numbers read as numbers, so
+`part_10` comes after `part_2` and not between it and `part_1`. That is the
+order **Divide into Parts** already leaves them in, so it does not matter which
+order you type them. What comes back is what a reader who read those volumes a
+year ago needs before they open this one: who the people are, what they did, and
+what is still unresolved. It gives the ending away, which is the whole
+difference between it and a blurb — a blurb sells a book it must not spoil, and
+this one is written for somebody who has already read it.
+
+The reading is the same as a blurb's: a chapter at a time, with the recap so far
+carried between them, so a shelf of finished volumes is no harder than one. The
+bar counts the chapters of all of them together, you can go on writing while it
+reads, and the square button stops it.
+
+<!-- CAPTURE story-so-far.webp — a The Story So Far section with two documents
+     in its Documents box and a finished recap under it. Add
+     `![The story so far](docs/images/story-so-far.webp)` here once it exists;
+     until then the link would be a broken image in the marketplace. -->
+
+The paths are written relative to the document, so a story that is moved,
+cloned or opened on another machine still finds its earlier volumes. Like the
+blurb, this is written beside the story rather than in it: it is not printed in
+the book and not counted in the word count, and it is yours to edit once it
+lands.
 
 ---
 
