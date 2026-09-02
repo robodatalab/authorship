@@ -12,7 +12,7 @@
 
 import * as vscode from 'vscode';
 
-import { compile, fromMarkdown, toMarkdown } from './model';
+import { compile, fromMarkdown, generatedCell, toMarkdown } from './model';
 import { BODY } from './page';
 
 /** How often a running job is asked whether it has finished. */
@@ -542,6 +542,13 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 * why it is not part of starting one: a job outlives the click that began it,
 	 * and an editor that comes back to a document being written has to be able to
 	 * pick the job up rather than start a second.
+	 *
+	 * Where the cell is, is not settled by the click that started this. A blurb
+	 * takes minutes and the document around it stays the author's the whole time,
+	 * so a cell added or taken out above the blurb moves it and the index stops
+	 * naming it. It is found again from the document on every tick and once more
+	 * before the blurb lands, because an index that is only ever right at the
+	 * start is an index that writes the blurb over whatever moved into the slot.
 	 */
 	private async watch(
 		document: vscode.TextDocument,
@@ -550,9 +557,19 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	): Promise<void> {
 		const key = document.uri.toString();
 		const tell = (message: unknown): void => void panel?.webview.postMessage(message);
+		let into = at;
+		let read = -1;
 		const reached = (written: number, chapters: number): void => {
-			this.writing.set(key, { at, written, chapters });
-			tell({ type: 'writing', at, written, chapters });
+			// Looked for again only when the document has actually changed. The
+			// job is polled four times a second for as long as it runs, and
+			// parsing the manuscript that often to be told the same answer is work
+			// nobody asked for.
+			if (document.version !== read) {
+				read = document.version;
+				into = generatedCell(parse(document.getText()), into);
+			}
+			this.writing.set(key, { at: into, written, chapters });
+			tell({ type: 'writing', at: into, written, chapters });
 		};
 
 		reached(0, 0);
@@ -587,10 +604,20 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			const cells = parse(document.getText());
 			// A cancelled job hands back nothing rather than a blurb for half the
 			// book, and nothing is not what to put in the author's cell.
-			if (!cells[at] || !blurb) {
+			if (!blurb) {
 				return;
 			}
-			cells[at] = { ...cells[at], source: blurb };
+			// Looked for once more, and not taken from the last poll: the author
+			// can move it in the moment between the model finishing and this. The
+			// cell can also be gone — deleted while the model wrote — and a blurb
+			// with nowhere to go goes nowhere. Written into whatever now stands at
+			// that index it would take a page of the book away to make room for
+			// itself, which is the one outcome worse than no blurb at all.
+			const cell = generatedCell(cells, into);
+			if (cell < 0) {
+				return;
+			}
+			cells[cell] = { ...cells[cell], source: blurb };
 			await this.write(document, cells);
 		} finally {
 			this.writing.delete(key);
@@ -638,7 +665,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		// Which cell it is going into is not the server's to know — it writes the
 		// blurb and the editor places it — but a document has one blurb cell, and
 		// that is the one that asked.
-		const at = parse(document.getText()).findIndex((cell) => cell.kind === 'blurb');
+		const at = generatedCell(parse(document.getText()), -1);
 		if (at >= 0) {
 			await this.watch(document, at, panel);
 		}

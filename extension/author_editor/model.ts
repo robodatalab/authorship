@@ -301,6 +301,28 @@ export function isGenerated(kind: string): boolean {
 }
 
 /**
+ * The cell a job that started at `at` is writing, or -1 for none in the list.
+ *
+ * An index names a cell only for as long as the cells above it stay put, and a
+ * generated cell takes minutes to write — during which the rest of the document
+ * is the author's to add to, delete, move and split. So the index a job began
+ * with is a guess to be checked rather than an answer: it stands while it still
+ * names a cell of a kind the server writes, and otherwise the document's own is
+ * the one that asked for it, because a document has one.
+ *
+ * Both halves of the editor ask this and they have to agree — the page to know
+ * which cell to draw the bar and the stop button on, the host to know which cell
+ * to put the answer in. Asked on only one side, the author watches one cell and
+ * the writing lands in another; asked on neither, it lands on whatever has moved
+ * into the slot and takes that cell's text with it.
+ */
+export function generatedCell(cells: Cell[], at: number): number {
+	return isGenerated(cells[at]?.kind ?? '')
+		? at
+		: cells.findIndex((cell) => isGenerated(cell.kind));
+}
+
+/**
  * Whether this kind is a page of the book rather than part of the story.
  *
  * A kind nobody has heard of is not: an unrecognised cell holds text the author

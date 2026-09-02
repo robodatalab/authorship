@@ -29,7 +29,7 @@
 // holds its own text until it settles, because a repaint mid-keystroke would
 // take the caret with it. Everything else is drawn from what the host last sent.
 
-import { withDefaultCell } from './model';
+import { generatedCell, withDefaultCell } from './model';
 import { checkEl, post, styleEl, toolbarEl } from './elements';
 import { closeFind, openFind, refind, searching, showCount, step } from './find_bar';
 import { drawJob, setStyling } from './job_view';
@@ -177,11 +177,16 @@ window.addEventListener('message', (event) => {
 /** The server has started, moved on with, or finished writing a cell. */
 function writingChanged(message: Record<string, unknown>): void {
 	const was = state.writing?.at ?? null;
+	// No cell reads the same as no job. The host says which cell the blurb is
+	// going into by looking for it, and a job whose cell the author has deleted
+	// is a job with nowhere to draw a bar — there is no section left to draw it
+	// above, whatever the server is still doing about it.
+	const at = message.at as number | null;
 	state.writing =
-		message.at === null
+		at === null || at < 0
 			? null
 			: {
-					at: message.at as number,
+					at,
 					written: (message.written as number) ?? 0,
 					chapters: (message.chapters as number) ?? 0,
 				};
@@ -205,6 +210,10 @@ function writingChanged(message: Record<string, unknown>): void {
 function cellsArrived(message: Record<string, unknown>): void {
 	const incoming = withDefaultCell(message.cells as Cell[]);
 	state.base = String(message.base ?? '');
+	// Before anything is drawn from it, because what is drawn depends on it: the
+	// cell being written is held as an index, and the document that has just
+	// arrived need not be the one that index was taken from.
+	followWriting(incoming);
 	// Most of what arrives here is this view's own edit coming back around,
 	// which is not news and must not disturb a cell being typed in.
 	if (signatureOf(incoming) === state.drawn) {
@@ -230,6 +239,37 @@ function cellsArrived(message: Record<string, unknown>): void {
 	// put back the lock the rebuild just cleared off the page.
 	drawJob();
 	restoreCaret(caret);
+}
+
+/**
+ * Keep the bar on the cell being written, wherever the document has moved it to.
+ *
+ * A blurb takes minutes, and the document around it stays the author's the whole
+ * time — so the cell being written into can be pushed down by one added above
+ * it, pulled up by one taken out, or carried off by a split. The index alone
+ * does not survive that: left where it was it names whatever cell has moved into
+ * the slot, and the bar, the stop button and the write-lock all go to that one.
+ *
+ * Found by kind rather than followed through each edit. The kind is what the job
+ * is actually for and a document has one cell of it, so this is right about
+ * edits nobody thought of here — including the ones made in a text editor
+ * alongside, which never pass through this page at all. An index carried along
+ * by each command would be right about the commands it was taught and quietly
+ * wrong about the next one added.
+ *
+ * The host looks the same cell up for itself before it puts the blurb anywhere;
+ * this is the half of it the author can see, and it is done here because a
+ * chapter is minutes and the bar cannot wait that long to be right.
+ */
+function followWriting(cells: Cell[]): void {
+	const writing = state.writing;
+	if (writing === null) {
+		return;
+	}
+	// The rule the host places the writing by, so the bar is drawn on the cell
+	// the writing is actually going into rather than beside it.
+	const at = generatedCell(cells, writing.at);
+	state.writing = at < 0 ? null : { ...writing, at };
 }
 
 // The host has nothing to push until we ask: a message it posted before this

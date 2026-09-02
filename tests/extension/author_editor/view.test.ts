@@ -1032,6 +1032,122 @@ describe('a cell the server is writing', () => {
 			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 		expect(shown()[0].querySelector('textarea')).toBeNull();
 	});
+
+	// The job is held as an index, and the whole document except this one cell
+	// stays the author's while it runs — so the cells above it move, and the
+	// index stops naming the cell it was taken from. Everything below is the one
+	// bug: a table of contents added above a blurb being written took the bar,
+	// the stop button and in the end the blurb itself.
+
+	it('keeps the bar on the blurb when a page is added above it', async () => {
+		await mount([blurb()]);
+		writes(0, 2, 12);
+		// Added through the bar above the first cell, as the author adds one.
+		bars()[0].querySelectorAll<HTMLElement>('.insert')[1].click();
+		echo();
+		expect(shown().map((cell) => (cell as HTMLElement).dataset.kind)).toEqual([
+			'chapter',
+			'blurb',
+		]);
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		expect(shown()[0].querySelector('.run')).toBeNull();
+		expect(shown()[1].querySelector('.writing')).not.toBeNull();
+		expect(shown()[1].querySelector('.run .codicon-primitive-square')).not.toBeNull();
+	});
+
+	it('keeps it there when the page above is one that has a run button of its own', async () => {
+		// The table of contents of the report: it is built rather than written,
+		// so it has a run button either way and the wrong one being drawn on it
+		// says it is doing something it has never been asked to do.
+		await mount([blurb()]);
+		writes(0, 2, 12);
+		send([contents(), blurb()]);
+		expect(shown()[0].querySelector('.run .codicon-play')).not.toBeNull();
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		expect(shown()[1].querySelector('.run .codicon-primitive-square')).not.toBeNull();
+		expect(shown()[1].querySelector('.writing')).not.toBeNull();
+	});
+
+	it('stops the job from the cell it has moved to', async () => {
+		// The other half of the wrong cell being marked as running: the cell that
+		// really is running gets its Write button back, and a click meant to stop
+		// the job starts a second one on a document that already has one.
+		await mount([blurb()]);
+		writes(0, 2, 12);
+		send([contents(), blurb()]);
+		shown()[1].querySelector<HTMLElement>('.run')!.click();
+		expect(posted.at(-1)).toEqual({ type: 'stop', at: 1 });
+		expect(posted.filter((m) => m.type === 'generate')).toHaveLength(0);
+	});
+
+	it('leaves the page that moved under the job its own button', async () => {
+		// A table of contents is built rather than written, and its run button
+		// builds it. Marked as running it becomes a stop button for a job that is
+		// not its own, and the one thing it does is the one thing it cannot do.
+		await mount([blurb(), chapter('One')]);
+		writes(0, 2, 12);
+		send([contents(), blurb(), chapter('One')]);
+		shown()[0].querySelector<HTMLElement>('.run')!.click();
+		expect(posted.filter((m) => m.type === 'stop')).toHaveLength(0);
+		expect(lastCells()[0].source).toBe('1. One');
+	});
+
+	it('lets the author into the page that moved and not into the blurb', async () => {
+		await mount([blurb('An older draft.')]);
+		writes(0, 2, 12);
+		send([markdown('a'), blurb('An older draft.')]);
+		shown()[1]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[1].querySelector('textarea')).toBeNull();
+		shown()[0]
+			.querySelector('.rendered')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(shown()[0].querySelector('textarea')).not.toBeNull();
+	});
+
+	it('follows the blurb up when a cell above it is taken out', async () => {
+		await mount([markdown('a'), blurb()]);
+		writes(1, 2, 12);
+		shown()[0].querySelector<HTMLElement>('.actions .icon:last-child')!.click();
+		echo();
+		expect(shown()[0].querySelector('.writing')).not.toBeNull();
+	});
+
+	it('follows it through an edit made outside this page', async () => {
+		// A document edited in the text editor beside this one arrives the same
+		// way and moves the cell just as far, without this page making the edit.
+		await mount([blurb()]);
+		writes(0, 2, 12);
+		send([markdown('a'), markdown('b'), blurb()]);
+		expect(shown()[2].querySelector('.writing')).not.toBeNull();
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		expect(shown()[1].querySelector('.writing')).toBeNull();
+	});
+
+	it('gives up the bar when the cell being written is deleted', async () => {
+		// There is no section left to draw it above. What the server is doing
+		// about it is the host's to end; this only stops claiming to know where
+		// the blurb is going.
+		await mount([markdown('a'), blurb()]);
+		writes(1, 2, 12);
+		send([markdown('a')]);
+		expect(document.querySelector('.writing')).toBeNull();
+		expect(shown()).toHaveLength(1);
+	});
+
+	it('takes no bar from a host that says the cell is gone', async () => {
+		// The host looks the cell up the same way and can find none — and no cell
+		// reads the same as no job, or the next document to arrive would revive a
+		// bar on a cell the host has already said the blurb is not going into.
+		await mount([blurb()]);
+		writes(0, 2, 12);
+		writes(-1, 2, 12);
+		expect(document.querySelector('.writing')).toBeNull();
+		expect(shown()[0].querySelector('.run .codicon-play')).not.toBeNull();
+		send([markdown('a'), blurb()]);
+		expect(document.querySelector('.writing')).toBeNull();
+	});
 });
 
 describe('the experiment switch', () => {
