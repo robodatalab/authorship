@@ -209,6 +209,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					// A page rebuilt under the author — reloaded, or reopened — knows
 					// nothing about the checks it was showing a moment ago.
 					this.sayChecking(document, panel);
+					this.sayMinimized(document, panel);
 					if (this.checking.has(document.uri.toString())) {
 						void this.check(document, panel, null, true);
 					}
@@ -239,6 +240,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					break;
 				case 'stop':
 					this.onActive((d) => this.stop(d));
+					break;
+				case 'minimize':
+					void this.minimize(
+						document,
+						panel,
+						message.kind as string,
+						message.on as boolean
+					);
 					break;
 				case 'exportEpub':
 					void this.exportEpub(document, panel);
@@ -348,6 +357,54 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 			type: 'features',
 			styleFix: styleFixEnabled(),
 		});
+	}
+
+	/**
+	 * Which sections this document is folded away to, as it was left.
+	 *
+	 * Kept in the workspace rather than in the manuscript. How an author likes to
+	 * look at their book is not part of their book: it would show up in the file,
+	 * in the diff and in everybody else's checkout, and a story document is the
+	 * story. The same bargain the marks strike, only this one is remembered.
+	 */
+	private minimizedKey(document: vscode.TextDocument): string {
+		return `minimized:${document.uri.toString()}`;
+	}
+
+	private minimizedIn(document: vscode.TextDocument): string[] {
+		return this.context.workspaceState.get<string[]>(
+			this.minimizedKey(document),
+			[]
+		);
+	}
+
+	private sayMinimized(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel
+	): void {
+		void panel.webview.postMessage({
+			type: 'minimized',
+			kinds: this.minimizedIn(document),
+		});
+	}
+
+	private async minimize(
+		document: vscode.TextDocument,
+		panel: vscode.WebviewPanel,
+		kind: string,
+		on: boolean
+	): Promise<void> {
+		const folded = new Set(this.minimizedIn(document));
+		if (on) {
+			folded.add(kind);
+		} else {
+			folded.delete(kind);
+		}
+		await this.context.workspaceState.update(
+			this.minimizedKey(document),
+			[...folded]
+		);
+		this.sayMinimized(document, panel);
 	}
 
 	private sayChecking(

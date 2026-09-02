@@ -396,6 +396,56 @@ describe('drawing cells', () => {
 		expect(shown()[0].querySelector('.cell-name')).toBeNull();
 	});
 
+	it('shows the cover art until it is folded away', async () => {
+		await mount([{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} }]);
+		const cell = shown()[0];
+		expect(cell.querySelector('.rendered')).not.toBeNull();
+		// Unfolded it is the picture, and the picture says what it is.
+		expect(cell.querySelector('.cell-name')).toBeNull();
+	});
+
+	it('gives a folded cover the same heading every other section has', async () => {
+		// The bug this exists for: folded, the cover kept only the whisper in its
+		// bottom corner and drew as a hairline the author had to hunt for.
+		await mount([{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} }]);
+		window.dispatchEvent(
+			new MessageEvent('message', { data: { type: 'minimized', kinds: ['cover'] } })
+		);
+		const cell = shown()[0];
+		expect(cell.classList.contains('minimized')).toBe(true);
+		expect(cell.querySelector('.cell-name')!.textContent).toBe('Cover');
+		// The picture is the whole of what folding it takes away.
+		expect(cell.querySelector('.rendered')).toBeNull();
+	});
+
+	it('unfolds the cover again when the host says so', async () => {
+		await mount([{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} }]);
+		const fold = (kinds: string[]): void => {
+			window.dispatchEvent(
+				new MessageEvent('message', { data: { type: 'minimized', kinds } })
+			);
+		};
+		fold(['cover']);
+		fold([]);
+		const cell = shown()[0];
+		expect(cell.classList.contains('minimized')).toBe(false);
+		expect(cell.querySelector('.rendered')).not.toBeNull();
+		expect(cell.querySelector('.cell-name')).toBeNull();
+	});
+
+	it('folds nothing but the cover, whatever the host names', async () => {
+		// A chapter nobody can unfold is a chapter nobody can read.
+		await mount([chapter('One'), markdown('The lantern.')]);
+		window.dispatchEvent(
+			new MessageEvent('message', {
+				data: { type: 'minimized', kinds: ['chapter', 'markdown'] },
+			})
+		);
+		for (const cell of shown()) {
+			expect(cell.classList.contains('minimized')).toBe(false);
+		}
+	});
+
 	it('renders prose as markdown rather than as its source', async () => {
 		await mount([markdown('# Heading')]);
 		expect(shown()[0].querySelector('.rendered')!.innerHTML).toContain('<h1>');

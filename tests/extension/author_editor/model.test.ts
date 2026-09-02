@@ -15,6 +15,7 @@ import {
 	isDivisible,
 	isGenerated,
 	isMatter,
+	isMinimizable,
 	isNamed,
 	isStale,
 	isUnpublished,
@@ -226,6 +227,15 @@ describe('the kinds a section can be', () => {
 		expect(fields.every((f) => f.optional)).toBe(true);
 		// The blurb about the author is prose, so it is written not typed in.
 		expect(hasProse('about')).toBe(true);
+	});
+
+	it('lets the cover be folded away and nothing else', () => {
+		// The one section that is decided early and then sits at the top of the
+		// manuscript costing a screenful of scrolling on the way to the writing.
+		expect(isMinimizable('cover')).toBe(true);
+		for (const kind of ['markdown', 'chapter', 'part', 'title-page', 'contents', 'about', 'blurb', 'note', 'disclaimer', 'epigraph']) {
+			expect(isMinimizable(kind), kind).toBe(false);
+		}
 	});
 
 	it('names the sections the reader meets by name and no others', () => {

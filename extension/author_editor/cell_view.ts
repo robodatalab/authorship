@@ -155,8 +155,11 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	body.className = 'body';
 
 	// A section the reader meets by name says its name, even when the author has
-	// no say in what that name is.
-	if (isNamed(cell.kind)) {
+	// no say in what that name is — and so does one folded away, whose name is
+	// the only thing left of it. A fold with nothing but the label in its corner
+	// is a hairline the author has to go looking for; it should read as the
+	// section it is, in the same hand as every other section's heading.
+	if (isNamed(cell.kind) || minimized(cell)) {
 		const name = document.createElement('div');
 		name.className = 'cell-name';
 		name.textContent = labelOf(cell.kind);
