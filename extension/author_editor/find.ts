@@ -60,6 +60,10 @@ export function matchesIn(cells: Cell[], query: Query): Match[] {
 		// The facts before the prose, which is the order the file itself is in:
 		// the marker line carries the attributes and the text follows under it.
 		for (const field of fieldsOf(cell.kind)) {
+			// A box that is ticked or not has no words in it to find.
+			if (field.toggle) {
+				continue;
+			}
 			for (const span of spansIn(cell.attrs[field.name] ?? '', pattern, query)) {
 				found.push({ field: field.name, cell: index, ...span });
 			}

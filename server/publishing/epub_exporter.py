@@ -36,6 +36,7 @@ from server.storydoc import (
     TITLE_PAGE,
     Cell,
     Document,
+    prints_page,
 )
 
 # A cell whose text is neither a page of the book nor part of one: built from the
@@ -271,8 +272,13 @@ def read_book(document: Document) -> Book:
             documents.append(Chapter(chapters, cell.title, []))
             chapters += 1
         elif cell.kind == PART:
-            documents.append(build_part_page(parts, cell))
-            parts += 1
+            # A part the author marked unprinted says where the story may be cut
+            # into files and nothing else. There is no page for it here, and it
+            # is not counted among the parts that do have one — the reader
+            # numbers the pages they meet.
+            if prints_page(cell):
+                documents.append(build_part_page(parts, cell))
+                parts += 1
         elif cell.kind == TITLE_PAGE:
             documents.append(build_title_page(imprint))
         elif cell.kind == COVER:

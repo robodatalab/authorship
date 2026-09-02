@@ -405,28 +405,6 @@ body {
 	border-color: var(--vscode-focusBorder);
 }
 
-/* A section folded away to its heading. It keeps its name, its place and every
-   button that acts on it, and loses everything that takes room: the writing, the
-   picture, the boxes. Folded, a manuscript reads as an outline of itself.
-
-   The heading is the whole of what is left, so it is read at a glance and not
-   hunted for — smaller than a section's full heading, because twenty of those is
-   not an outline, but in the document's own foreground and not dimmed. */
-.cell.folded .cell-name {
-	font-size: 1.25em;
-	font-weight: 600;
-	color: var(--vscode-foreground);
-	padding-top: 6px;
-	padding-bottom: 6px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.cell.folded .cell-kind {
-	opacity: 1;
-}
-
 /* A section the book needs that has nothing in it yet. The exporter says which
    these are when an export is asked for, and they stay marked until the next
    export finds them written. After `.editing`, so a section still wanting stays
@@ -436,14 +414,8 @@ body {
 	border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
 }
 
-/* The name is normally a whisper in the corner on hover. On one of these it is
-   the whole point: it says which section is still to write. */
+/* The header of one of these says which section is still to write. */
 .cell.wanting .cell-kind {
-	opacity: 1;
-	color: var(--vscode-errorForeground);
-}
-
-.cell.wanting .cell-name {
 	color: var(--vscode-errorForeground);
 }
 
@@ -501,12 +473,45 @@ body {
 	color: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
 }
 
-/* --- the cell body --- */
+/* --- the section as a panel: a header, a body, a footer ---
 
-.body {
+   Three rows, each with room of its own. Everything a section says about itself
+   is in one of them and in the flow of it, which is what keeps a name off the
+   writing, a menu off the name and a count off the label — the three collisions
+   this arrangement replaced. */
+
+.panel {
 	flex: 1;
 	min-width: 0;
-	padding: 4px 10px 2px 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.cell-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 2px 4px 2px 0;
+}
+
+.cell-body {
+	padding: 4px 10px 4px 0;
+}
+
+/* What the section comes to, at the end of it and at the right — where the count
+   of the whole document stands in the toolbar. */
+.cell-foot {
+	display: flex;
+	justify-content: flex-end;
+	padding: 2px 4px 2px 0;
+}
+
+/* The hairlines between the three. Drawn only where two of them meet, so a
+   section that is a header alone is one line and not a box. */
+.cell-body + .cell-foot,
+.cell-head + .cell-body,
+.cell-head + .cell-foot {
+	border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
 }
 
 .cell-fields {
@@ -555,10 +560,12 @@ body {
 }
 
 /* A chapter is a landmark in a long document — it has to be findable while
-   scrolling past, not merely legible when you stop on it. */
+   scrolling past, not merely legible when you stop on it. It takes the width its
+   header has left after the kind and the buttons, which both keep their room
+   whatever the title says. */
 .cell-title {
-	display: block;
-	width: 100%;
+	flex: 1;
+	min-width: 0;
 	box-sizing: border-box;
 	font-family: inherit;
 	font-size: 1.7em;
@@ -589,16 +596,22 @@ body {
 	border-color: var(--vscode-focusBorder);
 }
 
-/* A heading the author does not type: the section's own name. Sized as a title
-   is, but plainly not a box to write in. */
+/* A name the author does not type: the section's own — "About the Author" — or
+   what a section folded away has been folded down to. Sized as a title is, and
+   in the same place, but plainly not a box to write in. */
 .cell-name {
+	flex: 1;
+	min-width: 0;
 	font-size: 1.7em;
 	font-weight: 600;
 	line-height: 1.3;
 	padding: 3px 5px;
-	margin-bottom: 2px;
 	color: var(--vscode-foreground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
+
 
 /* Everything a title page records besides its name. Labelled, because a column
    of identical boxes says nothing about which one is the publisher. */
@@ -615,6 +628,15 @@ body {
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: var(--vscode-descriptionForeground);
+}
+
+/* A field with two answers. On the same row as every other field, in the same
+   label column — only the control differs, and it takes the width it needs
+   rather than the width a box would. */
+.cell-toggle {
+	flex: 0 0 auto;
+	margin: 0;
+	accent-color: var(--vscode-focusBorder);
 }
 
 .cell-field {
@@ -766,59 +788,64 @@ body {
 	border-top: 1px solid var(--vscode-widget-border, currentColor);
 }
 
-/* What the cell is, quietly in its bottom corner — out of the flow, so it costs
-   the cell no height. */
-.cell-kind {
-	position: absolute;
-	right: 8px;
-	bottom: 1px;
-	font-size: 0.8em;
-	line-height: 1;
+/* What the writing under a heading weighs. Set in the same small caps the kind
+   and the field labels are: it labels the section rather than titling it. */
+.cell-words {
+	font-size: 0.82em;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
 	color: var(--vscode-descriptionForeground);
-	opacity: 0;
-	pointer-events: none;
 }
 
-.cell:hover .cell-kind,
-.cell.selected .cell-kind {
-	opacity: 1;
+/* What the section is, said in every header at the right end of it — chrome,
+   beside the buttons, out of the way of the name and the writing, which both
+   start at the left. Set in the small caps the fields are labelled in: it labels
+   the section rather than titling it. The auto margin is what puts it there,
+   whether it follows a name or opens the row alone. */
+.cell-kind {
+	flex: 0 0 auto;
+	margin-left: auto;
+	font-size: 0.82em;
+	line-height: 1.3;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--vscode-descriptionForeground);
+	pointer-events: none;
 }
 
 .cell-kind.automated {
 	font-style: italic;
 }
 
-/* --- the actions that float at the cell's top right --- */
+/* --- what can be done to the section, at the right end of its header ---
+
+   In the header rather than floating over the cell's top edge, where they sat on
+   the section above. Hidden rather than taken out when the pointer is elsewhere,
+   so the room they take is the room they always take and the header does not
+   change shape under the pointer. */
 
 .actions {
-	position: absolute;
-	top: -10px;
-	right: 6px;
-	z-index: 2;
-	display: none;
+	display: flex;
+	flex: 0 0 auto;
 	gap: 1px;
-	padding: 1px;
-	background: var(--vscode-editorWidget-background);
-	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
-	border-radius: 4px;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+	visibility: hidden;
 }
 
 .cell:hover .actions,
 .cell.selected .actions {
-	display: flex;
+	visibility: visible;
 }
 
 /* While the pointer is over the page, the cell under it is the one that answers
    — otherwise the selected cell's set and the hovered cell's set are both up. */
 .cells:hover .cell.selected:not(:hover) .actions {
-	display: none;
+	visibility: hidden;
 }
 
 .actions .icon {
 	display: flex;
 	align-items: center;
-	padding: 4px 6px;
+	padding: 3px 5px;
 	color: var(--vscode-foreground);
 	background: none;
 	border: none;

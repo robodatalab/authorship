@@ -152,14 +152,40 @@ export function chapter(title: string): Cell {
 	return { kind: CHAPTER, source: '', attrs: { title } };
 }
 
+/** What an attribute says when the answer to it is no. */
+export const NO = 'no';
+
+/** Whether a part is printed as a page of the book. */
+export const PRINT = 'print';
+
 /**
  * A part is a named division of the story, and nothing else.
  *
  * The same bargain a chapter strikes, one level up: it names a run of chapters
  * and carries no prose of its own, so moving it moves only the name.
  */
-export function part(title: string): Cell {
-	return { kind: PART, source: '', attrs: { title } };
+export function part(title: string, printed = true): Cell {
+	return {
+		kind: PART,
+		source: '',
+		attrs: printed ? { title } : { title, [PRINT]: NO },
+	};
+}
+
+/**
+ * Whether a part is a page the reader turns to, or only a seam in the story.
+ *
+ * A part does two jobs and they are not the same one. It names a run of chapters
+ * — the tale, in a book of tales — and it says where the story may be cut into
+ * files. An author who wants the second without the first marks the part
+ * unprinted: it divides the story exactly as any other part does, and the book
+ * goes out with no page where it stands.
+ *
+ * Saying nothing is printing, so a part written before there was anything to say
+ * about this is the page it has always been.
+ */
+export function printsPage(cell: Cell): boolean {
+	return cell.attrs[PRINT] !== NO;
 }
 
 export function cover(src: string, alt = 'Cover'): Cell {

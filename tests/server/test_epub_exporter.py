@@ -437,6 +437,49 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<h1>Part 1</h1>", first)
         self.assertIn("<h1>Part 2</h1>", second)
 
+    def test_a_part_marked_unprinted_reaches_no_page_of_the_book(self) -> None:
+        # What it is for: the author says where the story divides into files, and
+        # the reader turns from one chapter to the next without meeting the seam.
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.part("Break", printed=False),
+            storydoc.chapter("Two"),
+            storydoc.markdown("more"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            names = z.namelist()
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+
+        self.assertNotIn("OEBPS/part.xhtml", names)
+        self.assertNotIn("Break", nav)
+
+    def test_a_seam_does_not_take_a_number_from_the_parts_the_book_prints(
+        self,
+    ) -> None:
+        # The reader numbers the pages they meet: a part printed after a seam is
+        # the second part of the book, not the third.
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            Cell(storydoc.PART, "", {}),
+            storydoc.chapter("One"),
+            storydoc.part("Break", printed=False),
+            storydoc.chapter("Two"),
+            Cell(storydoc.PART, "", {}),
+            storydoc.chapter("Three"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            first = z.read("OEBPS/part.xhtml").decode("utf-8")
+            second = z.read("OEBPS/part_2.xhtml").decode("utf-8")
+
+        self.assertIn("<h1>Part 1</h1>", first)
+        self.assertIn("<h1>Part 2</h1>", second)
+
     def test_a_part_is_somewhere_the_reader_can_navigate_to(self) -> None:
         out = written(
             self.root,

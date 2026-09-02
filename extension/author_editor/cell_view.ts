@@ -19,11 +19,12 @@ import {
 	isAutomated,
 	isDivisible,
 	isGenerated,
+	isHeading,
 	isNamed,
 	isStale,
 	isFolded,
 	labelOf,
-	summaryOf,
+	saidWords,
 	renderMarkdown,
 	runCell,
 } from './model';
@@ -37,9 +38,10 @@ import { current, found, foundIn } from './find_bar';
 import { hideSeam, seamFor, showSeam } from './seam_view';
 import { openCellMenu, openInsertMenu } from './menu_view';
 import { post } from './elements';
-import { select } from './page_view';
+import { select, wordsHeaded } from './page_view';
 import { state } from './state';
 import type { CellField } from './model';
+import { NO } from '../storydoc/model';
 import type { Cell } from '../storydoc/model';
 import type { Writing } from './state';
 
@@ -74,7 +76,7 @@ export function cellElement(cell: Cell, index: number): HTMLElement {
 		openCellMenu(event.clientX, event.clientY, index);
 	});
 
-	row.append(runColumnFor(cell, index), bodyFor(cell, index), actionsFor(cell, index));
+	row.append(runColumnFor(cell, index), panelFor(cell, index));
 	if (isDivisible(cell.kind)) {
 		row.append(seamFor(index));
 		row.addEventListener('mousemove', (event) => showSeam(row, index, event.clientY));
@@ -151,24 +153,107 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	return column;
 }
 
-function bodyFor(cell: Cell, index: number): HTMLElement {
-	const body = document.createElement('div');
-	body.className = 'body';
+/**
+ * One section, as a panel: a header, a body, a footer.
+ *
+ * The same three parts in the same three places on every kind of section, each
+ * with one job. The header says what the section is, what it is called, and what
+ * can be done to it. The body is what the author put in it — the fields, the
+ * picture, the prose. The footer is what the section comes to, which today is
+ * what it weighs.
+ *
+ * Every one of them stands in the flow, and that is the point of the
+ * arrangement: nothing is drawn in a corner over something else. A name in a
+ * corner sat on the writing, a menu floating over the top edge sat on the name,
+ * and a count added to the body landed on the name in the corner. Three parts
+ * with room of their own cannot land on each other.
+ *
+ * A part with nothing to put in it is not drawn: a section with no fields and no
+ * prose has no body, and only the two levels of the story have anything to
+ * total. The header is the one part every section has.
+ */
+function panelFor(cell: Cell, index: number): HTMLElement {
+	const panel = document.createElement('div');
+	panel.className = 'panel';
+	panel.append(headFor(cell, index));
 
-	// A section the reader meets by name says its name, even when the author has
-	// no say in what that name is — and so does one folded away, whose name is
-	// the only thing left of it. A fold with nothing but the label in its corner
-	// is a hairline the author has to go looking for; it should read as the
-	// section it is, in the same hand as every other section's heading.
-	if (isNamed(cell.kind) || isFolded(cell)) {
+	const body = bodyFor(cell, index);
+	if (body) {
+		panel.append(body);
+	}
+	const foot = footFor(cell, index);
+	if (foot) {
+		panel.append(foot);
+	}
+	return panel;
+}
+
+/**
+ * What the section is called, what it is, and what can be done to it.
+ *
+ * The same header whatever the section is doing. It is the one part of a panel
+ * that never changes: folding a section takes away what is under the header, not
+ * what is in it, so a document folded and unfolded reads down the same left edge
+ * both times. Nothing is ever lifted into it from below — a header that borrowed
+ * the first line of the writing would be a different header on every section and
+ * a moving target on each one.
+ *
+ * The name takes the left, where the writing under it starts, so a title lines
+ * up with the prose it heads however long the words beside it are. It is the box
+ * a title is typed into, or the section's own name where the author has no say
+ * in it, and nothing at all in a section that has neither.
+ *
+ * The kind and the buttons take the right, as chrome should: the kind was
+ * already whispered in the corner and has only come up into the row, and the
+ * buttons keep their room whether they are showing or not, so the header does
+ * not change shape under the pointer.
+ *
+ * A section the reader meets by name says that name once. The kind *is* the
+ * name — "About the Author" is what that page is called — so it is said in the
+ * name's place, in the document's own hand, and not again as chrome.
+ */
+function headFor(cell: Cell, index: number): HTMLElement {
+	const head = document.createElement('header');
+	head.className = 'cell-head';
+	const named = isNamed(cell.kind);
+	const title = fieldsOf(cell.kind).find((field) => field.name === TITLE);
+
+	if (named) {
 		const name = document.createElement('div');
 		name.className = 'cell-name';
-		name.textContent = isFolded(cell) ? summaryOf(cell) : labelOf(cell.kind);
-		body.append(name);
+		name.textContent = labelOf(cell.kind);
+		head.append(name);
+	} else if (title) {
+		head.append(boxFor(cell, index, title));
 	}
+	if (!named) {
+		head.append(kindLabelFor(cell));
+	}
+	head.append(actionsFor(cell, index));
+	return head;
+}
 
-	const fields = fieldsOf(cell.kind);
-	if (fields.length > 0 && !isFolded(cell)) {
+/**
+ * What the author put in the section, or null where there is nothing in it.
+ *
+ * The name is not here — it is the header's — so what is left is everything
+ * else: the facts the kind records, the bar for a cell being written, and the
+ * prose or the picture.
+ *
+ * A folded section has no body at all. That is the whole of what folding does,
+ * and the whole of what it is allowed to do: everything a section shows about
+ * itself is under the header, so taking it away is one thing to think about
+ * rather than a rule per kind of section.
+ */
+function bodyFor(cell: Cell, index: number): HTMLElement | null {
+	if (isFolded(cell)) {
+		return null;
+	}
+	const body = document.createElement('div');
+	body.className = 'cell-body';
+
+	const fields = fieldsOf(cell.kind).filter((field) => field.name !== TITLE);
+	if (fields.length > 0) {
 		body.append(fieldsFor(cell, index, fields));
 	}
 
@@ -179,62 +264,52 @@ function bodyFor(cell: Cell, index: number): HTMLElement {
 	}
 
 	// A chapter is its title and nothing else — there is no prose in it to show,
-	// and the writing beneath it is markdown cells of its own. A section folded
-	// away shows none either: that is what folding it is for.
-	if (hasProse(cell.kind) && !isFolded(cell)) {
+	// and the writing beneath it is markdown cells of its own.
+	if (hasProse(cell.kind)) {
 		body.append(
 			state.editing === index ? sourceFor(cell, index) : renderedFor(cell, index)
 		);
 	}
-	body.append(kindLabelFor(cell));
-	return body;
+	return body.childElementCount > 0 ? body : null;
 }
+
+/**
+ * What the section comes to, or null where it comes to nothing.
+ *
+ * Only the two levels of the story have anything to total: a chapter weighs what
+ * is written under it and a part weighs its chapters. Folded away with the body,
+ * because a fold takes away everything under the header — what a section adds up
+ * to is about what is in it, and what is in it is what has just been put away.
+ */
+function footFor(cell: Cell, index: number): HTMLElement | null {
+	if (isFolded(cell) || !isHeading(cell.kind)) {
+		return null;
+	}
+	const foot = document.createElement('footer');
+	foot.className = 'cell-foot';
+	foot.append(wordsFor(index));
+	return foot;
+}
+
+/** The field a section is named by, which its header carries rather than its
+ *  body. */
+const TITLE = 'title';
 
 /**
  * The facts a cell records, as fields rather than prose.
  *
- * A field called `title` is the cell's name and is shown as a heading — it is
- * what the author looks for when scrolling. The rest are a labelled list,
- * because a bare row of boxes says nothing about which is the publisher and
- * which is the date. A cell with no title, like the author's links, is all list.
+ * A labelled list, because a bare row of boxes says nothing about which is the
+ * publisher and which is the date. Every field is written on the same row
+ * whatever it holds — the name in the label column, the control beside it — so
+ * a section with three of them reads as one list and not as three arrangements.
  */
 function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement {
 	const holder = document.createElement('div');
 	holder.className = 'cell-fields';
 
 	for (const field of fields) {
-		const heading = field.name === 'title';
-		const input = document.createElement('input');
-		input.className = heading ? 'cell-title' : 'cell-field';
-		input.value = cell.attrs[field.name] ?? '';
-		// The label is already beside the box, so an empty box is free to say what
-		// a good value looks like instead of repeating the name.
-		input.placeholder =
-			field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
-		// A box cannot hold a mark around part of what it says, so a field with a
-		// match in it is lit whole.
-		const hits = foundIn(index, field.name);
-		if (hits.length > 0) {
-			input.classList.add('find-field');
-			const here = found[current];
-			if (here && hits.includes(here)) {
-				input.classList.add('current');
-			}
-		}
-		input.addEventListener('change', () => {
-			const next = [...state.cells];
-			const attrs = { ...cell.attrs, [field.name]: input.value };
-			// An empty field is one the author has not filled in, not one they
-			// have filled in with nothing — so it leaves no attribute behind.
-			if (!input.value) {
-				delete attrs[field.name];
-			}
-			next[index] = { ...cell, attrs };
-			commit(next);
-		});
-
-		if (heading) {
-			holder.append(input);
+		if (field.toggle) {
+			holder.append(toggleFor(cell, index, field));
 			continue;
 		}
 		const row = document.createElement('label');
@@ -242,10 +317,108 @@ function fieldsFor(cell: Cell, index: number, fields: CellField[]): HTMLElement 
 		const label = document.createElement('span');
 		label.className = 'cell-field-label';
 		label.textContent = field.label;
-		row.append(label, input);
+		row.append(label, boxFor(cell, index, field));
 		holder.append(row);
 	}
 	return holder;
+}
+
+/**
+ * One field as the box it is typed into.
+ *
+ * The same box wherever it is drawn — the title in the header is the field the
+ * author edits, not a copy of it kept somewhere else — so what a box does when
+ * it is typed in, and what it looks like when the find bar has a match in it, is
+ * written down once.
+ */
+function boxFor(cell: Cell, index: number, field: CellField): HTMLInputElement {
+	const input = document.createElement('input');
+	input.className = field.name === TITLE ? 'cell-title' : 'cell-field';
+	input.value = cell.attrs[field.name] ?? '';
+	// The label is already beside the box, so an empty box is free to say what
+	// a good value looks like instead of repeating the name.
+	input.placeholder =
+		field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
+	// A box cannot hold a mark around part of what it says, so a field with a
+	// match in it is lit whole.
+	const hits = foundIn(index, field.name);
+	if (hits.length > 0) {
+		input.classList.add('find-field');
+		const here = found[current];
+		if (here && hits.includes(here)) {
+			input.classList.add('current');
+		}
+	}
+	input.addEventListener('change', () => {
+		const next = [...state.cells];
+		const attrs = { ...cell.attrs, [field.name]: input.value };
+		// An empty field is one the author has not filled in, not one they have
+		// filled in with nothing — so it leaves no attribute behind.
+		if (!input.value) {
+			delete attrs[field.name];
+		}
+		next[index] = { ...cell, attrs };
+		commit(next);
+	});
+	return input;
+}
+
+/**
+ * A fact with two answers, as the box the author ticks.
+ *
+ * The same row every other field is written on — the name in the label column,
+ * the control beside it — because it is another fact about the section and not
+ * another kind of thing. What a tick means is the hint, which a box has nowhere
+ * to print the way an empty text field does, so it is said on hovering the row.
+ *
+ * Unticking is what writes the attribute: the answer every cell already in the
+ * document gives is the ticked one, so a part written before the box existed is
+ * still a part that prints.
+ */
+function toggleFor(cell: Cell, index: number, field: CellField): HTMLElement {
+	const row = document.createElement('label');
+	row.className = 'cell-field-row';
+	if (field.hint) {
+		row.title = field.hint;
+	}
+	const said = document.createElement('span');
+	said.className = 'cell-field-label';
+	said.textContent = field.label;
+
+	const box = document.createElement('input');
+	box.type = 'checkbox';
+	box.className = 'cell-toggle';
+	box.checked = cell.attrs[field.name] !== NO;
+
+	box.addEventListener('change', () => {
+		const attrs = { ...cell.attrs };
+		if (box.checked) {
+			delete attrs[field.name];
+		} else {
+			attrs[field.name] = NO;
+		}
+		const next = [...state.cells];
+		next[index] = { ...cell, attrs };
+		commit(next);
+	});
+	row.append(said, box);
+	return row;
+}
+
+/**
+ * What the writing under a heading weighs, said under the heading.
+ *
+ * The same count as the toolbar's, made of the same words and standing at the
+ * same end of the line, so a chapter's number and the document's are two
+ * readings of one thing and are read in the same place. Kept out of the corner
+ * where the kind is whispered: this is the author's own measure of the day's
+ * work and is there to be read, not to be hunted for on hover.
+ */
+function wordsFor(index: number): HTMLElement {
+	const said = document.createElement('div');
+	said.className = 'cell-words';
+	said.textContent = saidWords(wordsHeaded(index));
+	return said;
 }
 
 /** A cell as the reader will meet it: the markdown, rendered. */
@@ -305,7 +478,7 @@ function writingBarFor(progress: Writing): HTMLElement {
 	return holder;
 }
 
-/** What the cell is, in its bottom corner, the way a notebook names its language. */
+/** What the cell is, at the head of it, the way a notebook names its language. */
 function kindLabelFor(cell: Cell): HTMLElement {
 	const label = document.createElement('span');
 	label.className = 'cell-kind';
@@ -316,7 +489,7 @@ function kindLabelFor(cell: Cell): HTMLElement {
 	return label;
 }
 
-/** The actions that float at the cell's top-right corner. */
+/** What can be done to the section, at the right end of its header. */
 function actionsFor(cell: Cell, index: number): HTMLElement {
 	const actions = document.createElement('div');
 	actions.className = 'actions';

@@ -16,7 +16,9 @@ import {
 	MARKDOWN,
 	NOTE,
 	PART,
+	PRINT,
 	TITLE_PAGE,
+	printsPage,
 	type Cell,
 } from '../storydoc/model';
 
@@ -34,6 +36,14 @@ export interface CellField {
 	hint?: string;
 	/** Shown, but a book is complete without it. */
 	optional?: boolean;
+	/**
+	 * A fact with two answers rather than something to write: a box to tick.
+	 *
+	 * Ticked is what a cell answers by saying nothing, so unticking the box is
+	 * what writes the attribute. A document from before the field existed reads
+	 * as the author who wrote it would expect it to.
+	 */
+	toggle?: boolean;
 }
 
 export interface CellKind {
@@ -105,6 +115,14 @@ export interface CellKind {
 	 */
 	divisible?: boolean;
 	/**
+	 * Stands over the writing that follows it, and says what that writing weighs.
+	 *
+	 * The two levels of the story: a chapter and the part the chapters are
+	 * gathered into. Everything else is either the writing itself or a page of the
+	 * book, and neither has anything under it to count.
+	 */
+	heading?: boolean;
+	/**
 	 * Prints its label as the section's heading.
 	 *
 	 * For a section the reader meets by name but the author does not get to
@@ -152,6 +170,7 @@ export const KINDS: CellKind[] = [
 		prose: false,
 		label: 'Chapter',
 		automated: false,
+		heading: true,
 		fields: [{ name: 'title', label: 'Title' }],
 		primary: true,
 		blank: () => ({ kind: CHAPTER, source: '', attrs: { title: 'Untitled' } }),
@@ -179,7 +198,19 @@ export const KINDS: CellKind[] = [
 		prose: false,
 		label: 'Part',
 		automated: false,
-		fields: [{ name: 'title', label: 'Title' }],
+		heading: true,
+		// Untick `print` and the part is a seam: it still says where the story
+		// divides into files, and the book goes out with no page where it stands.
+		// That is how an author says "break here" without saying it to the reader.
+		fields: [
+			{ name: 'title', label: 'Title' },
+			{
+				name: PRINT,
+				label: 'Printed',
+				hint: 'A page of its own in the book, before the chapters under it',
+				toggle: true,
+			},
+		],
 		primary: false,
 		blank: () => ({ kind: PART, source: '', attrs: { title: 'Untitled' } }),
 	},
@@ -323,31 +354,6 @@ export function isFolded(cell: Cell): boolean {
 	return cell.attrs[FOLDED] === 'true';
 }
 
-/**
- * What a folded section says it is.
- *
- * A fold is only worth having if the author can tell what they folded. So it
- * shows whatever names the cell: the title where the cell has one, the first
- * line of the writing where it does not — which is what makes folding the whole
- * document an outline of it rather than a stack of identical bars — and the
- * kind's own name only where the cell says nothing at all.
- */
-export function summaryOf(cell: Cell): string {
-	const titled = cell.attrs.title?.trim();
-	if (titled) {
-		return titled;
-	}
-	const first = cell.source
-		.split('\n')
-		.map((line) => line.trim())
-		.find((line) => line !== '');
-	if (!first) {
-		return labelOf(cell.kind);
-	}
-	const said = first.replace(/^#{1,6}\s+/, '').replace(/^!\[[^\]]*\]\(.*$/, '');
-	return said.length > 80 ? said.slice(0, 79).trimEnd() + '…' : said || labelOf(cell.kind);
-}
-
 /** This section folded, or unfolded — the attribute goes when it is not set. */
 export function foldedCell(cell: Cell, on: boolean): Cell {
 	const attrs = { ...cell.attrs };
@@ -413,6 +419,16 @@ export function generatedCell(cells: Cell[], at: number): number {
 	return isGenerated(cells[at]?.kind ?? '')
 		? at
 		: cells.findIndex((cell) => isGenerated(cell.kind));
+}
+
+/**
+ * Whether this kind stands over the writing under it, weighing what it holds.
+ *
+ * A kind nobody has heard of does not: an unrecognised cell is text, and text is
+ * counted where it stands rather than counting anything else.
+ */
+export function isHeading(kind: string): boolean {
+	return KINDS.find((k) => k.kind === kind)?.heading ?? false;
 }
 
 /**
@@ -657,6 +673,94 @@ export function wordsIn(cells: readonly Cell[], except: number | null = null): n
 	);
 }
 
+/**
+ * What each part and chapter weighs, by the cell that heads it.
+ *
+ * The same words in the same places as the count in the toolbar: the markdown
+ * sections and nothing else, so an author reading a chapter's number and the
+ * document's is reading two answers to the same question. What every other cell
+ * weighs is zero, which is what a title or a cover weighs there too.
+ *
+ * A section of prose belongs to the chapter above it and to the part above that,
+ * so its words are counted into both. A part weighs what the chapters under it
+ * weigh together, and the prose an author put under a part before its first
+ * chapter is a part's as well — it is under the part and under no chapter.
+ *
+ * `except` leaves one section out, for the same reason `wordsIn` does: a caller
+ * holding a newer copy of it than the document has.
+ */
+export function wordsByHeading(
+	cells: readonly Cell[],
+	except: number | null = null
+): number[] {
+	const words = cells.map(() => 0);
+	let part: number | null = null;
+	let chapter: number | null = null;
+
+	cells.forEach((cell, at) => {
+		if (cell.kind === PART) {
+			// The chapters of the part that has just ended are not under this one,
+			// and neither is the last of them: what follows a part is the part's.
+			part = at;
+			chapter = null;
+			return;
+		}
+		if (cell.kind === CHAPTER) {
+			chapter = at;
+			return;
+		}
+		if (cell.kind !== MARKDOWN || at === except) {
+			return;
+		}
+		const count = countWords(cell.source);
+		if (chapter !== null) {
+			words[chapter] += count;
+		}
+		if (part !== null) {
+			words[part] += count;
+		}
+	});
+	return words;
+}
+
+/**
+ * The headings a cell's words are counted into, by index.
+ *
+ * The other half of the rule `wordsByHeading` walks, asked of one cell — which
+ * is what a page redrawing a count while the author types needs: a keystroke
+ * changes the two numbers above the box and no others.
+ */
+export function headingsOver(cells: readonly Cell[], index: number | null): number[] {
+	if (index === null) {
+		return [];
+	}
+	const over: number[] = [];
+	for (let at = Math.min(index, cells.length) - 1; at >= 0; at--) {
+		const kind = cells[at].kind;
+		if (kind === CHAPTER && over.length === 0) {
+			over.push(at);
+		}
+		if (kind === PART) {
+			over.push(at);
+			break;
+		}
+	}
+	return over;
+}
+
+/**
+ * A count as it is said: `1,240 words`.
+ *
+ * The thousands are marked because a manuscript's count is six digits long and
+ * nobody reads `127450` at a glance — and marked here rather than by
+ * `toLocaleString`, so the number does not change its shape with the machine the
+ * editor was opened on while the words beside it stay English.
+ */
+export function saidWords(count: number): string {
+	const grouped = String(count).replace(/\B(?=(\d{3})+$)/g, ',');
+	return `${grouped} ${count === 1 ? 'word' : 'words'}`;
+}
+
 /** Where in the book a cell stands. Either level may be missing. */
 export interface Place {
 	part: string | null;
@@ -679,7 +783,10 @@ export function placeOf(cells: Cell[], index: number): Place {
 	let chapter: string | null = null;
 	for (let i = Math.min(index, cells.length - 1); i >= 0; i--) {
 		const cell = cells[i];
-		if (cell.kind === PART) {
+		// A part that prints is a place in the book and names where the author is
+		// standing; a seam is not somewhere anyone is, so the walk goes on past it
+		// to the part that does name this stretch of the story.
+		if (cell.kind === PART && printsPage(cell)) {
 			return { part: cell.attrs.title || 'Untitled', chapter };
 		}
 		if (cell.kind === CHAPTER && chapter === null) {
@@ -787,6 +894,11 @@ export function toMarkdown(cells: Cell[]): string {
 			continue;
 		}
 		if (cell.kind === PART || cell.kind === CHAPTER) {
+			// A part the book does not print is not a heading of the manuscript
+			// either: it marks where the files divide, and a manuscript is one file.
+			if (cell.kind === PART && !printsPage(cell)) {
+				continue;
+			}
 			out.push(`${headingFor(cell.kind)} ${cell.attrs.title || 'Untitled'}`);
 			continue;
 		}

@@ -100,14 +100,24 @@ so it asks first, and one `Ctrl+Z` / `Cmd+Z` puts it back.
 ## The editor
 
 A `.author` file opens as a page of **sections**, laid out the way a notebook
-lays out cells: a narrow column down the left, the section filling the width
-beside it, and what the section is named quietly in its bottom corner.
+lays out cells: a narrow run column down the left, and the section filling the
+width beside it as a panel of three parts.
+
+- The **header** carries the section's name at the left — the box a chapter, a
+  part or the title page is named in — with what kind of section it is, and the
+  buttons that act on it, at the right.
+- The **body** is what you put in it: the fields the kind records, the picture,
+  the prose.
+- The **footer** is what the section comes to. Today that is what a chapter and
+  a part weigh.
+
+Nothing is drawn over anything else: each of the three has room of its own.
 
 <!-- CAPTURE editor-anatomy.webp — one screen of the editor showing, in one
-     frame: the toolbar, the run column on the left, a Chapter section, two
-     prose sections under it, the kind label in a section's bottom corner, and
-     the part · chapter line and word count in the toolbar. Annotate it with
-     callouts if you like — this is the picture that explains the layout. -->
+     frame: the toolbar, the run column on the left, a Chapter section with its
+     header / footer, two prose sections under it, and the part · chapter line
+     and word count in the toolbar. Annotate it with callouts if you like —
+     this is the picture that explains the layout. -->
 
 ![The parts of the editor](docs/images/editor-anatomy.webp)
 
@@ -121,6 +131,16 @@ editor. The document is the file; the page is a view of it.
 you are reading, taken from what is on screen rather than from what you last
 clicked — scroll through a hundred thousand words and it keeps up. The word
 count sits at the other end.
+
+**What it weighs.** Every chapter says in its footer how many words are written
+under it, and every part says what its chapters weigh together. The same count
+as the toolbar's, made of the same words — the prose and nothing else, so a
+title you rename and a note you leave yourself weigh nothing in either. Both
+keep up with the keys rather than with the file.
+
+**Folding.** Folding a section takes away its body and its footer and leaves its
+header exactly as it was — the same name, in the same place, saying the same
+thing. A folded document is the headers of its sections and nothing else.
 
 **Splitting and joining.** Hover between two paragraphs and a line appears at
 the nearest seam, with a button on it. Press it to cut the section in two there,
@@ -145,8 +165,8 @@ right: move up, move down, delete.
 
 ![Adding a section](docs/images/insert-menu.webp)
 
-<!-- CAPTURE cell-actions.webp — a section hovered, with the move up / move down
-     / delete buttons visible at its top right. -->
+<!-- CAPTURE cell-actions.webp — a section hovered, with the fold / move up /
+     move down / delete buttons visible at the right of its header. -->
 
 ![Moving and deleting a section](docs/images/cell-actions.webp)
 
@@ -192,7 +212,7 @@ chapter called "Disclaimer" is still a chapter.
 |---|---|
 | **Markdown** | Prose. Most of a novel is this. |
 | **Chapter** | Names a chapter. Carries a title and no prose of its own, so moving it moves the name. |
-| **Part** | Names a run of chapters, one level above a chapter. |
+| **Part** | Names a run of chapters, one level above a chapter, and marks where the story divides into files. Untick **Printed** and it does the second job only — the book goes out with no page where it stands. |
 | **Note** | What you say to yourself about the story while writing it. It sits beside the passage it is about, and is never published. |
 | **Title Page** | Title, subtitle, author, publisher, date, version, ISBN. |
 | **Cover** | The cover art. |
@@ -449,21 +469,25 @@ manuscript and not a book.
 ## Dividing a long story into parts
 
 **Divide into Parts** cuts the story into `parts/part_1.author`,
-`part_2.author`, and so on, beside the document it came from. It asks about how
-many words a part should be — 5,000 unless you say otherwise — and a story with
-Parts of its own is also asked whether to keep them whole, so that no file spans
-two of them.
+`part_2.author`, and so on, beside the document it came from. It asks nothing:
+the cuts fall where you put the **Parts**, one file each, and the chapters you
+wrote before the first one are a file of their own.
 
-The cuts fall between chapters, never mid-scene, so the lengths land near what
-you asked for rather than exactly on it. Each part is a story document like any
-other: it carries the book's furniture, its title page renumbered, and its share
-of the chapters — and it opens in this editor and exports to an EPUB by the same
-buttons.
+Where a story breaks is a question about the story, so it is answered in the
+story. A Part you want the reader to meet — the tale, in a book of tales — is
+printed as a page of its own and divides the files as well. A Part that is only
+there to say "break here" is marked unprinted: untick **Printed** on it, and it
+divides the files while the book goes out with no page where it stands. A story
+with no Parts at all is asking to be divided nowhere, and is left alone.
 
-<!-- CAPTURE divide-parts.webp — the "About how many words should a part be?"
-     prompt, ideally the quick-pick form with the "along the story's own parts"
-     tick, and the parts/ folder with part_1.author … part_5.author showing in
-     the Explorer behind or beside it. Two shots stitched is fine. -->
+Each part is a story document like any other: it carries the book's furniture,
+its title page renumbered, and its share of the chapters — and it opens in this
+editor and exports to an EPUB by the same buttons. A file cut at an unprinted
+Part inside "Day One" is still titled *Veriona — Day One — Part 2*.
+
+<!-- CAPTURE divide-parts.webp — a Part section with the Printed box unticked,
+     and the parts/ folder with part_1.author … part_5.author showing in the
+     Explorer behind or beside it. Two shots stitched is fine. -->
 
 ![Dividing a story into parts](docs/images/divide-parts.webp)
 

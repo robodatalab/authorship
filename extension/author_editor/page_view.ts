@@ -9,7 +9,15 @@
 //
 // What a cell is made of is cell_view.ts; this is the page around them.
 
-import { countWords, isStale, placeOf, wordsIn } from './model';
+import {
+	countWords,
+	headingsOver,
+	isStale,
+	placeOf,
+	saidWords,
+	wordsByHeading,
+	wordsIn,
+} from './model';
 import { cellElement, insertBarFor } from './cell_view';
 import { cellsEl, statusEl, topbarEl, whereEl } from './elements';
 import { forgetSeam } from './seam_view';
@@ -128,10 +136,9 @@ export function showStatus(): void {
 function documentStatus(): string {
 	const chapters = state.cells.filter((cell) => cell.kind === 'chapter').length;
 	const stale = state.cells.filter((_cell, index) => isStale(state.cells, index)).length;
-	const words = wordsNow();
 	const said = [
 		`${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`,
-		`${grouped(words)} ${words === 1 ? 'word' : 'words'}`,
+		saidWords(wordsNow()),
 	];
 	if (stale > 0) {
 		said.push(`${stale} to run`);
@@ -185,15 +192,54 @@ function wordsTyping(): number {
 }
 
 /**
- * A count with its thousands marked, because a manuscript's is six digits long
- * and nobody reads `127450` at a glance.
+ * What the section headed by this cell weighs, as the page has it right now.
  *
- * Punctuated here rather than by `toLocaleString`, so the number does not change
- * its shape with the machine the editor was opened on while the words beside it
- * stay English.
+ * Read by the cell as it is drawn, and by `showHeadingWords` as it is typed
+ * into. Counted the way the toolbar counts the whole document, down to the open
+ * box being taken as it stands rather than as the document last heard it — the
+ * two numbers are answers to the same question and must not disagree.
  */
-function grouped(count: number): string {
-	return String(count).replace(/\B(?=(\d{3})+$)/g, ',');
+export function wordsHeaded(index: number): number {
+	const under = keptHeadings()[index] ?? 0;
+	return under + (headingsOver(state.cells, state.editing).includes(index)
+		? wordsTyping()
+		: 0);
+}
+
+/**
+ * The counts on the headings the open box stands under, brought up to the keys.
+ *
+ * Only those two: a keystroke lands in one section, and the chapter and the part
+ * over it are the only numbers in the document it can change. Written straight
+ * onto the elements rather than by redrawing the cells, which would take the
+ * caret with them.
+ */
+export function showHeadingWords(): void {
+	const rows = cellsEl.querySelectorAll('.cell');
+	for (const at of headingsOver(state.cells, state.editing)) {
+		const said = rows[at]?.querySelector('.cell-words');
+		if (said) {
+			said.textContent = saidWords(wordsHeaded(at));
+		}
+	}
+}
+
+/**
+ * What every heading weighs, with the open box left out.
+ *
+ * Kept for the same reason the document's own count is kept, and thrown away by
+ * the same two things: a new document, and a different cell being opened. What
+ * the open box holds is added back by `wordsHeaded`, a chapter's worth of
+ * counting per keystroke rather than a novel's.
+ */
+let headings: { cells: Cell[]; editing: number | null; words: number[] } | null = null;
+
+function keptHeadings(): number[] {
+	const { cells, editing } = state;
+	if (!headings || headings.cells !== cells || headings.editing !== editing) {
+		headings = { cells, editing, words: wordsByHeading(cells, editing) };
+	}
+	return headings.words;
 }
 
 /** Move the selection, without rebuilding either cell to say so. */

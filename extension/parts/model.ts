@@ -8,30 +8,36 @@
 // same editor, exports to the same EPUB, and nothing here has to know how either
 // of those is done.
 //
+// Where the cuts fall is the author's own answer, given in the document rather
+// than to a form: the story divides where its Parts stand, one file per Part. A
+// Part that is only there to place a cut is marked unprinted and the book goes
+// out without a page for it, so dividing the files costs the reader nothing.
+//
 // Deliberately free of the `vscode` module, so a division can be read and tested
-// without launching an editor. Everything here deals in cells and counts;
-// divide.ts turns the parts into files.
+// without launching an editor. Everything here deals in cells; divide.ts turns
+// the parts into files.
 
-import { countWords, isAside, isMatter, isUnpublished } from '../author_editor/model';
+import { isAside, isMatter, isUnpublished } from '../author_editor/model';
 import {
 	CHAPTER,
 	COVER,
 	EXTENSION,
 	PART,
 	TITLE_PAGE,
+	printsPage,
 	type Cell,
 } from '../storydoc/model';
 
-/** A chapter and the cells written under it, with what a reader counts in them. */
+/** A chapter and the cells written under it. */
 export interface Section {
 	cells: Cell[];
-	words: number;
 	/**
 	 * What the story calls the part this section stands in, or '' where it stands
 	 * in none.
 	 *
-	 * The author's own division of the book, which a division into files can be
-	 * asked to cut along rather than across.
+	 * Only a part the book prints names anything. One marked unprinted places a
+	 * cut and says nothing else, so a file cut at a seam inside "Day One" is
+	 * still a file of "Day One".
 	 */
 	under: string;
 }
@@ -39,9 +45,8 @@ export interface Section {
 /** Whole sections, gathered into one part. */
 export interface Part {
 	sections: Section[];
-	words: number;
-	/** The part of the story these sections were taken from, or '' if the cuts
-	 *  were made by length alone and fell wherever they fell. */
+	/** The part of the story these sections were taken from, or '' for the
+	 *  chapters that stand before the first the book prints. */
 	under: string;
 }
 
@@ -56,9 +61,6 @@ export interface Furniture {
 	back: Cell[];
 }
 
-/** The length a part is asked to be. */
-export const DEFAULT_PART_WORDS = 5000;
-
 /**
  * The story, as the sections a division cuts along.
  *
@@ -67,15 +69,17 @@ export const DEFAULT_PART_WORDS = 5000;
  * so a heading someone wrote in their prose stays prose — the one thing cutting
  * along `##` in flattened markdown could never get right.
  *
- * A part names the chapters that follow it and is printed above the first of
- * them, so it travels with the section it opens rather than joining the one it
- * happens to stand after. Every section carries the name of the part it fell in,
- * which is what lets a division cut along the author's own divisions.
+ * A part names the chapters that follow it and stands above the first of them, so
+ * it travels with the section it opens rather than joining the one it happens to
+ * stand after — which is what makes the section it opens a place to cut. Every
+ * section carries the name of the part it fell in, and only a part the book
+ * prints has a name to give: one marked unprinted is a seam and leaves the name
+ * where it was.
  *
  * The book's furniture is not the story and belongs to every part rather than to
  * one; what the author keeps beside the story and publishes nowhere belongs to
  * neither. An aside is the exception: it was written about the passage it stands
- * beside, so it goes wherever that passage goes and weighs nothing on the way.
+ * beside, so it goes wherever that passage goes.
  */
 export function sectionsOf(cells: readonly Cell[]): Section[] {
 	const sections: Section[] = [];
@@ -87,16 +91,14 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 
 	for (const cell of cells) {
 		if (cell.kind === PART) {
-			under = cell.attrs.title ?? '';
-			opening = opening ?? { cells: [], words: 0, under };
+			under = printsPage(cell) ? cell.attrs.title ?? '' : under;
+			opening = opening ?? { cells: [], under };
 			opening.cells.push(cell);
-			opening.words += countWords(under);
 			continue;
 		}
 		if (cell.kind === CHAPTER) {
-			const opened = opening ?? { cells: [], words: 0, under };
+			const opened = opening ?? { cells: [], under };
 			opened.cells.push(cell);
-			opened.words += countWords(cell.attrs.title ?? '');
 			opened.under = under;
 			sections.push(opened);
 			opening = null;
@@ -110,9 +112,6 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 			continue;
 		}
 		holding.cells.push(cell);
-		// A note the author left themselves is not words the reader reads, so a
-		// part holds as much story with one in it as it would without.
-		holding.words += isAside(cell.kind) ? 0 : countWords(cell.source);
 	}
 
 	// A part nobody wrote a chapter under names nothing, and what stands after it
@@ -120,7 +119,6 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 	const last = sections[sections.length - 1];
 	if (opening && last) {
 		last.cells.push(...opening.cells);
-		last.words += opening.words;
 	}
 	return sections;
 }
@@ -142,40 +140,40 @@ export function furnitureOf(cells: readonly Cell[]): Furniture {
 }
 
 /**
- * Fill each part with as many whole sections as it will hold.
+ * One file per part the author marked, in the order they marked them.
  *
- * `alongParts` asks for the author's own divisions to be the first cut: each
- * part of the story is filled on its own, so a part never carries chapters from
- * two of them and every file says which one it came from. Length is then the
- * second cut, made inside each — a part of the story longer than the quota still
- * becomes as many files as it needs.
+ * There is no arithmetic in this and no form to fill in: where a story divides
+ * is a question about the story, and the author answers it by putting a Part
+ * where the answer is. A Part the book prints divides the files as well — a tale
+ * in a book of tales is one file for the same reason it is one tale — and a Part
+ * marked unprinted divides the files and nothing else.
  *
- * Without it — or in a story that has no parts, where the two are the same
- * division — the cuts are made by length alone, wherever they fall.
+ * A story with no Parts at all is asking to be divided nowhere, so it divides
+ * into nothing rather than into one file holding all of it.
  */
-export function intoParts(
-	sections: readonly Section[],
-	quota: number,
-	alongParts = false
-): Part[] {
-	if (!alongParts) {
-		return filled(sections, quota);
+export function intoParts(sections: readonly Section[]): Part[] {
+	if (!sections.some(opensAPart)) {
+		return [];
 	}
-	return divisions(sections).flatMap((division) =>
-		filled(division, quota).map((part) => ({ ...part, under: division[0].under }))
-	);
+	return divisions(sections).map((run) => ({
+		sections: run,
+		under: run[0].under,
+	}));
 }
 
 /**
  * The sections in the runs the author divided them into.
  *
  * Cut where a part cell stands rather than wherever the name changes, so two
- * parts the author happened to give the same name are still two parts.
+ * parts the author happened to give the same name are still two parts — and so
+ * are two seams, which have no name to differ by at all. What the author wrote
+ * before the first part is a run of its own: it is in the book and has to be in
+ * some file.
  */
 function divisions(sections: readonly Section[]): Section[][] {
 	const runs: Section[][] = [];
 	for (const section of sections) {
-		if (runs.length === 0 || section.cells[0].kind === PART) {
+		if (runs.length === 0 || opensAPart(section)) {
 			runs.push([section]);
 			continue;
 		}
@@ -184,40 +182,9 @@ function divisions(sections: readonly Section[]): Section[][] {
 	return runs;
 }
 
-/**
- * As many whole sections as each part will hold.
- *
- * A section joins the part being filled while doing so lands nearer the quota
- * than stopping short would — so a part runs over only by less than it would
- * otherwise run under, and a section that would blow past the quota starts the
- * next part instead. A part always takes at least one section: a section longer
- * than the quota is still a section, and there is nowhere smaller to put it.
- */
-function filled(sections: readonly Section[], quota: number): Part[] {
-	const parts: Part[] = [];
-	let held: Section[] = [];
-	let words = 0;
-
-	for (const section of sections) {
-		if (held.length > 0 && !nearer(words, section.words, quota)) {
-			parts.push({ sections: held, words, under: '' });
-			held = [];
-			words = 0;
-		}
-		held.push(section);
-		words += section.words;
-	}
-	if (held.length > 0) {
-		parts.push({ sections: held, words, under: '' });
-	}
-	return parts;
-}
-
-/** Under the quota it always is; over it, only while the overshoot is the
- *  smaller of the two misses. */
-function nearer(words: number, adding: number, quota: number): boolean {
-	const over = words + adding - quota;
-	return over <= 0 || over < quota - words;
+/** Whether the author put a part where this section starts. */
+function opensAPart(section: Section): boolean {
+	return section.cells[0]?.kind === PART;
 }
 
 /** A part as a document of its own: the furniture, then its share of the story. */
@@ -299,8 +266,9 @@ const PART_MARKER = ' — ';
  * part of that it is.
  *
  * `Veriona — Day One — Part 3`, so a reader holding one file can see all three.
- * A piece the story does not have is left out rather than left blank, and a part
- * cut by length alone stands under nothing and says so by saying nothing.
+ * A piece the story does not have is left out rather than left blank: a file cut
+ * at a seam the book does not print stands under nothing it can name, and says
+ * so by saying nothing.
  */
 export function partTitle(title: string, number: number, under = ''): string {
 	return [title, under, `Part ${number}`].filter(Boolean).join(PART_MARKER);
@@ -323,16 +291,4 @@ export function partFileName(number: number): string {
 export function partNumber(name: string): number | null {
 	const match = new RegExp(`^part_(\\d+)\\${EXTENSION}$`, 'i').exec(name);
 	return match === null ? null : Number(match[1]);
-}
-
-/**
- * Whatever the form reported, as a quota.
- *
- * A quota of nothing divides a story into nothing, so anything unusable —
- * blank, negative, not a number — falls back to the default rather than being
- * acted on.
- */
-export function quotaOf(raw: unknown): number {
-	const words = Math.floor(Number(raw));
-	return Number.isFinite(words) && words > 0 ? words : DEFAULT_PART_WORDS;
 }

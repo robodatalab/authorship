@@ -1,9 +1,9 @@
 // Putting a story's parts on disk: the folder beside it, one file per part, and
 // nothing left over from a division that made more of them.
 //
-// The whole of the work is here and in model.ts. Cutting a story along its own
-// chapters and counting the words is arithmetic — it asks nothing of a model, so
-// it never leaves the editor.
+// The whole of the work is here and in model.ts. Cutting a story where its own
+// Parts stand is bookkeeping — it asks nothing of a model, so it never leaves
+// the editor.
 
 import * as vscode from 'vscode';
 
@@ -32,16 +32,14 @@ export interface Division {
  * other, so exporting one to an EPUB is the export that already exists rather
  * than a second way of building a book.
  *
- * `alongParts` asks for the author's own parts to be the first cut and length
- * the second, so no file spans two of them.
+ * There is nothing to ask the author: the cuts fall where they put the Parts,
+ * and a story with none divides into nothing.
  */
 export async function divideManuscript(
 	document: vscode.Uri,
-	cells: readonly Cell[],
-	quota: number,
-	alongParts = false
+	cells: readonly Cell[]
 ): Promise<Division> {
-	const parts = intoParts(sectionsOf(cells), quota, alongParts);
+	const parts = intoParts(sectionsOf(cells));
 	const folder = vscode.Uri.joinPath(document, '..', PARTS_FOLDER);
 	if (parts.length === 0) {
 		return { folder, parts: 0 };

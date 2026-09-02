@@ -52,6 +52,11 @@ ABOUT = "about"
 BLURB = "blurb"
 NOTE = "note"
 
+# What an attribute says when the answer to it is no, and the attribute a part
+# says it of: whether the book prints a page where the part stands.
+NO = "no"
+PRINT = "print"
+
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
 
@@ -166,13 +171,29 @@ def chapter(title: str) -> Cell:
     return Cell(CHAPTER, "", {"title": title})
 
 
-def part(title: str) -> Cell:
+def part(title: str, printed: bool = True) -> Cell:
     """A named division of the story, gathering the chapters that follow it.
 
     The same bargain a chapter strikes, one level up: it names a run of chapters
     and carries no prose of its own.
     """
-    return Cell(PART, "", {"title": title})
+    return Cell(PART, "", {"title": title} if printed else {"title": title, PRINT: NO})
+
+
+def prints_page(cell: Cell) -> bool:
+    """Whether a part is a page the reader turns to, or only a seam in the story.
+
+    A part does two jobs and they are not the same one. It names a run of
+    chapters — the tale, in a book of tales — and it says where the story may be
+    cut into files. An author who wants the second without the first marks the
+    part unprinted: it divides the story exactly as any other part does, and the
+    book goes out with no page where it stands.
+
+    Saying nothing is printing, so a part written before there was anything to
+    say about this is the page it has always been. Mirrors `printsPage` in
+    `extension/storydoc/model.ts`.
+    """
+    return cell.attrs.get(PRINT, "") != NO
 
 
 def cover(src: str, alt: str = "Cover") -> Cell:

@@ -339,6 +339,205 @@ describe('the word count', () => {
 	});
 });
 
+describe('a section as a panel — header, body, footer', () => {
+	it('gives every section a header saying what it is', async () => {
+		await mount([
+			markdown('The lantern had gone out.'),
+			chapter('One'),
+			{ kind: 'cover', source: '![Cover](art.jpg)', attrs: {} },
+		]);
+		expect(shown().map((c) => c.querySelector('.cell-head .cell-kind')!.textContent))
+			.toEqual(['Markdown', 'Chapter', 'Cover']);
+	});
+
+	it('puts the name at the left and the kind and buttons after it', async () => {
+		// A title lines up with the writing under it however long the words beside
+		// it are, which is what keeps the chrome out of the manuscript.
+		await mount([chapter('One')]);
+		const head = shown()[0].querySelector('.cell-head')!;
+		expect([...head.children].map((child) => child.className.split(' ')[0])).toEqual([
+			'cell-title',
+			'cell-kind',
+			'actions',
+		]);
+	});
+
+	it('puts the name in the header and the rest of the facts in the body', async () => {
+		await mount([
+			{ kind: 'title-page', source: '', attrs: { title: 'The Long Night' } },
+		]);
+		const cell = shown()[0];
+		expect(cell.querySelector('.cell-head .cell-title')).not.toBeNull();
+		expect(cell.querySelector('.cell-body .cell-title')).toBeNull();
+		// Everything the title page records apart from its name.
+		expect(cell.querySelectorAll('.cell-body .cell-field-row')).toHaveLength(6);
+	});
+
+	it('puts the writing in the body', async () => {
+		await mount([markdown('The lantern had gone out.')]);
+		expect(shown()[0].querySelector('.cell-body .rendered')).not.toBeNull();
+	});
+
+	it('puts what the section comes to in the footer, and nowhere else', async () => {
+		await mount([chapter('One'), markdown('one two three')]);
+		expect(shown()[0].querySelector('.cell-foot .cell-words')!.textContent).toBe(
+			'3 words'
+		);
+		// A section with nothing to total has no footer at all.
+		expect(shown()[1].querySelector('.cell-foot')).toBeNull();
+	});
+
+	it('gives a section with nothing to hold no body', async () => {
+		// A chapter is its name and nothing else: a header, a footer, and no room
+		// taken between them.
+		await mount([chapter('One')]);
+		expect(shown()[0].querySelector('.cell-body')).toBeNull();
+	});
+
+	it('puts the buttons in the header rather than over the section above', async () => {
+		await mount([chapter('One')]);
+		expect(shown()[0].querySelector('.cell-head .actions')).not.toBeNull();
+	});
+
+	it('folds a section down to its header, and takes nothing else away', async () => {
+		/** The header without the buttons, which say what pressing them will do. */
+		function said(): string {
+			const head = shown()[0].querySelector('.cell-head')!.cloneNode(true) as HTMLElement;
+			head.querySelector('.actions')!.remove();
+			return head.innerHTML;
+		}
+		await mount([
+			{ kind: 'chapter', source: '', attrs: { title: 'One' } },
+			markdown('The lantern had gone out.'),
+		]);
+		const open = said();
+
+		send([
+			{ kind: 'chapter', source: '', attrs: { title: 'One', folded: 'true' } },
+			markdown('The lantern had gone out.'),
+		]);
+		const cell = shown()[0];
+		expect(cell.querySelector('.cell-body')).toBeNull();
+		expect(cell.querySelector('.cell-foot')).toBeNull();
+		// The one part of a panel a fold does not touch: the same header, said the
+		// same way, so a document folded and unfolded reads down the same edge.
+		expect(said()).toBe(open);
+	});
+
+	it('lifts nothing out of the body into the header', async () => {
+		// The bug this exists for: a folded table of contents put the first line of
+		// the listing where its name goes, so the header said something different
+		// on every section and something else again once it was unfolded.
+		await mount([
+			{ kind: 'contents', source: '1. One\n2. Two', attrs: { folded: 'true' } },
+		]);
+		const head = shown()[0].querySelector('.cell-head')!;
+		expect(head.textContent).toBe('Table of Contents');
+		expect(head.querySelector('.cell-name')).toBeNull();
+	});
+});
+
+describe('the count on a chapter and a part', () => {
+	/** Prose of a known length, so the number read back is the one under test. */
+	function prose(words: number): Cell {
+		return markdown(Array.from({ length: words }, () => 'word').join(' '));
+	}
+
+	/** What a section says it weighs, or null where it says nothing. */
+	function weighs(index: number): string | null {
+		return shown()[index].querySelector('.cell-words')?.textContent ?? null;
+	}
+
+	it('says under a chapter what the writing under it weighs', async () => {
+		await mount([chapter('One'), prose(10), prose(5)]);
+		expect(weighs(0)).toBe('15 words');
+	});
+
+	it('says under a part what the chapters under it weigh together', async () => {
+		await mount([
+			part('Day One'),
+			chapter('One'),
+			prose(10),
+			chapter('Two'),
+			prose(5),
+		]);
+		expect(weighs(0)).toBe('15 words');
+		expect(weighs(1)).toBe('10 words');
+		expect(weighs(3)).toBe('5 words');
+	});
+
+	it('says nothing on a section that has nothing under it', async () => {
+		// The writing itself, and the pages the book is wrapped in: neither stands
+		// over anything to count.
+		await mount([
+			{ kind: 'title-page', source: '', attrs: { title: 'The Long Night' } },
+			chapter('One'),
+			prose(3),
+		]);
+		expect(weighs(0)).toBeNull();
+		expect(weighs(2)).toBeNull();
+	});
+
+	it('counts the same words the toolbar counts', async () => {
+		// One rule read twice. A note is written about the story and a title names
+		// it; neither is counted in either place.
+		await mount([
+			chapter('One'),
+			prose(3),
+			{ kind: 'note', source: 'She has to find the letter here.', attrs: {} },
+		]);
+		expect(status()).toContain('3 words');
+		expect(weighs(0)).toBe('3 words');
+	});
+
+	it('marks the thousands, and says one word rather than one words', async () => {
+		await mount([chapter('One'), prose(1234), chapter('Two'), markdown('Alone.')]);
+		expect(weighs(0)).toBe('1,234 words');
+		expect(weighs(2)).toBe('1 word');
+	});
+
+	it('keeps up with the keys, as the toolbar does', async () => {
+		// The chapter above the box is one of the two numbers a keystroke can
+		// change, and it changes on the keystroke rather than 400ms later.
+		await mount([part('Day One'), chapter('One'), markdown('one two')]);
+		typeInto(opened(2), 'one two three four');
+		expect(weighs(1)).toBe('4 words');
+		expect(weighs(0)).toBe('4 words');
+	});
+
+	it('does not count the open section twice while it is being typed in', async () => {
+		await mount([chapter('One'), prose(10), markdown('one two')]);
+		typeInto(opened(2), 'one two three');
+		expect(weighs(0)).toBe('13 words');
+	});
+
+	it('still stands once what was typed reaches the document', async () => {
+		await mount([chapter('One'), markdown('one two')]);
+		typeInto(opened(1), 'one two three four');
+		await new Promise((wake) => setTimeout(wake, 450));
+		echo();
+		expect(weighs(0)).toBe('4 words');
+	});
+
+	it('follows the document as sections arrive', async () => {
+		await mount([chapter('One'), prose(2)]);
+		send([chapter('One'), prose(2), prose(5)]);
+		expect(weighs(0)).toBe('7 words');
+	});
+
+	it('is put away with the body when the section is folded', async () => {
+		// The count is about what is in the section, and folding is putting what is
+		// in it away.
+		await mount([chapter('One'), prose(10)]);
+		shown()[0]
+			.querySelector<HTMLElement>('.actions [aria-label="Fold this section away"]')!
+			.click();
+		send(lastCells());
+		expect(weighs(0)).toBeNull();
+		expect(shown()[0].querySelector('.cell-head .cell-title')).not.toBeNull();
+	});
+});
+
 describe('drawing cells', () => {
 	it('draws one cell per cell', async () => {
 		await mount([markdown('a'), chapter('One'), markdown('b')]);
@@ -357,6 +556,24 @@ describe('drawing cells', () => {
 		const cell = shown()[0];
 		expect(cell.querySelector<HTMLInputElement>('.cell-title')!.value).toBe('Day One');
 		expect(cell.querySelector('.rendered')).toBeNull();
+	});
+
+	it('gives a part a box saying whether the book prints a page for it', async () => {
+		await mount([part('Day One')]);
+		const cell = shown()[0];
+		// Ticked is what a part says by saying nothing about it.
+		expect(cell.querySelector<HTMLInputElement>('.cell-toggle')!.checked).toBe(true);
+		// On the row every other field is written on, named in the same column.
+		const row = cell.querySelector('.cell-field-row')!;
+		expect(row.querySelector('.cell-field-label')!.textContent).toBe('Printed');
+		expect(row.querySelector('.cell-toggle')).not.toBeNull();
+	});
+
+	it('shows the box unticked for a part the book prints no page for', async () => {
+		await mount([part('Break', false)]);
+		expect(
+			shown()[0].querySelector<HTMLInputElement>('.cell-toggle')!.checked
+		).toBe(false);
 	});
 
 	it('says what kind every cell is, which is what the stylesheet draws it by', async () => {
@@ -406,7 +623,12 @@ describe('drawing cells', () => {
 	it('gives the author page three link boxes, a blurb, and its own name', async () => {
 		await mount([{ kind: 'about', source: '', attrs: {} }]);
 		const cell = shown()[0];
-		expect(cell.querySelector('.cell-name')!.textContent).toBe('About the Author');
+		// A section the reader meets by name says it once: in its header, in the
+		// name's place, and not again as the kind beside it.
+		expect(cell.querySelector('.cell-head .cell-name')!.textContent).toBe(
+			'About the Author'
+		);
+		expect(cell.querySelector('.cell-kind')).toBeNull();
 		expect(cell.querySelectorAll('.cell-field-row')).toHaveLength(3);
 		// The name is the section's, not a box the author types in.
 		expect(cell.querySelector('.cell-title')).toBeNull();
@@ -415,7 +637,9 @@ describe('drawing cells', () => {
 
 	it('does not put a fixed name on a section the author names', async () => {
 		await mount([chapter('One')]);
-		expect(shown()[0].querySelector('.cell-name')).toBeNull();
+		const cell = shown()[0];
+		expect(cell.querySelector('.cell-name')).toBeNull();
+		expect(cell.querySelector('.cell-kind')!.textContent).toBe('Chapter');
 	});
 
 	it('shows the cover art until it is folded away', async () => {
@@ -426,30 +650,27 @@ describe('drawing cells', () => {
 		expect(cell.querySelector('.cell-name')).toBeNull();
 	});
 
-	it('gives a folded section the same heading every other section has', async () => {
-		// The bug this exists for: folded, the cover kept only the whisper in its
-		// bottom corner and drew as a hairline the author had to hunt for.
+	it('leaves a folded section its header, which still says what it is', async () => {
 		await mount([
 			{ kind: 'cover', source: '![Cover](art.jpg)', attrs: { folded: 'true' } },
 		]);
 		const cell = shown()[0];
 		expect(cell.classList.contains('folded')).toBe(true);
-		expect(cell.querySelector('.cell-name')!.textContent).toBe('Cover');
+		expect(cell.querySelector('.cell-kind')!.textContent).toBe('Cover');
 		// The picture is the whole of what folding it takes away.
 		expect(cell.querySelector('.rendered')).toBeNull();
 	});
 
-	it('folds a section down to what names it', async () => {
+	it('keeps the box a folded section is named in, since the header is its own', async () => {
 		await mount([
 			{ kind: 'chapter', source: '', attrs: { title: 'One', folded: 'true' } },
 			{ kind: 'markdown', source: 'The lantern had gone out.', attrs: { folded: 'true' } },
 		]);
-		expect(shown().map((c) => c.querySelector('.cell-name')!.textContent)).toEqual([
-			'One',
-			'The lantern had gone out.',
-		]);
-		// A folded chapter keeps no box to type its title into either.
-		expect(shown()[0].querySelector('.cell-title')).toBeNull();
+		expect(
+			shown()[0].querySelector<HTMLInputElement>('.cell-head .cell-title')!.value
+		).toBe('One');
+		// A section with no name of its own is its kind, folded or open.
+		expect(shown()[1].querySelector('.cell-head')!.textContent).toBe('Markdown');
 	});
 
 	it('asks the host to fold a section when the fold button is pressed', async () => {
@@ -896,6 +1117,22 @@ describe('changing the document', () => {
 		title.value = 'Renamed';
 		title.dispatchEvent(new Event('change'));
 		expect(lastCells()[0].attrs.title).toBe('Renamed');
+	});
+
+	it('writes the attribute when the author unticks the box, and only then', async () => {
+		// Ticked is the answer everything already in the document gives, so it is
+		// the answer that leaves nothing behind.
+		await mount([part('Day One')]);
+		const box = shown()[0].querySelector<HTMLInputElement>('.cell-toggle')!;
+		box.checked = false;
+		box.dispatchEvent(new Event('change'));
+		expect(lastCells()[0].attrs.print).toBe('no');
+
+		send(lastCells());
+		const back = shown()[0].querySelector<HTMLInputElement>('.cell-toggle')!;
+		back.checked = true;
+		back.dispatchEvent(new Event('change'));
+		expect(lastCells()[0].attrs).not.toHaveProperty('print');
 	});
 
 	it('drops a field the author has emptied rather than storing nothing', async () => {
