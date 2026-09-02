@@ -7,6 +7,7 @@ import {
 	countWords,
 	divisionsOf,
 	fromMarkdown,
+	generatedCell,
 	insertAt,
 	hasProse,
 	isAside,
@@ -42,6 +43,10 @@ import {
 	type Cell,
 } from '../../../extension/storydoc/model';
 
+function blurb(source = ''): Cell {
+	return { kind: 'blurb', source, attrs: {} };
+}
+
 describe('the kinds a section can be', () => {
 	it('names every kind it offers', () => {
 		for (const kind of KINDS) {
@@ -67,6 +72,37 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('blurb')).toBe(true);
 		expect(isGenerated('contents')).toBe(false);
 		expect(isGenerated('epigraph')).toBe(false);
+	});
+
+	it('finds the cell a job is writing again after the document moved it', () => {
+		// The bug this exists for: a job takes minutes, the author adds a page
+		// above the cell being written, and the index the job started with now
+		// names the page they just added. Placed by that index, the blurb is
+		// written over a table of contents the author has to get back by hand.
+		const moved = [contents(), blurb()];
+		expect(generatedCell(moved, 0)).toBe(1);
+	});
+
+	it('leaves the index alone while it still names the cell being written', () => {
+		const cells = [markdown('a'), blurb(), markdown('b')];
+		expect(generatedCell(cells, 1)).toBe(1);
+	});
+
+	it('says none when the cell being written has been deleted', () => {
+		// Better than a cell: writing the blurb into whatever is left at that
+		// index would take a section of the story away to make room for it.
+		expect(generatedCell([markdown('a'), contents()], 1)).toBe(-1);
+		expect(generatedCell([], 0)).toBe(-1);
+	});
+
+	it('says none rather than a cell for an index off either end', () => {
+		expect(generatedCell([markdown('a')], 7)).toBe(-1);
+		expect(generatedCell([markdown('a')], -1)).toBe(-1);
+	});
+
+	it('finds the blurb from an index that never named one', () => {
+		// How an editor that comes back to a job somebody else started asks.
+		expect(generatedCell([markdown('a'), blurb()], -1)).toBe(1);
 	});
 
 	it('knows the blurb belongs to the working document and to no book', () => {

@@ -19,6 +19,12 @@ import type { Cell } from '../storydoc/model';
  * The host says when it starts, how far it has got, and when it stops. Nothing
  * here starts it or times it out — a view that decided for itself when a job was
  * over would show a cell as finished while the model was still writing it.
+ *
+ * `at` is the exception to the host owning this: the job runs for minutes while
+ * the document around it stays the author's, so a cell added or taken out above
+ * this one moves it, and the index is found again from every document that
+ * arrives rather than waiting for the host's next word about it. See
+ * `followWriting` in view.ts.
  */
 export interface Writing {
 	at: number;
