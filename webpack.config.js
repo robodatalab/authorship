@@ -77,6 +77,10 @@ const publishViewConfig = {
       {
         test: /\.css$/,
         use: [MiniCssExtractPlugin.loader, 'css-loader']
+      },
+      {
+        test: /\.(ttf|woff2?)$/,
+        type: 'asset/resource'
       }
     ]
   },

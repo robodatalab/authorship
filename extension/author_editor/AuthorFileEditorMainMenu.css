@@ -1,4 +1,53 @@
+@import '../../media/codicon.css';
+
+@font-face {
+	font-family: 'authorship-icons';
+	font-display: block;
+	src: url('../../media/authorship-icons.woff') format('woff');
+}
+
+.aicon {
+	font-family: 'authorship-icons';
+	font-size: 16px;
+	line-height: 1;
+	display: inline-block;
+}
+
+.aicon-import-markdown::before { content: '\E001'; }
+.aicon-export-markdown::before { content: '\E002'; }
+.aicon-export-epub::before { content: '\E003'; }
+.aicon-export-parts::before { content: '\E004'; }
+
 .author-file-editor-main-menu {
 	flex: 0 0 auto;
+	position: relative;
+	display: flex;
+	gap: 2px;
+	align-items: center;
+	padding: 5px 12px;
 	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+}
+
+.author-file-editor-main-menu-divider {
+	width: 1px;
+	height: 16px;
+	margin: 0 6px;
+	background: var(--vscode-widget-border, var(--vscode-panel-border, currentColor));
+	opacity: 0.5;
+}
+
+.author-file-editor-main-menu-tool {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 7px;
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.author-file-editor-main-menu-tool:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
