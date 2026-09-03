@@ -113,7 +113,7 @@ const authorViewConfig = {
 /** @type WebpackConfig */
 const authorFileEditorViewConfig = {
   ...publishViewConfig,
-  entry: './extension/author_editor/AuthorFileEditorCanvas.tsx',
+  entry: './extension/author_file_editor_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'author_file_editor_view.js'
