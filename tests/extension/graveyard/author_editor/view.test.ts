@@ -13,14 +13,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BODY } from '../../../../extension/graveyard/author_editor/page';
 import {
+	type Cell,
+} from '../../../../extension/storydoc/model';
+import {
 	chapter,
 	contents,
 	dumps,
 	markdown,
-	parse,
 	part,
-	type Cell,
-} from '../../../../extension/storydoc/model';
+} from '../../../../extension/graveyard/storydoc_model';
+import { parse } from '../../../../extension/graveyard/storydoc_model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };

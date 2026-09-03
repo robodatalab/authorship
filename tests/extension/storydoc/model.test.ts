@@ -9,6 +9,10 @@ import {
 	COVER,
 	DISCLAIMER,
 	EXTENSION,
+	AuthorDocument,
+	type Cell,
+} from '../../../extension/storydoc/model';
+import {
 	addMissing,
 	authorPathFor,
 	cellsOf,
@@ -18,18 +22,20 @@ import {
 	dumps,
 	has,
 	markdown,
-	parse,
 	part,
 	printsPage,
 	titleOf,
-	type Cell,
-} from '../../../extension/storydoc/model';
+} from '../../../extension/graveyard/storydoc_model';
 
 interface Case {
 	name: string;
 	text: string;
 	cells: Cell[];
 	dumped: string;
+}
+
+function cellsOfText(text: string): Cell[] {
+	return AuthorDocument.fromText(text).currentCells();
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(
@@ -41,7 +47,7 @@ describe('the shared corpus — the same documents server/storydoc.py reads', ()
 	// cannot quietly go unimplemented in the other.
 	for (const testCase of CORPUS.cases) {
 		it(testCase.name, () => {
-			expect(parse(testCase.text)).toEqual(testCase.cells);
+			expect(cellsOfText(testCase.text)).toEqual(testCase.cells);
 		});
 	}
 
@@ -50,14 +56,14 @@ describe('the shared corpus — the same documents server/storydoc.py reads', ()
 	// rather than the behaviour.
 	for (const testCase of CORPUS.cases) {
 		it(`writes back byte for byte: ${testCase.name}`, () => {
-			expect(dumps(parse(testCase.text))).toBe(testCase.dumped);
+			expect(dumps(cellsOfText(testCase.text))).toBe(testCase.dumped);
 		});
 	}
 
 	for (const testCase of CORPUS.cases) {
 		it(`survives a round trip: ${testCase.name}`, () => {
-			const cells = parse(testCase.text);
-			expect(parse(dumps(cells))).toEqual(cells);
+			const cells = cellsOfText(testCase.text);
+			expect(cellsOfText(dumps(cells))).toEqual(cells);
 		});
 	}
 });
@@ -89,7 +95,7 @@ describe('writing', () => {
 
 	it('writes an unknown kind back as it was read', () => {
 		const text = '<!-- cell: epigraph attribution="Anon" -->\n\nA line.\n';
-		expect(dumps(parse(text))).toBe(text);
+		expect(dumps(cellsOfText(text))).toBe(text);
 	});
 
 	it('escapes a quote in an attribute on the way out', () => {
@@ -175,7 +181,7 @@ describe('printsPage — whether a part is a page or only a seam', () => {
 	});
 
 	it('survives the round trip through the file', () => {
-		const back = parse(dumps([part('Break', false)]));
+		const back = cellsOfText(dumps([part('Break', false)]));
 		expect(printsPage(back[0])).toBe(false);
 	});
 });

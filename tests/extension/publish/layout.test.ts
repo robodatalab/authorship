@@ -11,11 +11,13 @@ import {
 } from '../../../extension/publish/layout';
 import {
 	CHAPTER,
+	type Cell,
+} from '../../../extension/storydoc/model';
+import {
 	chapter,
 	cover,
 	markdown,
-	type Cell,
-} from '../../../extension/storydoc/model';
+} from '../../../extension/graveyard/storydoc_model';
 
 /** A report shaped as the server sends one. */
 function report(over: Partial<Report> = {}): Report {

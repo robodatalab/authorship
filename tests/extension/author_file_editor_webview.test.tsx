@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
+import { dumps } from "../../extension/graveyard/storydoc_model";
 import type { Cell } from "../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,7 +27,9 @@ async function openWebview(): Promise<void> {
 async function hostSends(cells: Cell[]): Promise<void> {
     await act(async () => {
         window.dispatchEvent(
-            new MessageEvent("message", { data: { type: "cells", cells } }),
+            new MessageEvent("message", {
+                data: { type: "document", text: dumps(cells) },
+            }),
         );
     });
 }
@@ -34,7 +37,7 @@ async function hostSends(cells: Cell[]): Promise<void> {
 function renderedCellText(): string[] {
     return [
         ...document.querySelectorAll(".author-file-editor-cell-body"),
-    ].map((body) => body.textContent ?? "");
+    ].map((body) => body.textContent?.trim() ?? "");
 }
 
 beforeEach(() => {

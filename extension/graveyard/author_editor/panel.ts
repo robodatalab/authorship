@@ -62,7 +62,9 @@ import {
 } from '../../publish/layout';
 import { loadTemplates, watchSettings } from '../../settings/file';
 import { useTemplates } from '../../settings/model';
-import { MARKDOWN, RECAP, dumps, parse, type Cell } from '../../storydoc/model';
+import { MARKDOWN, RECAP, type Cell } from '../../storydoc/model';
+import { dumps } from '../storydoc_model';
+import { parse } from '../storydoc_model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';

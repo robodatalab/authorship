@@ -46,13 +46,15 @@ import {
 	wordsIn,
 } from '../../../../extension/graveyard/author_editor/model';
 import {
+	type Cell,
+} from '../../../../extension/storydoc/model';
+import {
 	chapter,
 	contents,
 	dumps,
 	markdown,
 	part,
-	type Cell,
-} from '../../../../extension/storydoc/model';
+} from '../../../../extension/graveyard/storydoc_model';
 import {
 	EMPTY_TEMPLATES,
 	parseSettings,
