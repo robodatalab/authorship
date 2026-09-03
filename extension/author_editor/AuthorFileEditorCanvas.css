@@ -38,6 +38,11 @@ body {
     opacity: 1;
 }
 
+.author-file-editor-canvas > ul:hover
+    .author-file-editor-insert-cell-menu:not(:hover) {
+    opacity: 0;
+}
+
 .author-file-editor-insert-cell-menu::before,
 .author-file-editor-insert-cell-menu::after {
     content: "";
