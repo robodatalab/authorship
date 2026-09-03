@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { parse } from "../storydoc/model";
 
 export class AuthorFileEditorProvider
     implements vscode.CustomTextEditorProvider
@@ -21,25 +20,33 @@ export class AuthorFileEditorProvider
         };
         panel.webview.html = this.html(panel.webview);
 
-        const sendCells = (): void => {
+        const sendDocument = (): void => {
             void panel.webview.postMessage({
-                type: "cells",
-                cells: parse(document.getText()),
+                type: "document",
+                text: document.getText(),
             });
         };
 
         const documentChanged = vscode.workspace.onDidChangeTextDocument(
             (event) => {
                 if (event.document.uri.toString() === document.uri.toString()) {
-                    sendCells();
+                    sendDocument();
                 }
             },
         );
 
         const webviewSpoke = panel.webview.onDidReceiveMessage(
-            (message: { type?: string }) => {
+            (message: { type?: string; text?: string }) => {
                 if (message?.type === "ready") {
-                    sendCells();
+                    sendDocument();
+                } else if (
+                    message?.type === "save" &&
+                    message.text !== undefined
+                ) {
+                    void vscode.workspace.fs.writeFile(
+                        document.uri,
+                        new TextEncoder().encode(message.text),
+                    );
                 }
             },
         );

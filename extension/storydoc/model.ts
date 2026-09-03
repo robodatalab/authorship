@@ -30,19 +30,25 @@
 // the round-trip and parsing rules are mirrored there test for test. Deliberately
 // free of the `vscode` module, so it can be unit tested without an editor.
 
-export const EXTENSION = '.author';
+export const EXTENSION = ".author";
 
-export const MARKDOWN = 'markdown';
-export const CHAPTER = 'chapter';
-export const PART = 'part';
-export const TITLE_PAGE = 'title-page';
-export const COVER = 'cover';
-export const CONTENTS = 'contents';
-export const DISCLAIMER = 'disclaimer';
-export const ABOUT = 'about';
-export const BLURB = 'blurb';
-export const NOTE = 'note';
-export const RECAP = 'recap';
+export const MARKDOWN = "markdown";
+export const CHAPTER = "chapter";
+export const PART = "part";
+export const TITLE_PAGE = "title-page";
+export const COVER = "cover";
+export const CONTENTS = "contents";
+export const DISCLAIMER = "disclaimer";
+export const ABOUT = "about";
+export const BLURB = "blurb";
+export const NOTE = "note";
+export const RECAP = "recap";
+
+/** What an attribute says when the answer to it is no. */
+export const NO = "no";
+
+/** Whether a part is printed as a page of the book. */
+export const PRINT = "print";
 
 /**
  * One thing the document is made of, and what it says it is.
@@ -52,205 +58,158 @@ export const RECAP = 'recap';
  * about it, and is kept even when this module has no use for it.
  */
 export interface Cell {
-	kind: string;
-	source: string;
-	attrs: Record<string, string>;
+    kind: string;
+    source: string;
+    attrs: Record<string, string>;
 }
 
-const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
-const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
+export class AuthorDocument {
+    private static readonly MARKER =
+        /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
+    private static readonly ATTR =
+        /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
-export function parse(text: string): Cell[] {
-	const cells: Cell[] = [];
-	let kind = MARKDOWN;
-	let attrs: Record<string, string> = {};
-	let body: string[] = [];
+    private documentCells: Cell[];
+    private readonly cellsBefore: Cell[][] = [];
+    private readonly cellsUndone: Cell[][] = [];
+    private readonly changeListeners: (() => void)[] = [];
 
-	const close = (): void => {
-		const source = trimBlankEnds(body);
-		// The run of text above the first marker is only a cell if the author
-		// wrote something there; a document that opens with a marker does not
-		// start with an empty one.
-		if (source || cells.length > 0 || kind !== MARKDOWN || hasAny(attrs)) {
-			cells.push({ kind, source, attrs: { ...attrs } });
-		}
-	};
+    private constructor(cells: Cell[]) {
+        this.documentCells = cells;
+    }
 
-	for (const line of text.split('\n')) {
-		const marker = MARKER.exec(line);
-		if (!marker) {
-			body.push(line);
-			continue;
-		}
-		close();
-		kind = marker[1];
-		attrs = readAttrs(marker[2]);
-		body = [];
-	}
-	close();
-	return cells;
-}
+    static fromText(text: string): AuthorDocument {
+        const cells: Cell[] = [];
+        let kind = MARKDOWN;
+        let attrs: Record<string, string> = {};
+        let body: string[] = [];
 
-/**
- * The document as text, such that `parse(dumps(cells))` equals `cells` — with
- * every source read back as `stored` leaves it, since that is the round trip.
- */
-export function dumps(cells: Cell[]): string {
-	const out: string[] = [];
-	for (const cell of cells) {
-		out.push(markerFor(cell));
-		out.push('');
-		if (cell.source) {
-			out.push(cell.source);
-			out.push('');
-		}
-	}
-	return out.join('\n');
-}
+        const close = (): void => {
+            const source = AuthorDocument.trimBlankEnds(body);
+            // The run of text above the first marker is only a cell if the author
+            // wrote something there; a document that opens with a marker does not
+            // start with an empty one.
+            if (
+                source ||
+                cells.length > 0 ||
+                kind !== MARKDOWN ||
+                Object.keys(attrs).length > 0
+            ) {
+                cells.push({ kind, source, attrs: { ...attrs } });
+            }
+        };
 
-export function cellsOf(cells: Cell[], kind: string): Cell[] {
-	return cells.filter((cell) => cell.kind === kind);
-}
+        for (const line of text.split("\n")) {
+            const marker = AuthorDocument.MARKER.exec(line);
+            if (!marker) {
+                body.push(line);
+                continue;
+            }
+            close();
+            kind = marker[1];
+            attrs = AuthorDocument.readAttrs(marker[2]);
+            body = [];
+        }
+        close();
+        return new AuthorDocument(cells);
+    }
 
-/**
- * Whether the document already carries a cell of this kind.
- *
- * This is what keeps *prepare for publishing* from laying a second title page
- * over the one the author already wrote or edited.
- */
-export function has(cells: Cell[], kind: string): boolean {
-	return cells.some((cell) => cell.kind === kind);
-}
+    get cells(): Cell[] {
+        return this.documentCells;
+    }
 
-/**
- * Add each wanted cell the document does not already have, in order.
- *
- * Kind is the identity, so a cell the author has since rewritten still counts as
- * present and is left exactly as they left it.
- */
-export function addMissing(cells: Cell[], wanted: Cell[]): Cell[] {
-	const added = [...cells];
-	for (const cell of wanted) {
-		if (!has(added, cell.kind)) {
-			added.push(cell);
-		}
-	}
-	return added;
-}
+    toText(): string {
+        const out: string[] = [];
+        for (const cell of this.documentCells) {
+            out.push(AuthorDocument.markerFor(cell));
+            out.push("");
+            if (cell.source) {
+                out.push(cell.source);
+                out.push("");
+            }
+        }
+        return out.join("\n");
+    }
 
-export function markdown(source: string): Cell {
-	return { kind: MARKDOWN, source, attrs: {} };
-}
+    replaceCellMarkdown(cellIndex: number, markdown: string): void {
+        const cell = this.documentCells[cellIndex];
+        if (cell === undefined || cell.source === markdown) {
+            return;
+        }
+        this.recordChange(
+            this.documentCells.map((existing, at) =>
+                at === cellIndex ? { ...existing, source: markdown } : existing,
+            ),
+        );
+    }
 
-/**
- * A chapter is a named place in the book and nothing else.
- *
- * The prose beneath it is markdown cells, as prose is everywhere else — so a
- * chapter carries a title and no source. Moving one moves the name, and the two
- * responsibilities never sit in the same cell.
- */
-export function chapter(title: string): Cell {
-	return { kind: CHAPTER, source: '', attrs: { title } };
-}
+    canUndo(): boolean {
+        return this.cellsBefore.length > 0;
+    }
 
-/** What an attribute says when the answer to it is no. */
-export const NO = 'no';
+    canRedo(): boolean {
+        return this.cellsUndone.length > 0;
+    }
 
-/** Whether a part is printed as a page of the book. */
-export const PRINT = 'print';
+    undo(): void {
+        const previous = this.cellsBefore.pop();
+        if (previous === undefined) {
+            return;
+        }
+        this.cellsUndone.push(this.documentCells);
+        this.documentCells = previous;
+        this.notifyChanged();
+    }
 
-/**
- * A part is a named division of the story, and nothing else.
- *
- * The same bargain a chapter strikes, one level up: it names a run of chapters
- * and carries no prose of its own, so moving it moves only the name.
- */
-export function part(title: string, printed = true): Cell {
-	return {
-		kind: PART,
-		source: '',
-		attrs: printed ? { title } : { title, [PRINT]: NO },
-	};
-}
+    redo(): void {
+        const next = this.cellsUndone.pop();
+        if (next === undefined) {
+            return;
+        }
+        this.cellsBefore.push(this.documentCells);
+        this.documentCells = next;
+        this.notifyChanged();
+    }
 
-/**
- * Whether a part is a page the reader turns to, or only a seam in the story.
- *
- * A part does two jobs and they are not the same one. It names a run of chapters
- * — the tale, in a book of tales — and it says where the story may be cut into
- * files. An author who wants the second without the first marks the part
- * unprinted: it divides the story exactly as any other part does, and the book
- * goes out with no page where it stands.
- *
- * Saying nothing is printing, so a part written before there was anything to say
- * about this is the page it has always been.
- */
-export function printsPage(cell: Cell): boolean {
-	return cell.attrs[PRINT] !== NO;
-}
+    onChanged(listener: () => void): void {
+        this.changeListeners.push(listener);
+    }
 
-export function cover(src: string, alt = 'Cover'): Cell {
-	return { kind: COVER, source: `![${alt}](${src})`, attrs: { src } };
-}
+    private recordChange(cells: Cell[]): void {
+        this.cellsBefore.push(this.documentCells);
+        this.cellsUndone.length = 0;
+        this.documentCells = cells;
+        this.notifyChanged();
+    }
 
-/** The table of contents, built at export from the chapters around it. */
-export function contents(): Cell {
-	return { kind: CONTENTS, source: '', attrs: {} };
-}
+    private notifyChanged(): void {
+        for (const listener of this.changeListeners) {
+            listener();
+        }
+    }
 
-export function titleOf(cell: Cell): string {
-	return cell.attrs.title ?? '';
-}
+    private static readAttrs(text: string): Record<string, string> {
+        const attrs: Record<string, string> = {};
+        // `matchAll` on a /g regex needs the index reset; the literal is shared.
+        AuthorDocument.ATTR.lastIndex = 0;
+        for (const found of text.matchAll(AuthorDocument.ATTR)) {
+            attrs[found[1]] = found[2].replace(/\\(.)/g, "$1");
+        }
+        return attrs;
+    }
 
-/** `story.md` sits next to `story.author`. */
-export function authorPathFor(mdPath: string): string {
-	return mdPath.replace(/\.md$/i, '') + EXTENSION;
-}
+    private static markerFor(cell: Cell): string {
+        const said = Object.entries(cell.attrs)
+            .map(
+                ([name, value]) =>
+                    ` ${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+            )
+            .join("");
+        return `<!-- cell: ${cell.kind}${said} -->`;
+    }
 
-function readAttrs(text: string): Record<string, string> {
-	const attrs: Record<string, string> = {};
-	// `matchAll` on a /g regex needs the index reset; the literal is shared.
-	ATTR.lastIndex = 0;
-	for (const found of text.matchAll(ATTR)) {
-		attrs[found[1]] = unescape(found[2]);
-	}
-	return attrs;
-}
-
-function markerFor(cell: Cell): string {
-	const said = Object.entries(cell.attrs)
-		.map(([name, value]) => ` ${name}="${escape(value)}"`)
-		.join('');
-	return `<!-- cell: ${cell.kind}${said} -->`;
-}
-
-function escape(value: string): string {
-	return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function unescape(value: string): string {
-	return value.replace(/\\(.)/g, '$1');
-}
-
-function hasAny(attrs: Record<string, string>): boolean {
-	return Object.keys(attrs).length > 0;
-}
-
-/** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
-/**
- * A cell's text as the document reads it back.
- *
- * A cell is written to the file with a blank line under it and parsed out of it
- * again, and the parse takes the blank lines off either end — they belong to the
- * shape of the file rather than to the cell. So this is what a cell's text
- * becomes the moment it is written down, and anything comparing what it holds
- * against what the document says has to compare against this and not against
- * what was typed.
- */
-export function stored(source: string): string {
-	return source.replace(/^\n+/, '').replace(/\n+$/, '');
-}
-
-function trimBlankEnds(body: string[]): string {
-	return stored(body.join('\n'));
+    /** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
+    private static trimBlankEnds(body: string[]): string {
+        return body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
+    }
 }

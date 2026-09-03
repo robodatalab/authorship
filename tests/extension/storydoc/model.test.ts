@@ -35,7 +35,7 @@ interface Case {
 }
 
 function cellsOfText(text: string): Cell[] {
-	return AuthorDocument.fromText(text).currentCells();
+	return AuthorDocument.fromText(text).cells;
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(

@@ -1,22 +1,21 @@
-import type { ReactNode } from "react";
 import { useState } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import type { AuthorDocumentCellRenderers } from "./author_document_cell_renderers";
-import type { Cell } from "../storydoc/model";
+import type { AuthorDocument } from "../storydoc/model";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_FILE_EDITOR_PRIMARY_COMMAND_CATEGORY = "primary";
 
 interface AuthorFileEditorCanvasProps {
-    cells: Cell[];
+    document: AuthorDocument;
     cellRenderers: AuthorDocumentCellRenderers;
     mainMenuCommands: AuthorDocumentCommand[];
     cellInsertCommands: AuthorDocumentCommand[];
 }
 
 export function AuthorFileEditorCanvas({
-    cells,
+    document,
     cellRenderers,
     mainMenuCommands,
     cellInsertCommands,
@@ -30,14 +29,14 @@ export function AuthorFileEditorCanvas({
                         commands={cellInsertCommands}
                     />
                 </li>
-                {cells.map((cell, cellIndex) => {
+                {document.cells.map((cell, cellIndex) => {
                     const renderCell = cellRenderers[cell.kind];
                     if (!renderCell) {
                         return null;
                     }
                     return (
                         <li key={cellIndex}>
-                            {renderCell(cell)}
+                            {renderCell(document, cellIndex)}
                             <AuthorFileEditorInsertCellMenu
                                 commands={cellInsertCommands}
                             />

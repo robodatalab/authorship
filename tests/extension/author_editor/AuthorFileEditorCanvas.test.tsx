@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "../../../extension/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "../../../extension/author_editor/author_document_command";
 import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/author_document_cell_renderers";
+import { AuthorDocument } from "../../../extension/storydoc/model";
 import type { Cell } from "../../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -13,8 +14,18 @@ function markdownCell(source: string): Cell {
     return { kind: "markdown", source, attrs: {} };
 }
 
+function documentOf(cells: Cell[]): AuthorDocument {
+    return AuthorDocument.fromText(
+        cells
+            .map((cell) => `<!-- cell: ${cell.kind} -->\n\n${cell.source}\n`)
+            .join("\n"),
+    );
+}
+
 const CELL_RENDERERS: AuthorDocumentCellRenderers = {
-    markdown: (cell) => <div className="test-cell">{cell.source}</div>,
+    markdown: (document, cellIndex) => (
+        <div className="test-cell">{document.cells[cellIndex].source}</div>
+    ),
 };
 
 function command(
@@ -40,7 +51,7 @@ async function mountCanvas(options: {
     await act(async () => {
         createRoot(container).render(
             <AuthorFileEditorCanvas
-                cells={options.cells ?? []}
+                document={documentOf(options.cells ?? [])}
                 cellRenderers={CELL_RENDERERS}
                 mainMenuCommands={options.mainMenuCommands ?? []}
                 cellInsertCommands={options.cellInsertCommands ?? []}
