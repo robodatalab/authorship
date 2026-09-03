@@ -60,6 +60,8 @@ import {
 	wantingKinds,
 	type Report,
 } from '../publish/layout';
+import { loadTemplates, watchSettings } from '../settings/file';
+import { useTemplates } from '../settings/model';
 import { MARKDOWN, RECAP, dumps, parse, type Cell } from '../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
@@ -192,6 +194,25 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 					.toString(),
 			});
 
+		/**
+		 * Read the workspace's templates and hand them to the page.
+		 *
+		 * Both halves need them: the page builds a section the author inserts from
+		 * a menu, and this builds the ones an export lays out. They are read per
+		 * document rather than once, because a window may hold folders belonging
+		 * to two different authors.
+		 */
+		const sayTemplates = async (): Promise<void> => {
+			const said = await loadTemplates(document.uri);
+			useTemplates(said);
+			void panel.webview.postMessage({ type: 'templates', templates: said });
+		};
+
+		// The author editing `.author/settings.json` is the author saying what the
+		// next disclaimer should be, and a story stays open far longer than it
+		// takes them to go and change it.
+		const settings = watchSettings(document.uri, () => void sayTemplates());
+
 		// Turning the experiment on or off changes what the toolbar carries, and
 		// an author who has just switched it should not have to reopen the file.
 		const switched = vscode.workspace.onDidChangeConfiguration((changed) => {
@@ -211,6 +232,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		panel.webview.onDidReceiveMessage((message) => {
 			switch (message?.type) {
 				case 'ready':
+					void sayTemplates();
 					send();
 					this.sayFeatures(panel);
 					this.resume(document, panel);
@@ -281,6 +303,7 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 
 		panel.onDidDispose(() => {
 			watching.dispose();
+			settings.dispose();
 			switched.dispose();
 			focusing.dispose();
 			if (this.active?.panel === panel) {
@@ -1278,6 +1301,10 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 		if (answer !== 'Fix') {
 			return;
 		}
+		// The sections the plan writes in are blank ones, and a blank disclaimer is
+		// the workspace's. Read them here rather than trust what the last document
+		// opened left behind.
+		useTemplates(await loadTemplates(document.uri));
 		// One edit, so one undo walks all of it back.
 		await this.write(document, applyPlan(parse(document.getText()), report.plan));
 		void vscode.window.showInformationMessage(doneOf(name, report));

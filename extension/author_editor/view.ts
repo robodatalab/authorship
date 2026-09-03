@@ -30,6 +30,7 @@
 // take the caret with it. Everything else is drawn from what the host last sent.
 
 import { generatedCell, withDefaultCell } from './model';
+import { useTemplates } from '../settings/model';
 import { checkEl, post, styleEl, toolbarEl } from './elements';
 import { closeFind, openFind, refind, searching, showCount, step } from './find_bar';
 import { drawJob, setStyling } from './job_view';
@@ -41,6 +42,7 @@ import { redrawCell, render, restoreCaret, showWhere } from './page_view';
 import { foldAllCells } from './edits';
 import { signatureOf, state } from './state';
 import type { Cell } from '../storydoc/model';
+import type { Templates } from '../settings/model';
 import type { Finding } from './marks';
 
 // --- the toolbar ---
@@ -173,6 +175,11 @@ window.addEventListener('message', (event) => {
 					}
 				: null
 		);
+	} else if (message?.type === 'templates') {
+		// What a blank disclaimer or author page says in this workspace. Only the
+		// host can read the file, so what it last said is what the menus build
+		// from.
+		useTemplates(message.templates as Templates);
 	} else if (message?.type === 'features') {
 		styleEl.hidden = !message.styleFix;
 	} else if (message?.type === 'checking') {
