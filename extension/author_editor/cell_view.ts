@@ -27,6 +27,9 @@ import {
 	saidWords,
 	renderMarkdown,
 	runCell,
+	unfilledFields,
+	writesOf,
+	writtenFrom,
 } from './model';
 import { marked } from './find';
 import { iconButton, insertButton, withBase } from './dom';
@@ -114,11 +117,14 @@ function runColumnFor(cell: Cell, index: number): HTMLElement {
 	const run = document.createElement('button');
 	run.type = 'button';
 	run.className = running ? 'run running' : 'run';
+	// A built section is spoken of by its label; a written one has words of its
+	// own, because "Stop writing this the story so far" is what a label makes of
+	// a name that is already a sentence.
 	run.dataset.tip = running
-		? `Stop writing this ${named}`
+		? `Stop writing ${writesOf(cell.kind)}`
 		: built
 			? `Build this ${named} from the document`
-			: `Write this ${named} from the story`;
+			: `Write ${writesOf(cell.kind)} from ${writtenFrom(cell.kind)}`;
 	const glyph = document.createElement('i');
 	glyph.className = running
 		? 'codicon codicon-primitive-square'
@@ -339,6 +345,13 @@ function boxFor(cell: Cell, index: number, field: CellField): HTMLInputElement {
 	// a good value looks like instead of repeating the name.
 	input.placeholder =
 		field.hint ?? (field.optional ? `${field.label} (optional)` : field.label);
+	// A parameter the section is written from, still empty. Every other field
+	// here is a fact the book would like and does without; this one is the whole
+	// input to the run button beside it, so it is drawn as something to fill in
+	// rather than as a caption in the same grey as the prose under it.
+	if (unfilledFields(cell).some((needed) => needed.name === field.name)) {
+		input.classList.add('needed');
+	}
 	// A box cannot hold a mark around part of what it says, so a field with a
 	// match in it is lit whole.
 	const hits = foundIn(index, field.name);
@@ -421,6 +434,14 @@ function wordsFor(index: number): HTMLElement {
 	return said;
 }
 
+/** A list of names as a sentence says it: `Documents`, `A and B`, `A, B and C`. */
+function said(names: string[]): string {
+	if (names.length < 2) {
+		return names[0] ?? '';
+	}
+	return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /** A cell as the reader will meet it: the markdown, rendered. */
 function renderedFor(cell: Cell, index: number): HTMLElement {
 	const rendered = document.createElement('div');
@@ -433,11 +454,19 @@ function renderedFor(cell: Cell, index: number): HTMLElement {
 		wireMarks(rendered);
 	} else {
 		rendered.classList.add('blank');
+		// A generated section with its parameters still empty must not say
+		// "double-click to write": the author who does is typing the parameters
+		// into the place the answer is about to land on, and the run button can
+		// only fail until the boxes above are filled in. It is the one line of
+		// this section anybody reads before they press anything.
+		const unfilled = unfilledFields(cell);
 		rendered.textContent = state.writing?.at === index
-			? 'Being written from the story…'
+			? `Being written from ${writtenFrom(cell.kind)}…`
 			: isAutomated(cell.kind)
 				? 'Empty — run this section to build it.'
-				: 'Empty — double-click to write.';
+				: unfilled.length > 0
+					? `Empty — fill in ${said(unfilled.map((field) => field.label))} above, then run this section.`
+					: 'Empty — double-click to write.';
 	}
 	// Clicking selects; opening a cell is a double-click, as it is in a notebook.
 	// One gesture that sometimes opened a cell and sometimes did not was the

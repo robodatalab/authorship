@@ -651,6 +651,17 @@ body {
 	border-radius: 2px;
 }
 
+/* A parameter the section is written from, still empty. Every other field on a
+   section is a fact the book would like; this one is the whole input to the run
+   button beside it, and drawn like the others it reads as a caption rather than
+   as something to type in — which is exactly how the paths end up in the prose
+   below it. So it keeps the border and the ground the others only take on
+   focus. */
+.cell-field.needed {
+	background: var(--vscode-input-background);
+	border-color: var(--vscode-inputValidation-warningBorder, var(--vscode-focusBorder));
+}
+
 .cell-field:hover {
 	border-color: var(--vscode-input-border, var(--vscode-widget-border, transparent));
 }

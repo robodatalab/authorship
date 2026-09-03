@@ -136,8 +136,8 @@ class Chapters(unittest.TestCase):
             )
         )
         self.assertEqual(
-            document.chapters(),
-            [("One", ["The door stood open."]), ("Two", ["It closed."])],
+            document.chapters,
+            [("One", "The door stood open."), ("Two", "It closed.")],
         )
 
     def test_a_part_divides_the_chapters_without_being_one(self) -> None:
@@ -156,8 +156,8 @@ class Chapters(unittest.TestCase):
             )
         )
         self.assertEqual(
-            document.chapters(),
-            [("One", ["The door stood open."]), ("Two", ["It closed."])],
+            document.chapters,
+            [("One", "The door stood open."), ("Two", "It closed.")],
         )
 
 

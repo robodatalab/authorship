@@ -7,6 +7,7 @@ import {
 	countWords,
 	divisionsOf,
 	fromMarkdown,
+	documentsOf,
 	generatedCell,
 	insertAt,
 	hasProse,
@@ -37,7 +38,10 @@ import {
 	splitAt,
 	saidWords,
 	toMarkdown,
+	unfilledFields,
 	withDefaultCell,
+	writesOf,
+	writtenFrom,
 	wordsByHeading,
 	wordsIn,
 } from '../../../extension/author_editor/model';
@@ -52,6 +56,10 @@ import {
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
+}
+
+function recap(documents = '', source = ''): Cell {
+	return { kind: 'recap', source, attrs: documents ? { documents } : {} };
 }
 
 describe('the kinds a section can be', () => {
@@ -81,35 +89,139 @@ describe('the kinds a section can be', () => {
 		expect(isGenerated('epigraph')).toBe(false);
 	});
 
+	it('knows the story so far is written by the server too', () => {
+		expect(isGenerated('recap')).toBe(true);
+		expect(isAutomated('recap')).toBe(false);
+		expect(hasProse('recap')).toBe(true);
+	});
+
+	it('says what each written section is called and what it is written from', () => {
+		// The words the run button, the stop button and the notification are all
+		// built out of, so that a label which is already a sentence — "The Story
+		// So Far" — never lands in the middle of one.
+		expect(writesOf('blurb')).toBe('the blurb');
+		expect(writtenFrom('blurb')).toBe('the story');
+		expect(writesOf('recap')).toBe('the story so far');
+		expect(writtenFrom('recap')).toBe('the documents it names');
+	});
+
+	it('has something to call a section nobody wrote words for', () => {
+		expect(writesOf('epigraph')).toBe('this section');
+		expect(writtenFrom('epigraph')).toBe('the story');
+	});
+
 	it('finds the cell a job is writing again after the document moved it', () => {
 		// The bug this exists for: a job takes minutes, the author adds a page
 		// above the cell being written, and the index the job started with now
 		// names the page they just added. Placed by that index, the blurb is
 		// written over a table of contents the author has to get back by hand.
 		const moved = [contents(), blurb()];
-		expect(generatedCell(moved, 0)).toBe(1);
+		expect(generatedCell(moved, 0, 'blurb')).toBe(1);
 	});
 
 	it('leaves the index alone while it still names the cell being written', () => {
 		const cells = [markdown('a'), blurb(), markdown('b')];
-		expect(generatedCell(cells, 1)).toBe(1);
+		expect(generatedCell(cells, 1, 'blurb')).toBe(1);
+	});
+
+	it('finds the cell of the kind being written and no other written kind', () => {
+		// Two sections the server writes now stand in one document, and an answer
+		// that fell back to whichever came first would land in the other one and
+		// take what was written there with it.
+		const cells = [recap('a.author'), blurb()];
+		expect(generatedCell(cells, 1, 'blurb')).toBe(1);
+		expect(generatedCell(cells, 1, 'recap')).toBe(0);
+		expect(generatedCell(cells, 0, 'blurb')).toBe(1);
 	});
 
 	it('says none when the cell being written has been deleted', () => {
 		// Better than a cell: writing the blurb into whatever is left at that
 		// index would take a section of the story away to make room for it.
-		expect(generatedCell([markdown('a'), contents()], 1)).toBe(-1);
-		expect(generatedCell([], 0)).toBe(-1);
+		expect(generatedCell([markdown('a'), contents()], 1, 'blurb')).toBe(-1);
+		expect(generatedCell([], 0, 'blurb')).toBe(-1);
+		// The other written kind is not a place to put this one either.
+		expect(generatedCell([recap('a.author')], 0, 'blurb')).toBe(-1);
 	});
 
 	it('says none rather than a cell for an index off either end', () => {
-		expect(generatedCell([markdown('a')], 7)).toBe(-1);
-		expect(generatedCell([markdown('a')], -1)).toBe(-1);
+		expect(generatedCell([markdown('a')], 7, 'blurb')).toBe(-1);
+		expect(generatedCell([markdown('a')], -1, 'blurb')).toBe(-1);
 	});
 
 	it('finds the blurb from an index that never named one', () => {
 		// How an editor that comes back to a job somebody else started asks.
-		expect(generatedCell([markdown('a'), blurb()], -1)).toBe(1);
+		expect(generatedCell([markdown('a'), blurb()], -1, 'blurb')).toBe(1);
+		expect(generatedCell([markdown('a'), recap('a.author')], -1, 'recap')).toBe(1);
+	});
+
+	it('says which parameters a section cannot be run without', () => {
+		// The bug this exists for: the Documents box is drawn like every other
+		// field — no border, grey placeholder — with a large "double-click to
+		// write" area under it, so the paths get typed into the body instead and
+		// the run button can only fail.
+		expect(unfilledFields(recap()).map((field) => field.name)).toEqual([
+			'documents',
+		]);
+		expect(unfilledFields(recap('a.author'))).toEqual([]);
+	});
+
+	it('counts a box holding only spaces as unfilled', () => {
+		expect(unfilledFields(recap('   ')).map((f) => f.name)).toEqual(['documents']);
+	});
+
+	it('asks nothing of a section that is written from the story it stands in', () => {
+		expect(unfilledFields(blurb())).toEqual([]);
+	});
+
+	it('asks nothing of a section nobody generates', () => {
+		// A title page has empty fields all the time and no run button to fail.
+		expect(
+			unfilledFields({ kind: 'title-page', source: '', attrs: {} })
+		).toEqual([]);
+	});
+
+	it('reads the documents a story so far is written from', () => {
+		expect(documentsOf(recap('parts/part_1.author, parts/part_2.author'))).toEqual([
+			'parts/part_1.author',
+			'parts/part_2.author',
+		]);
+	});
+
+	it('drops the blanks a comma-separated list collects', () => {
+		// A trailing comma and a stray space are how a list gets typed, and
+		// neither of them names a document.
+		expect(documentsOf(recap(' a.author ,, b.author, '))).toEqual([
+			'a.author',
+			'b.author',
+		]);
+	});
+
+	it('leaves the order the author typed alone', () => {
+		// Which order the story happened in is a question about the story, and the
+		// server answers it — this only reads the box.
+		expect(documentsOf(recap('b.author, a.author'))).toEqual([
+			'b.author',
+			'a.author',
+		]);
+	});
+
+	it('says no documents for a section nobody has filled in', () => {
+		expect(documentsOf(recap())).toEqual([]);
+		expect(documentsOf(blurb())).toEqual([]);
+	});
+
+	it('knows the story so far belongs to the working document and to no book', () => {
+		// A recap of the volumes before this one is written for a reader, but it
+		// is not the story — so it stays beside the manuscript like the blurb.
+		expect(isUnpublished('recap')).toBe(true);
+		expect(isNamed('recap')).toBe(true);
+	});
+
+	it('gives the story so far the one field it needs and no title', () => {
+		// The paths are what makes it parameterisable, and they sit in the body
+		// with the writing — so folding the section puts both away together.
+		expect(fieldsOf('recap').map((field) => field.name)).toEqual(['documents']);
+		expect(fieldsOf('recap')[0].label).toBe('Documents');
 	});
 
 	it('knows the blurb belongs to the working document and to no book', () => {
@@ -980,6 +1092,20 @@ describe('toMarkdown — writing a plain manuscript out', () => {
 			markdown('a'),
 		]);
 		expect(written).not.toContain('A woman loses her name.');
+		expect(written).toBe('### One\n\na\n');
+	});
+
+	it('leaves the story so far out for the same reason', () => {
+		const written = toMarkdown([
+			{
+				kind: 'recap',
+				source: 'She has lost her name.',
+				attrs: { documents: 'a.author' },
+			},
+			chapter('One'),
+			markdown('a'),
+		]);
+		expect(written).not.toContain('She has lost her name.');
 		expect(written).toBe('### One\n\na\n');
 	});
 

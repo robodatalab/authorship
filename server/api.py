@@ -1,5 +1,6 @@
 """Backend API."""
 
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -11,6 +12,7 @@ from server import log
 from server.publishing import authorship
 from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
+from server.writing_tools.recap import write_recap
 from server.writing_tools.grammar import correct_span
 from server.writing_tools import grammar_check, prose_check, style
 from server.writing_tools.gemini import (
@@ -26,6 +28,7 @@ from vramen import (
     coedit_prompt, machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
+from server import storydoc
 from server.storydoc import Document
 
 _log = log.logger(__name__)
@@ -304,64 +307,162 @@ def fix_grammar_status(id: str) -> dict[str, Any]:
     return {"running": not job.done, "error": job.error}
 
 
+# --- writing a section from the story ------------------------------------
+#
+# Two sections are written by a model rather than by the author: the blurb, out
+# of the document it stands in, and the story so far, out of the earlier
+# documents of a serial. They are the same job to everybody watching — a bar
+# counting chapters, a button that stops it, and a piece of markdown handed back
+# for the editor to place — so they answer at one status endpoint and differ only
+# in what starts them.
+#
+# What comes back is handed over rather than written into the file. A cell's text
+# is the editor's to write, and an empty cell occupies no lines for the server to
+# replace.
+
+
+class WritingJob(Job):
+    """A section a model writes, and how far into the story it has read.
+
+    `cell_kind` is the kind of cell the answer belongs in. The server never
+    places it — that is the editor's, which is the half of this that knows where
+    the cell has moved to while the model wrote — but the editor has to be told
+    which kind of section is being written, because a document may hold one of
+    each and only one of them asked.
+
+    `written` and `chapters` are read from the thread answering the status
+    endpoint while the worker writes them, which two ints tolerate. A chapter at
+    a time is the only division the work has, so it is the only one the author
+    can be shown.
+    """
+
+    def __init__(self, cell_kind: str, target: str) -> None:
+        super().__init__(target)
+        self.cell_kind = cell_kind
+        self.text = ""
+        self.written = 0
+        self.chapters = 0
+
+    def reached(self, written: int, chapters: int) -> None:
+        self.written, self.chapters = written, chapters
+
+
 class BlurbRequest(BaseModel):
     # Path of the document to write a blurb for.
     path: str
 
 
-class BlurbJob(Job):
+class BlurbJob(WritingJob):
     kind = "blurb"
 
     def __init__(self, model: CausalModel, document: Document) -> None:
-        super().__init__(str(document.path))
+        super().__init__(storydoc.BLURB, str(document.path))
         self._model = model
         self._document = document
-        self.blurb = ""
-        # A chapter at a time is the only division the work has, so it is the
-        # only one the author can be shown. Read from the thread answering the
-        # status endpoint while the worker writes them, which two ints tolerate.
-        self.written = 0
-        self.chapters = 0
 
     def execute(self) -> None:
-        self.blurb = write_blurb(
-            self._model, self._document, lambda: self.cancelled, self._reached
+        self.text = write_blurb(
+            self._model, self._document, lambda: self.cancelled, self.reached
         )
 
-    def _reached(self, written: int, chapters: int) -> None:
-        self.written, self.chapters = written, chapters
+
+class RecapRequest(BaseModel):
+    # Path of the document the recap is being written into.
+    path: str
+    # The earlier documents to summarise, named relative to that one. Resolved
+    # and ordered here rather than by the editor: which file a relative path
+    # means is a question about the disk, and the order they are read in is a
+    # question about the story.
+    documents: list[str]
+
+
+class RecapJob(WritingJob):
+    kind = "recap"
+
+    def __init__(self, model: CausalModel, document: Document, earlier: list[Document]) -> None:
+        super().__init__(storydoc.RECAP, str(document.path))
+        self._model = model
+        self._earlier = earlier
+
+    def execute(self) -> None:
+        self.text = write_recap(
+            self._model, self._earlier, lambda: self.cancelled, self.reached
+        )
 
 
 @app.post("/generate/blurb", status_code=202)
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
-    """Start writing the story's blurb; poll /generate/blurb/status for it.
-
-    Unlike a grammar pass this does not touch the document — the blurb is handed
-    back and the editor puts it in the cell that asked, because a cell's text is
-    the editor's to write and a line span is a poor way to name an empty cell.
-    """
+    """Start writing the story's blurb; poll /generate/status for it."""
     document = _document(request.path)
     job = BlurbJob(app.state.causal_model, document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
 
-@app.get("/generate/blurb/status")
-def generate_blurb_status(id: str) -> dict[str, Any]:
-    """Whether the blurb job is still running, how far it has read, and the blurb
-    once it is not.
+@app.post("/generate/recap", status_code=202)
+def generate_recap(request: RecapRequest) -> dict[str, Any]:
+    """Start writing the story so far; poll /generate/status for it.
+
+    The earlier volumes are read in the alphabetical order of the paths that name
+    them, which is the order `part_1.author`, `part_2.author` and their like
+    already stand in — so an author who names them in whatever order they think
+    of gets the story in the order it happened. A path named twice is one
+    document, and is read once.
+    """
+    document = _document(request.path)
+    if not request.documents:
+        raise HTTPException(
+            status_code=400,
+            detail="That section names no documents to summarise.",
+        )
+    beside = Path(request.path).parent
+    earlier = [
+        _document(str(beside / named))
+        for named in sorted(set(request.documents), key=_in_order)
+    ]
+    job = RecapJob(app.state.causal_model, document, earlier)
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+_DIGITS = re.compile(r"(\d+)")
+
+
+def _in_order(named: str) -> list[Any]:
+    """A path as it sorts, with runs of digits compared as the numbers they are.
+
+    Alphabetically `part_10.author` stands between `part_1` and `part_2`, which
+    would hand the tenth volume to the model before the second and quietly
+    produce a summary of a story nobody wrote. A tenth part is exactly what a
+    serial long enough to need this has, so the order has to survive it.
+
+    The split alternates text and digits from the same starting foot for every
+    path, so two paths only ever compare text against text and number against
+    number.
+    """
+    return [
+        int(piece) if index % 2 else piece
+        for index, piece in enumerate(_DIGITS.split(named))
+    ]
+
+
+@app.get("/generate/status")
+def generate_status(id: str) -> dict[str, Any]:
+    """Which section is being written for a document, how far it has read, and
+    what it wrote once it has stopped.
 
     A book is read chapter by chapter, so how far it has got is a real fraction
-    rather than a guess — `chapters` is 0 only in the moment before the document
-    has been read, when there is nothing yet to be a fraction of.
+    rather than a guess — `chapters` is 0 only in the moment before the documents
+    have been read, when there is nothing yet to be a fraction of.
     """
     job = app.state.jobs.get(id)
-    if not isinstance(job, BlurbJob):
-        raise HTTPException(status_code=404, detail=f"No blurb job for {id}")
+    if not isinstance(job, WritingJob):
+        raise HTTPException(status_code=404, detail=f"No writing job for {id}")
     return {
         "running": not job.done,
         "error": job.error,
-        "blurb": job.blurb,
+        "kind": job.cell_kind,
+        "text": job.text,
         "progress": {"written": job.written, "chapters": job.chapters},
     }
 

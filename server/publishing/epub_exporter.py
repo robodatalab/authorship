@@ -1,16 +1,4 @@
-"""A story document, bound as an EPUB.
-
-Everything the book needs is in the document. The title page names it and
-credits it, the cover cell points at its art, the contents cell asks for a table
-of contents, the chapters are the story, and the disclaimer and about pages open
-and close it. There is no second file carrying half the answer, so there is
-nothing here to reconcile.
-
-**The document's order is the book's order.** A cell is printed where it stands,
-which is why there is no list of front matter to keep in step with the writing:
-move the disclaimer above the title page in the editor and it is above it in the
-book.
-"""
+"""Exporter of Documents to epub format"""
 
 from __future__ import annotations
 

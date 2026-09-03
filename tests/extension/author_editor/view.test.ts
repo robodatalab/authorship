@@ -26,6 +26,17 @@ function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
 }
 
+function recap(documents = '', source = '', folded = false): Cell {
+	return {
+		kind: 'recap',
+		source,
+		attrs: {
+			...(documents ? { documents } : {}),
+			...(folded ? { folded: 'true' } : {}),
+		},
+	};
+}
+
 let posted: { type: string; [key: string]: unknown }[] = [];
 
 /** Mount the page and load the view against it, as the webview does. */
@@ -62,10 +73,15 @@ function echo(): void {
 }
 
 /** What the host sends while the server writes a cell, and when it stops. */
-function writes(at: number | null, written = 0, chapters = 0): void {
+function writes(
+	at: number | null,
+	written = 0,
+	chapters = 0,
+	kind = 'blurb'
+): void {
 	window.dispatchEvent(
 		new MessageEvent('message', {
-			data: { type: 'writing', at, written, chapters },
+			data: { type: 'writing', at, kind, written, chapters },
 		})
 	);
 }
@@ -1165,6 +1181,150 @@ describe('changing the document', () => {
 		expect(shown()[0].querySelector('.run')).not.toBeNull();
 		expect(shown()[0].querySelector('.state')).toBeNull();
 	});
+
+	it('says what running each written section does, in words that read', async () => {
+		// A label that is already a name — "The Story So Far" — cannot be dropped
+		// into "Write this … from the story", so each kind says its own sentence.
+		await mount([blurb(), recap()]);
+		expect(shown()[0].querySelector<HTMLElement>('.run')!.dataset.tip).toBe(
+			'Write the blurb from the story'
+		);
+		expect(shown()[1].querySelector<HTMLElement>('.run')!.dataset.tip).toBe(
+			'Write the story so far from the documents it names'
+		);
+	});
+
+	it('asks the host to write the story so far, naming the cell that asked', async () => {
+		await mount([blurb(), recap('parts/part_1.author')]);
+		shown()[1].querySelector<HTMLElement>('.run')!.click();
+		expect(posted.at(-1)).toEqual({ type: 'generate', at: 1 });
+	});
+});
+
+describe('the story so far', () => {
+	// The blurb's near relation: written by the server out of the documents it
+	// names rather than out of this one, and the one generated section with
+	// something for the author to fill in.
+
+	it('carries its own name, the documents box and the writing in the body', async () => {
+		await mount([recap('parts/part_1.author', 'She has lost her name.')]);
+		const cell = shown()[0];
+		// A section the reader meets by name says it once, in the header.
+		expect(cell.querySelector('.cell-head .cell-name')!.textContent).toBe(
+			'The Story So Far'
+		);
+		expect(cell.querySelector('.cell-title')).toBeNull();
+		// Both the parameters and the writing sit under the header, together.
+		const row = cell.querySelector('.cell-body .cell-field-row')!;
+		expect(row.querySelector('.cell-field-label')!.textContent).toBe('Documents');
+		expect(row.querySelector<HTMLInputElement>('.cell-field')!.value).toBe(
+			'parts/part_1.author'
+		);
+		expect(cell.querySelector('.cell-body .rendered')!.textContent).toContain(
+			'She has lost her name.'
+		);
+	});
+
+	it('hints at how the documents are written in the empty box', async () => {
+		await mount([recap()]);
+		expect(
+			shown()[0].querySelector<HTMLInputElement>('.cell-field')!.placeholder
+		).toBe('parts/part_1.author, parts/part_2.author');
+	});
+
+	it('writes what is typed into the box back to the document', async () => {
+		await mount([recap()]);
+		const box = shown()[0].querySelector<HTMLInputElement>('.cell-field')!;
+		box.value = 'a.author, b.author';
+		box.dispatchEvent(new Event('change'));
+		expect(lastCells()[0].attrs.documents).toBe('a.author, b.author');
+	});
+
+	it('folds the documents away with the writing', async () => {
+		// The whole of what folding does: everything under the header goes, which
+		// is one rule rather than one per kind of section.
+		await mount([recap('a.author', 'She has lost her name.', true)]);
+		const cell = shown()[0];
+		expect(cell.querySelector('.cell-name')!.textContent).toBe('The Story So Far');
+		expect(cell.querySelector('.cell-body')).toBeNull();
+		expect(cell.querySelector('.cell-field')).toBeNull();
+		expect(cell.querySelector('.rendered')).toBeNull();
+	});
+
+	it('sends the author to the box rather than inviting them to write', async () => {
+		// What went wrong in the field: the empty body said "double-click to
+		// write", so the paths were typed into the place the recap was going to
+		// land on and the Documents box stayed empty.
+		await mount([recap()]);
+		expect(shown()[0].querySelector('.rendered')!.textContent).toBe(
+			'Empty — fill in Documents above, then run this section.'
+		);
+	});
+
+	it('goes back to inviting writing once the box is filled in', async () => {
+		await mount([recap('a.author')]);
+		expect(shown()[0].querySelector('.rendered')!.textContent).toBe(
+			'Empty — double-click to write.'
+		);
+	});
+
+	it('draws an unfilled parameter as a box rather than as a caption', async () => {
+		await mount([recap(), recap('a.author')]);
+		expect(
+			shown()[0].querySelector('.cell-field')!.classList.contains('needed')
+		).toBe(true);
+		expect(
+			shown()[1].querySelector('.cell-field')!.classList.contains('needed')
+		).toBe(false);
+	});
+
+	it('leaves the fields of a section nobody generates alone', async () => {
+		// A title page is empty for weeks and has no run button to fail.
+		await mount([{ kind: 'title-page', source: '', attrs: {} }]);
+		expect(shown()[0].querySelector('.cell-field.needed')).toBeNull();
+	});
+
+	it('opens for the author to edit, as a first draft rather than an answer', async () => {
+		await mount([recap('a.author', 'She has lost her name.')]);
+		const box = opened(0);
+		expect(box.value).toBe('She has lost her name.');
+	});
+
+	it('says what it is waiting for while the server writes it', async () => {
+		await mount([recap('a.author')]);
+		writes(0, 0, 0, 'recap');
+		expect(shown()[0].querySelector('.rendered')!.textContent).toBe(
+			'Being written from the documents it names…'
+		);
+		expect(shown()[0].querySelector<HTMLElement>('.run')!.dataset.tip).toBe(
+			'Stop writing the story so far'
+		);
+	});
+
+	it('draws the bar on the section being written and not on the other one', async () => {
+		// A document may hold both, and only one of them asked.
+		await mount([blurb(), recap('a.author')]);
+		writes(1, 1, 4, 'recap');
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+		expect(shown()[1].querySelector('.writing')).not.toBeNull();
+	});
+
+	it('follows the section being written by its own kind', async () => {
+		// The index a job started with stops naming its cell the moment anything
+		// above it moves, and the other generated section is not where it goes.
+		await mount([blurb(), recap('a.author')]);
+		writes(1, 1, 4, 'recap');
+		send([markdown('a'), blurb(), recap('a.author')]);
+		expect(shown()[2].querySelector('.writing')).not.toBeNull();
+		expect(shown()[1].querySelector('.writing')).toBeNull();
+	});
+
+	it('gives up the bar when the section being written is deleted', async () => {
+		await mount([blurb(), recap('a.author')]);
+		writes(1, 1, 4, 'recap');
+		send([blurb()]);
+		expect(shown()[0].querySelector('.writing')).toBeNull();
+	});
 });
 
 describe('the menus', () => {
@@ -1215,6 +1375,7 @@ describe('the menus', () => {
 			(item) => item.textContent
 		);
 		expect(listed).toContain('Blurb');
+		expect(listed).toContain('The Story So Far');
 	});
 });
 
@@ -1228,7 +1389,7 @@ describe('a cell the server is writing', () => {
 		expect(shown()[0].querySelector('.run .codicon-primitive-square')).not.toBeNull();
 		expect(shown()[0].querySelector('.run .codicon-play')).toBeNull();
 		expect(shown()[0].querySelector<HTMLElement>('.run')!.dataset.tip).toBe(
-			'Stop writing this blurb'
+			'Stop writing the blurb'
 		);
 	});
 

@@ -17,6 +17,7 @@ import {
 	NOTE,
 	PART,
 	PRINT,
+	RECAP,
 	TITLE_PAGE,
 	printsPage,
 	type Cell,
@@ -62,6 +63,25 @@ export interface CellKind {
 	 * that will be overwritten from under you.
 	 */
 	generated?: boolean;
+	/**
+	 * What a generated section is called where it is spoken of rather than headed,
+	 * article and all: "the blurb", "the story so far".
+	 *
+	 * A label is a name for a menu — "Blurb", "The Story So Far" — and drops
+	 * straight into a sentence for exactly as long as every kind is one word. The
+	 * moment one is not, "Stop writing this the story so far" is what a tooltip
+	 * built out of a label says. So the sentence's own words are written here,
+	 * once, and the button, the menu and the notification all read from them.
+	 */
+	writes?: string;
+	/**
+	 * What a generated section is written out of, in the author's words.
+	 *
+	 * The one real difference between the two: a blurb is written from the story
+	 * it stands in, and the story so far is written from the documents before it.
+	 * Everything the author is shown while one is written says so.
+	 */
+	from?: string;
 	/**
 	 * Kept in the working document and printed in no book.
 	 *
@@ -153,6 +173,17 @@ const DISCLAIMER_TEXT = [
 	'',
 	'Enjoy!',
 ].join('\n');
+
+/**
+ * The field naming the documents a section is written out of.
+ *
+ * One box holding paths as they are written beside the document —
+ * `parts/part_1.author, parts/part_2.author` — rather than absolute ones, so a
+ * story survives being moved, checked out somewhere else, or written on another
+ * machine. Which file each names, and the order they are read in, is the
+ * server's answer.
+ */
+export const DOCUMENTS = 'documents';
 
 export const KINDS: CellKind[] = [
 	{
@@ -308,12 +339,56 @@ export const KINDS: CellKind[] = [
 		label: 'Blurb',
 		automated: false,
 		generated: true,
+		writes: 'the blurb',
+		from: 'the story',
 		unpublished: true,
 		named: true,
 		primary: false,
 		blank: () => ({ kind: BLURB, source: '', attrs: {} }),
 	},
+	{
+		kind: RECAP,
+		// What a reader coming to this volume from the last one needs before they
+		// start. The blurb's near relation and written the same way, but out of
+		// the documents *before* this one rather than out of this one — which is
+		// why it is the one generated section with something to fill in.
+		prose: true,
+		fields: [
+			{
+				name: DOCUMENTS,
+				label: 'Documents',
+				hint: 'parts/part_1.author, parts/part_2.author',
+			},
+		],
+		label: 'The Story So Far',
+		automated: false,
+		generated: true,
+		writes: 'the story so far',
+		from: 'the documents it names',
+		unpublished: true,
+		named: true,
+		primary: false,
+		blank: () => ({ kind: RECAP, source: '', attrs: {} }),
+	},
 ];
+
+/**
+ * The documents a section names, in the order the author wrote them down.
+ *
+ * Separated by commas because a cell's attributes are one line of an HTML comment
+ * and a newline is not something that line can hold. Blanks are dropped, so a
+ * trailing comma and a stray space cost nothing.
+ *
+ * The order here is the author's rather than the reading's: the server sorts them
+ * before it opens any of them, because which order a story happened in is a
+ * question about the story and not about the box they were typed into.
+ */
+export function documentsOf(cell: Cell): string[] {
+	return (cell.attrs[DOCUMENTS] ?? '')
+		.split(',')
+		.map((named) => named.trim())
+		.filter(Boolean);
+}
 
 /** What a kind is called, falling back to the kind itself for one we don't know. */
 export function labelOf(kind: string): string {
@@ -400,14 +475,61 @@ export function isGenerated(kind: string): boolean {
 }
 
 /**
- * The cell a job that started at `at` is writing, or -1 for none in the list.
+ * What this section is called in a sentence about writing it.
+ *
+ * A kind that says nothing about itself is "this section", which is true of any
+ * of them and is what an unrecognised one has to be called.
+ */
+export function writesOf(kind: string): string {
+	return KINDS.find((k) => k.kind === kind)?.writes ?? 'this section';
+}
+
+/** What this section is written out of, in the author's words. */
+export function writtenFrom(kind: string): string {
+	return KINDS.find((k) => k.kind === kind)?.from ?? 'the story';
+}
+
+/**
+ * The fields a section still needs filled in before running it can mean
+ * anything.
+ *
+ * Only asked of a section the server writes, and only about the facts it is
+ * written *from* — a blurb needs nothing and answers with none. A section with
+ * one of these empty has a run button that cannot do anything but fail, so the
+ * page says so where the author is looking and the host refuses before it asks
+ * the server.
+ *
+ * Kind-agnostic on purpose: it reads the fields the kind declares rather than
+ * naming any kind, so the next generated section with a parameter is covered by
+ * the code that is already here.
+ */
+export function unfilledFields(cell: Cell): CellField[] {
+	if (!isGenerated(cell.kind)) {
+		return [];
+	}
+	return fieldsOf(cell.kind).filter(
+		(field) =>
+			!field.optional &&
+			!field.toggle &&
+			!(cell.attrs[field.name] ?? '').trim()
+	);
+}
+
+/**
+ * The cell a job of this kind that started at `at` is writing, or -1 for none in
+ * the list.
  *
  * An index names a cell only for as long as the cells above it stay put, and a
  * generated cell takes minutes to write — during which the rest of the document
  * is the author's to add to, delete, move and split. So the index a job began
  * with is a guess to be checked rather than an answer: it stands while it still
- * names a cell of a kind the server writes, and otherwise the document's own is
- * the one that asked for it, because a document has one.
+ * names a cell of the kind the job is writing, and otherwise the document's own
+ * cell of that kind is the one that asked for it, because a document has one.
+ *
+ * The kind is asked for rather than taken to be "whichever kind the server
+ * writes". There is more than one of those now, and a blurb that fell back to
+ * the first generated cell it found would land in the story so far and take what
+ * was written there with it.
  *
  * Both halves of the editor ask this and they have to agree — the page to know
  * which cell to draw the bar and the stop button on, the host to know which cell
@@ -415,10 +537,10 @@ export function isGenerated(kind: string): boolean {
  * the writing lands in another; asked on neither, it lands on whatever has moved
  * into the slot and takes that cell's text with it.
  */
-export function generatedCell(cells: Cell[], at: number): number {
-	return isGenerated(cells[at]?.kind ?? '')
+export function generatedCell(cells: Cell[], at: number, kind: string): number {
+	return cells[at]?.kind === kind
 		? at
-		: cells.findIndex((cell) => isGenerated(cell.kind));
+		: cells.findIndex((cell) => cell.kind === kind);
 }
 
 /**

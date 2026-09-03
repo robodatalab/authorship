@@ -176,9 +176,10 @@ describe('sectionsOf — the sections a division cuts along', () => {
 		expect(sections[0].under).toBe('Day Two');
 	});
 
-	it('leaves the furniture and the blurb out of the story', () => {
+	it('leaves the furniture, the blurb and the story so far out of the story', () => {
 		const sections = sectionsOf([
 			titlePage({ title: 'Veriona' }),
+			{ kind: 'recap', source: 'She has lost her name.', attrs: {} },
 			chapter('One'),
 			markdown('alpha'),
 			{ kind: 'blurb', source: 'A woman loses her name.', attrs: {} },
