@@ -1,0 +1,4 @@
+.author-file-editor-main-menu {
+	flex: 0 0 auto;
+	background: var(--vscode-editor-background);
+}

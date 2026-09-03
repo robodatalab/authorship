@@ -3,6 +3,7 @@
 'use strict';
 
 const path = require('path');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -72,9 +73,16 @@ const publishViewConfig = {
             loader: 'ts-loader'
           }
         ]
+      },
+      {
+        test: /\.css$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader']
       }
     ]
   },
+  plugins: [
+    new MiniCssExtractPlugin({ filename: 'publish_view.css' })
+  ],
   devtool: 'nosources-source-map',
   infrastructureLogging: {
     level: "log",
@@ -93,6 +101,22 @@ const authorViewConfig = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'author_view.js'
   },
+  plugins: [
+    new MiniCssExtractPlugin({ filename: 'author_view.css' })
+  ],
 };
 
-module.exports = [ extensionConfig, publishViewConfig, authorViewConfig ];
+/** @type WebpackConfig */
+const authorFileEditorViewConfig = {
+  ...publishViewConfig,
+  entry: './extension/author_editor/AuthorFileEditorCanvas.tsx',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'author_file_editor_view.js'
+  },
+  plugins: [
+    new MiniCssExtractPlugin({ filename: 'author_file_editor_view.css' })
+  ],
+};
+
+module.exports = [ extensionConfig, publishViewConfig, authorViewConfig, authorFileEditorViewConfig ];

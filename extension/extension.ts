@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { AuthorEditorProvider } from './graveyard/author_editor/panel';
+import { AuthorFileEditorProvider } from './author_editor/author_file_editor_provider';
 import { GeminiAccount } from './gemini/account';
 import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
@@ -40,10 +40,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// The editor a `.author` file opens in. Declared in package.json under
 	// contributes.customEditors as the default for the extension, so opening one
 	// lands here rather than in the text editor.
-	const authorEditor = new AuthorEditorProvider(context, PORT, gemini);
+	const authorEditor = new AuthorFileEditorProvider(context);
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
-			AuthorEditorProvider.viewType,
+			AuthorFileEditorProvider.viewType,
 			authorEditor,
 			{
 				webviewOptions: { retainContextWhenHidden: true },
@@ -53,16 +53,6 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		)
 	);
-
-	// Its tools are VS Code's own buttons, contributed to the editor title bar in
-	// package.json and shown only over a `.author` editor. Being commands, they
-	// are in the Command Palette and bindable to keys for free — which a toolbar
-	// drawn inside the webview could never be.
-	for (const [name, run] of Object.entries(authorEditor.commands)) {
-		context.subscriptions.push(
-			vscode.commands.registerCommand(`authorship.author.${name}`, run)
-		);
-	}
 
 	// The view container and view are declared in package.json under
 	// contributes.viewsContainers / contributes.views. Registering the provider
