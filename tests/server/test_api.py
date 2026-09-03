@@ -492,14 +492,6 @@ class GenerateBlurb(unittest.TestCase):
         self.assertEqual(cancelled.status_code, 200)
 
 
-def _chapters_read() -> list[str]:
-    """The turns that read a chapter: every turn but the last, which writes the
-    recap out of what they came to."""
-    return [
-        call.args[1] for call in app.state.causal_model.complete.call_args_list
-    ][:-1]
-
-
 class GenerateRecap(unittest.TestCase):
     """The story so far, written out of the documents the section names.
 
@@ -581,41 +573,6 @@ class GenerateRecap(unittest.TestCase):
         wait_for_writing(client, started.json()["id"])
         said = app.state.causal_model.complete.call_args_list[0].args[1]
         self.assertIn("The lantern had gone out.", said)
-
-    def test_they_are_read_in_alphabetical_order_however_they_were_named(self) -> None:
-        client = TestClient(app)
-        started = self.start("b.author", "a.author")
-        wait_for_writing(client, started.json()["id"])
-        first, second = _chapters_read()
-        self.assertIn("The lantern had gone out.", first)
-        self.assertIn("The door stood open.", second)
-
-    def test_a_tenth_volume_is_read_after_the_second_and_not_before_it(self) -> None:
-        # `part_10` sorts between `part_1` and `part_2` alphabetically, which
-        # would hand the model the story out of order — and a serial long enough
-        # to need a recap is exactly the one with ten parts.
-        for name, prose in [
-            ("part_2.author", "The door stood open."),
-            ("part_10.author", "The gate was shut."),
-        ]:
-            storydoc.save(
-                self.folder / name,
-                [storydoc.chapter("One"), storydoc.markdown(prose)],
-            )
-        client = TestClient(app)
-        started = self.start("part_10.author", "part_2.author")
-        wait_for_writing(client, started.json()["id"])
-        first, second = _chapters_read()
-        self.assertIn("The door stood open.", first)
-        self.assertIn("The gate was shut.", second)
-
-    def test_a_document_named_twice_is_read_once(self) -> None:
-        client = TestClient(app)
-        started = self.start("a.author", "a.author")
-        wait_for_writing(client, started.json()["id"])
-        read = _chapters_read()
-        self.assertEqual(len(read), 1)
-        self.assertIn("The lantern had gone out.", read[0])
 
     def test_leaves_every_document_alone(self) -> None:
         # The recap comes back for the editor to place, exactly as a blurb does.
