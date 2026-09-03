@@ -26,7 +26,7 @@ import {
 	TITLE_PAGE,
 	printsPage,
 	type Cell,
-} from '../storydoc/model';
+} from '../../storydoc/model';
 
 /** A chapter and the cells written under it. */
 export interface Section {

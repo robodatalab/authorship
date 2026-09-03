@@ -12,7 +12,7 @@
 // Free of the `vscode` module and of the DOM, so all of it can be unit tested
 // without an editor and the page can mark cells with it.
 
-import { blankOf, fieldsOf, labelOf } from '../author_editor/model';
+import { blankOf, fieldsOf, labelOf } from '../graveyard/author_editor/model';
 import type { Cell } from '../storydoc/model';
 
 /** One place in the laid-out document, and where its cell comes from. */

@@ -21,8 +21,8 @@ import {
 	TITLE_PAGE,
 	printsPage,
 	type Cell,
-} from '../storydoc/model';
-import { templates } from '../settings/model';
+} from '../../storydoc/model';
+import { templates } from '../../settings/model';
 
 /** One thing a cell records apart from prose, and what the author calls it. */
 export interface CellField {

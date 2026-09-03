@@ -23,7 +23,7 @@ import { cellsEl, statusEl, topbarEl, whereEl } from './elements';
 import { forgetSeam } from './seam_view';
 import { noteMarks } from './find_bar';
 import { signatureOf, state } from './state';
-import { MARKDOWN, type Cell } from '../storydoc/model';
+import { MARKDOWN, type Cell } from '../../storydoc/model';
 
 /**
  * Redraw the whole page.

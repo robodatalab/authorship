@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { blankOf } from '../../../extension/author_editor/model';
+import { blankOf } from '../../../extension/graveyard/author_editor/model';
 import {
 	applyPlan,
 	askOf,

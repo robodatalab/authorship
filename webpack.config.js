@@ -88,7 +88,7 @@ const publishViewConfig = {
  */
 const authorViewConfig = {
   ...publishViewConfig,
-  entry: './extension/author_editor/view.ts',
+  entry: './extension/graveyard/author_editor/view.ts',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'author_view.js'

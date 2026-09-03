@@ -44,8 +44,8 @@ import { post } from './elements';
 import { select, wordsHeaded } from './page_view';
 import { state } from './state';
 import type { CellField } from './model';
-import { NO } from '../storydoc/model';
-import type { Cell } from '../storydoc/model';
+import { NO } from '../../storydoc/model';
+import type { Cell } from '../../storydoc/model';
 import type { Writing } from './state';
 
 export function cellElement(cell: Cell, index: number): HTMLElement {

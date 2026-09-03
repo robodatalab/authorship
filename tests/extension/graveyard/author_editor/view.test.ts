@@ -11,7 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BODY } from '../../../extension/author_editor/page';
+import { BODY } from '../../../../extension/graveyard/author_editor/page';
 import {
 	chapter,
 	contents,
@@ -20,7 +20,7 @@ import {
 	parse,
 	part,
 	type Cell,
-} from '../../../extension/storydoc/model';
+} from '../../../../extension/storydoc/model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
@@ -49,7 +49,7 @@ async function mount(cells: Cell[] = []): Promise<void> {
 	vi.resetModules();
 	// Loaded fresh each time: the view holds the document in module state, and a
 	// second test inheriting the first one's is not a test of anything.
-	await import('../../../extension/author_editor/view.js');
+	await import('../../../../extension/graveyard/author_editor/view.js');
 	send(cells);
 }
 

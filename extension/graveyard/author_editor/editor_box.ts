@@ -32,7 +32,7 @@ import { commit } from './edits';
 import { post } from './elements';
 import { redrawCell, showHeadingWords, showStatus } from './page_view';
 import { signatureOf, state } from './state';
-import type { Cell } from '../storydoc/model';
+import type { Cell } from '../../storydoc/model';
 
 /** How long after the last keystroke an open cell is written to the document. */
 const TYPING_DEBOUNCE_MS = 400;

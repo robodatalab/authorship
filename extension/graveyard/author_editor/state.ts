@@ -10,8 +10,8 @@
 // A leaf, deliberately: it imports nothing that imports it back, so whatever
 // order the bundler settles on, this is standing before anything reads it.
 
-import { stored } from '../storydoc/model';
-import type { Cell } from '../storydoc/model';
+import { stored } from '../../storydoc/model';
+import type { Cell } from '../../storydoc/model';
 
 /**
  * The cell the server is writing, and how far through the story it has read.

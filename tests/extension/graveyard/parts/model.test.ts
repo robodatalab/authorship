@@ -8,14 +8,14 @@ import {
 	partNumber,
 	partTitle,
 	sectionsOf,
-} from '../../../extension/parts/model';
+} from '../../../../extension/graveyard/parts/model';
 import {
 	chapter,
 	markdown,
 	part,
 	printsPage,
 	type Cell,
-} from '../../../extension/storydoc/model';
+} from '../../../../extension/storydoc/model';
 
 function titlePage(attrs: Record<string, string>): Cell {
 	return { kind: 'title-page', source: '', attrs };

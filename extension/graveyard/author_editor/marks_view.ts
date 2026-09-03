@@ -28,7 +28,7 @@ import { commit } from './edits';
 import { current, found, foundIn, query } from './find_bar';
 import { redrawCell, render } from './page_view';
 import { signatureOf, state } from './state';
-import type { Cell } from '../storydoc/model';
+import type { Cell } from '../../storydoc/model';
 import type { Finding, Mark } from './marks';
 
 /**

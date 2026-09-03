@@ -52,17 +52,17 @@ import {
 	STYLE_FIX_SETTING,
 	configuredModel,
 	styleFixEnabled,
-} from '../gemini/account';
+} from '../../gemini/account';
 import {
 	applyPlan,
 	askOf,
 	doneOf,
 	wantingKinds,
 	type Report,
-} from '../publish/layout';
-import { loadTemplates, watchSettings } from '../settings/file';
-import { useTemplates } from '../settings/model';
-import { MARKDOWN, RECAP, dumps, parse, type Cell } from '../storydoc/model';
+} from '../../publish/layout';
+import { loadTemplates, watchSettings } from '../../settings/file';
+import { useTemplates } from '../../settings/model';
+import { MARKDOWN, RECAP, dumps, parse, type Cell } from '../../storydoc/model';
 
 export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	public static readonly viewType = 'authorship.authorEditor';

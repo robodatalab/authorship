@@ -44,7 +44,7 @@ import {
 	writtenFrom,
 	wordsByHeading,
 	wordsIn,
-} from '../../../extension/author_editor/model';
+} from '../../../../extension/graveyard/author_editor/model';
 import {
 	chapter,
 	contents,
@@ -52,12 +52,12 @@ import {
 	markdown,
 	part,
 	type Cell,
-} from '../../../extension/storydoc/model';
+} from '../../../../extension/storydoc/model';
 import {
 	EMPTY_TEMPLATES,
 	parseSettings,
 	useTemplates,
-} from '../../../extension/settings/model';
+} from '../../../../extension/settings/model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
