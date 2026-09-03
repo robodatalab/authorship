@@ -24,6 +24,7 @@ Every model it uses runs on your machine; nothing you write is sent anywhere.
 - [Starting a story](#starting-a-story)
 - [The editor](#the-editor)
 - [Sections](#sections)
+- [The pages you write once](#the-pages-you-write-once)
 - [Checking the prose](#checking-the-prose)
 - [Writing a blurb](#writing-a-blurb)
 - [The story so far](#the-story-so-far)
@@ -234,6 +235,74 @@ labelled boxes rather than as prose you have to remember the shape of.
 The order on the page is the order in the book. Move the disclaimer above the
 title page here and it is above it in the EPUB; there is no second list of front
 matter to keep in step.
+
+---
+
+## The pages you write once
+
+Three of the pages above are the same in every book you write and different for
+every author who writes one: the **disclaimer**, the **About the Author** page,
+and the name and publisher on a **title page**.
+
+Authorship has no words of its own for any of them, and does not want any — a
+disclaimer shipped with an editor is that editor's opinion of what a story warns
+its readers about, and it would be the wrong opinion for somebody. So these
+pages are yours, kept per workspace in
+
+```
+.author/settings.json
+```
+
+which Authorship writes — empty — the first time you open a story in a folder
+that has none. Fill it in once, and every disclaimer, author page and title page
+you add from then on starts from what you wrote. Leave it alone and those
+sections are simply added blank, for you to write in the editor as you would any
+other.
+
+```json
+{
+  "templates": {
+    "disclaimer": {
+      "title": "Disclaimer",
+      "text": [
+        "This story is a work of fiction and, regardless of the story’s events,",
+        "the author strongly believes in consent, equality, and inclusivity.",
+        "",
+        "Enjoy!"
+      ]
+    },
+    "about": {
+      "text": ["A. Writer lives by the sea and writes at night."],
+      "kdp": "https://amazon.com/author/…",
+      "website": "https://…",
+      "substack": "https://….substack.com"
+    },
+    "title-page": {
+      "author": "A. Writer",
+      "publisher": ""
+    }
+  }
+}
+```
+
+It is a file in your repository, so the templates travel with the stories and
+their history is your history — not a preference on one machine.
+
+A page of prose is a list of lines rather than one string, because JSON has no
+multi-line string and a disclaimer kept as one is a disclaimer nobody wants to
+edit. This way it also diffs a line at a time. One plain string works too, if
+you would rather write one.
+
+Anything you leave empty is left out of the section entirely: a title page in a
+workspace with no publisher is added with no publisher field, not with a blank
+one to read past.
+
+Edits take effect as you save them; there is no need to reopen a story. A file
+that is not valid JSON is reported once and then ignored, so a half-finished
+edit never silently changes what a page says.
+
+A story opened from outside a workspace has nowhere to keep templates, and
+starts these pages empty.
 
 ---
 

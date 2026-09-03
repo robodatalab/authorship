@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
 	KINDS,
@@ -53,6 +53,11 @@ import {
 	part,
 	type Cell,
 } from '../../../extension/storydoc/model';
+import {
+	EMPTY_TEMPLATES,
+	parseSettings,
+	useTemplates,
+} from '../../../extension/settings/model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };
@@ -337,11 +342,16 @@ describe('the kinds a section can be', () => {
 		expect(hasProse('disclaimer')).toBe(true);
 	});
 
-	it('starts a disclaimer with something worth keeping', () => {
-		const blank = KINDS.find((k) => k.kind === 'disclaimer')!.blank();
-		expect(blank.attrs.title).toBe('Disclaimer');
-		expect(blank.source).toContain('work of fiction');
-		expect(blank.source).toContain('consent');
+	it('starts a disclaimer empty, because what a story warns about is not ours to say', () => {
+		// Every word on this page comes from the workspace or from the author.
+		// A disclaimer written into the extension is the extension's opinion of
+		// what a story warns its readers about, and it would be wrong for
+		// somebody. See `.author/settings.json`.
+		expect(KINDS.find((k) => k.kind === 'disclaimer')!.blank()).toEqual({
+			kind: 'disclaimer',
+			source: '',
+			attrs: {},
+		});
 	});
 
 	it('records where the author can be found, all of it optional', () => {
@@ -1300,3 +1310,106 @@ describe('folding a section away', () => {
 	});
 });
 
+
+describe('the templates a workspace fills its own pages in from', () => {
+	// The store is module state the rest of the suite reads, so every test here
+	// puts it back the way it found it.
+	afterEach(() => useTemplates(EMPTY_TEMPLATES));
+
+	function blankOfKind(kind: string): Cell {
+		return KINDS.find((k) => k.kind === kind)!.blank();
+	}
+
+	it('writes a new disclaimer from the workspace, heading and all', () => {
+		useTemplates(
+			parseSettings(
+				'{"templates": {"disclaimer": {"title": "A Word Before", "text": "All of it invented."}}}'
+			)
+		);
+		expect(blankOfKind('disclaimer')).toEqual({
+			kind: 'disclaimer',
+			source: 'All of it invented.',
+			attrs: { title: 'A Word Before' },
+		});
+	});
+
+	it('writes a new author page from the workspace, words and links both', () => {
+		useTemplates(
+			parseSettings(
+				JSON.stringify({
+					templates: {
+						about: {
+							text: 'Writes at night.',
+							website: 'https://example.com',
+						},
+					},
+				})
+			)
+		);
+		expect(blankOfKind('about')).toEqual({
+			kind: 'about',
+			source: 'Writes at night.',
+			// The two links the workspace said nothing about are left out rather
+			// than written empty.
+			attrs: { website: 'https://example.com' },
+		});
+	});
+
+	it('fills in the credits on a title page that belong to the author', () => {
+		useTemplates(
+			parseSettings(
+				'{"templates": {"title-page": {"author": "A. Writer", "publisher": "Nobody"}}}'
+			)
+		);
+		// The title and the version are this book's and are still typed in; the
+		// name and the publisher are every book's in the workspace.
+		expect(blankOfKind('title-page')).toEqual({
+			kind: 'title-page',
+			source: '',
+			attrs: {
+				title: 'Untitled',
+				author: 'A. Writer',
+				publisher: 'Nobody',
+				version: '1.0',
+			},
+		});
+	});
+
+	it('leaves out what the workspace has said nothing about', () => {
+		// A workspace that has never named a publisher starts a title page with no
+		// publisher attribute at all — an empty one is a fact that says nothing and
+		// that the author has to read past.
+		expect(blankOfKind('title-page')).toEqual({
+			kind: 'title-page',
+			source: '',
+			attrs: { title: 'Untitled', version: '1.0' },
+		});
+		expect(blankOfKind('about')).toEqual({
+			kind: 'about',
+			source: '',
+			attrs: {},
+		});
+		expect(blankOfKind('disclaimer')).toEqual({
+			kind: 'disclaimer',
+			source: '',
+			attrs: {},
+		});
+	});
+
+	it('carries what the workspace wrote all the way out to markdown', () => {
+		// The whole point of the file: an author who has filled it in exports a
+		// book with their own back page, without typing it into this story.
+		useTemplates(
+			parseSettings(
+				JSON.stringify({
+					templates: {
+						about: { text: 'Writes at night.', website: 'https://example.com' },
+					},
+				})
+			)
+		);
+		const said = toMarkdown([blankOfKind('about')]);
+		expect(said).toContain('Writes at night.');
+		expect(said).toContain('[Website](https://example.com)');
+	});
+});

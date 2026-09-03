@@ -22,6 +22,7 @@ import {
 	printsPage,
 	type Cell,
 } from '../storydoc/model';
+import { templates } from '../settings/model';
 
 /** One thing a cell records apart from prose, and what the author calls it. */
 export interface CellField {
@@ -157,24 +158,6 @@ export interface CellKind {
 }
 
 /**
- * What a disclaimer says before anyone has written one.
- *
- * The shape is the one these take in practice: what the story contains, that it
- * is fiction whatever happens in it, and where the author stands. What a
- * particular book needs warning about is the author's to write, so the first
- * line is the one to replace.
- */
-const DISCLAIMER_TEXT = [
-	'This story is intended for adult readers and contains themes and scenes',
-	'that may not appeal to everyone.',
-	'',
-	'This story is a work of fiction and, regardless of the story\u2019s events,',
-	'the author strongly believes in consent, equality, and inclusivity.',
-	'',
-	'Enjoy!',
-].join('\n');
-
-/**
  * The field naming the documents a section is written out of.
  *
  * One box holding paths as they are written beside the document —
@@ -184,6 +167,21 @@ const DISCLAIMER_TEXT = [
  * server's answer.
  */
 export const DOCUMENTS = 'documents';
+
+/**
+ * The attributes of a new section, with the ones nothing has been said about
+ * left out.
+ *
+ * A workspace that has never named a publisher would otherwise start every title
+ * page with `publisher=""` — a fact about the document that says nothing, sitting
+ * in the file for the author to read past. A missing attribute already means
+ * "not filled in", which is exactly what an empty template is.
+ */
+function filled(attrs: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(attrs).filter(([, said]) => said !== '')
+	);
+}
 
 export const KINDS: CellKind[] = [
 	{
@@ -261,10 +259,18 @@ export const KINDS: CellKind[] = [
 		],
 		matter: true,
 		primary: false,
+		// The name and the publisher come from the workspace: they are the same on
+		// every title page an author writes, and the only two credits here that
+		// are theirs rather than this book's.
 		blank: () => ({
 			kind: TITLE_PAGE,
 			source: '',
-			attrs: { title: 'Untitled', version: '1.0' },
+			attrs: filled({
+				title: 'Untitled',
+				author: templates()['title-page'].author,
+				publisher: templates()['title-page'].publisher,
+				version: '1.0',
+			}),
 		}),
 	},
 	{
@@ -303,8 +309,8 @@ export const KINDS: CellKind[] = [
 		primary: false,
 		blank: () => ({
 			kind: DISCLAIMER,
-			source: DISCLAIMER_TEXT,
-			attrs: { title: 'Disclaimer' },
+			source: templates().disclaimer.text,
+			attrs: filled({ title: templates().disclaimer.title }),
 		}),
 	},
 	{
@@ -328,7 +334,17 @@ export const KINDS: CellKind[] = [
 		named: true,
 		matter: true,
 		primary: false,
-		blank: () => ({ kind: ABOUT, source: '', attrs: {} }),
+		// The one page that is about the author rather than the book, so all of it
+		// — the words and the links both — is the workspace's to remember.
+		blank: () => ({
+			kind: ABOUT,
+			source: templates().about.text,
+			attrs: filled({
+				kdp: templates().about.kdp,
+				website: templates().about.website,
+				substack: templates().about.substack,
+			}),
+		}),
 	},
 	{
 		kind: BLURB,
