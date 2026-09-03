@@ -5,13 +5,15 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 
-interface MarkdownCellProps {}
+interface MarkdownCellProps {
+    markdown: string;
+}
 
-export function MarkdownCell({}: MarkdownCellProps) {
+export function MarkdownCell({ markdown }: MarkdownCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader></AuthorFileEditorCellHeader>
-            <AuthorFileEditorCellBody></AuthorFileEditorCellBody>
+            <AuthorFileEditorCellBody>{markdown}</AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>
     );

@@ -2,21 +2,25 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { MarkdownCell } from "../cell_types/MarkdownCell";
+import type { AuthorDocumentCellRenderers } from "./author_document_cell_renderers";
+import type { Cell } from "../storydoc/model";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_FILE_EDITOR_PRIMARY_COMMAND_CATEGORY = "primary";
 
 interface AuthorFileEditorCanvasProps {
+    cells: Cell[];
+    cellRenderers: AuthorDocumentCellRenderers;
     mainMenuCommands: AuthorDocumentCommand[];
     cellInsertCommands: AuthorDocumentCommand[];
 }
 
 export function AuthorFileEditorCanvas({
+    cells,
+    cellRenderers,
     mainMenuCommands,
     cellInsertCommands,
 }: AuthorFileEditorCanvasProps) {
-    var fakeCells = [1, 2];
     return (
         <div className="author-file-editor-canvas">
             <AuthorFileEditorMainMenu commands={mainMenuCommands} />
@@ -26,14 +30,20 @@ export function AuthorFileEditorCanvas({
                         commands={cellInsertCommands}
                     />
                 </li>
-                {fakeCells.map((cell) => (
-                    <li key={cell}>
-                        <MarkdownCell />
-                        <AuthorFileEditorInsertCellMenu
-                            commands={cellInsertCommands}
-                        />
-                    </li>
-                ))}
+                {cells.map((cell, cellIndex) => {
+                    const renderCell = cellRenderers[cell.kind];
+                    if (!renderCell) {
+                        return null;
+                    }
+                    return (
+                        <li key={cellIndex}>
+                            {renderCell(cell)}
+                            <AuthorFileEditorInsertCellMenu
+                                commands={cellInsertCommands}
+                            />
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
