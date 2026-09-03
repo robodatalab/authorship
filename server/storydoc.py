@@ -268,6 +268,23 @@ BUILT_KINDS = frozenset({CONTENTS})
 PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP})
 
 
+def prose_of(lines: list[tuple[int, str]]) -> str:
+    """Those lines with the breaks between their paragraphs put back.
+
+    The story comes back as the lines that carry it, so where a paragraph ended
+    survives only as the gap in their numbering. Run together without it a
+    chapter arrives as one block, and reads to the model as one thought.
+    """
+    written: list[str] = []
+    previous: int | None = None
+    for index, said in lines:
+        if previous is not None and index != previous + 1:
+            written.append("")
+        written.append(said)
+        previous = index
+    return "\n".join(written)
+
+
 @dataclass(frozen=True)
 class Placed:
     """A cell and where its text sits in the file, 0-based and inclusive.
@@ -368,23 +385,34 @@ class Document:
                     if said:
                         yield index, said
 
-    def chapters(self) -> list[tuple[str, list[str]]]:
-        """Each chapter and the prose written under it.
+    @property
+    def chapters(self) -> list[tuple[str, str]]:
+        """Each chapter that has prose under it, and that prose.
 
         A chapter cell opens one; the prose cells after it belong to it until the
-        next chapter opens. What stands before the first chapter is front matter
-        and belongs to no chapter at all.
+        next chapter opens. What stands before the first chapter is a title page,
+        a cover, a dedication — it is about the book, belongs to no chapter, and
+        is not read.
+
+        The story and only the story comes back. What the author writes *about*
+        the book is left out wherever it is written: a blurb, a note or a recap
+        standing between two chapters, and the `<!-- -->` notes in the margin of
+        the prose itself. Asking a model to summarise a table of contents or to
+        take the author's reminder to themselves for something that happened is
+        asking it to write down something nobody wrote.
+
+        This is how every tool that reads a book reads it — the blurb, the story
+        so far, and whatever is written from the whole story next — so the answer
+        to what counts as a chapter is given once, here, rather than once per
+        tool.
         """
-        found: list[tuple[str, list[str]]] = []
-        for cell in self.cells:
-            if cell.kind == CHAPTER:
-                found.append((cell.title or f"Chapter {len(found) + 1}", []))
-            elif found and cell.source and cell.kind not in BUILT_KINDS:
-                body = found[-1][1]
-                if body:
-                    body.append("")
-                body.extend(cell.source.splitlines())
-        return found
+        found: list[tuple[str, list[tuple[int, str]]]] = []
+        for placed in self.placed:
+            if placed.cell.kind == CHAPTER:
+                found.append((placed.cell.title or f"Chapter {len(found) + 1}", []))
+            elif found and placed.at and placed.cell.kind not in PRIVATE_KINDS:
+                found[-1][1].extend(self.story_lines(*placed.at))
+        return [(title, prose_of(lines)) for title, lines in found if lines]
 
     def __str__(self) -> str:
         return self.text

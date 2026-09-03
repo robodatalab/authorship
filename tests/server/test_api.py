@@ -492,6 +492,14 @@ class GenerateBlurb(unittest.TestCase):
         self.assertEqual(cancelled.status_code, 200)
 
 
+def _chapters_read() -> list[str]:
+    """The turns that read a chapter: every turn but the last, which writes the
+    recap out of what they came to."""
+    return [
+        call.args[1] for call in app.state.causal_model.complete.call_args_list
+    ][:-1]
+
+
 class GenerateRecap(unittest.TestCase):
     """The story so far, written out of the documents the section names.
 
@@ -578,9 +586,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("b.author", "a.author")
         wait_for_writing(client, started.json()["id"])
-        first, second = (
-            call.args[1] for call in app.state.causal_model.complete.call_args_list
-        )
+        first, second = _chapters_read()
         self.assertIn("The lantern had gone out.", first)
         self.assertIn("The door stood open.", second)
 
@@ -599,9 +605,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("part_10.author", "part_2.author")
         wait_for_writing(client, started.json()["id"])
-        first, second = (
-            call.args[1] for call in app.state.causal_model.complete.call_args_list
-        )
+        first, second = _chapters_read()
         self.assertIn("The door stood open.", first)
         self.assertIn("The gate was shut.", second)
 
@@ -609,7 +613,9 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("a.author", "a.author")
         wait_for_writing(client, started.json()["id"])
-        self.assertEqual(app.state.causal_model.complete.call_count, 1)
+        read = _chapters_read()
+        self.assertEqual(len(read), 1)
+        self.assertIn("The lantern had gone out.", read[0])
 
     def test_leaves_every_document_alone(self) -> None:
         # The recap comes back for the editor to place, exactly as a blurb does.
