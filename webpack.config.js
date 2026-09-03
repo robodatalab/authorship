@@ -53,19 +53,19 @@ const extensionConfig = {
  */
 const publishViewConfig = {
   target: 'web',
-  mode: 'none',
+  mode: 'development',
   entry: './extension/publish/view.ts',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'publish_view.js'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.tsx', '.js']
   },
   module: {
     rules: [
       {
-        test: /\.ts$/,
+        test: /\.tsx?$/,
         exclude: /node_modules/,
         use: [
           {

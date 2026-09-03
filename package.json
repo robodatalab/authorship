@@ -196,6 +196,8 @@
     "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "24.x",
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.7",
         "@types/vscode": "^1.125.0",
         "@vscode/codicons": "^0.0.46-24",
         "eslint": "^10.5.0",
@@ -212,6 +214,8 @@
         "serialize-javascript": "^7.0.6"
     },
     "dependencies": {
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
         "yaml": "^2.9.0"
     }
 }
