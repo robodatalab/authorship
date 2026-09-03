@@ -1,11 +1,40 @@
 .author-file-editor-cell {
+    position: relative;
     display: flex;
     flex-direction: column;
-    margin: 0 0 12px;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
     background: var(--vscode-editor-background);
     overflow: hidden;
+}
+
+.author-file-editor-cell-actions {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    z-index: 1;
+    display: flex;
+    gap: 1px;
+    visibility: hidden;
+}
+
+.author-file-editor-cell:hover .author-file-editor-cell-actions {
+    visibility: visible;
+}
+
+.author-file-editor-cell-actions-button {
+    display: flex;
+    align-items: center;
+    padding: 3px 5px;
+    color: var(--vscode-foreground);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-cell-actions-button:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
 .author-file-editor-cell-header {

@@ -21,3 +21,62 @@ body {
 	padding: 6px 12px 40vh;
 	list-style: none;
 }
+
+
+.author-file-editor-insert-cell-menu {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    opacity: 0;
+    transition: opacity 80ms linear;
+}
+
+.author-file-editor-insert-cell-menu:hover,
+.author-file-editor-insert-cell-menu:focus-within {
+    opacity: 1;
+}
+
+.author-file-editor-insert-cell-menu::before,
+.author-file-editor-insert-cell-menu::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--vscode-widget-border, var(--vscode-panel-border, currentColor));
+    opacity: 0.4;
+}
+
+.author-file-editor-insert-cell-menu-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-family: inherit;
+    font-size: 0.9em;
+    color: var(--vscode-foreground);
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.author-file-editor-insert-cell-menu-overflow {
+    position: relative;
+    display: inline-flex;
+}
+
+.author-file-editor-insert-cell-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border-radius: 4px;
+}
