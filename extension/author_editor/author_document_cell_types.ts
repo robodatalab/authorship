@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import type { AuthorDocument, Cell } from "../storydoc/model";
 import type { AuthorDocumentCellRenderers } from "./author_document_cell_renderers";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import type { AuthorDocumentHostChannel } from "./author_document_host_channel";
 
 export interface AuthorDocumentCellType {
     kind: string;
@@ -32,28 +31,32 @@ class CellInsertCommand implements AuthorDocumentCommand {
     readonly category: string;
     readonly iconClassName = "codicon codicon-add";
     readonly tooltip: string;
-    private readonly hostChannel: AuthorDocumentHostChannel;
+    private readonly authorDocument: AuthorDocument;
+    private readonly at: number;
     private readonly cellType: AuthorDocumentCellType;
 
     constructor(
-        hostChannel: AuthorDocumentHostChannel,
+        authorDocument: AuthorDocument,
+        at: number,
         cellType: AuthorDocumentCellType,
     ) {
-        this.hostChannel = hostChannel;
+        this.authorDocument = authorDocument;
+        this.at = at;
         this.cellType = cellType;
         this.tooltip = cellType.label;
         this.category = cellType.category;
     }
 
     invoke = () => {
-        // TODO: do stuff to modify the document and insert the cell in a proper place
+        this.authorDocument.insertAt(this.at, this.cellType.create());
     };
 }
 
 export function authorDocumentCellInsertCommands(
-    hostChannel: AuthorDocumentHostChannel,
+    authorDocument: AuthorDocument,
+    at: number,
 ): AuthorDocumentCommand[] {
     return [...registeredCellTypes.values()].map(
-        (cellType) => new CellInsertCommand(hostChannel, cellType),
+        (cellType) => new CellInsertCommand(authorDocument, at, cellType),
     );
 }

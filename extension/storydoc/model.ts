@@ -163,6 +163,17 @@ export class AuthorDocument {
         return this.documentCells;
     }
 
+    insertAt(at: number, cell: Cell): void {
+        this.documentCells.splice(
+            at,
+            0,
+            new Cell(cell.kind, cell.source, cell.attrs, () =>
+                this.notifyChanged(),
+            ),
+        );
+        this.notifyChanged();
+    }
+
     toText(): string {
         const out: string[] = [];
         for (const cell of this.documentCells) {

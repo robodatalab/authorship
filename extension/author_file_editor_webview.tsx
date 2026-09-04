@@ -38,9 +38,9 @@ function main(): void {
                 document={authorDocument}
                 cellRenderers={authorDocumentCellRenderers()}
                 mainMenuCommands={authorFileEditorCommands(hostChannel)}
-                cellInsertCommands={authorDocumentCellInsertCommands(
-                    hostChannel,
-                )}
+                cellInsertCommandsAt={(at) =>
+                    authorDocumentCellInsertCommands(authorDocument, at)
+                }
             />,
         );
     }

@@ -51,8 +51,19 @@
 }
 
 .author-file-editor-cell-body {
+    display: flex;
+    flex-direction: column;
     min-height: 48px;
     padding: 10px;
+}
+
+.author-file-editor-cell-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.author-file-editor-cell-card:last-child {
+    flex: 1 1 auto;
 }
 
 .author-file-editor-cell-card + .author-file-editor-cell-card {

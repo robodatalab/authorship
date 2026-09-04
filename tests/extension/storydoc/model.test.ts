@@ -9,6 +9,7 @@ import {
 	COVER,
 	DISCLAIMER,
 	EXTENSION,
+	MARKDOWN,
 	AuthorDocument,
 } from '../../../extension/storydoc/model';
 import {
@@ -183,5 +184,61 @@ describe('printsPage — whether a part is a page or only a seam', () => {
 	it('survives the round trip through the file', () => {
 		const back = cellsOfText(dumps([part('Break', false)]));
 		expect(printsPage(back[0])).toBe(false);
+	});
+});
+
+describe('inserting a cell', () => {
+	const blankChapter = () =>
+		AuthorDocument.fromText('<!-- cell: chapter title="New" -->\n').cells[0];
+
+	it('puts it at the place it was given', () => {
+		const document = AuthorDocument.fromText('one\n');
+
+		document.insertAt(0, blankChapter());
+
+		expect(document.cells.map((cell) => cell.kind)).toEqual([
+			CHAPTER,
+			MARKDOWN,
+		]);
+	});
+
+	it('puts it after the last cell when the place is the end', () => {
+		const document = AuthorDocument.fromText('one\n');
+
+		document.insertAt(document.cells.length, blankChapter());
+
+		expect(document.cells.map((cell) => cell.kind)).toEqual([
+			MARKDOWN,
+			CHAPTER,
+		]);
+	});
+
+	it('carries the attributes it was given', () => {
+		const document = AuthorDocument.fromText('one\n');
+
+		document.insertAt(0, blankChapter());
+
+		expect(document.cells[0].attrs).toEqual({ title: 'New' });
+	});
+
+	it('says the document changed', () => {
+		const document = AuthorDocument.fromText('one\n');
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.insertAt(0, blankChapter());
+
+		expect(changes).toBe(1);
+	});
+
+	it('leaves the inserted cell saying so when it is edited', () => {
+		const document = AuthorDocument.fromText('one\n');
+		document.insertAt(0, blankChapter());
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.cells[0].replaceMarkdown('written');
+
+		expect(changes).toBe(1);
 	});
 });

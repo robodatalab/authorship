@@ -12,14 +12,14 @@ interface AuthorFileEditorCanvasProps {
     document: AuthorDocument;
     cellRenderers: AuthorDocumentCellRenderers;
     mainMenuCommands: AuthorDocumentCommand[];
-    cellInsertCommands: AuthorDocumentCommand[];
+    cellInsertCommandsAt: (at: number) => AuthorDocumentCommand[];
 }
 
 export function AuthorFileEditorCanvas({
     document,
     cellRenderers,
     mainMenuCommands,
-    cellInsertCommands,
+    cellInsertCommandsAt,
 }: AuthorFileEditorCanvasProps) {
     return (
         <div className="author-file-editor-canvas">
@@ -28,7 +28,7 @@ export function AuthorFileEditorCanvas({
                 <ul>
                     <li>
                         <AuthorFileEditorInsertCellMenu
-                            commands={cellInsertCommands}
+                            commands={cellInsertCommandsAt(0)}
                         />
                     </li>
                     {document.cells.map((cell, cellIndex) => {
@@ -40,7 +40,9 @@ export function AuthorFileEditorCanvas({
                             <li key={cellIndex}>
                                 {renderCell(document, cellIndex)}
                                 <AuthorFileEditorInsertCellMenu
-                                    commands={cellInsertCommands}
+                                    commands={cellInsertCommandsAt(
+                                        cellIndex + 1,
+                                    )}
                                 />
                             </li>
                         );

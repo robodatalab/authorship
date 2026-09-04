@@ -39,11 +39,14 @@ function command(
     };
 }
 
+const insertPositionsAsked: number[] = [];
+
 async function mountCanvas(options: {
     cells?: Cell[];
     mainMenuCommands?: AuthorDocumentCommand[];
     cellInsertCommands?: AuthorDocumentCommand[];
 }): Promise<void> {
+    insertPositionsAsked.length = 0;
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
@@ -53,7 +56,10 @@ async function mountCanvas(options: {
                 document={documentOf(options.cells ?? [])}
                 cellRenderers={CELL_RENDERERS}
                 mainMenuCommands={options.mainMenuCommands ?? []}
-                cellInsertCommands={options.cellInsertCommands ?? []}
+                cellInsertCommandsAt={(at) => {
+                    insertPositionsAsked.push(at);
+                    return options.cellInsertCommands ?? [];
+                }}
             />,
         );
     });
@@ -149,6 +155,15 @@ describe("invoking a cell insert command", () => {
         }
 
         expect(addMarkdown.invoke).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks each menu for the commands of the place it inserts at", async () => {
+        await mountCanvas({
+            cells: [markdownCell("one"), markdownCell("two")],
+            cellInsertCommands: [command("Markdown", "primary")],
+        });
+
+        expect(insertPositionsAsked).toEqual([0, 1, 2]);
     });
 
     it("holds a command that is not primary behind the ellipsis", async () => {

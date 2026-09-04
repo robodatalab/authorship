@@ -93,7 +93,11 @@ export function MarkdownEditor({
     };
 
     if (!isEditing && children) {
-        return <div onDoubleClick={openOnDoubleClick}>{children(markdown)}</div>;
+        return (
+            <div className="markdown-rendered" onDoubleClick={openOnDoubleClick}>
+                {children(markdown)}
+            </div>
+        );
     }
 
     if (!isEditing) {
