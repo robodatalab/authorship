@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { AuthorDocument } from "../storydoc/model";
+import { AuthorDocument } from "./storydoc/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";

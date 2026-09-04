@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
-import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_editor/author_file_editor_provider";
+import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
 import { Uri, executedCommands, files } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -40,7 +40,9 @@ async function openEditor(text: string): Promise<OpenEditor> {
             cspSource: "vscode-resource:",
             asWebviewUri: (uri: unknown) => uri,
             postMessage: (message: unknown) => {
-                window.dispatchEvent(new MessageEvent("message", { data: message }));
+                window.dispatchEvent(
+                    new MessageEvent("message", { data: message }),
+                );
                 return Promise.resolve(true);
             },
             onDidReceiveMessage: (listener: (message: unknown) => void) => {
@@ -83,7 +85,9 @@ async function openEditor(text: string): Promise<OpenEditor> {
 }
 
 async function addMarkdownCellAtTheTop(): Promise<void> {
-    const menu = document.querySelector(".author-file-editor-insert-cell-menu")!;
+    const menu = document.querySelector(
+        ".author-file-editor-insert-cell-menu",
+    )!;
     await act(async () => {
         menu.querySelector("button")!.dispatchEvent(
             new MouseEvent("click", { bubbles: true }),
