@@ -28,6 +28,20 @@
       "dumped": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n"
     },
     {
+      "name": "a marker is read whatever spacing it was written with",
+      "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
+      "cells": [
+        {
+          "kind": "chapter",
+          "source": "Prose.",
+          "attrs": {
+            "title": "One"
+          }
+        }
+      ],
+      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+    },
+    {
       "name": "a document opening with a marker has no empty leading cell",
       "text": "<!-- cell: contents -->\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n",
       "cells": [
@@ -114,20 +128,6 @@
         }
       ],
       "dumped": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n"
-    },
-    {
-      "name": "a marker is read whatever spacing it was written with",
-      "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
-      "cells": [
-        {
-          "kind": "chapter",
-          "source": "Prose.",
-          "attrs": {
-            "title": "One"
-          }
-        }
-      ],
-      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
     },
     {
       "name": "blank lines inside a cell are the author's and are kept",

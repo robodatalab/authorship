@@ -1,29 +1,11 @@
 import * as vscode from "vscode";
+import { AuthorDocument } from "../storydoc/model";
 
-class AuthorFileDocument implements vscode.CustomDocument {
-    public savedText: string;
-
-    constructor(
-        readonly uri: vscode.Uri,
-        public text: string,
-    ) {
-        this.savedText = text;
-    }
-
-    hasUnsavedEdits(): boolean {
-        return this.text !== this.savedText;
-    }
-
-    dispose(): void {}
-}
-
-export class AuthorFileEditorProvider
-    implements vscode.CustomEditorProvider<AuthorFileDocument>
-{
+export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";
 
     private readonly edited = new vscode.EventEmitter<
-        vscode.CustomDocumentEditEvent<AuthorFileDocument>
+        vscode.CustomDocumentEditEvent<AuthorDocument>
     >();
     readonly onDidChangeCustomDocument = this.edited.event;
 
@@ -34,16 +16,16 @@ export class AuthorFileEditorProvider
     async openCustomDocument(
         uri: vscode.Uri,
         openContext: vscode.CustomDocumentOpenContext,
-    ): Promise<AuthorFileDocument> {
+    ): Promise<AuthorDocument> {
         const from = openContext.backupId
             ? vscode.Uri.parse(openContext.backupId)
             : uri;
         const bytes = await vscode.workspace.fs.readFile(from);
-        return new AuthorFileDocument(uri, new TextDecoder().decode(bytes));
+        return new AuthorDocument(uri, new TextDecoder().decode(bytes));
     }
 
     resolveCustomEditor(
-        document: AuthorFileDocument,
+        document: AuthorDocument,
         panel: vscode.WebviewPanel,
     ): void {
         panel.webview.options = {
@@ -85,16 +67,12 @@ export class AuthorFileEditorProvider
             ),
         );
         const writtenElsewhere = fileWatcher.onDidChange(async () => {
-            if (document.hasUnsavedEdits()) {
-                return;
-            }
             const bytes = await vscode.workspace.fs.readFile(document.uri);
             const text = new TextDecoder().decode(bytes);
             if (text === document.text) {
                 return;
             }
-            document.text = text;
-            document.savedText = text;
+            document.fromText(text);
             this.sendDocument(document);
         });
 
@@ -106,34 +84,33 @@ export class AuthorFileEditorProvider
         });
     }
 
-    async saveCustomDocument(document: AuthorFileDocument): Promise<void> {
+    async saveCustomDocument(document: AuthorDocument): Promise<void> {
         const text = document.text;
         await vscode.workspace.fs.writeFile(
             document.uri,
             new TextEncoder().encode(text),
         );
-        document.savedText = text;
+        document.fromText(text);
     }
 
     saveCustomDocumentAs(
-        document: AuthorFileDocument,
+        document: AuthorDocument,
         destination: vscode.Uri,
     ): Thenable<void> {
         return vscode.workspace.fs.writeFile(
             destination,
-            new TextEncoder().encode(document.text),
+            new TextEncoder().encode(document.toText()),
         );
     }
 
-    async revertCustomDocument(document: AuthorFileDocument): Promise<void> {
+    async revertCustomDocument(document: AuthorDocument): Promise<void> {
         const bytes = await vscode.workspace.fs.readFile(document.uri);
-        document.text = new TextDecoder().decode(bytes);
-        document.savedText = document.text;
+        document.fromText(new TextDecoder().decode(bytes));
         this.sendDocument(document);
     }
 
     async backupCustomDocument(
-        document: AuthorFileDocument,
+        document: AuthorDocument,
         context: vscode.CustomDocumentBackupContext,
     ): Promise<vscode.CustomDocumentBackup> {
         await vscode.workspace.fs.writeFile(
@@ -150,24 +127,24 @@ export class AuthorFileEditorProvider
         };
     }
 
-    private recordEdit(document: AuthorFileDocument, text: string): void {
+    private recordEdit(document: AuthorDocument, text: string): void {
         const before = document.text;
-        document.text = text;
+        document.fromText(text);
         this.edited.fire({
             document,
             label: "Edit",
             undo: () => {
-                document.text = before;
+                document.fromText(before);
                 this.sendDocument(document);
             },
             redo: () => {
-                document.text = text;
+                document.fromText(text);
                 this.sendDocument(document);
             },
         });
     }
 
-    private sendDocument(document: AuthorFileDocument): void {
+    private sendDocument(document: AuthorDocument): void {
         void this.panelsByDocument
             .get(document.uri.toString())
             ?.webview.postMessage({ type: "document", text: document.text });

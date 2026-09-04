@@ -26,6 +26,8 @@
 // the round-trip and parsing rules are mirrored there test for test. Deliberately
 // free of the `vscode` module, so it can be unit tested without an editor.
 
+import type * as vscode from "vscode";
+
 export const EXTENSION = ".author";
 
 export const MARKDOWN = "markdown";
@@ -126,16 +128,24 @@ export class Cell {
     }
 }
 
-export class AuthorDocument {
+export class AuthorDocument implements vscode.CustomDocument {
     private documentCells: Cell[];
     private readonly changeListeners: (() => void)[] = [];
 
-    private constructor(cells: Cell[]) {
-        this.documentCells = cells;
+    constructor(
+        readonly uri: vscode.Uri,
+        text: string,
+    ) {
+        this.documentCells = [];
+        this.fromText(text);
     }
 
+    /** The document VS Code holds when there is no file behind it: the webview's. */
     static fromText(text: string): AuthorDocument {
-        const document = new AuthorDocument([]);
+        return new AuthorDocument(undefined as unknown as vscode.Uri, text);
+    }
+
+    fromText(text: string): void {
         const sections: { marker: RegExpExecArray; body: string[] }[] = [];
 
         for (const line of text.split("\n")) {
@@ -147,21 +157,22 @@ export class AuthorDocument {
             }
         }
 
-        const changed = (): void => document.notifyChanged();
-        const cells: Cell[] = [];
-        for (const section of sections) {
-            cells.push(
+        const changed = (): void => this.notifyChanged();
+        this.documentCells = sections.map(
+            (section) =>
                 new Cell(
                     section.marker[1],
                     trimBlankEnds(section.body),
                     readAttributes(section.marker[2]),
                     changed,
                 ),
-            );
-        }
+        );
+    }
 
-        document.documentCells = cells;
-        return document;
+    dispose(): void {}
+
+    get text(): string {
+        return this.toText();
     }
 
     get cells(): Cell[] {
