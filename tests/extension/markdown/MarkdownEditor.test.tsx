@@ -330,7 +330,7 @@ describe("two editors", () => {
         expect(renderedMarkdown()).toEqual(["The lantern."]);
     });
 
-    it("commits typing that had not settled when the second is opened", async () => {
+    it("commits nothing on the way out, since the page may have moved on", async () => {
         const lantern = committedSpy();
         await mountAll([
             { markdown: "The lantern.", committed: lantern },
@@ -341,6 +341,6 @@ describe("two editors", () => {
         await typeIntoEditor("The lantern had gone out.");
         await doubleClickRenderedMarkdown("The night.");
 
-        expect(lantern).toHaveBeenCalledWith("The lantern had gone out.");
+        expect(lantern).not.toHaveBeenCalled();
     });
 });

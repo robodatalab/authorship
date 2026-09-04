@@ -222,7 +222,6 @@ function MonacoMarkdownEditor({
             openEditor.current = null;
             window.removeEventListener("keydown", escaped, true);
             clearTimeout(settling);
-            latest.current.onSettled(editor.getValue());
             sized.dispose();
             changed.dispose();
             editor.dispose();
