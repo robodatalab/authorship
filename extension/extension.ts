@@ -6,8 +6,6 @@ import { GeminiAccount } from "./gemini/account";
 import { PublishView } from "./publish/panel";
 import { ModelHealth } from "./llm/health";
 import { ModelServer } from "./server/process";
-import { ExportMarkdownCommand } from "./menu_commands/export_markdown";
-import { ImportMarkdownCommand } from "./menu_commands/import_markdown";
 
 // Fixed rather than ephemeral, so that a server the extension did not start —
 // the one under the debugger, or the one belonging to another window — is
