@@ -64,6 +64,32 @@ export function authorDocumentCellInsertCommands(
 }
 
 
+export function authorDocumentCellCommands(
+    authorDocument: AuthorDocument,
+    at: number,
+): AuthorDocumentCommand[] {
+    return [
+        {
+            category: "cell",
+            iconClassName: "codicon codicon-chevron-up",
+            tooltip: "Move up",
+            invoke: () => authorDocument.moveAt(at, at - 1),
+        },
+        {
+            category: "cell",
+            iconClassName: "codicon codicon-chevron-down",
+            tooltip: "Move down",
+            invoke: () => authorDocument.moveAt(at, at + 1),
+        },
+        {
+            category: "cell",
+            iconClassName: "codicon codicon-trash",
+            tooltip: "Delete this section",
+            invoke: () => authorDocument.removeAt(at),
+        },
+    ];
+}
+
 function hostCommand(
     hostChannel: AuthorDocumentHostChannel,
     category: string,

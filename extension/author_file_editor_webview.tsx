@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentHostChannel } from "./author_editor/author_document_host_channel";
 import {
+    authorDocumentCellCommands,
     authorDocumentCellInsertCommands,
     authorDocumentCellRenderers,
     authorFileEditorCommands,
@@ -40,6 +41,9 @@ function main(): void {
                 mainMenuCommands={authorFileEditorCommands(hostChannel)}
                 cellInsertCommandsAt={(at) =>
                     authorDocumentCellInsertCommands(authorDocument, at)
+                }
+                cellCommandsAt={(at) =>
+                    authorDocumentCellCommands(authorDocument, at)
                 }
             />,
         );

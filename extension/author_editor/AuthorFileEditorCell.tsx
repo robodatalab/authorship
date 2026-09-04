@@ -1,4 +1,6 @@
+import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
+import type { AuthorDocumentCommand } from "./author_document_command";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -21,26 +23,41 @@ interface AuthorFileEditorCellCardProps {
     children?: ReactNode;
 }
 
-const AUTHOR_FILE_EDITOR_CELL_ACTIONS = [
-    { iconClassName: "codicon codicon-fold-up", tooltip: "Fold this section away" },
-    { iconClassName: "codicon codicon-chevron-up", tooltip: "Move up" },
-    { iconClassName: "codicon codicon-chevron-down", tooltip: "Move down" },
-    { iconClassName: "codicon codicon-trash", tooltip: "Delete this section" },
-];
+const AuthorFileEditorCellCommandsContext = createContext<
+    AuthorDocumentCommand[]
+>([]);
+
+interface AuthorFileEditorCellCommandsProps {
+    commands: AuthorDocumentCommand[];
+    children?: ReactNode;
+}
+
+export function AuthorFileEditorCellCommands({
+    commands,
+    children,
+}: AuthorFileEditorCellCommandsProps) {
+    return (
+        <AuthorFileEditorCellCommandsContext.Provider value={commands}>
+            {children}
+        </AuthorFileEditorCellCommandsContext.Provider>
+    );
+}
 
 export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
+    const commands = useContext(AuthorFileEditorCellCommandsContext);
     return (
         <section className="author-file-editor-cell">
             <div className="author-file-editor-cell-actions">
-                {AUTHOR_FILE_EDITOR_CELL_ACTIONS.map((action) => (
+                {commands.map((command) => (
                     <button
-                        key={action.iconClassName}
+                        key={command.tooltip}
                         type="button"
                         className="author-file-editor-cell-actions-button"
-                        title={action.tooltip}
-                        aria-label={action.tooltip}
+                        title={command.tooltip}
+                        aria-label={command.tooltip}
+                        onClick={command.invoke}
                     >
-                        <i className={action.iconClassName} />
+                        <i className={command.iconClassName} />
                     </button>
                 ))}
             </div>

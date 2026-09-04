@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/author_editor/AuthorFileEditorCanvas";
+import { AuthorFileEditorCell } from "../../../extension/author_editor/AuthorFileEditorCell";
 import type { AuthorDocumentCommand } from "../../../extension/author_editor/author_document_command";
 import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/AuthorFileEditorCanvas";
 import { AuthorDocument, Cell } from "../../../extension/storydoc/model";
@@ -40,13 +41,17 @@ function command(
 }
 
 const insertPositionsAsked: number[] = [];
+const cellPositionsAsked: number[] = [];
 
 async function mountCanvas(options: {
     cells?: Cell[];
     mainMenuCommands?: AuthorDocumentCommand[];
     cellInsertCommands?: AuthorDocumentCommand[];
+    cellCommands?: AuthorDocumentCommand[];
+    cellRenderers?: AuthorDocumentCellRenderers;
 }): Promise<void> {
     insertPositionsAsked.length = 0;
+    cellPositionsAsked.length = 0;
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
@@ -54,11 +59,15 @@ async function mountCanvas(options: {
         createRoot(container).render(
             <AuthorFileEditorCanvas
                 document={documentOf(options.cells ?? [])}
-                cellRenderers={CELL_RENDERERS}
+                cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 mainMenuCommands={options.mainMenuCommands ?? []}
                 cellInsertCommandsAt={(at) => {
                     insertPositionsAsked.push(at);
                     return options.cellInsertCommands ?? [];
+                }}
+                cellCommandsAt={(at) => {
+                    cellPositionsAsked.push(at);
+                    return options.cellCommands ?? [];
                 }}
             />,
         );
@@ -243,5 +252,52 @@ describe("invoking a main menu command", () => {
         expect(
             document.querySelectorAll(".author-file-editor-main-menu-divider"),
         ).toHaveLength(2);
+    });
+});
+
+describe("the commands on a cell", () => {
+    it("asks for the commands of the cell it is drawing", async () => {
+        await mountCanvas({
+            cells: [markdownCell("one"), markdownCell("two")],
+            cellCommands: [command("Move up", "cell")],
+        });
+
+        expect(cellPositionsAsked).toEqual([0, 1]);
+    });
+
+    it("draws one button for each, inside the cell it belongs to", async () => {
+        await mountCanvas({
+            cells: [markdownCell("one")],
+            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellCommands: [
+                command("Move up", "cell"),
+                command("Delete", "cell"),
+            ],
+        });
+
+        expect(
+            document.querySelectorAll(
+                ".author-file-editor-cell .author-file-editor-cell-actions-button",
+            ),
+        ).toHaveLength(2);
+    });
+
+    it("calls the command the button was drawn from", async () => {
+        const moveUp = command("Move up", "cell");
+        const remove = command("Delete", "cell");
+        await mountCanvas({
+            cells: [markdownCell("one")],
+            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellCommands: [moveUp, remove],
+        });
+
+        await click(
+            document.querySelectorAll(
+                ".author-file-editor-cell-actions-button",
+            )[1],
+        );
+
+        expect(remove.invoke).toHaveBeenCalledTimes(1);
+        expect(moveUp.invoke).not.toHaveBeenCalled();
     });
 });

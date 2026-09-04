@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
+import { AuthorFileEditorCellCommands } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import type { AuthorDocument } from "../storydoc/model";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
@@ -18,6 +19,7 @@ interface AuthorFileEditorCanvasProps {
     cellRenderers: AuthorDocumentCellRenderers;
     mainMenuCommands: AuthorDocumentCommand[];
     cellInsertCommandsAt: (at: number) => AuthorDocumentCommand[];
+    cellCommandsAt: (at: number) => AuthorDocumentCommand[];
 }
 
 export function AuthorFileEditorCanvas({
@@ -25,6 +27,7 @@ export function AuthorFileEditorCanvas({
     cellRenderers,
     mainMenuCommands,
     cellInsertCommandsAt,
+    cellCommandsAt,
 }: AuthorFileEditorCanvasProps) {
     return (
         <div className="author-file-editor-canvas">
@@ -43,7 +46,11 @@ export function AuthorFileEditorCanvas({
                         }
                         return (
                             <li key={cellIndex}>
-                                {renderCell(document, cellIndex)}
+                                <AuthorFileEditorCellCommands
+                                    commands={cellCommandsAt(cellIndex)}
+                                >
+                                    {renderCell(document, cellIndex)}
+                                </AuthorFileEditorCellCommands>
                                 <AuthorFileEditorInsertCellMenu
                                     commands={cellInsertCommandsAt(
                                         cellIndex + 1,
