@@ -72,6 +72,11 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
+.author-file-editor-cell-folded .author-file-editor-cell-body,
+.author-file-editor-cell-folded .author-file-editor-cell-footer {
+    display: none;
+}
+
 .author-file-editor-cell-footer {
     display: flex;
     align-items: center;

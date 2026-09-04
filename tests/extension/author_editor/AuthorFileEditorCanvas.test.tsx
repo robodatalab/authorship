@@ -17,7 +17,7 @@ function markdownCell(source: string): Cell {
 function documentOf(cells: Cell[]): AuthorDocument {
     return AuthorDocument.fromText(
         cells
-            .map((cell) => `<!-- cell: ${cell.kind} -->\n\n${cell.source}\n`)
+            .map((cell) => `${cell.marker()}\n\n${cell.source}\n`)
             .join("\n"),
     );
 }
@@ -299,5 +299,22 @@ describe("the commands on a cell", () => {
 
         expect(remove.invoke).toHaveBeenCalledTimes(1);
         expect(moveUp.invoke).not.toHaveBeenCalled();
+    });
+});
+
+describe("a folded cell", () => {
+    it("is marked as folded on the page", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("one"),
+                new Cell("markdown", "two", { folded: "true" }),
+            ],
+        });
+
+        expect(
+            listItems().map((item) =>
+                item.classList.contains("author-file-editor-cell-folded"),
+            ),
+        ).toEqual([false, false, true]);
     });
 });

@@ -68,7 +68,18 @@ export function authorDocumentCellCommands(
     authorDocument: AuthorDocument,
     at: number,
 ): AuthorDocumentCommand[] {
+    const cell = authorDocument.cells[at];
     return [
+        {
+            category: "cell",
+            iconClassName: cell.isFolded()
+                ? "codicon codicon-fold-down"
+                : "codicon codicon-fold-up",
+            tooltip: cell.isFolded()
+                ? "Unfold this section"
+                : "Fold this section away",
+            invoke: () => cell.fold(!cell.isFolded()),
+        },
         {
             category: "cell",
             iconClassName: "codicon codicon-chevron-up",

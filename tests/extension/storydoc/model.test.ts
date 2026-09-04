@@ -358,3 +358,62 @@ describe('deleting a cell', () => {
 		expect(changes).toBe(0);
 	});
 });
+
+describe('folding a cell', () => {
+	const cellOf = (text: string) => AuthorDocument.fromText(text).cells[0];
+
+	it('is not folded to begin with', () => {
+		expect(cellOf('<!-- cell: markdown -->\n\none\n').isFolded()).toBe(false);
+	});
+
+	it('is folded when the document says so', () => {
+		expect(
+			cellOf('<!-- cell: markdown -->\n\none\n').isFolded()
+		).toBe(false);
+		expect(
+			cellOf('<!-- cell: markdown folded="true" -->\n\none\n').isFolded()
+		).toBe(true);
+	});
+
+	it('writes the fold into the document', () => {
+		const document = AuthorDocument.fromText('<!-- cell: markdown -->\n\none\n');
+
+		document.cells[0].fold(true);
+
+		expect(document.toText()).toBe(
+			'<!-- cell: markdown folded="true" -->\n\none\n'
+		);
+	});
+
+	it('takes the attribute out again when it is unfolded', () => {
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown folded="true" -->\n\none\n'
+		);
+
+		document.cells[0].fold(false);
+
+		expect(document.toText()).toBe('<!-- cell: markdown -->\n\none\n');
+	});
+
+	it('says the document changed', () => {
+		const document = AuthorDocument.fromText('<!-- cell: markdown -->\n\none\n');
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.cells[0].fold(true);
+
+		expect(changes).toBe(1);
+	});
+
+	it('says nothing when it is already folded', () => {
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown folded="true" -->\n\none\n'
+		);
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.cells[0].fold(true);
+
+		expect(changes).toBe(0);
+	});
+});

@@ -46,6 +46,9 @@ export const NO = "no";
 /** Whether a part is printed as a page of the book. */
 export const PRINT = "print";
 
+/** Whether a section is folded away to its heading. */
+export const FOLDED = "folded";
+
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
@@ -94,6 +97,24 @@ export class Cell {
             )
             .join("");
         return `<!-- cell: ${this.kind}${said} -->`;
+    }
+
+    isFolded(): boolean {
+        return this.attrs[FOLDED] === "true";
+    }
+
+    fold(folded: boolean): void {
+        if (this.isFolded() === folded) {
+            return;
+        }
+        const attrs = { ...this.attrs };
+        if (folded) {
+            attrs[FOLDED] = "true";
+        } else {
+            delete attrs[FOLDED];
+        }
+        this.attrs = attrs;
+        this.#changed();
     }
 
     replaceAttribute(name: string, value: string): void {

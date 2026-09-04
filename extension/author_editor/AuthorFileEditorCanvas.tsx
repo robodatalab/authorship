@@ -45,7 +45,14 @@ export function AuthorFileEditorCanvas({
                             return null;
                         }
                         return (
-                            <li key={cellIndex}>
+                            <li
+                                key={cellIndex}
+                                className={
+                                    cell.isFolded()
+                                        ? "author-file-editor-cell-folded"
+                                        : undefined
+                                }
+                            >
                                 <AuthorFileEditorCellCommands
                                     commands={cellCommandsAt(cellIndex)}
                                 >
