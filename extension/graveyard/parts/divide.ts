@@ -16,7 +16,7 @@ import {
 	partNumber,
 	sectionsOf,
 } from './model';
-import { type Cell } from '../../storydoc/model';
+import { type Cell } from '../storydoc_model';
 import { dumps } from '../storydoc_model';
 
 /** What a division came to. */

@@ -14,7 +14,7 @@ import { post } from './elements';
 import { refind, showCount } from './find_bar';
 import { followEditing } from './editor_box';
 import { state } from './state';
-import type { Cell } from '../../storydoc/model';
+import type { Cell } from '../storydoc_model';
 
 export function commit(next: Cell[]): void {
 	// Nothing on the page is the author's to change while a pass is correcting

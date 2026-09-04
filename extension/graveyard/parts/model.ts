@@ -18,7 +18,7 @@
 // the parts into files.
 
 import { isAside, isMatter, isUnpublished } from '../author_editor/model';
-import { CHAPTER, COVER, EXTENSION, PART, TITLE_PAGE, type Cell } from '../../storydoc/model';
+import { CHAPTER, COVER, EXTENSION, PART, TITLE_PAGE, type Cell } from '../storydoc_model';
 import { printsPage } from '../storydoc_model';
 
 /** A chapter and the cells written under it. */

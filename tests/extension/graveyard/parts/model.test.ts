@@ -11,7 +11,7 @@ import {
 } from '../../../../extension/graveyard/parts/model';
 import {
 	type Cell,
-} from '../../../../extension/storydoc/model';
+} from '../../../../extension/graveyard/storydoc_model';
 import {
 	chapter,
 	markdown,

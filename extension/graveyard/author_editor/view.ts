@@ -41,7 +41,7 @@ import { beginEditing, closeEditing, releaseBox, writable } from './editor_box';
 import { redrawCell, render, restoreCaret, showWhere } from './page_view';
 import { foldAllCells } from './edits';
 import { signatureOf, state } from './state';
-import type { Cell } from '../../storydoc/model';
+import type { Cell } from '../storydoc_model';
 import type { Templates } from '../../settings/model';
 import type { Finding } from './marks';
 

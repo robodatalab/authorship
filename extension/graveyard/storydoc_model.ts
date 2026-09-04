@@ -1,20 +1,28 @@
-import {
-	ABOUT,
-	BLURB,
-	CHAPTER,
-	CONTENTS,
-	COVER,
-	DISCLAIMER,
-	EXTENSION,
-	MARKDOWN,
-	NO,
-	NOTE,
-	PART,
-	PRINT,
-	RECAP,
-	TITLE_PAGE,
-} from '../storydoc/model';
-import type { Cell } from '../storydoc/model';
+export const EXTENSION = '.author';
+
+export const MARKDOWN = 'markdown';
+export const CHAPTER = 'chapter';
+export const PART = 'part';
+export const TITLE_PAGE = 'title-page';
+export const COVER = 'cover';
+export const CONTENTS = 'contents';
+export const DISCLAIMER = 'disclaimer';
+export const ABOUT = 'about';
+export const BLURB = 'blurb';
+export const NOTE = 'note';
+export const RECAP = 'recap';
+
+/** What an attribute says when the answer to it is no. */
+export const NO = 'no';
+
+/** Whether a part is printed as a page of the book. */
+export const PRINT = 'print';
+
+export interface Cell {
+	kind: string;
+	source: string;
+	attrs: Record<string, string>;
+}
 
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;

@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BODY } from '../../../../extension/graveyard/author_editor/page';
 import {
 	type Cell,
-} from '../../../../extension/storydoc/model';
+} from '../../../../extension/graveyard/storydoc_model';
 import {
 	chapter,
 	contents,

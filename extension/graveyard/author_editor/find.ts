@@ -10,7 +10,7 @@
 // as much as the chapter is, and an author renaming a character must not have to
 // rename them twice.
 
-import type { Cell } from '../../storydoc/model';
+import type { Cell } from '../storydoc_model';
 import { fieldsOf } from './model';
 
 export interface Query {

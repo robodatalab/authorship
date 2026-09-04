@@ -6,7 +6,7 @@
 // unit tested without launching an editor or a browser. panel.ts drives the
 // document with it; view.ts draws with it.
 
-import { ABOUT, BLURB, CHAPTER, CONTENTS, COVER, DISCLAIMER, MARKDOWN, NOTE, PART, PRINT, RECAP, TITLE_PAGE, type Cell } from '../../storydoc/model';
+import { ABOUT, BLURB, CHAPTER, CONTENTS, COVER, DISCLAIMER, MARKDOWN, NOTE, PART, PRINT, RECAP, TITLE_PAGE, type Cell } from '../storydoc_model';
 import { printsPage } from '../storydoc_model';
 import { templates } from '../../settings/model';
 

@@ -62,7 +62,7 @@ import {
 } from '../../publish/layout';
 import { loadTemplates, watchSettings } from '../../settings/file';
 import { useTemplates } from '../../settings/model';
-import { MARKDOWN, RECAP, type Cell } from '../../storydoc/model';
+import { MARKDOWN, RECAP, type Cell } from '../storydoc_model';
 import { dumps } from '../storydoc_model';
 import { parse } from '../storydoc_model';
 

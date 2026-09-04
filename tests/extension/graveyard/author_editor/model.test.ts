@@ -47,7 +47,7 @@ import {
 } from '../../../../extension/graveyard/author_editor/model';
 import {
 	type Cell,
-} from '../../../../extension/storydoc/model';
+} from '../../../../extension/graveyard/storydoc_model';
 import {
 	chapter,
 	contents,

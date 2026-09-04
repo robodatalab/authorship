@@ -17,7 +17,7 @@
 //
 // Free of the DOM and of `vscode`, so it can be unit tested without a page.
 
-import type { Cell } from '../../storydoc/model';
+import type { Cell } from '../storydoc_model';
 
 /** Somewhere a fault is, in the page's own coordinates. */
 export interface Span {
