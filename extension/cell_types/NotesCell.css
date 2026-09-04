@@ -1,0 +1,13 @@
+.notes-cell-rendered {
+    white-space: pre-wrap;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+.notes-cell-rendered > :first-child {
+    margin-top: 0;
+}
+
+.notes-cell-rendered > :last-child {
+    margin-bottom: 0;
+}
