@@ -158,6 +158,23 @@ export class AuthorDocument {
         this.notifyChanged();
     }
 
+    moveAt(at: number, to: number): void {
+        if (to === at || to < 0 || to >= this.documentCells.length) {
+            return;
+        }
+        const [moved] = this.documentCells.splice(at, 1);
+        this.documentCells.splice(to, 0, moved);
+        this.notifyChanged();
+    }
+
+    removeAt(at: number): void {
+        if (at < 0 || at >= this.documentCells.length) {
+            return;
+        }
+        this.documentCells.splice(at, 1);
+        this.notifyChanged();
+    }
+
     toText(): string {
         const out: string[] = [];
         for (const cell of this.documentCells) {

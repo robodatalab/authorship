@@ -251,3 +251,110 @@ describe('what a document reads as', () => {
 		]);
 	});
 });
+
+describe('moving a cell', () => {
+	const threeCells = () =>
+		AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n\n<!-- cell: markdown -->\n\ntwo\n\n<!-- cell: markdown -->\n\nthree\n'
+		);
+
+	it('swaps it with the one above', () => {
+		const document = threeCells();
+
+		document.moveAt(1, 0);
+
+		expect(document.cells.map((cell) => cell.source)).toEqual([
+			'two',
+			'one',
+			'three',
+		]);
+	});
+
+	it('swaps it with the one below', () => {
+		const document = threeCells();
+
+		document.moveAt(1, 2);
+
+		expect(document.cells.map((cell) => cell.source)).toEqual([
+			'one',
+			'three',
+			'two',
+		]);
+	});
+
+	it('leaves the first cell where it is', () => {
+		const document = threeCells();
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.moveAt(0, -1);
+
+		expect(document.cells.map((cell) => cell.source)).toEqual([
+			'one',
+			'two',
+			'three',
+		]);
+		expect(changes).toBe(0);
+	});
+
+	it('leaves the last cell where it is', () => {
+		const document = threeCells();
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.moveAt(2, 3);
+
+		expect(document.cells.map((cell) => cell.source)).toEqual([
+			'one',
+			'two',
+			'three',
+		]);
+		expect(changes).toBe(0);
+	});
+
+	it('says the document changed', () => {
+		const document = threeCells();
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.moveAt(0, 1);
+
+		expect(changes).toBe(1);
+	});
+});
+
+describe('deleting a cell', () => {
+	const twoCells = () =>
+		AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n\n<!-- cell: note -->\n\ntwo\n'
+		);
+
+	it('takes it out of the document', () => {
+		const document = twoCells();
+
+		document.removeAt(0);
+
+		expect(document.cells.map((cell) => cell.kind)).toEqual([NOTE]);
+	});
+
+	it('says the document changed', () => {
+		const document = twoCells();
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.removeAt(1);
+
+		expect(changes).toBe(1);
+	});
+
+	it('does nothing when there is no cell there', () => {
+		const document = twoCells();
+		let changes = 0;
+		document.onChanged(() => changes++);
+
+		document.removeAt(2);
+
+		expect(document.cells).toHaveLength(2);
+		expect(changes).toBe(0);
+	});
+});
