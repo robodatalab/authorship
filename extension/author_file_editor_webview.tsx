@@ -11,16 +11,18 @@ import { AuthorDocument } from "./storydoc/model";
 declare function acquireVsCodeApi(): AuthorDocumentHostChannel;
 
 declare const require: {
-    context?(
+    context(
         directory: string,
         useSubdirectories: boolean,
         expression: RegExp,
     ): { keys(): string[]; (id: string): unknown };
 };
 
-if (typeof require !== "undefined" && require.context) {
+try {
     const cellTypeModules = require.context("./cell_types", false, /\.tsx$/);
     cellTypeModules.keys().forEach(cellTypeModules);
+} catch {
+    void 0;
 }
 
 function main(): void {
