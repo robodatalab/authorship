@@ -44,7 +44,10 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
                         className="markdown-cell-rendered"
                         onDoubleClick={beginEditing}
                         dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(markdown),
+                            __html: marked.parse(markdown, {
+                                async: false,
+                                gfm: true,
+                            }),
                         }}
                     />
                 )}
@@ -52,8 +55,4 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>
     );
-}
-
-function renderMarkdown(source: string): string {
-    return marked.parse(source, { async: false, gfm: true });
 }
