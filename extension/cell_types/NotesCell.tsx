@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
@@ -21,6 +21,10 @@ export function NotesCell({ source, editCommand }: NotesCellProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [draftNote, setDraftNote] = useState(note);
 
+    useEffect(() => {
+        setDraftNote(note);
+    }, [note]);
+
     function beginEditing(): void {
         setDraftNote(note);
         setIsEditing(true);
@@ -39,6 +43,9 @@ export function NotesCell({ source, editCommand }: NotesCellProps) {
                     <MarkdownEditor
                         markdown={draftNote}
                         onMarkdownChanged={setDraftNote}
+                        onSettled={(settled) =>
+                            editCommand.invoke(`<!--\n${settled}\n-->`)
+                        }
                         onFinished={commit}
                     />
                 ) : (

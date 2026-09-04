@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
@@ -21,6 +21,10 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [draftMarkdown, setDraftMarkdown] = useState(markdown);
 
+    useEffect(() => {
+        setDraftMarkdown(markdown);
+    }, [markdown]);
+
     function beginEditing(): void {
         setDraftMarkdown(markdown);
         setIsEditing(true);
@@ -39,6 +43,7 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
                     <MarkdownEditor
                         markdown={draftMarkdown}
                         onMarkdownChanged={setDraftMarkdown}
+                        onSettled={(settled) => editCommand.invoke(settled)}
                         onFinished={commit}
                     />
                 ) : (

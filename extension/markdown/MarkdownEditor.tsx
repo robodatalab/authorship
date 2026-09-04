@@ -11,20 +11,35 @@ monaco.languages.register({ id: "markdown" });
 monaco.languages.setLanguageConfiguration("markdown", markdownConfiguration);
 monaco.languages.setMonarchTokensProvider("markdown", markdownLanguage);
 
+monaco.editor.addKeybindingRules([
+    { keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, command: null },
+    {
+        keybinding:
+            monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ,
+        command: null,
+    },
+    { keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY, command: null },
+]);
+
+const SETTLE_AFTER_TYPING_MS = 400;
+
 interface MarkdownEditorProps {
     markdown: string;
     onMarkdownChanged: (markdown: string) => void;
+    onSettled: (markdown: string) => void;
     onFinished: () => void;
 }
 
 export function MarkdownEditor({
     markdown,
     onMarkdownChanged,
+    onSettled,
     onFinished,
 }: MarkdownEditorProps) {
     const host = useRef<HTMLDivElement>(null);
-    const latest = useRef({ onMarkdownChanged, onFinished });
-    latest.current = { onMarkdownChanged, onFinished };
+    const openEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const latest = useRef({ onMarkdownChanged, onSettled, onFinished });
+    latest.current = { onMarkdownChanged, onSettled, onFinished };
 
     useEffect(() => {
         const node = host.current;
@@ -68,26 +83,66 @@ export function MarkdownEditor({
         };
 
         const sized = editor.onDidContentSizeChange(fitToContent);
-        const changed = editor.onDidChangeModelContent(() =>
-            latest.current.onMarkdownChanged(editor.getValue()),
-        );
+        let settling: ReturnType<typeof setTimeout> | undefined;
+        const changed = editor.onDidChangeModelContent(() => {
+            latest.current.onMarkdownChanged(editor.getValue());
+            clearTimeout(settling);
+            settling = setTimeout(
+                () => latest.current.onSettled(editor.getValue()),
+                SETTLE_AFTER_TYPING_MS,
+            );
+        });
         const blurred = editor.onDidBlurEditorWidget(() =>
             latest.current.onFinished(),
         );
         editor.addCommand(monaco.KeyCode.Escape, () =>
             latest.current.onFinished(),
         );
+        const forwardToWindow = (key: string, shiftKey = false): void => {
+            window.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key,
+                    ctrlKey: true,
+                    metaKey: true,
+                    shiftKey,
+                    bubbles: true,
+                }),
+            );
+        };
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, () =>
+            forwardToWindow("z"),
+        );
+        editor.addCommand(
+            monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ,
+            () => forwardToWindow("z", true),
+        );
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY, () =>
+            forwardToWindow("y"),
+        );
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () =>
+            forwardToWindow("s"),
+        );
+        openEditor.current = editor;
 
         fitToContent();
         editor.focus();
 
         return () => {
+            openEditor.current = null;
+            clearTimeout(settling);
             sized.dispose();
             changed.dispose();
             blurred.dispose();
             editor.dispose();
         };
     }, []);
+
+    useEffect(() => {
+        const editor = openEditor.current;
+        if (editor && editor.getValue() !== markdown) {
+            editor.setValue(markdown);
+        }
+    }, [markdown]);
 
     return <div className="markdown-editor" ref={host} />;
 }

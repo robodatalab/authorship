@@ -1,14 +1,41 @@
 import * as vscode from "vscode";
 
+class AuthorFileDocument implements vscode.CustomDocument {
+    constructor(
+        readonly uri: vscode.Uri,
+        public text: string,
+    ) {}
+
+    dispose(): void {}
+}
+
 export class AuthorFileEditorProvider
-    implements vscode.CustomTextEditorProvider
+    implements vscode.CustomEditorProvider<AuthorFileDocument>
 {
     public static readonly viewType = "authorship.authorEditor";
 
+    private readonly edited = new vscode.EventEmitter<
+        vscode.CustomDocumentEditEvent<AuthorFileDocument>
+    >();
+    readonly onDidChangeCustomDocument = this.edited.event;
+
+    private readonly panelsByDocument = new Map<string, vscode.WebviewPanel>();
+
     constructor(private readonly context: vscode.ExtensionContext) {}
 
-    resolveCustomTextEditor(
-        document: vscode.TextDocument,
+    async openCustomDocument(
+        uri: vscode.Uri,
+        openContext: vscode.CustomDocumentOpenContext,
+    ): Promise<AuthorFileDocument> {
+        const from = openContext.backupId
+            ? vscode.Uri.parse(openContext.backupId)
+            : uri;
+        const bytes = await vscode.workspace.fs.readFile(from);
+        return new AuthorFileDocument(uri, new TextDecoder().decode(bytes));
+    }
+
+    resolveCustomEditor(
+        document: AuthorFileDocument,
         panel: vscode.WebviewPanel,
     ): void {
         panel.webview.options = {
@@ -19,42 +46,92 @@ export class AuthorFileEditorProvider
             ),
         };
         panel.webview.html = this.html(panel.webview);
-
-        const sendDocument = (): void => {
-            void panel.webview.postMessage({
-                type: "document",
-                text: document.getText(),
-            });
-        };
-
-        const documentChanged = vscode.workspace.onDidChangeTextDocument(
-            (event) => {
-                if (event.document.uri.toString() === document.uri.toString()) {
-                    sendDocument();
-                }
-            },
-        );
+        this.panelsByDocument.set(document.uri.toString(), panel);
 
         const webviewSpoke = panel.webview.onDidReceiveMessage(
-            (message: { type?: string; text?: string }) => {
+            (message: { type?: string; text?: string; command?: string }) => {
                 if (message?.type === "ready") {
-                    sendDocument();
+                    this.sendDocument(document);
                 } else if (
-                    message?.type === "save" &&
-                    message.text !== undefined
+                    message?.type === "edit" &&
+                    message.text !== undefined &&
+                    message.text !== document.text
                 ) {
-                    void vscode.workspace.fs.writeFile(
-                        document.uri,
-                        new TextEncoder().encode(message.text),
-                    );
+                    this.recordEdit(document, message.text);
+                } else if (message?.type === "command" && message.command) {
+                    void vscode.commands.executeCommand(message.command);
                 }
             },
         );
 
         panel.onDidDispose(() => {
-            documentChanged.dispose();
             webviewSpoke.dispose();
+            this.panelsByDocument.delete(document.uri.toString());
         });
+    }
+
+    saveCustomDocument(document: AuthorFileDocument): Thenable<void> {
+        return vscode.workspace.fs.writeFile(
+            document.uri,
+            new TextEncoder().encode(document.text),
+        );
+    }
+
+    saveCustomDocumentAs(
+        document: AuthorFileDocument,
+        destination: vscode.Uri,
+    ): Thenable<void> {
+        return vscode.workspace.fs.writeFile(
+            destination,
+            new TextEncoder().encode(document.text),
+        );
+    }
+
+    async revertCustomDocument(document: AuthorFileDocument): Promise<void> {
+        const bytes = await vscode.workspace.fs.readFile(document.uri);
+        document.text = new TextDecoder().decode(bytes);
+        this.sendDocument(document);
+    }
+
+    async backupCustomDocument(
+        document: AuthorFileDocument,
+        context: vscode.CustomDocumentBackupContext,
+    ): Promise<vscode.CustomDocumentBackup> {
+        await vscode.workspace.fs.writeFile(
+            context.destination,
+            new TextEncoder().encode(document.text),
+        );
+        return {
+            id: context.destination.toString(),
+            delete: () =>
+                void vscode.workspace.fs.delete(context.destination).then(
+                    () => undefined,
+                    () => undefined,
+                ),
+        };
+    }
+
+    private recordEdit(document: AuthorFileDocument, text: string): void {
+        const before = document.text;
+        document.text = text;
+        this.edited.fire({
+            document,
+            label: "Edit",
+            undo: () => {
+                document.text = before;
+                this.sendDocument(document);
+            },
+            redo: () => {
+                document.text = text;
+                this.sendDocument(document);
+            },
+        });
+    }
+
+    private sendDocument(document: AuthorFileDocument): void {
+        void this.panelsByDocument
+            .get(document.uri.toString())
+            ?.webview.postMessage({ type: "document", text: document.text });
     }
 
     private html(webview: vscode.Webview): string {

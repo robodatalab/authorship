@@ -47,7 +47,13 @@ function main(): void {
 
     function open(text: string): void {
         authorDocument = AuthorDocument.fromText(text);
-        authorDocument.onChanged(draw);
+        authorDocument.onChanged(() => {
+            hostChannel.postMessage({
+                type: "edit",
+                text: authorDocument.toText(),
+            });
+            draw();
+        });
         draw();
     }
 
@@ -64,19 +70,18 @@ function main(): void {
         if (event.key === "s") {
             event.preventDefault();
             hostChannel.postMessage({
-                type: "save",
-                text: authorDocument.toText(),
+                type: "command",
+                command: "workbench.action.files.save",
             });
         } else if (event.key === "z" && !event.shiftKey) {
             event.preventDefault();
-            authorDocument.undo();
+            hostChannel.postMessage({ type: "command", command: "undo" });
         } else if (event.key === "y" || (event.key === "z" && event.shiftKey)) {
             event.preventDefault();
-            authorDocument.redo();
+            hostChannel.postMessage({ type: "command", command: "redo" });
         }
     });
 
-    authorDocument.onChanged(draw);
     draw();
     hostChannel.postMessage({ type: "ready" });
 }
