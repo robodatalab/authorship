@@ -8,7 +8,7 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
 import { DISCLAIMER, Cell } from "../storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];

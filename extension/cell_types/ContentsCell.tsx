@@ -5,7 +5,7 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
 import { CONTENTS, Cell } from "../storydoc/model";
 
 interface ContentsCellProps {

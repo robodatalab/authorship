@@ -4,8 +4,8 @@ import type { AuthorDocumentHostChannel } from "./author_editor/author_document_
 import {
     authorDocumentCellInsertCommands,
     authorDocumentCellRenderers,
-} from "./author_editor/author_document_cell_types";
-import { authorFileEditorCommands } from "./author_file_editor_commands";
+    authorFileEditorCommands,
+} from "./author_file_editor_commands";
 import { AuthorDocument } from "./storydoc/model";
 
 declare function acquireVsCodeApi(): AuthorDocumentHostChannel;

@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "../../../extension/author_editor/author_document_command";
-import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/author_document_cell_renderers";
+import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/AuthorFileEditorCanvas";
 import { AuthorDocument, Cell } from "../../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;

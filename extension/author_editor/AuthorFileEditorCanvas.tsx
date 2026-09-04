@@ -1,12 +1,17 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import type { AuthorDocumentCellRenderers } from "./author_document_cell_renderers";
 import type { AuthorDocument } from "../storydoc/model";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_FILE_EDITOR_PRIMARY_COMMAND_CATEGORY = "primary";
+
+export type AuthorDocumentCellRenderers = Record<
+    string,
+    (document: AuthorDocument, cellIndex: number) => ReactNode
+>;
 
 interface AuthorFileEditorCanvasProps {
     document: AuthorDocument;

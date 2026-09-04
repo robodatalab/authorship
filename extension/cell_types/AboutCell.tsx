@@ -7,7 +7,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
 import { ABOUT, Cell } from "../storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
