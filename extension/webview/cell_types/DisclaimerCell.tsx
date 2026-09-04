@@ -9,7 +9,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { DISCLAIMER, Cell } from "../storydoc/model";
+import { DISCLAIMER, Cell } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 

@@ -52,16 +52,16 @@ import {
 	STYLE_FIX_SETTING,
 	configuredModel,
 	styleFixEnabled,
-} from '../../gemini/account';
+} from '../../vscode_runtime/gemini/account';
 import {
 	applyPlan,
 	askOf,
 	doneOf,
 	wantingKinds,
 	type Report,
-} from '../../publish/layout';
-import { loadTemplates, watchSettings } from '../../settings/file';
-import { useTemplates } from '../../settings/model';
+} from '../../vscode_runtime/publish/layout';
+import { loadTemplates, watchSettings } from '../../vscode_runtime/settings/file';
+import { useTemplates } from '../../vscode_runtime/settings/model';
 import { MARKDOWN, RECAP, type Cell } from '../storydoc_model';
 import { dumps } from '../storydoc_model';
 import { parse } from '../storydoc_model';

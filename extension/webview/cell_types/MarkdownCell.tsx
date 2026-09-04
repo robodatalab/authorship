@@ -6,7 +6,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { MARKDOWN, Cell } from "../storydoc/model";
+import { MARKDOWN, Cell } from "../../vscode_runtime/storydoc/model";
 
 interface MarkdownCellProps {
     cell: Cell;

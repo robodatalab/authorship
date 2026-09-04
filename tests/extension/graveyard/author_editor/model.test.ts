@@ -59,7 +59,7 @@ import {
 	EMPTY_TEMPLATES,
 	parseSettings,
 	useTemplates,
-} from '../../../../extension/settings/model';
+} from '../../../../extension/vscode_runtime/settings/model';
 
 function blurb(source = ''): Cell {
 	return { kind: 'blurb', source, attrs: {} };

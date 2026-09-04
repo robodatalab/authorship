@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { AuthorDocumentCommand } from "./author_editor/author_document_command";
 import type { AuthorDocumentHostChannel } from "./author_editor/author_document_host_channel";
 import type { AuthorDocumentCellRenderers } from "./author_editor/AuthorFileEditorCanvas";
-import type { AuthorDocument, Cell } from "./storydoc/model";
+import type { AuthorDocument, Cell } from "../vscode_runtime/storydoc/model";
 
 export interface AuthorDocumentCellType {
     kind: string;
@@ -62,7 +62,6 @@ export function authorDocumentCellInsertCommands(
         (cellType) => new CellInsertCommand(authorDocument, at, cellType),
     );
 }
-
 
 export function authorDocumentCellCommands(
     authorDocument: AuthorDocument,

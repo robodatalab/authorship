@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { dumps } from "../../extension/graveyard/storydoc_model";
-import { Cell } from "../../extension/storydoc/model";
+import { Cell } from "../../extension/vscode_runtime/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-
 
 let posted: { type: string }[] = [];
 
@@ -21,9 +20,9 @@ async function openWebview(): Promise<void> {
     });
     vi.resetModules();
     await act(async () => {
-        await import("../../extension/cell_types/MarkdownCell");
-        await import("../../extension/cell_types/NotesCell");
-        await import("../../extension/author_file_editor_webview");
+        await import("../../extension/webview/cell_types/MarkdownCell");
+        await import("../../extension/webview/cell_types/NotesCell");
+        await import("../../extension/webview/author_file_editor_webview");
     });
 }
 
@@ -38,9 +37,9 @@ async function hostSends(cells: Cell[]): Promise<void> {
 }
 
 function renderedCellText(): string[] {
-    return [
-        ...document.querySelectorAll(".author-file-editor-cell-body"),
-    ].map((body) => body.textContent?.trim() ?? "");
+    return [...document.querySelectorAll(".author-file-editor-cell-body")].map(
+        (body) => body.textContent?.trim() ?? "",
+    );
 }
 
 beforeEach(() => {

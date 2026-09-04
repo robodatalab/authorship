@@ -9,7 +9,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { RECAP, Cell } from "../storydoc/model";
+import { RECAP, Cell } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     {
@@ -26,7 +26,9 @@ interface RecapCellProps {
 export function RecapCell({ cell }: RecapCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>The Story So Far</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>
+                The Story So Far
+            </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "../author_editor/author_document_command";
+import type { AuthorDocumentCommand } from "../../webview/author_editor/author_document_command";
 import { toMarkdown } from "../markdown/exporter";
 import { AuthorDocument } from "../storydoc/model";
 

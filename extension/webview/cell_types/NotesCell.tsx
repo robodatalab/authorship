@@ -6,7 +6,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { Cell, NOTE } from "../storydoc/model";
+import { Cell, NOTE } from "../../vscode_runtime/storydoc/model";
 import "./NotesCell.css";
 
 interface NotesCellProps {

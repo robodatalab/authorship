@@ -8,13 +8,13 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { ABOUT, Cell } from "../storydoc/model";
+import { ABOUT, Cell } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
 const FIELDS: AuthorFileEditorCellField[] = [
-        { name: "kdp", label: "KDP", hint: "https://amazon.com/author/…" },
-        { name: "website", label: "Website", hint: "https://…" },
-        { name: "substack", label: "Substack", hint: "https://….substack.com" },
+    { name: "kdp", label: "KDP", hint: "https://amazon.com/author/…" },
+    { name: "website", label: "Website", hint: "https://…" },
+    { name: "substack", label: "Substack", hint: "https://….substack.com" },
 ];
 
 interface AboutCellProps {
@@ -24,7 +24,9 @@ interface AboutCellProps {
 export function AboutCell({ cell }: AboutCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>About the Author</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>
+                About the Author
+            </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields

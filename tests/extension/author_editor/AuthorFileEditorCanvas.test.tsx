@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
-import { AuthorFileEditorCanvas } from "../../../extension/author_editor/AuthorFileEditorCanvas";
-import { AuthorFileEditorCell } from "../../../extension/author_editor/AuthorFileEditorCell";
-import type { AuthorDocumentCommand } from "../../../extension/author_editor/author_document_command";
-import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/AuthorFileEditorCanvas";
-import { AuthorDocument, Cell } from "../../../extension/storydoc/model";
+import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import { AuthorFileEditorCell } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
+import type { AuthorDocumentCommand } from "../../../extension/webview/author_editor/author_document_command";
+import type { AuthorDocumentCellRenderers } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import {
+    AuthorDocument,
+    Cell,
+} from "../../../extension/vscode_runtime/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -16,9 +19,7 @@ function markdownCell(source: string): Cell {
 
 function documentOf(cells: Cell[]): AuthorDocument {
     return AuthorDocument.fromText(
-        cells
-            .map((cell) => `${cell.marker()}\n\n${cell.source}\n`)
-            .join("\n"),
+        cells.map((cell) => `${cell.marker()}\n\n${cell.source}\n`).join("\n"),
     );
 }
 
@@ -81,7 +82,9 @@ function insertMenus(): Element[] {
 }
 
 function listItems(): Element[] {
-    return [...document.querySelectorAll(".author-file-editor-canvas > ul > li")];
+    return [
+        ...document.querySelectorAll(".author-file-editor-canvas > ul > li"),
+    ];
 }
 
 async function click(element: Element): Promise<void> {
@@ -127,10 +130,7 @@ describe("where the insert menus go", () => {
 
     it("gives a cell it cannot render no menu of its own", async () => {
         await mountCanvas({
-            cells: [
-                markdownCell("kept"),
-                new Cell("chapter", "", {}),
-            ],
+            cells: [markdownCell("kept"), new Cell("chapter", "", {})],
         });
         expect(insertMenus()).toHaveLength(2);
     });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
-import { AuthorFileEditorProvider } from "../../extension/author_editor/author_file_editor_provider";
+import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_editor/author_file_editor_provider";
 import { Uri, executedCommands, files } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -71,8 +71,8 @@ async function openEditor(text: string): Promise<OpenEditor> {
         listen(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
-        await import("../../extension/cell_types/MarkdownCell");
-        await import("../../extension/author_file_editor_webview");
+        await import("../../extension/webview/cell_types/MarkdownCell");
+        await import("../../extension/webview/author_file_editor_webview");
     });
     window.addEventListener = listen;
 

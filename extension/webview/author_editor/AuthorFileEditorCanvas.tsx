@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorCellCommands } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import type { AuthorDocument } from "../storydoc/model";
+import type { AuthorDocument } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 

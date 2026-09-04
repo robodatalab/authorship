@@ -6,7 +6,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { COVER, Cell } from "../storydoc/model";
+import { COVER, Cell } from "../../vscode_runtime/storydoc/model";
 
 interface CoverCellProps {
     cell: Cell;

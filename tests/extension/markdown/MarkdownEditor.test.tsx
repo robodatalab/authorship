@@ -59,7 +59,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
 });
 
 const { MarkdownEditor, MarkdownEditorMediator } = await import(
-    "../../../extension/markdown/MarkdownEditor"
+    "../../../extension/webview/markdown/MarkdownEditor"
 );
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;

@@ -165,7 +165,9 @@ export function toMarkdown(cells: Cell[]): string {
             if (cell.kind === PART && cell.attrs[PRINT] === NO) {
                 continue;
             }
-            out.push(`${headingFor(cell.kind)} ${cell.attrs.title || "Untitled"}`);
+            out.push(
+                `${headingFor(cell.kind)} ${cell.attrs.title || "Untitled"}`,
+            );
             continue;
         }
         if (cell.kind === ABOUT) {

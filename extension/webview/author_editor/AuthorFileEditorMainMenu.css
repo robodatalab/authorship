@@ -1,9 +1,9 @@
-@import '../../media/codicon.css';
+@import '../../../media/codicon.css';
 
 @font-face {
 	font-family: 'authorship-icons';
 	font-display: block;
-	src: url('../../media/authorship-icons.woff') format('woff');
+	src: url('../../../media/authorship-icons.woff') format('woff');
 }
 
 .aicon {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { authorshipPathFor } from '../../../extension/publish/model';
+import { authorshipPathFor } from '../../../extension/vscode_runtime/publish/model';
 
 describe('authorshipPathFor — the book’s own document, beside the manuscript', () => {
 	it('sits next to the manuscript it describes', () => {

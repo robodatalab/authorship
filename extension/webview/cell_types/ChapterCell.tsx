@@ -7,7 +7,7 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { CHAPTER, Cell } from "../storydoc/model";
+import { CHAPTER, Cell } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 

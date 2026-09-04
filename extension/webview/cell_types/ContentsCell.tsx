@@ -6,7 +6,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { CONTENTS, Cell } from "../storydoc/model";
+import { CONTENTS, Cell } from "../../vscode_runtime/storydoc/model";
 
 interface ContentsCellProps {
     cell: Cell;
@@ -15,7 +15,9 @@ interface ContentsCellProps {
 export function ContentsCell({ cell }: ContentsCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>Table of Contents</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>
+                Table of Contents
+            </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}

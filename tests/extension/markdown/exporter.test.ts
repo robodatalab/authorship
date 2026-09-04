@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
     fromMarkdown,
     toMarkdown,
-} from "../../../extension/markdown/exporter";
-import { AuthorDocument, Cell } from "../../../extension/storydoc/model";
+} from "../../../extension/vscode_runtime/markdown/exporter";
+import {
+    AuthorDocument,
+    Cell,
+} from "../../../extension/vscode_runtime/storydoc/model";
 
 function cellsOf(text: string): Cell[] {
     return AuthorDocument.fromText(text).cells;
@@ -55,7 +58,9 @@ describe("what a document exports as", () => {
 
     it("writes a note as a comment no reader of the book sees", () => {
         expect(
-            markdownOf("<!-- cell: note -->\n\n<!--\nRemember the lantern.\n-->\n"),
+            markdownOf(
+                "<!-- cell: note -->\n\n<!--\nRemember the lantern.\n-->\n",
+            ),
         ).toBe("<!--\n<!--\nRemember the lantern.\n--&gt;\n-->\n");
     });
 
@@ -103,17 +108,19 @@ describe("what a markdown manuscript imports as", () => {
 
     it("reads the three levels as title page, part and chapter", () => {
         expect(
-            shapeOf(fromMarkdown("# Veriona\n\n## Book One\n\n### Night\n")).map(
-                (cell) => cell.kind,
-            ),
+            shapeOf(
+                fromMarkdown("# Veriona\n\n## Book One\n\n### Night\n"),
+            ).map((cell) => cell.kind),
         ).toEqual(["title-page", "part", "chapter"]);
     });
 
     it("reads the prose under a heading as a markdown cell of its own", () => {
-        expect(shapeOf(fromMarkdown("### Night\n\nIt began badly.\n"))).toEqual([
-            { kind: "chapter", source: "", attrs: { title: "Night" } },
-            { kind: "markdown", source: "It began badly.", attrs: {} },
-        ]);
+        expect(shapeOf(fromMarkdown("### Night\n\nIt began badly.\n"))).toEqual(
+            [
+                { kind: "chapter", source: "", attrs: { title: "Night" } },
+                { kind: "markdown", source: "It began badly.", attrs: {} },
+            ],
+        );
     });
 
     it("reads prose written before any heading", () => {

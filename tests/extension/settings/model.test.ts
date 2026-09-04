@@ -8,7 +8,7 @@ import {
 	settingsText,
 	templates,
 	useTemplates,
-} from '../../../extension/settings/model';
+} from '../../../extension/vscode_runtime/settings/model';
 
 // The store is module state that every other test in the process reads, so a
 // test that changes it puts it back.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { phaseFor, renderStatus } from '../../../extension/llm/state';
+import { phaseFor, renderStatus } from '../../../extension/vscode_runtime/llm/state';
 
 describe('phaseFor', () => {
 	it('reads a serving model as ready', () => {

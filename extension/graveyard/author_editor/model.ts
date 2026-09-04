@@ -8,7 +8,7 @@
 
 import { ABOUT, BLURB, CHAPTER, CONTENTS, COVER, DISCLAIMER, MARKDOWN, NOTE, PART, PRINT, RECAP, TITLE_PAGE, type Cell } from '../storydoc_model';
 import { printsPage } from '../storydoc_model';
-import { templates } from '../../settings/model';
+import { templates } from '../../vscode_runtime/settings/model';
 
 /** One thing a cell records apart from prose, and what the author calls it. */
 export interface CellField {

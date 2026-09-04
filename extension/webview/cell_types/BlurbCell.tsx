@@ -6,7 +6,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { BLURB, Cell } from "../storydoc/model";
+import { BLURB, Cell } from "../../vscode_runtime/storydoc/model";
 
 interface BlurbCellProps {
     cell: Cell;

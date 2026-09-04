@@ -7,7 +7,7 @@ import {
     authorDocumentCellRenderers,
     authorFileEditorCommands,
 } from "./author_file_editor_commands";
-import { AuthorDocument } from "./storydoc/model";
+import { AuthorDocument } from "../vscode_runtime/storydoc/model";
 
 declare function acquireVsCodeApi(): AuthorDocumentHostChannel;
 

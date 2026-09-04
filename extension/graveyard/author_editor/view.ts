@@ -30,7 +30,7 @@
 // take the caret with it. Everything else is drawn from what the host last sent.
 
 import { generatedCell, withDefaultCell } from './model';
-import { useTemplates } from '../../settings/model';
+import { useTemplates } from '../../vscode_runtime/settings/model';
 import { checkEl, post, styleEl, toolbarEl } from './elements';
 import { closeFind, openFind, refind, searching, showCount, step } from './find_bar';
 import { drawJob, setStyling } from './job_view';
@@ -42,7 +42,7 @@ import { redrawCell, render, restoreCaret, showWhere } from './page_view';
 import { foldAllCells } from './edits';
 import { signatureOf, state } from './state';
 import type { Cell } from '../storydoc_model';
-import type { Templates } from '../../settings/model';
+import type { Templates } from '../../vscode_runtime/settings/model';
 import type { Finding } from './marks';
 
 // --- the toolbar ---
