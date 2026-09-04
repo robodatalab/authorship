@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "../../webview/author_editor/author_document_command";
+import type { AuthorDocumentCommand } from "./author_document_command";
 import { fromMarkdown } from "../markdown/exporter";
 
 export class ImportMarkdownCommand implements AuthorDocumentCommand {
+    readonly name = "importMarkdown";
     readonly category = "transfer";
     readonly iconClassName = "aicon aicon-import-markdown";
     readonly tooltip =

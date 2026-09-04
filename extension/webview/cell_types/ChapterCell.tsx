@@ -6,16 +6,24 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { CHAPTER, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { CHAPTER } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 
 interface ChapterCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function ChapterCell({ cell }: ChapterCellProps) {
+export function ChapterCell({ cell, at, postToHost }: ChapterCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Chapter</AuthorFileEditorCellHeader>
@@ -24,7 +32,7 @@ export function ChapterCell({ cell }: ChapterCellProps) {
                     fields={FIELDS}
                     attributes={cell.attrs}
                     onAttributeChanged={(name, value) =>
-                        cell.replaceAttribute(name, value)
+                        replaceCellAttribute(postToHost, at, name, value)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -37,8 +45,8 @@ registerAuthorDocumentCellType({
     kind: CHAPTER,
     label: "Chapter",
     category: "primary",
-    render: (document, cellIndex) => (
-        <ChapterCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <ChapterCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(CHAPTER, "", { title: "Untitled" }),
+    create: () => ({ kind: CHAPTER, source: "", attrs: { title: "Untitled" } }),
 });

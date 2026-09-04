@@ -2,28 +2,37 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorCellCommands } from "./AuthorFileEditorCell";
-import type { AuthorDocumentCommand } from "./author_document_command";
-import type { AuthorDocument } from "../../vscode_runtime/storydoc/model";
+import type { WebviewAuthorDocumentCommandCard } from "../../vscode_runtime/commands/author_document_command";
+import type { PostToHost } from "../../vscode_runtime/commands/author_file_editor_buttons";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_FILE_EDITOR_PRIMARY_COMMAND_CATEGORY = "primary";
 
+/** A cell as the page draws it, which is all the page does with one. */
+export interface WebviewCell {
+    readonly kind: string;
+    readonly source: string;
+    readonly attrs: Readonly<Record<string, string>>;
+}
+
 export type AuthorDocumentCellRenderers = Record<
     string,
-    (document: AuthorDocument, cellIndex: number) => ReactNode
+    (cell: WebviewCell, at: number, postToHost: PostToHost) => ReactNode
 >;
 
 interface AuthorFileEditorCanvasProps {
-    document: AuthorDocument;
+    cells: WebviewCell[];
+    postToHost: PostToHost;
     cellRenderers: AuthorDocumentCellRenderers;
-    mainMenuCommands: AuthorDocumentCommand[];
-    cellInsertCommandsAt: (at: number) => AuthorDocumentCommand[];
-    cellCommandsAt: (at: number) => AuthorDocumentCommand[];
+    mainMenuCommands: WebviewAuthorDocumentCommandCard[];
+    cellInsertCommandsAt: (at: number) => WebviewAuthorDocumentCommandCard[];
+    cellCommandsAt: (at: number) => WebviewAuthorDocumentCommandCard[];
 }
 
 export function AuthorFileEditorCanvas({
-    document,
+    cells,
+    postToHost,
     cellRenderers,
     mainMenuCommands,
     cellInsertCommandsAt,
@@ -39,7 +48,7 @@ export function AuthorFileEditorCanvas({
                             commands={cellInsertCommandsAt(0)}
                         />
                     </li>
-                    {document.cells.map((cell, cellIndex) => {
+                    {cells.map((cell, cellIndex) => {
                         const renderCell = cellRenderers[cell.kind];
                         if (!renderCell) {
                             return null;
@@ -48,7 +57,7 @@ export function AuthorFileEditorCanvas({
                             <li
                                 key={cellIndex}
                                 className={
-                                    cell.isFolded()
+                                    cell.attrs.folded === "true"
                                         ? "author-file-editor-cell-folded"
                                         : undefined
                                 }
@@ -56,7 +65,7 @@ export function AuthorFileEditorCanvas({
                                 <AuthorFileEditorCellCommands
                                     commands={cellCommandsAt(cellIndex)}
                                 >
-                                    {renderCell(document, cellIndex)}
+                                    {renderCell(cell, cellIndex, postToHost)}
                                 </AuthorFileEditorCellCommands>
                                 <AuthorFileEditorInsertCellMenu
                                     commands={cellInsertCommandsAt(
@@ -73,7 +82,7 @@ export function AuthorFileEditorCanvas({
 }
 
 interface AuthorFileEditorInsertCellMenuProps {
-    commands: AuthorDocumentCommand[];
+    commands: WebviewAuthorDocumentCommandCard[];
 }
 
 function AuthorFileEditorInsertCellMenu({
@@ -127,7 +136,7 @@ function AuthorFileEditorInsertCellMenu({
 }
 
 interface AuthorFileEditorInsertCellMenuButtonProps {
-    command: AuthorDocumentCommand;
+    command: WebviewAuthorDocumentCommandCard;
 }
 
 function AuthorFileEditorInsertCellMenuButton({

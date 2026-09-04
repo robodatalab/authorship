@@ -6,8 +6,14 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { TITLE_PAGE, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { TITLE_PAGE } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     { name: "title", label: "Title" },
@@ -20,10 +26,12 @@ const FIELDS: AuthorFileEditorCellField[] = [
 ];
 
 interface TitlePageCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function TitlePageCell({ cell }: TitlePageCellProps) {
+export function TitlePageCell({ cell, at, postToHost }: TitlePageCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Title Page</AuthorFileEditorCellHeader>
@@ -32,7 +40,7 @@ export function TitlePageCell({ cell }: TitlePageCellProps) {
                     fields={FIELDS}
                     attributes={cell.attrs}
                     onAttributeChanged={(name, value) =>
-                        cell.replaceAttribute(name, value)
+                        replaceCellAttribute(postToHost, at, name, value)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -45,8 +53,12 @@ registerAuthorDocumentCellType({
     kind: TITLE_PAGE,
     label: "Title Page",
     category: "secondary",
-    render: (document, cellIndex) => (
-        <TitlePageCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <TitlePageCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(TITLE_PAGE, "", { title: "Untitled" }),
+    create: () => ({
+        kind: TITLE_PAGE,
+        source: "",
+        attrs: { title: "Untitled" },
+    }),
 });

@@ -5,15 +5,23 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { Cell, NOTE } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { NOTE } from "../../vscode_runtime/storydoc/model";
 import "./NotesCell.css";
 
 interface NotesCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function NotesCell({ cell }: NotesCellProps) {
+export function NotesCell({ cell, at, postToHost }: NotesCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
@@ -21,7 +29,11 @@ export function NotesCell({ cell }: NotesCellProps) {
                 <MarkdownEditor
                     markdown={noteWithinComment(cell.source)}
                     onMarkdownCommitted={(note) =>
-                        cell.replaceMarkdown(`<!--\n${note}\n-->`)
+                        replaceCellMarkdown(
+                            postToHost,
+                            at,
+                            `<!--\n${note}\n-->`,
+                        )
                     }
                 >
                     {(note) => (
@@ -51,8 +63,8 @@ registerAuthorDocumentCellType({
     kind: NOTE,
     label: "Note",
     category: "primary",
-    render: (document, cellIndex) => (
-        <NotesCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <NotesCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(NOTE, "", {}),
+    create: () => ({ kind: NOTE, source: "", attrs: {} }),
 });

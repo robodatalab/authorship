@@ -5,14 +5,22 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { COVER, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { COVER } from "../../vscode_runtime/storydoc/model";
 
 interface CoverCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function CoverCell({ cell }: CoverCellProps) {
+export function CoverCell({ cell, at, postToHost }: CoverCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Cover</AuthorFileEditorCellHeader>
@@ -20,7 +28,7 @@ export function CoverCell({ cell }: CoverCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        cell.replaceMarkdown(markdown)
+                        replaceCellMarkdown(postToHost, at, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -33,8 +41,12 @@ registerAuthorDocumentCellType({
     kind: COVER,
     label: "Cover",
     category: "secondary",
-    render: (document, cellIndex) => (
-        <CoverCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <CoverCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(COVER, "![Cover](cover.jpg)", { src: "cover.jpg" }),
+    create: () => ({
+        kind: COVER,
+        source: "![Cover](cover.jpg)",
+        attrs: { src: "cover.jpg" },
+    }),
 });

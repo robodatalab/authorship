@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { AuthorDocument } from "./storydoc/model";
+import { authorDocumentCommand } from "./commands/author_document_commands";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";
@@ -39,15 +40,19 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         this.panelsByDocument.set(document.uri.toString(), panel);
 
         const webviewSpoke = panel.webview.onDidReceiveMessage(
-            (message: { type?: string; text?: string; command?: string }) => {
+            (message: {
+                type?: string;
+                command?: string;
+                payload?: Record<string, unknown>;
+            }) => {
                 if (message?.type === "ready") {
                     this.sendDocument(document);
-                } else if (
-                    message?.type === "edit" &&
-                    message.text !== undefined &&
-                    message.text !== document.text
-                ) {
-                    this.recordEdit(document, message.text);
+                } else if (message?.type === "invoke" && message.command) {
+                    this.runCommand(
+                        document,
+                        message.command,
+                        message.payload ?? {},
+                    );
                 } else if (message?.type === "command" && message.command) {
                     void vscode.commands.executeCommand(message.command);
                 } else if (message?.type === "openAsText") {
@@ -127,6 +132,22 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         };
     }
 
+    private runCommand(
+        document: AuthorDocument,
+        command: string,
+        payload: Record<string, unknown>,
+    ): void {
+        const before = document.text;
+        authorDocumentCommand(command)?.invoke(document, payload);
+        const after = document.text;
+        if (after === before) {
+            return;
+        }
+        document.fromText(before);
+        this.recordEdit(document, after);
+        this.sendDocument(document);
+    }
+
     private recordEdit(document: AuthorDocument, text: string): void {
         const before = document.text;
         document.fromText(text);
@@ -147,7 +168,14 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     private sendDocument(document: AuthorDocument): void {
         void this.panelsByDocument
             .get(document.uri.toString())
-            ?.webview.postMessage({ type: "document", text: document.text });
+            ?.webview.postMessage({
+                type: "document",
+                cells: document.cells.map((cell) => ({
+                    kind: cell.kind,
+                    source: cell.source,
+                    attrs: cell.attrs,
+                })),
+            });
     }
 
     private html(webview: vscode.Webview, document: vscode.Uri): string {

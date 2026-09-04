@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { WebviewAuthorDocumentCommandCard } from "../../vscode_runtime/commands/author_document_command";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -24,11 +24,11 @@ interface AuthorFileEditorCellCardProps {
 }
 
 const AuthorFileEditorCellCommandsContext = createContext<
-    AuthorDocumentCommand[]
+    WebviewAuthorDocumentCommandCard[]
 >([]);
 
 interface AuthorFileEditorCellCommandsProps {
-    commands: AuthorDocumentCommand[];
+    commands: WebviewAuthorDocumentCommandCard[];
     children?: ReactNode;
 }
 

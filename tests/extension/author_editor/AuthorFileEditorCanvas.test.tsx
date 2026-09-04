@@ -4,36 +4,28 @@ import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 import { AuthorFileEditorCell } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { AuthorDocumentCommand } from "../../../extension/webview/author_editor/author_document_command";
-import type { AuthorDocumentCellRenderers } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
-import {
-    AuthorDocument,
-    Cell,
-} from "../../../extension/vscode_runtime/storydoc/model";
+import type { WebviewAuthorDocumentCommandCard } from "../../../extension/vscode_runtime/commands/author_document_command";
+import type {
+    AuthorDocumentCellRenderers,
+    WebviewCell,
+} from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function markdownCell(source: string): Cell {
-    return new Cell("markdown", source, {});
-}
-
-function documentOf(cells: Cell[]): AuthorDocument {
-    return AuthorDocument.fromText(
-        cells.map((cell) => `${cell.marker()}\n\n${cell.source}\n`).join("\n"),
-    );
+function markdownCell(source: string): WebviewCell {
+    return { kind: "markdown", source, attrs: {} };
 }
 
 const CELL_RENDERERS: AuthorDocumentCellRenderers = {
-    markdown: (document, cellIndex) => (
-        <div className="test-cell">{document.cells[cellIndex].source}</div>
-    ),
+    markdown: (cell) => <div className="test-cell">{cell.source}</div>,
 };
 
 function command(
     tooltip: string,
     category: string,
-): AuthorDocumentCommand & { invoke: ReturnType<typeof vi.fn> } {
+): WebviewAuthorDocumentCommandCard & { invoke: ReturnType<typeof vi.fn> } {
     return {
+        name: tooltip,
         category,
         iconClassName: `codicon codicon-${tooltip.toLowerCase()}`,
         tooltip,
@@ -45,10 +37,10 @@ const insertPositionsAsked: number[] = [];
 const cellPositionsAsked: number[] = [];
 
 async function mountCanvas(options: {
-    cells?: Cell[];
-    mainMenuCommands?: AuthorDocumentCommand[];
-    cellInsertCommands?: AuthorDocumentCommand[];
-    cellCommands?: AuthorDocumentCommand[];
+    cells?: WebviewCell[];
+    mainMenuCommands?: WebviewAuthorDocumentCommandCard[];
+    cellInsertCommands?: WebviewAuthorDocumentCommandCard[];
+    cellCommands?: WebviewAuthorDocumentCommandCard[];
     cellRenderers?: AuthorDocumentCellRenderers;
 }): Promise<void> {
     insertPositionsAsked.length = 0;
@@ -59,7 +51,8 @@ async function mountCanvas(options: {
     await act(async () => {
         createRoot(container).render(
             <AuthorFileEditorCanvas
-                document={documentOf(options.cells ?? [])}
+                cells={options.cells ?? []}
+                postToHost={() => undefined}
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 mainMenuCommands={options.mainMenuCommands ?? []}
                 cellInsertCommandsAt={(at) => {
@@ -130,7 +123,10 @@ describe("where the insert menus go", () => {
 
     it("gives a cell it cannot render no menu of its own", async () => {
         await mountCanvas({
-            cells: [markdownCell("kept"), new Cell("chapter", "", {})],
+            cells: [
+                markdownCell("kept"),
+                { kind: "chapter", source: "", attrs: {} },
+            ],
         });
         expect(insertMenus()).toHaveLength(2);
     });
@@ -307,7 +303,7 @@ describe("a folded cell", () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
-                new Cell("markdown", "two", { folded: "true" }),
+                { kind: "markdown", source: "two", attrs: { folded: "true" } },
             ],
         });
 

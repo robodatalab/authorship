@@ -8,16 +8,24 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { DISCLAIMER, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { DISCLAIMER } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 
 interface DisclaimerCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function DisclaimerCell({ cell }: DisclaimerCellProps) {
+export function DisclaimerCell({ cell, at, postToHost }: DisclaimerCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
@@ -27,7 +35,7 @@ export function DisclaimerCell({ cell }: DisclaimerCellProps) {
                         fields={FIELDS}
                         attributes={cell.attrs}
                         onAttributeChanged={(name, value) =>
-                            cell.replaceAttribute(name, value)
+                            replaceCellAttribute(postToHost, at, name, value)
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -35,7 +43,7 @@ export function DisclaimerCell({ cell }: DisclaimerCellProps) {
                     <MarkdownEditor
                         markdown={cell.source}
                         onMarkdownCommitted={(markdown) =>
-                            cell.replaceMarkdown(markdown)
+                            replaceCellMarkdown(postToHost, at, markdown)
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -49,8 +57,8 @@ registerAuthorDocumentCellType({
     kind: DISCLAIMER,
     label: "Disclaimer",
     category: "secondary",
-    render: (document, cellIndex) => (
-        <DisclaimerCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <DisclaimerCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(DISCLAIMER, "", {}),
+    create: () => ({ kind: DISCLAIMER, source: "", attrs: {} }),
 });

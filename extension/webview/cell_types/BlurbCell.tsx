@@ -5,14 +5,22 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { BLURB, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { BLURB } from "../../vscode_runtime/storydoc/model";
 
 interface BlurbCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function BlurbCell({ cell }: BlurbCellProps) {
+export function BlurbCell({ cell, at, postToHost }: BlurbCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
@@ -20,7 +28,7 @@ export function BlurbCell({ cell }: BlurbCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        cell.replaceMarkdown(markdown)
+                        replaceCellMarkdown(postToHost, at, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -33,8 +41,8 @@ registerAuthorDocumentCellType({
     kind: BLURB,
     label: "Blurb",
     category: "secondary",
-    render: (document, cellIndex) => (
-        <BlurbCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <BlurbCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(BLURB, "", {}),
+    create: () => ({ kind: BLURB, source: "", attrs: {} }),
 });

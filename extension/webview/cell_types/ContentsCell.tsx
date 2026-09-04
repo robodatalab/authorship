@@ -5,14 +5,22 @@ import {
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../author_file_editor_commands";
-import { CONTENTS, Cell } from "../../vscode_runtime/storydoc/model";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    replaceCellAttribute,
+    replaceCellMarkdown,
+    type PostToHost,
+} from "../../vscode_runtime/commands/author_file_editor_buttons";
+import { CONTENTS } from "../../vscode_runtime/storydoc/model";
 
 interface ContentsCellProps {
-    cell: Cell;
+    cell: WebviewCell;
+    at: number;
+    postToHost: PostToHost;
 }
 
-export function ContentsCell({ cell }: ContentsCellProps) {
+export function ContentsCell({ cell, at, postToHost }: ContentsCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>
@@ -22,7 +30,7 @@ export function ContentsCell({ cell }: ContentsCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        cell.replaceMarkdown(markdown)
+                        replaceCellMarkdown(postToHost, at, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -35,8 +43,8 @@ registerAuthorDocumentCellType({
     kind: CONTENTS,
     label: "Table of Contents",
     category: "secondary",
-    render: (document, cellIndex) => (
-        <ContentsCell cell={document.cells[cellIndex]} />
+    render: (cell, at, postToHost) => (
+        <ContentsCell cell={cell} at={at} postToHost={postToHost} />
     ),
-    create: () => new Cell(CONTENTS, "", {}),
+    create: () => ({ kind: CONTENTS, source: "", attrs: {} }),
 });

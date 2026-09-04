@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
-import { dumps } from "../../extension/graveyard/storydoc_model";
-import { Cell } from "../../extension/vscode_runtime/storydoc/model";
+import type { WebviewCell } from "../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 let posted: { type: string }[] = [];
 
-function markdownCell(source: string): Cell {
-    return new Cell("markdown", source, {});
+function markdownCell(source: string): WebviewCell {
+    return { kind: "markdown", source, attrs: {} };
 }
 
 async function openWebview(): Promise<void> {
@@ -26,11 +25,11 @@ async function openWebview(): Promise<void> {
     });
 }
 
-async function hostSends(cells: Cell[]): Promise<void> {
+async function hostSends(cells: WebviewCell[]): Promise<void> {
     await act(async () => {
         window.dispatchEvent(
             new MessageEvent("message", {
-                data: { type: "document", text: dumps(cells) },
+                data: { type: "document", cells },
             }),
         );
     });
@@ -70,7 +69,7 @@ describe("opening the document", () => {
         await openWebview();
         await hostSends([
             markdownCell("kept"),
-            new Cell("chapter", "", { title: "Dropped" }),
+            { kind: "chapter", source: "", attrs: { title: "Dropped" } },
         ]);
         expect(renderedCellText()).toEqual(["kept"]);
     });

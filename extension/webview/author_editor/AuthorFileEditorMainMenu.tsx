@@ -1,9 +1,9 @@
 import { Fragment } from "react";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { WebviewAuthorDocumentCommandCard } from "../../vscode_runtime/commands/author_document_command";
 import "./AuthorFileEditorMainMenu.css";
 
 interface AuthorFileEditorMainMenuProps {
-    commands: AuthorDocumentCommand[];
+    commands: WebviewAuthorDocumentCommandCard[];
 }
 
 export function AuthorFileEditorMainMenu({

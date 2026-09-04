@@ -1,15 +1,15 @@
 import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
-import type { AuthorDocumentHostChannel } from "./author_editor/author_document_host_channel";
+import type { WebviewCell } from "./author_editor/AuthorFileEditorCanvas";
+import { authorDocumentCellRenderers } from "../vscode_runtime/commands/author_document_cell_types";
+import type { PostToHost } from "../vscode_runtime/commands/author_file_editor_buttons";
 import {
     authorDocumentCellCommands,
     authorDocumentCellInsertCommands,
-    authorDocumentCellRenderers,
     authorFileEditorCommands,
-} from "./author_file_editor_commands";
-import { AuthorDocument } from "../vscode_runtime/storydoc/model";
+} from "../vscode_runtime/commands/author_file_editor_buttons";
 
-declare function acquireVsCodeApi(): AuthorDocumentHostChannel;
+declare function acquireVsCodeApi(): { postMessage: PostToHost };
 
 declare const require: {
     context(
@@ -27,48 +27,38 @@ try {
 }
 
 function main(): void {
-    const hostChannel = acquireVsCodeApi();
+    const postToHost: PostToHost = acquireVsCodeApi().postMessage;
     const root = createRoot(
         document.getElementById("author-file-editor-root")!,
     );
-    let authorDocument = AuthorDocument.fromText("");
+    let cells: WebviewCell[] = [];
 
     function draw(): void {
         root.render(
             <AuthorFileEditorCanvas
-                document={authorDocument}
+                cells={cells}
+                postToHost={postToHost}
                 cellRenderers={authorDocumentCellRenderers()}
-                mainMenuCommands={authorFileEditorCommands(hostChannel)}
+                mainMenuCommands={authorFileEditorCommands(postToHost)}
                 cellInsertCommandsAt={(at) =>
-                    authorDocumentCellInsertCommands(authorDocument, at)
+                    authorDocumentCellInsertCommands(postToHost, at)
                 }
                 cellCommandsAt={(at) =>
-                    authorDocumentCellCommands(authorDocument, at)
+                    authorDocumentCellCommands(postToHost, at)
                 }
             />,
         );
     }
 
-    function open(text: string): void {
-        authorDocument = AuthorDocument.fromText(text);
-        authorDocument.onChanged(() => {
-            hostChannel.postMessage({
-                type: "edit",
-                text: authorDocument.toText(),
-            });
-            draw();
-        });
-        draw();
-    }
-
     window.addEventListener("message", (event: MessageEvent) => {
         if (event.data?.type === "document") {
-            open(event.data.text as string);
+            cells = event.data.cells as WebviewCell[];
+            draw();
         }
     });
 
     draw();
-    hostChannel.postMessage({ type: "ready" });
+    postToHost({ type: "ready" });
 }
 
 main();
