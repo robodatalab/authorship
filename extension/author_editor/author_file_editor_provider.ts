@@ -60,6 +60,12 @@ export class AuthorFileEditorProvider
                     this.recordEdit(document, message.text);
                 } else if (message?.type === "command" && message.command) {
                     void vscode.commands.executeCommand(message.command);
+                } else if (message?.type === "openAsText") {
+                    void vscode.commands.executeCommand(
+                        "vscode.openWith",
+                        document.uri,
+                        "default",
+                    );
                 }
             },
         );
