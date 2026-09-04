@@ -7,24 +7,26 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { ABOUT, Cell } from "../storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { RECAP, Cell } from "../storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
-        { name: "kdp", label: "KDP", hint: "https://amazon.com/author/…" },
-        { name: "website", label: "Website", hint: "https://…" },
-        { name: "substack", label: "Substack", hint: "https://….substack.com" },
+    {
+        name: "documents",
+        label: "Documents",
+        hint: "parts/part_1.author, parts/part_2.author",
+    },
 ];
 
-interface AboutCellProps {
+interface RecapCellProps {
     cell: Cell;
 }
 
-export function AboutCell({ cell }: AboutCellProps) {
+export function RecapCell({ cell }: RecapCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>About the Author</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>The Story So Far</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields
@@ -50,11 +52,11 @@ export function AboutCell({ cell }: AboutCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: ABOUT,
-    label: "About the Author",
+    kind: RECAP,
+    label: "The Story So Far",
     category: "secondary",
     render: (document, cellIndex) => (
-        <AboutCell cell={document.cells[cellIndex]} />
+        <RecapCell cell={document.cells[cellIndex]} />
     ),
-    create: () => new Cell(ABOUT, "", {}),
+    create: () => new Cell(RECAP, "", {}),
 });

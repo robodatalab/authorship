@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useId,
+    useRef,
+    useState,
+} from "react";
 import type { ReactNode } from "react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import {
@@ -6,7 +13,7 @@ import {
     language as markdownLanguage,
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
-import type { Cell } from "../storydoc/model";
+import { marked } from "marked";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -26,67 +33,78 @@ monaco.editor.addKeybindingRules([
 const SETTLE_AFTER_TYPING_MS = 400;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 
-interface CellBeingEditedMediator {
-    cellBeingEdited: Cell | null;
-    editCell: (cell: Cell | null) => void;
+interface MarkdownEditorBeingEdited {
+    editorBeingEdited: string | null;
+    editMarkdownEditor: (editorId: string | null) => void;
 }
 
-const CellBeingEdited = createContext<CellBeingEditedMediator | null>(null);
+const MarkdownEditorBeingEditedContext =
+    createContext<MarkdownEditorBeingEdited | null>(null);
 
 export function MarkdownEditorMediator({ children }: { children: ReactNode }) {
-    const [cellBeingEdited, editCell] = useState<Cell | null>(null);
+    const [editorBeingEdited, editMarkdownEditor] = useState<string | null>(
+        null,
+    );
     return (
-        <CellBeingEdited.Provider value={{ cellBeingEdited, editCell }}>
+        <MarkdownEditorBeingEditedContext.Provider
+            value={{ editorBeingEdited, editMarkdownEditor }}
+        >
             {children}
-        </CellBeingEdited.Provider>
+        </MarkdownEditorBeingEditedContext.Provider>
     );
 }
 
-function useCellBeingEdited(cell: Cell) {
-    const mediator = useContext(CellBeingEdited);
+function useMarkdownEditorBeingEdited(editorId: string) {
+    const mediator = useContext(MarkdownEditorBeingEditedContext);
     if (!mediator) {
         throw new Error(
             "A MarkdownEditor can only be rendered inside a MarkdownEditorMediator.",
         );
     }
     return {
-        isEditing: mediator.cellBeingEdited === cell,
-        beginEditing: () => mediator.editCell(cell),
-        finishEditing: () => mediator.editCell(null),
+        isEditing: mediator.editorBeingEdited === editorId,
+        beginEditing: () => mediator.editMarkdownEditor(editorId),
+        finishEditing: () => mediator.editMarkdownEditor(null),
     };
 }
 
 interface MarkdownEditorProps {
-    cell: Cell;
-    markdownFromSource?: (source: string) => string;
-    sourceFromMarkdown?: (markdown: string) => string;
-    children: (markdown: string) => ReactNode;
+    markdown: string;
+    onMarkdownCommitted: (markdown: string) => void;
+    children?: (markdown: string) => ReactNode;
 }
 
 export function MarkdownEditor({
-    cell,
-    markdownFromSource = (source) => source,
-    sourceFromMarkdown = (markdown) => markdown,
+    markdown,
+    onMarkdownCommitted,
     children,
 }: MarkdownEditorProps) {
-    const markdown = markdownFromSource(cell.source);
-    const { isEditing, beginEditing, finishEditing } = useCellBeingEdited(cell);
+    const { isEditing, beginEditing, finishEditing } =
+        useMarkdownEditorBeingEdited(useId());
     const [draftMarkdown, setDraftMarkdown] = useState(markdown);
 
     useEffect(() => {
         setDraftMarkdown(markdown);
     }, [markdown]);
 
+    const openOnDoubleClick = (): void => {
+        setDraftMarkdown(markdown);
+        beginEditing();
+    };
+
+    if (!isEditing && children) {
+        return <div onDoubleClick={openOnDoubleClick}>{children(markdown)}</div>;
+    }
+
     if (!isEditing) {
         return (
             <div
-                onDoubleClick={() => {
-                    setDraftMarkdown(markdown);
-                    beginEditing();
+                className="markdown-rendered"
+                onDoubleClick={openOnDoubleClick}
+                dangerouslySetInnerHTML={{
+                    __html: marked.parse(markdown, { async: false, gfm: true }),
                 }}
-            >
-                {children(markdown)}
-            </div>
+            />
         );
     }
 
@@ -94,12 +112,10 @@ export function MarkdownEditor({
         <MonacoMarkdownEditor
             markdown={draftMarkdown}
             onMarkdownChanged={setDraftMarkdown}
-            onSettled={(settled) =>
-                cell.replaceMarkdown(sourceFromMarkdown(settled))
-            }
+            onSettled={onMarkdownCommitted}
             onFinished={() => {
                 finishEditing();
-                cell.replaceMarkdown(sourceFromMarkdown(draftMarkdown));
+                onMarkdownCommitted(draftMarkdown);
             }}
         />
     );

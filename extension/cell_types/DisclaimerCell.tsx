@@ -7,24 +7,20 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { ABOUT, Cell } from "../storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { DISCLAIMER, Cell } from "../storydoc/model";
 
-const FIELDS: AuthorFileEditorCellField[] = [
-        { name: "kdp", label: "KDP", hint: "https://amazon.com/author/…" },
-        { name: "website", label: "Website", hint: "https://…" },
-        { name: "substack", label: "Substack", hint: "https://….substack.com" },
-];
+const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 
-interface AboutCellProps {
+interface DisclaimerCellProps {
     cell: Cell;
 }
 
-export function AboutCell({ cell }: AboutCellProps) {
+export function DisclaimerCell({ cell }: DisclaimerCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>About the Author</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields
@@ -50,11 +46,11 @@ export function AboutCell({ cell }: AboutCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: ABOUT,
-    label: "About the Author",
+    kind: DISCLAIMER,
+    label: "Disclaimer",
     category: "secondary",
     render: (document, cellIndex) => (
-        <AboutCell cell={document.cells[cellIndex]} />
+        <DisclaimerCell cell={document.cells[cellIndex]} />
     ),
-    create: () => new Cell(ABOUT, "", {}),
+    create: () => new Cell(DISCLAIMER, "", {}),
 });

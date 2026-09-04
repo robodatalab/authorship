@@ -6,16 +6,16 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { MARKDOWN, Cell } from "../storydoc/model";
+import { COVER, Cell } from "../storydoc/model";
 
-interface MarkdownCellProps {
+interface CoverCellProps {
     cell: Cell;
 }
 
-export function MarkdownCell({ cell }: MarkdownCellProps) {
+export function CoverCell({ cell }: CoverCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Cover</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}
@@ -30,11 +30,11 @@ export function MarkdownCell({ cell }: MarkdownCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: MARKDOWN,
-    label: "Markdown",
-    category: "primary",
+    kind: COVER,
+    label: "Cover",
+    category: "secondary",
     render: (document, cellIndex) => (
-        <MarkdownCell cell={document.cells[cellIndex]} />
+        <CoverCell cell={document.cells[cellIndex]} />
     ),
-    create: () => new Cell(MARKDOWN, "", {}),
+    create: () => new Cell(COVER, "![Cover](cover.jpg)", { src: "cover.jpg" }),
 });

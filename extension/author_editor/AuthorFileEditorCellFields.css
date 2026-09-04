@@ -26,10 +26,6 @@
     border-radius: 3px;
 }
 
-.author-file-editor-cell-prose {
-    margin-top: 10px;
-}
-
 .author-file-editor-cell-image {
     display: block;
     max-width: 240px;

@@ -61,32 +61,12 @@ vi.mock("monaco-editor/editor/editor.api", () => {
 const { MarkdownEditor, MarkdownEditorMediator } = await import(
     "../../../extension/markdown/MarkdownEditor"
 );
-const { Cell } = await import("../../../extension/storydoc/model");
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const SETTLE_AFTER_TYPING_MS = 400;
 
 let root: Root;
-
-interface MountOptions {
-    cell: InstanceType<typeof Cell>;
-    markdownFromSource?: (source: string) => string;
-    sourceFromMarkdown?: (markdown: string) => string;
-}
-
-function editorFor(options: MountOptions, key?: number) {
-    return (
-        <MarkdownEditor
-            key={key}
-            cell={options.cell}
-            markdownFromSource={options.markdownFromSource}
-            sourceFromMarkdown={options.sourceFromMarkdown}
-        >
-            {(markdown) => <div className="rendered">{markdown}</div>}
-        </MarkdownEditor>
-    );
-}
 
 function emptyBody(): HTMLElement {
     document.body.innerHTML = "";
@@ -95,25 +75,53 @@ function emptyBody(): HTMLElement {
     return container;
 }
 
-async function mount(options: MountOptions): Promise<void> {
-    root = createRoot(emptyBody());
-    await render(options);
+function committedSpy() {
+    return vi.fn();
 }
 
-async function render(options: MountOptions): Promise<void> {
+async function mount(
+    markdown: string,
+    onMarkdownCommitted = committedSpy(),
+): Promise<ReturnType<typeof committedSpy>> {
+    root = createRoot(emptyBody());
+    await render(markdown, onMarkdownCommitted);
+    return onMarkdownCommitted;
+}
+
+async function render(
+    markdown: string,
+    onMarkdownCommitted: ReturnType<typeof committedSpy>,
+): Promise<void> {
     await act(async () => {
         root.render(
-            <MarkdownEditorMediator>{editorFor(options)}</MarkdownEditorMediator>,
+            <MarkdownEditorMediator>
+                <MarkdownEditor
+                    markdown={markdown}
+                    onMarkdownCommitted={onMarkdownCommitted}
+                >
+                    {(text) => <div className="rendered">{text}</div>}
+                </MarkdownEditor>
+            </MarkdownEditorMediator>,
         );
     });
 }
 
-async function mountBoth(cells: InstanceType<typeof Cell>[]): Promise<void> {
+async function mountAll(
+    editors: { markdown: string; committed: ReturnType<typeof committedSpy> }[],
+): Promise<void> {
     root = createRoot(emptyBody());
     await act(async () => {
         root.render(
             <MarkdownEditorMediator>
-                {cells.map((cell, cellIndex) => editorFor({ cell }, cellIndex))}
+                {editors.map((editor, editorIndex) => (
+                    <MarkdownEditor
+                        key={editorIndex}
+                        markdown={editor.markdown}
+                        onMarkdownCommitted={editor.committed}
+                    >
+                        {(text) => <div className="rendered">{text}</div>}
+                    </MarkdownEditor>
+                ))}
             </MarkdownEditorMediator>,
         );
     });
@@ -191,28 +199,36 @@ beforeEach(() => {
     monacoEditors.length = 0;
 });
 
-describe("a cell that is not being edited", () => {
-    it("hands the child the cell's markdown to render", async () => {
-        await mount({ cell: new Cell("markdown", "The lantern.", {}) });
+describe("markdown that is not being edited", () => {
+    it("hands the child the markdown to render", async () => {
+        await mount("The lantern.");
 
         expect(rendered()?.textContent).toBe("The lantern.");
         expect(openEditor()).toBeNull();
     });
 
-    it("hands the child the markdown taken out of the source", async () => {
-        await mount({
-            cell: new Cell("note", "<!--\nRemember the lantern.\n-->", {}),
-            markdownFromSource: (source) =>
-                source.slice("<!--\n".length, -"\n-->".length),
+    it("renders the markdown itself when there is no child", async () => {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator>
+                    <MarkdownEditor
+                        markdown="# The lantern"
+                        onMarkdownCommitted={committedSpy()}
+                    />
+                </MarkdownEditorMediator>,
+            );
         });
 
-        expect(rendered()?.textContent).toBe("Remember the lantern.");
+        expect(
+            document.querySelector(".markdown-rendered h1")?.textContent,
+        ).toBe("The lantern");
     });
 });
 
 describe("opening the editor", () => {
     it("replaces the rendered markdown with an editor on a double click", async () => {
-        await mount({ cell: new Cell("markdown", "The lantern.", {}) });
+        await mount("The lantern.");
 
         await doubleClickRendered();
 
@@ -220,50 +236,29 @@ describe("opening the editor", () => {
         expect(openEditor()).not.toBeNull();
     });
 
-    it("opens the editor on the markdown taken out of the source", async () => {
-        await mount({
-            cell: new Cell("note", "<!--\nRemember.\n-->", {}),
-            markdownFromSource: (source) =>
-                source.slice("<!--\n".length, -"\n-->".length),
-        });
+    it("opens the editor on the markdown it was given", async () => {
+        await mount("The lantern.");
 
         await doubleClickRendered();
 
-        expect(monacoEditors[0].getValue()).toBe("Remember.");
+        expect(monacoEditors[0].getValue()).toBe("The lantern.");
     });
 });
 
 describe("editing", () => {
-    it("writes a pause in the typing back to the cell and stays open", async () => {
-        const cell = new Cell("markdown", "The lantern.", {});
-        await mount({ cell });
+    it("commits a pause in the typing and stays open", async () => {
+        const committed = await mount("The lantern.");
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
         await waitForTypingToSettle();
 
-        expect(cell.source).toBe("The lantern had gone out.");
+        expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).not.toBeNull();
     });
 
-    it("puts the markdown back into the source it came out of", async () => {
-        const cell = new Cell("note", "<!--\nRemember.\n-->", {});
-        await mount({
-            cell,
-            markdownFromSource: (source) =>
-                source.slice("<!--\n".length, -"\n-->".length),
-            sourceFromMarkdown: (markdown) => `<!--\n${markdown}\n-->`,
-        });
-        await doubleClickRendered();
-
-        await typeIntoEditor("Remember the lantern.");
-        await pressEscape();
-
-        expect(cell.source).toBe("<!--\nRemember the lantern.\n-->");
-    });
-
     it("stays open when something else is clicked once", async () => {
-        await mount({ cell: new Cell("markdown", "The lantern.", {}) });
+        await mount("The lantern.");
         await doubleClickRendered();
 
         await clickSomethingElse();
@@ -274,21 +269,18 @@ describe("editing", () => {
 
 describe("closing the editor", () => {
     it("commits the draft and renders it when escape is pressed", async () => {
-        const cell = new Cell("markdown", "The lantern.", {});
-        await mount({ cell });
+        const committed = await mount("The lantern.");
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
         await pressEscape();
 
-        expect(cell.source).toBe("The lantern had gone out.");
+        expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).toBeNull();
-        expect(rendered()?.textContent).toBe("The lantern had gone out.");
     });
 
     it("closes on escape after the editor has lost focus", async () => {
-        const cell = new Cell("markdown", "The lantern.", {});
-        await mount({ cell });
+        const committed = await mount("The lantern.");
         await doubleClickRendered();
         await typeIntoEditor("The lantern had gone out.");
 
@@ -296,28 +288,27 @@ describe("closing the editor", () => {
         await pressEscape();
 
         expect(openEditor()).toBeNull();
-        expect(cell.source).toBe("The lantern had gone out.");
+        expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
     });
 });
 
-describe("a cell that changes underneath the editor", () => {
-    it("follows the new source while the editor is open", async () => {
-        const cell = new Cell("markdown", "The lantern.", {});
-        await mount({ cell });
+describe("markdown that changes underneath the editor", () => {
+    it("follows the new markdown while the editor is open", async () => {
+        const committed = committedSpy();
+        await mount("The lantern.", committed);
         await doubleClickRendered();
 
-        cell.source = "The lantern had gone out.";
-        await render({ cell });
+        await render("The lantern had gone out.", committed);
 
         expect(monacoEditors[0].getValue()).toBe("The lantern had gone out.");
     });
 });
 
-describe("two cells", () => {
-    it("opens the editor on the cell that was double clicked", async () => {
-        await mountBoth([
-            new Cell("markdown", "The lantern.", {}),
-            new Cell("markdown", "The night.", {}),
+describe("two editors", () => {
+    it("opens the one that was double clicked", async () => {
+        await mountAll([
+            { markdown: "The lantern.", committed: committedSpy() },
+            { markdown: "The night.", committed: committedSpy() },
         ]);
 
         await doubleClickRenderedMarkdown("The night.");
@@ -326,10 +317,10 @@ describe("two cells", () => {
         expect(renderedMarkdown()).toEqual(["The lantern."]);
     });
 
-    it("closes the first editor when the second cell is opened", async () => {
-        await mountBoth([
-            new Cell("markdown", "The lantern.", {}),
-            new Cell("markdown", "The night.", {}),
+    it("closes the first when the second is opened", async () => {
+        await mountAll([
+            { markdown: "The lantern.", committed: committedSpy() },
+            { markdown: "The night.", committed: committedSpy() },
         ]);
 
         await doubleClickRenderedMarkdown("The lantern.");
@@ -339,14 +330,17 @@ describe("two cells", () => {
         expect(renderedMarkdown()).toEqual(["The lantern."]);
     });
 
-    it("commits typing that had not settled when the second cell is opened", async () => {
-        const lantern = new Cell("markdown", "The lantern.", {});
-        await mountBoth([lantern, new Cell("markdown", "The night.", {})]);
+    it("commits typing that had not settled when the second is opened", async () => {
+        const lantern = committedSpy();
+        await mountAll([
+            { markdown: "The lantern.", committed: lantern },
+            { markdown: "The night.", committed: committedSpy() },
+        ]);
 
         await doubleClickRenderedMarkdown("The lantern.");
         await typeIntoEditor("The lantern had gone out.");
         await doubleClickRenderedMarkdown("The night.");
 
-        expect(lantern.source).toBe("The lantern had gone out.");
+        expect(lantern).toHaveBeenCalledWith("The lantern had gone out.");
     });
 });

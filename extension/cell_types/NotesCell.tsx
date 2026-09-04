@@ -19,9 +19,10 @@ export function NotesCell({ cell }: NotesCellProps) {
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
-                    cell={cell}
-                    markdownFromSource={noteWithinComment}
-                    sourceFromMarkdown={(note) => `<!--\n${note}\n-->`}
+                    markdown={noteWithinComment(cell.source)}
+                    onMarkdownCommitted={(note) =>
+                        cell.replaceMarkdown(`<!--\n${note}\n-->`)
+                    }
                 >
                     {(note) => (
                         <div className="notes-cell-rendered">{note}</div>

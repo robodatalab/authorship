@@ -6,16 +6,16 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { MARKDOWN, Cell } from "../storydoc/model";
+import { CONTENTS, Cell } from "../storydoc/model";
 
-interface MarkdownCellProps {
+interface ContentsCellProps {
     cell: Cell;
 }
 
-export function MarkdownCell({ cell }: MarkdownCellProps) {
+export function ContentsCell({ cell }: ContentsCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Table of Contents</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}
@@ -30,11 +30,11 @@ export function MarkdownCell({ cell }: MarkdownCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: MARKDOWN,
-    label: "Markdown",
-    category: "primary",
+    kind: CONTENTS,
+    label: "Table of Contents",
+    category: "secondary",
     render: (document, cellIndex) => (
-        <MarkdownCell cell={document.cells[cellIndex]} />
+        <ContentsCell cell={document.cells[cellIndex]} />
     ),
-    create: () => new Cell(MARKDOWN, "", {}),
+    create: () => new Cell(CONTENTS, "", {}),
 });

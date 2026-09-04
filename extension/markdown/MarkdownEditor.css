@@ -2,3 +2,15 @@
     width: 100%;
     min-height: 1.4em;
 }
+
+.markdown-rendered > :first-child {
+    margin-top: 0;
+}
+
+.markdown-rendered > :last-child {
+    margin-bottom: 0;
+}
+
+.markdown-rendered img {
+    max-width: 100%;
+}

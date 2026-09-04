@@ -6,16 +6,16 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { MARKDOWN, Cell } from "../storydoc/model";
+import { BLURB, Cell } from "../storydoc/model";
 
-interface MarkdownCellProps {
+interface BlurbCellProps {
     cell: Cell;
 }
 
-export function MarkdownCell({ cell }: MarkdownCellProps) {
+export function BlurbCell({ cell }: BlurbCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}
@@ -30,11 +30,11 @@ export function MarkdownCell({ cell }: MarkdownCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: MARKDOWN,
-    label: "Markdown",
-    category: "primary",
+    kind: BLURB,
+    label: "Blurb",
+    category: "secondary",
     render: (document, cellIndex) => (
-        <MarkdownCell cell={document.cells[cellIndex]} />
+        <BlurbCell cell={document.cells[cellIndex]} />
     ),
-    create: () => new Cell(MARKDOWN, "", {}),
+    create: () => new Cell(BLURB, "", {}),
 });
