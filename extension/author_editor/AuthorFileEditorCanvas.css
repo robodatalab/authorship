@@ -67,6 +67,10 @@ body {
     white-space: nowrap;
 }
 
+.author-file-editor-insert-cell-menu-button:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
 .author-file-editor-insert-cell-menu-overflow {
     position: relative;
     display: inline-flex;
@@ -79,9 +83,27 @@ body {
     z-index: 2;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 4px;
-    background: var(--vscode-editorWidget-background);
-    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    min-width: 180px;
+    padding: 4px 0;
+    background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+    border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
     border-radius: 4px;
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.author-file-editor-insert-cell-menu-dropdown
+    .author-file-editor-insert-cell-menu-button {
+    justify-content: flex-start;
+    width: 100%;
+    padding: 4px 12px;
+    color: var(--vscode-menu-foreground, var(--vscode-foreground));
+    background: none;
+    border: none;
+    border-radius: 0;
+}
+
+.author-file-editor-insert-cell-menu-dropdown
+    .author-file-editor-insert-cell-menu-button:hover {
+    color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
+    background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
 }
