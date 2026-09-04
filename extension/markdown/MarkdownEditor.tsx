@@ -4,6 +4,7 @@ import {
     conf as markdownConfiguration,
     language as markdownLanguage,
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
+import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
