@@ -26,6 +26,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
         },
         editor: {
             addKeybindingRules: () => {},
+            defineTheme: () => {},
             create: (node: HTMLElement, options: { value: string }) => {
                 let value = options.value;
                 let changed = (): void => {};

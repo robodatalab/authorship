@@ -24,6 +24,7 @@ monaco.editor.addKeybindingRules([
 ]);
 
 const SETTLE_AFTER_TYPING_MS = 400;
+const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 
 interface CellBeingEditedMediator {
     cellBeingEdited: Cell | null;
@@ -127,12 +128,24 @@ function MonacoMarkdownEditor({
         if (!node) {
             return;
         }
+        const editorForeground = getComputedStyle(document.body)
+            .getPropertyValue("--vscode-editor-foreground")
+            .trim()
+            .replace("#", "");
+        monaco.editor.defineTheme(MONACO_THEME_FROM_VSCODE, {
+            base: document.body.classList.contains("vscode-light")
+                ? "vs"
+                : "vs-dark",
+            inherit: true,
+            rules: editorForeground
+                ? [{ token: "", foreground: editorForeground }]
+                : [],
+            colors: { "editor.background": "#00000000" },
+        });
         const editor = monaco.editor.create(node, {
             value: markdown,
             language: "markdown",
-            theme: document.body.classList.contains("vscode-light")
-                ? "vs"
-                : "vs-dark",
+            theme: MONACO_THEME_FROM_VSCODE,
             automaticLayout: true,
             wordWrap: "on",
             lineNumbers: "off",
@@ -148,6 +161,7 @@ function MonacoMarkdownEditor({
                 vertical: "hidden",
                 horizontal: "hidden",
                 alwaysConsumeMouseWheel: false,
+                useShadows: false,
             },
             wordBasedSuggestions: "off",
             quickSuggestions: false,
