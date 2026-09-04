@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/author_editor/author_file_editor_provider";
-import { Uri, files } from "./vscode";
+import { Uri, executedCommands, files } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
+
+const listeningForThePage: [string, EventListenerOrEventListenerObject][] = [];
 
 interface OpenEditor {
     fileDocument: { text: string };
@@ -55,10 +57,24 @@ async function openEditor(text: string): Promise<OpenEditor> {
         postMessage: (message: unknown) => receive(message),
     });
     vi.resetModules();
+    for (const [type, listener] of listeningForThePage) {
+        window.removeEventListener(type, listener);
+    }
+    listeningForThePage.length = 0;
+    const listen = window.addEventListener.bind(window);
+    window.addEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+    ) => {
+        listeningForThePage.push([type, listener]);
+        listen(type, listener, options);
+    }) as typeof window.addEventListener;
     await act(async () => {
         await import("../../extension/cell_types/MarkdownCell");
         await import("../../extension/author_file_editor_webview");
     });
+    window.addEventListener = listen;
 
     return {
         fileDocument: fileDocument as unknown as { text: string },
@@ -71,6 +87,18 @@ async function addMarkdownCellAtTheTop(): Promise<void> {
     await act(async () => {
         menu.querySelector("button")!.dispatchEvent(
             new MouseEvent("click", { bubbles: true }),
+        );
+    });
+}
+
+async function pressCtrlZ(): Promise<void> {
+    await act(async () => {
+        window.dispatchEvent(
+            new KeyboardEvent("keydown", {
+                key: "z",
+                ctrlKey: true,
+                bubbles: true,
+            }),
         );
     });
 }
@@ -92,7 +120,8 @@ function cellsOnThePage(): number {
 let editor: OpenEditor;
 
 beforeEach(async () => {
-    editor = await openEditor("one\n");
+    executedCommands.length = 0;
+    editor = await openEditor("<!-- cell: markdown -->\n\none\n");
 });
 
 describe("undoing after two cells were added", () => {
@@ -114,5 +143,16 @@ describe("undoing after two cells were added", () => {
         await undo(editor);
 
         expect(cellsOnThePage()).toBe(2);
+    });
+});
+
+describe("what one Ctrl+Z asks the host for", () => {
+    it("asks for nothing, since VS Code runs undo from the keystroke itself", async () => {
+        await addMarkdownCellAtTheTop();
+        await addMarkdownCellAtTheTop();
+
+        await pressCtrlZ();
+
+        expect(executedCommands).toEqual([]);
     });
 });

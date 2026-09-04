@@ -21,10 +21,6 @@
 // **The format is open.** A cell's kind is any name, and this module knows
 // nothing about most of them. An unrecognised kind is carried through parse and
 // save untouched, so a document written by a newer version — or by hand —
-// survives a round trip through an older one rather than losing cells.
-//
-// **Plain markdown is already a story document.** A file with no markers parses
-// as one `markdown` cell holding the lot.
 //
 // This is the same format `server/storydoc.py` reads, and the two must agree —
 // the round-trip and parsing rules are mirrored there test for test. Deliberately
@@ -119,42 +115,30 @@ export class AuthorDocument {
 
     static fromText(text: string): AuthorDocument {
         const document = new AuthorDocument([]);
-        const cells: Cell[] = [];
-        let kind = MARKDOWN;
-        let attrs: Record<string, string> = {};
-        let body: string[] = [];
-
-        const close = (): void => {
-            const source = trimBlankEnds(body);
-            // The run of text above the first marker is only a cell if the author
-            // wrote something there; a document that opens with a marker does not
-            // start with an empty one.
-            if (
-                source ||
-                cells.length > 0 ||
-                kind !== MARKDOWN ||
-                Object.keys(attrs).length > 0
-            ) {
-                cells.push(
-                    new Cell(kind, source, { ...attrs }, () =>
-                        document.notifyChanged(),
-                    ),
-                );
-            }
-        };
+        const sections: { marker: RegExpExecArray; body: string[] }[] = [];
 
         for (const line of text.split("\n")) {
             const marker = MARKER.exec(line);
-            if (!marker) {
-                body.push(line);
-                continue;
+            if (marker) {
+                sections.push({ marker, body: [] });
+            } else if (sections.length > 0) {
+                sections[sections.length - 1].body.push(line);
             }
-            close();
-            kind = marker[1];
-            attrs = readAttributes(marker[2]);
-            body = [];
         }
-        close();
+
+        const changed = (): void => document.notifyChanged();
+        const cells: Cell[] = [];
+        for (const section of sections) {
+            cells.push(
+                new Cell(
+                    section.marker[1],
+                    trimBlankEnds(section.body),
+                    readAttributes(section.marker[2]),
+                    changed,
+                ),
+            );
+        }
+
         document.documentCells = cells;
         return document;
     }

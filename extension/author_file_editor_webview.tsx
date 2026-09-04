@@ -63,25 +63,6 @@ function main(): void {
         }
     });
 
-    window.addEventListener("keydown", (event: KeyboardEvent) => {
-        if (!event.ctrlKey && !event.metaKey) {
-            return;
-        }
-        if (event.key === "s") {
-            event.preventDefault();
-            hostChannel.postMessage({
-                type: "command",
-                command: "workbench.action.files.save",
-            });
-        } else if (event.key === "z" && !event.shiftKey) {
-            event.preventDefault();
-            hostChannel.postMessage({ type: "command", command: "undo" });
-        } else if (event.key === "y" || (event.key === "z" && event.shiftKey)) {
-            event.preventDefault();
-            hostChannel.postMessage({ type: "command", command: "redo" });
-        }
-    });
-
     draw();
     hostChannel.postMessage({ type: "ready" });
 }

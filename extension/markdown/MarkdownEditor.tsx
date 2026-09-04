@@ -213,30 +213,6 @@ function MonacoMarkdownEditor({
             }
         };
         window.addEventListener("keydown", escaped, true);
-        const forwardToWindow = (key: string, shiftKey = false): void => {
-            window.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key,
-                    ctrlKey: true,
-                    metaKey: true,
-                    shiftKey,
-                    bubbles: true,
-                }),
-            );
-        };
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, () =>
-            forwardToWindow("z"),
-        );
-        editor.addCommand(
-            monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ,
-            () => forwardToWindow("z", true),
-        );
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY, () =>
-            forwardToWindow("y"),
-        );
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () =>
-            forwardToWindow("s"),
-        );
         openEditor.current = editor;
 
         fitToContent();

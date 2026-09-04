@@ -5,38 +5,25 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	CHAPTER,
-	CONTENTS,
-	COVER,
-	DISCLAIMER,
-	EXTENSION,
 	MARKDOWN,
+	NOTE,
 	AuthorDocument,
+	Cell,
 } from '../../../extension/storydoc/model';
-import {
-	type Cell,
-	addMissing,
-	authorPathFor,
-	cellsOf,
-	chapter,
-	contents,
-	cover,
-	dumps,
-	has,
-	markdown,
-	part,
-	printsPage,
-	titleOf,
-} from '../../../extension/graveyard/storydoc_model';
 
 interface Case {
 	name: string;
 	text: string;
-	cells: Cell[];
+	cells: { kind: string; source: string; attrs: Record<string, string> }[];
 	dumped: string;
 }
 
 function cellsOfText(text: string): Cell[] {
 	return AuthorDocument.fromText(text).cells;
+}
+
+function textWrittenBack(text: string): string {
+	return AuthorDocument.fromText(text).toText();
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(
@@ -57,133 +44,46 @@ describe('the shared corpus — the same documents server/storydoc.py reads', ()
 	// rather than the behaviour.
 	for (const testCase of CORPUS.cases) {
 		it(`writes back byte for byte: ${testCase.name}`, () => {
-			expect(dumps(cellsOfText(testCase.text))).toBe(testCase.dumped);
+			expect(textWrittenBack(testCase.text)).toBe(testCase.dumped);
 		});
 	}
 
 	for (const testCase of CORPUS.cases) {
 		it(`survives a round trip: ${testCase.name}`, () => {
 			const cells = cellsOfText(testCase.text);
-			expect(cellsOfText(dumps(cells))).toEqual(cells);
+			expect(cellsOfText(textWrittenBack(testCase.text))).toEqual(cells);
 		});
 	}
 });
 
-describe('writing', () => {
+describe('writing a document back out', () => {
 	it('writes a cell as a marker and its text', () => {
-		expect(dumps([markdown('Prose.')])).toBe(
+		expect(textWrittenBack('<!-- cell: markdown -->\n\nProse.\n')).toBe(
 			'<!-- cell: markdown -->\n\nProse.\n'
 		);
 	});
 
-	it('writes a chapter as its marker alone, since it is only a name', () => {
-		expect(dumps([chapter('One')])).toBe('<!-- cell: chapter title="One" -->\n');
-	});
-
-	it('writes a part as its marker alone, since it too is only a name', () => {
-		expect(dumps([part('Book One')])).toBe('<!-- cell: part title="Book One" -->\n');
-	});
-
-	it('writes an unprinted part as one that says it prints nothing', () => {
-		expect(dumps([part('Break', false)])).toBe(
-			'<!-- cell: part title="Break" print="no" -->\n'
+	it('writes a cell with no text as its marker alone', () => {
+		expect(textWrittenBack('<!-- cell: contents -->\n')).toBe(
+			'<!-- cell: contents -->\n'
 		);
 	});
 
-	it('writes a cell with no text as its marker alone', () => {
-		expect(dumps([contents()])).toBe('<!-- cell: contents -->\n');
-	});
-
-	it('writes an unknown kind back as it was read', () => {
+	it('writes a kind it has never heard of back as it was read', () => {
 		const text = '<!-- cell: epigraph attribution="Anon" -->\n\nA line.\n';
-		expect(dumps(cellsOfText(text))).toBe(text);
+		expect(textWrittenBack(text)).toBe(text);
 	});
 
 	it('escapes a quote in an attribute on the way out', () => {
-		expect(dumps([chapter('She said "no"')])).toContain(
-			'title="She said \\"no\\""'
+		expect(new Cell(CHAPTER, '', { title: 'She said "no"' }).marker()).toBe(
+			'<!-- cell: chapter title="She said \\"no\\"" -->'
 		);
 	});
-});
 
-describe('asking what a document carries', () => {
-	it('finds a kind the document carries', () => {
-		const cells = [chapter('One'), contents()];
-		expect(has(cells, CONTENTS)).toBe(true);
-		expect(has(cells, COVER)).toBe(false);
-	});
-
-	it('returns every cell of a kind in order', () => {
-		const cells = [chapter('One'), contents(), chapter('Two')];
-		expect(cellsOf(cells, CHAPTER).map(titleOf)).toEqual(['One', 'Two']);
-	});
-
-	it('knows a cell by its kind and not by its title', () => {
-		// The whole reason a cell carries a kind: a chapter the author named
-		// "Disclaimer" is a chapter.
-		const cells = [chapter('Disclaimer')];
-		expect(has(cells, DISCLAIMER)).toBe(false);
-		expect(has(cells, CHAPTER)).toBe(true);
-	});
-});
-
-describe('preparing for publishing', () => {
-	it('adds the missing cells in order', () => {
-		const prepared = addMissing([chapter('One')], [contents(), cover('c.jpg')]);
-		expect(prepared.map((cell) => cell.kind)).toEqual([
-			'chapter',
-			'contents',
-			'cover',
-		]);
-	});
-
-	it('adds nothing the second time', () => {
-		const wanted = [contents(), cover('c.jpg')];
-		const once = addMissing([chapter('One')], wanted);
-		expect(addMissing(once, wanted)).toEqual(once);
-	});
-
-	it('leaves a cell the author has edited alone', () => {
-		const mine: Cell = { kind: CONTENTS, source: 'My own contents.', attrs: {} };
-		expect(addMissing([mine], [contents()])).toEqual([mine]);
-	});
-});
-
-describe('authorPathFor', () => {
-	it('sits next to the manuscript it lays out', () => {
-		expect(authorPathFor('/work/data/story.md')).toBe(`/work/data/story${EXTENSION}`);
-	});
-
-	it('takes the extension off whatever case it was written in', () => {
-		expect(authorPathFor('/work/STORY.MD')).toBe(`/work/STORY${EXTENSION}`);
-	});
-
-	it('only takes the extension off the end', () => {
-		expect(authorPathFor('/work/notes.md/chapter.md')).toBe(
-			`/work/notes.md/chapter${EXTENSION}`
-		);
-	});
-});
-
-
-describe('printsPage — whether a part is a page or only a seam', () => {
-	it('prints a part that says nothing about it', () => {
-		// Every part written before there was anything to say is one the book
-		// prints, and stays one.
-		expect(printsPage(part('Book One'))).toBe(true);
-		expect(printsPage({ kind: 'part', source: '', attrs: {} })).toBe(true);
-	});
-
-	it('prints no page where the author said not to', () => {
-		expect(printsPage(part('Break', false))).toBe(false);
+	it('writes every attribute a cell carries', () => {
 		expect(
-			printsPage({ kind: 'part', source: '', attrs: { title: 'B', print: 'no' } })
-		).toBe(false);
-	});
-
-	it('survives the round trip through the file', () => {
-		const back = cellsOfText(dumps([part('Break', false)]));
-		expect(printsPage(back[0])).toBe(false);
+			textWrittenBack('<!-- cell: part title="Break" print="no" -->\n')
+		).toBe('<!-- cell: part title="Break" print="no" -->\n');
 	});
 });
 
@@ -192,7 +92,9 @@ describe('inserting a cell', () => {
 		AuthorDocument.fromText('<!-- cell: chapter title="New" -->\n').cells[0];
 
 	it('puts it at the place it was given', () => {
-		const document = AuthorDocument.fromText('one\n');
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n'
+		);
 
 		document.insertAt(0, blankChapter());
 
@@ -203,7 +105,9 @@ describe('inserting a cell', () => {
 	});
 
 	it('puts it after the last cell when the place is the end', () => {
-		const document = AuthorDocument.fromText('one\n');
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n'
+		);
 
 		document.insertAt(document.cells.length, blankChapter());
 
@@ -214,7 +118,9 @@ describe('inserting a cell', () => {
 	});
 
 	it('carries the attributes it was given', () => {
-		const document = AuthorDocument.fromText('one\n');
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n'
+		);
 
 		document.insertAt(0, blankChapter());
 
@@ -222,7 +128,9 @@ describe('inserting a cell', () => {
 	});
 
 	it('says the document changed', () => {
-		const document = AuthorDocument.fromText('one\n');
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n'
+		);
 		let changes = 0;
 		document.onChanged(() => changes++);
 
@@ -232,7 +140,9 @@ describe('inserting a cell', () => {
 	});
 
 	it('leaves the inserted cell saying so when it is edited', () => {
-		const document = AuthorDocument.fromText('one\n');
+		const document = AuthorDocument.fromText(
+			'<!-- cell: markdown -->\n\none\n'
+		);
 		document.insertAt(0, blankChapter());
 		let changes = 0;
 		document.onChanged(() => changes++);
@@ -240,5 +150,104 @@ describe('inserting a cell', () => {
 		document.cells[0].replaceMarkdown('written');
 
 		expect(changes).toBe(1);
+	});
+});
+
+describe('what a document reads as', () => {
+	const readCells = (text: string) =>
+		AuthorDocument.fromText(text).cells.map((cell) => ({
+			kind: cell.kind,
+			source: cell.source,
+			attrs: cell.attrs,
+		}));
+
+	it('reads nothing out of an empty file', () => {
+		expect(readCells('')).toEqual([]);
+	});
+
+	it('reads nothing out of a file of blank lines', () => {
+		expect(readCells('\n\n\n')).toEqual([]);
+	});
+
+	it('reads nothing out of a file with no markers', () => {
+		expect(readCells('one\n\ntwo\n')).toEqual([]);
+	});
+
+	it('reads a marker with nothing under it as an empty cell', () => {
+		expect(readCells('<!-- cell: markdown -->\n')).toEqual([
+			{ kind: MARKDOWN, source: '', attrs: {} },
+		]);
+	});
+
+	it('reads an empty cell written above a written one as its own cell', () => {
+		expect(
+			readCells('<!-- cell: markdown -->\n\n<!-- cell: markdown -->\n\none\n')
+		).toEqual([
+			{ kind: MARKDOWN, source: '', attrs: {} },
+			{ kind: MARKDOWN, source: 'one', attrs: {} },
+		]);
+	});
+
+	it('reads a run of empty cells as that many cells', () => {
+		expect(
+			readCells(
+				'<!-- cell: markdown -->\n<!-- cell: note -->\n<!-- cell: markdown -->\n'
+			)
+		).toEqual([
+			{ kind: MARKDOWN, source: '', attrs: {} },
+			{ kind: NOTE, source: '', attrs: {} },
+			{ kind: MARKDOWN, source: '', attrs: {} },
+		]);
+	});
+
+	it('reads nothing out of the text written above the first marker', () => {
+		expect(
+			readCells('loose\n\n<!-- cell: chapter title="One" -->\n\nunder\n')
+		).toEqual([{ kind: CHAPTER, source: 'under', attrs: { title: 'One' } }]);
+	});
+
+	it('reads no cell for blank lines above the first marker', () => {
+		expect(readCells('\n\n<!-- cell: chapter -->\n')).toEqual([
+			{ kind: CHAPTER, source: '', attrs: {} },
+		]);
+	});
+
+	it('reads every attribute a marker carries', () => {
+		expect(
+			readCells('<!-- cell: title-page title="A Story" author="Someone" -->\n')
+		).toEqual([
+			{
+				kind: 'title-page',
+				source: '',
+				attrs: { title: 'A Story', author: 'Someone' },
+			},
+		]);
+	});
+
+	it('reads an escaped quote inside an attribute', () => {
+		expect(readCells('<!-- cell: chapter title="A \\"Story\\"" -->\n')).toEqual([
+			{ kind: CHAPTER, source: '', attrs: { title: 'A "Story"' } },
+		]);
+	});
+
+	it('reads a kind it has never heard of as that kind', () => {
+		expect(readCells('<!-- cell: epigraph -->\n\nWhom the gods…\n')).toEqual([
+			{ kind: 'epigraph', source: 'Whom the gods…', attrs: {} },
+		]);
+	});
+
+	it('keeps blank lines inside a cell and drops them at its ends', () => {
+		expect(
+			readCells('<!-- cell: markdown -->\n\n\none\n\ntwo\n\n\n')
+		).toEqual([{ kind: MARKDOWN, source: 'one\n\ntwo', attrs: {} }]);
+	});
+
+	it('reads a line that looks like a marker inside a cell as a new cell', () => {
+		expect(
+			readCells('<!-- cell: markdown -->\n\none\n<!-- cell: note -->\ntwo\n')
+		).toEqual([
+			{ kind: MARKDOWN, source: 'one', attrs: {} },
+			{ kind: NOTE, source: 'two', attrs: {} },
+		]);
 	});
 });
