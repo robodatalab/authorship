@@ -3,6 +3,7 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    AuthorFileEditorCellCard,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -26,26 +27,30 @@ export function AboutCell({ cell }: AboutCellProps) {
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>About the Author</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                <AuthorFileEditorCellFields
-                    fields={FIELDS}
-                    attributes={cell.attrs}
-                    onAttributeChanged={(name, value) =>
-                        cell.replaceAttribute(name, value)
-                    }
-                />
-                <MarkdownEditor cell={cell}>
-                    {(markdown) => (
-                        <div
-                            className="author-file-editor-cell-prose"
-                            dangerouslySetInnerHTML={{
-                                __html: marked.parse(markdown, {
-                                    async: false,
-                                    gfm: true,
-                                }),
-                            }}
-                        />
-                    )}
-                </MarkdownEditor>
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellFields
+                        fields={FIELDS}
+                        attributes={cell.attrs}
+                        onAttributeChanged={(name, value) =>
+                            cell.replaceAttribute(name, value)
+                        }
+                    />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <MarkdownEditor cell={cell}>
+                        {(markdown) => (
+                            <div
+                                className="author-file-editor-cell-prose"
+                                dangerouslySetInnerHTML={{
+                                    __html: marked.parse(markdown, {
+                                        async: false,
+                                        gfm: true,
+                                    }),
+                                }}
+                            />
+                        )}
+                    </MarkdownEditor>
+                </AuthorFileEditorCellCard>
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

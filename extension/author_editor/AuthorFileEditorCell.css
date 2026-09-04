@@ -55,6 +55,12 @@
     padding: 10px;
 }
 
+.author-file-editor-cell-card + .author-file-editor-cell-card {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
 .author-file-editor-cell-footer {
     display: flex;
     align-items: center;

@@ -17,6 +17,10 @@ interface AuthorFileEditorCellFooterProps {
     children?: ReactNode;
 }
 
+interface AuthorFileEditorCellCardProps {
+    children?: ReactNode;
+}
+
 const AUTHOR_FILE_EDITOR_CELL_ACTIONS = [
     { iconClassName: "codicon codicon-fold-up", tooltip: "Fold this section away" },
     { iconClassName: "codicon codicon-chevron-up", tooltip: "Move up" },
@@ -67,4 +71,10 @@ export function AuthorFileEditorCellFooter({
     return (
         <section className="author-file-editor-cell-footer">{children}</section>
     );
+}
+
+export function AuthorFileEditorCellCard({
+    children,
+}: AuthorFileEditorCellCardProps) {
+    return <div className="author-file-editor-cell-card">{children}</div>;
 }
