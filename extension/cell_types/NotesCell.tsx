@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
@@ -15,46 +14,19 @@ interface NotesCellProps {
 }
 
 export function NotesCell({ cell }: NotesCellProps) {
-    const source = cell.source;
-    const note = noteWithinComment(source);
-    const [isEditing, setIsEditing] = useState(false);
-    const [draftNote, setDraftNote] = useState(note);
-
-    useEffect(() => {
-        setDraftNote(note);
-    }, [note]);
-
-    function beginEditing(): void {
-        setDraftNote(note);
-        setIsEditing(true);
-    }
-
-    function commit(): void {
-        setIsEditing(false);
-        cell.replaceMarkdown(`<!--\n${draftNote}\n-->`);
-    }
-
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                {isEditing ? (
-                    <MarkdownEditor
-                        markdown={draftNote}
-                        onMarkdownChanged={setDraftNote}
-                        onSettled={(settled) =>
-                            cell.replaceMarkdown(`<!--\n${settled}\n-->`)
-                        }
-                        onFinished={commit}
-                    />
-                ) : (
-                    <div
-                        className="notes-cell-rendered"
-                        onDoubleClick={beginEditing}
-                    >
-                        {note}
-                    </div>
-                )}
+                <MarkdownEditor
+                    cell={cell}
+                    markdownFromSource={noteWithinComment}
+                    sourceFromMarkdown={(note) => `<!--\n${note}\n-->`}
+                >
+                    {(note) => (
+                        <div className="notes-cell-rendered">{note}</div>
+                    )}
+                </MarkdownEditor>
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

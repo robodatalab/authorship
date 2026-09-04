@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
@@ -16,47 +15,23 @@ interface MarkdownCellProps {
 }
 
 export function MarkdownCell({ cell }: MarkdownCellProps) {
-    const markdown = cell.source;
-    const [isEditing, setIsEditing] = useState(false);
-    const [draftMarkdown, setDraftMarkdown] = useState(markdown);
-
-    useEffect(() => {
-        setDraftMarkdown(markdown);
-    }, [markdown]);
-
-    function beginEditing(): void {
-        setDraftMarkdown(markdown);
-        setIsEditing(true);
-    }
-
-    function commit(): void {
-        setIsEditing(false);
-        cell.replaceMarkdown(draftMarkdown);
-    }
-
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                {isEditing ? (
-                    <MarkdownEditor
-                        markdown={draftMarkdown}
-                        onMarkdownChanged={setDraftMarkdown}
-                        onSettled={(settled) => cell.replaceMarkdown(settled)}
-                        onFinished={commit}
-                    />
-                ) : (
-                    <div
-                        className="markdown-cell-rendered"
-                        onDoubleClick={beginEditing}
-                        dangerouslySetInnerHTML={{
-                            __html: marked.parse(markdown, {
-                                async: false,
-                                gfm: true,
-                            }),
-                        }}
-                    />
-                )}
+                <MarkdownEditor cell={cell}>
+                    {(markdown) => (
+                        <div
+                            className="markdown-cell-rendered"
+                            dangerouslySetInnerHTML={{
+                                __html: marked.parse(markdown, {
+                                    async: false,
+                                    gfm: true,
+                                }),
+                            }}
+                        />
+                    )}
+                </MarkdownEditor>
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

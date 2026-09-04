@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import {
     conf as markdownConfiguration,
     language as markdownLanguage,
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
+import type { Cell } from "../storydoc/model";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -24,18 +26,67 @@ monaco.editor.addKeybindingRules([
 const SETTLE_AFTER_TYPING_MS = 400;
 
 interface MarkdownEditorProps {
+    cell: Cell;
+    markdownFromSource?: (source: string) => string;
+    sourceFromMarkdown?: (markdown: string) => string;
+    children: (markdown: string) => ReactNode;
+}
+
+export function MarkdownEditor({
+    cell,
+    markdownFromSource = (source) => source,
+    sourceFromMarkdown = (markdown) => markdown,
+    children,
+}: MarkdownEditorProps) {
+    const markdown = markdownFromSource(cell.source);
+    const [isEditing, setIsEditing] = useState(false);
+    const [draftMarkdown, setDraftMarkdown] = useState(markdown);
+
+    useEffect(() => {
+        setDraftMarkdown(markdown);
+    }, [markdown]);
+
+    if (!isEditing) {
+        return (
+            <div
+                onDoubleClick={() => {
+                    setDraftMarkdown(markdown);
+                    setIsEditing(true);
+                }}
+            >
+                {children(markdown)}
+            </div>
+        );
+    }
+
+    return (
+        <MonacoMarkdownEditor
+            markdown={draftMarkdown}
+            onMarkdownChanged={setDraftMarkdown}
+            onSettled={(settled) =>
+                cell.replaceMarkdown(sourceFromMarkdown(settled))
+            }
+            onFinished={() => {
+                setIsEditing(false);
+                cell.replaceMarkdown(sourceFromMarkdown(draftMarkdown));
+            }}
+        />
+    );
+}
+
+interface MonacoMarkdownEditorProps {
     markdown: string;
     onMarkdownChanged: (markdown: string) => void;
     onSettled: (markdown: string) => void;
     onFinished: () => void;
 }
 
-export function MarkdownEditor({
+function MonacoMarkdownEditor({
     markdown,
     onMarkdownChanged,
     onSettled,
     onFinished,
-}: MarkdownEditorProps) {
+}: MonacoMarkdownEditorProps) {
     const host = useRef<HTMLDivElement>(null);
     const openEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const latest = useRef({ onMarkdownChanged, onSettled, onFinished });
