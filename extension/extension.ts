@@ -6,6 +6,8 @@ import { GeminiAccount } from './gemini/account';
 import { PublishView } from './publish/panel';
 import { ModelHealth } from './llm/health';
 import { ModelServer } from './server/process';
+import { ExportMarkdownCommand } from './menu_commands/export_markdown';
+import { ImportMarkdownCommand } from './menu_commands/import_markdown';
 
 // Fixed rather than ephemeral, so that a server the extension did not start —
 // the one under the debugger, or the one belonging to another window — is
@@ -40,7 +42,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// The editor a `.author` file opens in. Declared in package.json under
 	// contributes.customEditors as the default for the extension, so opening one
 	// lands here rather than in the text editor.
-	const authorEditor = new AuthorFileEditorProvider(context);
+	const authorEditor = new AuthorFileEditorProvider(context, (document) => [
+		new ImportMarkdownCommand(document),
+		new ExportMarkdownCommand(document),
+	]);
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			AuthorFileEditorProvider.viewType,
