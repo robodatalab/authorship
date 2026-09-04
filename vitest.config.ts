@@ -1,6 +1,15 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+	resolve: {
+		alias: {
+			vscode: fileURLToPath(
+				new URL('./tests/extension/vscode.ts', import.meta.url)
+			),
+		},
+	},
 	test: {
 		// Only the TypeScript sources — `out/` holds compiled copies of the same
 		// files and would otherwise be collected a second time.
