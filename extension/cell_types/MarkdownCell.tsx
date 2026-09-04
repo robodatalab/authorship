@@ -5,19 +5,18 @@ import {
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
-import type { AuthorDocumentCellEditCommand } from "../author_editor/author_document_cell_edit_command";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { MARKDOWN } from "../storydoc/model";
+import { Cell, MARKDOWN } from "../storydoc/model";
 import { marked } from "marked";
 import "./MarkdownCell.css";
 
 interface MarkdownCellProps {
-    markdown: string;
-    editCommand: AuthorDocumentCellEditCommand;
+    cell: Cell;
 }
 
-export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
+export function MarkdownCell({ cell }: MarkdownCellProps) {
+    const markdown = cell.source;
     const [isEditing, setIsEditing] = useState(false);
     const [draftMarkdown, setDraftMarkdown] = useState(markdown);
 
@@ -32,7 +31,7 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
 
     function commit(): void {
         setIsEditing(false);
-        editCommand.invoke(draftMarkdown);
+        cell.replaceMarkdown(draftMarkdown);
     }
 
     return (
@@ -43,7 +42,7 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
                     <MarkdownEditor
                         markdown={draftMarkdown}
                         onMarkdownChanged={setDraftMarkdown}
-                        onSettled={(settled) => editCommand.invoke(settled)}
+                        onSettled={(settled) => cell.replaceMarkdown(settled)}
                         onFinished={commit}
                     />
                 ) : (
@@ -69,13 +68,7 @@ registerAuthorDocumentCellType({
     label: "Markdown",
     category: "primary",
     render: (document, cellIndex) => (
-        <MarkdownCell
-            markdown={document.cells[cellIndex].source}
-            editCommand={{
-                invoke: (markdown) =>
-                    document.replaceCellMarkdown(cellIndex, markdown),
-            }}
-        />
+        <MarkdownCell cell={document.cells[cellIndex]} />
     ),
-    create: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
+    create: () => new Cell(MARKDOWN, "", {}),
 });

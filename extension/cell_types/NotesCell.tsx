@@ -5,18 +5,17 @@ import {
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
 } from "../author_editor/AuthorFileEditorCell";
-import type { AuthorDocumentCellEditCommand } from "../author_editor/author_document_cell_edit_command";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
-import { NOTE } from "../storydoc/model";
+import { Cell, NOTE } from "../storydoc/model";
 import "./NotesCell.css";
 
 interface NotesCellProps {
-    source: string;
-    editCommand: AuthorDocumentCellEditCommand;
+    cell: Cell;
 }
 
-export function NotesCell({ source, editCommand }: NotesCellProps) {
+export function NotesCell({ cell }: NotesCellProps) {
+    const source = cell.source;
     const note = noteWithinComment(source);
     const [isEditing, setIsEditing] = useState(false);
     const [draftNote, setDraftNote] = useState(note);
@@ -32,7 +31,7 @@ export function NotesCell({ source, editCommand }: NotesCellProps) {
 
     function commit(): void {
         setIsEditing(false);
-        editCommand.invoke(`<!--\n${draftNote}\n-->`);
+        cell.replaceMarkdown(`<!--\n${draftNote}\n-->`);
     }
 
     return (
@@ -44,7 +43,7 @@ export function NotesCell({ source, editCommand }: NotesCellProps) {
                         markdown={draftNote}
                         onMarkdownChanged={setDraftNote}
                         onSettled={(settled) =>
-                            editCommand.invoke(`<!--\n${settled}\n-->`)
+                            cell.replaceMarkdown(`<!--\n${settled}\n-->`)
                         }
                         onFinished={commit}
                     />
@@ -80,12 +79,7 @@ registerAuthorDocumentCellType({
     label: "Note",
     category: "primary",
     render: (document, cellIndex) => (
-        <NotesCell
-            source={document.cells[cellIndex].source}
-            editCommand={{
-                invoke: (note) => document.replaceCellMarkdown(cellIndex, note),
-            }}
-        />
+        <NotesCell cell={document.cells[cellIndex]} />
     ),
-    create: () => ({ kind: NOTE, source: "", attrs: {} }),
+    create: () => new Cell(NOTE, "", {}),
 });

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { dumps } from "../../extension/graveyard/storydoc_model";
-import type { Cell } from "../../extension/storydoc/model";
+import { Cell } from "../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -10,7 +10,7 @@ import type { Cell } from "../../extension/storydoc/model";
 let posted: { type: string }[] = [];
 
 function markdownCell(source: string): Cell {
-    return { kind: "markdown", source, attrs: {} };
+    return new Cell("markdown", source, {});
 }
 
 async function openWebview(): Promise<void> {
@@ -71,7 +71,7 @@ describe("opening the document", () => {
         await openWebview();
         await hostSends([
             markdownCell("kept"),
-            { kind: "chapter", source: "", attrs: { title: "Dropped" } },
+            new Cell("chapter", "", { title: "Dropped" }),
         ]);
         expect(renderedCellText()).toEqual(["kept"]);
     });

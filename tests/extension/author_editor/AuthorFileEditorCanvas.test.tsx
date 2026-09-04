@@ -5,13 +5,12 @@ import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "../../../extension/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "../../../extension/author_editor/author_document_command";
 import type { AuthorDocumentCellRenderers } from "../../../extension/author_editor/author_document_cell_renderers";
-import { AuthorDocument } from "../../../extension/storydoc/model";
-import type { Cell } from "../../../extension/storydoc/model";
+import { AuthorDocument, Cell } from "../../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 function markdownCell(source: string): Cell {
-    return { kind: "markdown", source, attrs: {} };
+    return new Cell("markdown", source, {});
 }
 
 function documentOf(cells: Cell[]): AuthorDocument {
@@ -115,7 +114,7 @@ describe("where the insert menus go", () => {
         await mountCanvas({
             cells: [
                 markdownCell("kept"),
-                { kind: "chapter", source: "", attrs: {} },
+                new Cell("chapter", "", {}),
             ],
         });
         expect(insertMenus()).toHaveLength(2);

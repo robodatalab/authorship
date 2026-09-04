@@ -50,6 +50,19 @@ export const NO = "no";
 /** Whether a part is printed as a page of the book. */
 export const PRINT = "print";
 
+const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
+const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
+
+function readAttributes(text: string): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    // `matchAll` on a /g regex needs the index reset; the literal is shared.
+    ATTR.lastIndex = 0;
+    for (const found of text.matchAll(ATTR)) {
+        attrs[found[1]] = found[2].replace(/\\(.)/g, "$1");
+    }
+    return attrs;
+}
+
 /**
  * One thing the document is made of, and what it says it is.
  *
@@ -57,21 +70,47 @@ export const PRINT = "print";
  * called "Disclaimer" is still a chapter. `attrs` is whatever the kind needs said
  * about it, and is kept even when this module has no use for it.
  */
-export interface Cell {
-    kind: string;
-    source: string;
-    attrs: Record<string, string>;
+export class Cell {
+    #changed: () => void;
+
+    constructor(
+        public kind: string,
+        public source: string,
+        public attrs: Record<string, string>,
+        changed: () => void = () => {},
+    ) {
+        this.#changed = changed;
+    }
+
+    replaceMarkdown(markdown: string): void {
+        if (this.source === markdown) {
+            return;
+        }
+        this.source = markdown;
+        this.#changed();
+    }
+
+    marker(): string {
+        const said = Object.entries(this.attrs)
+            .map(
+                ([name, value]) =>
+                    ` ${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+            )
+            .join("");
+        return `<!-- cell: ${this.kind}${said} -->`;
+    }
+
+    replaceAttribute(name: string, value: string): void {
+        if (this.attrs[name] === value) {
+            return;
+        }
+        this.attrs = { ...this.attrs, [name]: value };
+        this.#changed();
+    }
 }
 
 export class AuthorDocument {
-    private static readonly MARKER =
-        /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
-    private static readonly ATTR =
-        /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
-
     private documentCells: Cell[];
-    private readonly cellsBefore: Cell[][] = [];
-    private readonly cellsUndone: Cell[][] = [];
     private readonly changeListeners: (() => void)[] = [];
 
     private constructor(cells: Cell[]) {
@@ -79,13 +118,14 @@ export class AuthorDocument {
     }
 
     static fromText(text: string): AuthorDocument {
+        const document = new AuthorDocument([]);
         const cells: Cell[] = [];
         let kind = MARKDOWN;
         let attrs: Record<string, string> = {};
         let body: string[] = [];
 
         const close = (): void => {
-            const source = AuthorDocument.trimBlankEnds(body);
+            const source = trimBlankEnds(body);
             // The run of text above the first marker is only a cell if the author
             // wrote something there; a document that opens with a marker does not
             // start with an empty one.
@@ -95,23 +135,28 @@ export class AuthorDocument {
                 kind !== MARKDOWN ||
                 Object.keys(attrs).length > 0
             ) {
-                cells.push({ kind, source, attrs: { ...attrs } });
+                cells.push(
+                    new Cell(kind, source, { ...attrs }, () =>
+                        document.notifyChanged(),
+                    ),
+                );
             }
         };
 
         for (const line of text.split("\n")) {
-            const marker = AuthorDocument.MARKER.exec(line);
+            const marker = MARKER.exec(line);
             if (!marker) {
                 body.push(line);
                 continue;
             }
             close();
             kind = marker[1];
-            attrs = AuthorDocument.readAttrs(marker[2]);
+            attrs = readAttributes(marker[2]);
             body = [];
         }
         close();
-        return new AuthorDocument(cells);
+        document.documentCells = cells;
+        return document;
     }
 
     get cells(): Cell[] {
@@ -121,7 +166,7 @@ export class AuthorDocument {
     toText(): string {
         const out: string[] = [];
         for (const cell of this.documentCells) {
-            out.push(AuthorDocument.markerFor(cell));
+            out.push(cell.marker());
             out.push("");
             if (cell.source) {
                 out.push(cell.source);
@@ -131,85 +176,18 @@ export class AuthorDocument {
         return out.join("\n");
     }
 
-    replaceCellMarkdown(cellIndex: number, markdown: string): void {
-        const cell = this.documentCells[cellIndex];
-        if (cell === undefined || cell.source === markdown) {
-            return;
-        }
-        this.recordChange(
-            this.documentCells.map((existing, at) =>
-                at === cellIndex ? { ...existing, source: markdown } : existing,
-            ),
-        );
-    }
-
-    canUndo(): boolean {
-        return this.cellsBefore.length > 0;
-    }
-
-    canRedo(): boolean {
-        return this.cellsUndone.length > 0;
-    }
-
-    undo(): void {
-        const previous = this.cellsBefore.pop();
-        if (previous === undefined) {
-            return;
-        }
-        this.cellsUndone.push(this.documentCells);
-        this.documentCells = previous;
-        this.notifyChanged();
-    }
-
-    redo(): void {
-        const next = this.cellsUndone.pop();
-        if (next === undefined) {
-            return;
-        }
-        this.cellsBefore.push(this.documentCells);
-        this.documentCells = next;
-        this.notifyChanged();
-    }
-
     onChanged(listener: () => void): void {
         this.changeListeners.push(listener);
     }
 
-    private recordChange(cells: Cell[]): void {
-        this.cellsBefore.push(this.documentCells);
-        this.cellsUndone.length = 0;
-        this.documentCells = cells;
-        this.notifyChanged();
-    }
-
-    private notifyChanged(): void {
+    notifyChanged(): void {
         for (const listener of this.changeListeners) {
             listener();
         }
     }
+}
 
-    private static readAttrs(text: string): Record<string, string> {
-        const attrs: Record<string, string> = {};
-        // `matchAll` on a /g regex needs the index reset; the literal is shared.
-        AuthorDocument.ATTR.lastIndex = 0;
-        for (const found of text.matchAll(AuthorDocument.ATTR)) {
-            attrs[found[1]] = found[2].replace(/\\(.)/g, "$1");
-        }
-        return attrs;
-    }
-
-    private static markerFor(cell: Cell): string {
-        const said = Object.entries(cell.attrs)
-            .map(
-                ([name, value]) =>
-                    ` ${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
-            )
-            .join("");
-        return `<!-- cell: ${cell.kind}${said} -->`;
-    }
-
-    /** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
-    private static trimBlankEnds(body: string[]): string {
-        return body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
-    }
+/** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
+function trimBlankEnds(body: string[]): string {
+    return body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
 }

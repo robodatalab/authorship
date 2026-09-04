@@ -1,0 +1,38 @@
+.author-file-editor-cell-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.author-file-editor-cell-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.author-file-editor-cell-field-label {
+    flex: 0 0 110px;
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-cell-field-input {
+    flex: 1 1 auto;
+    padding: 3px 6px;
+    font: inherit;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    border-radius: 3px;
+}
+
+.author-file-editor-cell-prose {
+    margin-top: 10px;
+}
+
+.author-file-editor-cell-image {
+    display: block;
+    max-width: 240px;
+    margin-top: 10px;
+    border-radius: 3px;
+}
