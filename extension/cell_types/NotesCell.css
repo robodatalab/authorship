@@ -1,7 +1,11 @@
 .notes-cell-rendered {
     white-space: pre-wrap;
-    color: var(--vscode-descriptionForeground);
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.95em;
     font-style: italic;
+    line-height: 1.5;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.85;
 }
 
 .notes-cell-rendered > :first-child {
