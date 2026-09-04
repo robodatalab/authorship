@@ -10,9 +10,9 @@ import {
 	DISCLAIMER,
 	EXTENSION,
 	AuthorDocument,
-	type Cell,
 } from '../../../extension/storydoc/model';
 import {
+	type Cell,
 	addMissing,
 	authorPathFor,
 	cellsOf,

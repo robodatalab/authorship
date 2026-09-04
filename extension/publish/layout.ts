@@ -13,7 +13,7 @@
 // without an editor and the page can mark cells with it.
 
 import { blankOf, fieldsOf, labelOf } from '../graveyard/author_editor/model';
-import type { Cell } from '../storydoc/model';
+import type { Cell } from '../graveyard/storydoc_model';
 
 /** One place in the laid-out document, and where its cell comes from. */
 export interface Slot {

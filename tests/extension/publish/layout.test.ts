@@ -11,9 +11,9 @@ import {
 } from '../../../extension/publish/layout';
 import {
 	CHAPTER,
-	type Cell,
 } from '../../../extension/storydoc/model';
 import {
+	type Cell,
 	chapter,
 	cover,
 	markdown,
