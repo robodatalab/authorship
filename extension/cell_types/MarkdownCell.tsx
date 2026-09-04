@@ -7,7 +7,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import type { AuthorDocumentCellEditCommand } from "../author_editor/author_document_cell_edit_command";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { renderMarkdown } from "../markdown/markdown_renderer";
+import { marked } from "marked";
 import "./MarkdownCell.css";
 
 interface MarkdownCellProps {
@@ -52,4 +52,8 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>
     );
+}
+
+function renderMarkdown(source: string): string {
+    return marked.parse(source, { async: false, gfm: true });
 }

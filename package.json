@@ -216,6 +216,7 @@
         "serialize-javascript": "^7.0.6"
     },
     "dependencies": {
+        "marked": "^18.0.11",
         "monaco-editor": "^0.56.0",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
