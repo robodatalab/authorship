@@ -1,10 +1,18 @@
 import * as vscode from "vscode";
 
 class AuthorFileDocument implements vscode.CustomDocument {
+    public savedText: string;
+
     constructor(
         readonly uri: vscode.Uri,
         public text: string,
-    ) {}
+    ) {
+        this.savedText = text;
+    }
+
+    hasUnsavedEdits(): boolean {
+        return this.text !== this.savedText;
+    }
 
     dispose(): void {}
 }
@@ -70,17 +78,41 @@ export class AuthorFileEditorProvider
             },
         );
 
+        const fileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(
+                vscode.Uri.joinPath(document.uri, ".."),
+                document.uri.path.split("/").pop() ?? "",
+            ),
+        );
+        const writtenElsewhere = fileWatcher.onDidChange(async () => {
+            if (document.hasUnsavedEdits()) {
+                return;
+            }
+            const bytes = await vscode.workspace.fs.readFile(document.uri);
+            const text = new TextDecoder().decode(bytes);
+            if (text === document.text) {
+                return;
+            }
+            document.text = text;
+            document.savedText = text;
+            this.sendDocument(document);
+        });
+
         panel.onDidDispose(() => {
+            writtenElsewhere.dispose();
+            fileWatcher.dispose();
             webviewSpoke.dispose();
             this.panelsByDocument.delete(document.uri.toString());
         });
     }
 
-    saveCustomDocument(document: AuthorFileDocument): Thenable<void> {
-        return vscode.workspace.fs.writeFile(
+    async saveCustomDocument(document: AuthorFileDocument): Promise<void> {
+        const text = document.text;
+        await vscode.workspace.fs.writeFile(
             document.uri,
-            new TextEncoder().encode(document.text),
+            new TextEncoder().encode(text),
         );
+        document.savedText = text;
     }
 
     saveCustomDocumentAs(
@@ -96,6 +128,7 @@ export class AuthorFileEditorProvider
     async revertCustomDocument(document: AuthorFileDocument): Promise<void> {
         const bytes = await vscode.workspace.fs.readFile(document.uri);
         document.text = new TextDecoder().decode(bytes);
+        document.savedText = document.text;
         this.sendDocument(document);
     }
 

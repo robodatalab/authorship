@@ -19,11 +19,13 @@ export class EventEmitter<T> {
 }
 
 export interface StubUri {
+    path: string;
+    fsPath: string;
     toString(): string;
 }
 
 function uriOf(path: string): StubUri {
-    return { toString: () => path };
+    return { path, fsPath: path, toString: () => path };
 }
 
 export const Uri = {
@@ -33,7 +35,21 @@ export const Uri = {
         uriOf([base.toString(), ...parts].join("/")),
 };
 
+export class RelativePattern {
+    constructor(
+        readonly base: StubUri,
+        readonly pattern: string,
+    ) {}
+}
+
 export const workspace = {
+    createFileSystemWatcher: (): {
+        onDidChange(listener: () => void): { dispose(): void };
+        dispose(): void;
+    } => ({
+        onDidChange: () => ({ dispose: () => undefined }),
+        dispose: () => undefined,
+    }),
     fs: {
         readFile: (uri: StubUri): Promise<Uint8Array> =>
             Promise.resolve(
