@@ -5,7 +5,6 @@ import { createRoot, type Root } from "react-dom/client";
 const monacoEditors = vi.hoisted(() => {
     return [] as {
         type: (markdown: string) => void;
-        blur: () => void;
         getValue: () => string;
     }[];
 });
@@ -30,7 +29,6 @@ vi.mock("monaco-editor/editor/editor.api", () => {
             create: (node: HTMLElement, options: { value: string }) => {
                 let value = options.value;
                 let changed = (): void => {};
-                let blurred = (): void => {};
                 const editor = {
                     getValue: () => value,
                     setValue: (next: string) => {
@@ -46,15 +44,10 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                         changed = listener;
                         return disposable;
                     },
-                    onDidBlurEditorWidget: (listener: () => void) => {
-                        blurred = listener;
-                        return disposable;
-                    },
                     type: (markdown: string) => {
                         value = markdown;
                         changed();
                     },
-                    blur: () => blurred(),
                 };
                 node.dataset.monaco = "open";
                 monacoEditors.push(editor);
@@ -64,7 +57,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
     };
 });
 
-const { MarkdownEditor } = await import(
+const { MarkdownEditor, MarkdownEditorMediator } = await import(
     "../../../extension/markdown/MarkdownEditor"
 );
 const { Cell } = await import("../../../extension/storydoc/model");
@@ -81,24 +74,46 @@ interface MountOptions {
     sourceFromMarkdown?: (markdown: string) => string;
 }
 
-async function mount(options: MountOptions): Promise<void> {
+function editorFor(options: MountOptions, key?: number) {
+    return (
+        <MarkdownEditor
+            key={key}
+            cell={options.cell}
+            markdownFromSource={options.markdownFromSource}
+            sourceFromMarkdown={options.sourceFromMarkdown}
+        >
+            {(markdown) => <div className="rendered">{markdown}</div>}
+        </MarkdownEditor>
+    );
+}
+
+function emptyBody(): HTMLElement {
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
-    root = createRoot(container);
+    return container;
+}
+
+async function mount(options: MountOptions): Promise<void> {
+    root = createRoot(emptyBody());
     await render(options);
 }
 
 async function render(options: MountOptions): Promise<void> {
     await act(async () => {
         root.render(
-            <MarkdownEditor
-                cell={options.cell}
-                markdownFromSource={options.markdownFromSource}
-                sourceFromMarkdown={options.sourceFromMarkdown}
-            >
-                {(markdown) => <div className="rendered">{markdown}</div>}
-            </MarkdownEditor>,
+            <MarkdownEditorMediator>{editorFor(options)}</MarkdownEditorMediator>,
+        );
+    });
+}
+
+async function mountBoth(cells: InstanceType<typeof Cell>[]): Promise<void> {
+    root = createRoot(emptyBody());
+    await act(async () => {
+        root.render(
+            <MarkdownEditorMediator>
+                {cells.map((cell, cellIndex) => editorFor({ cell }, cellIndex))}
+            </MarkdownEditorMediator>,
         );
     });
 }
@@ -107,25 +122,67 @@ function rendered(): HTMLElement | null {
     return document.querySelector(".rendered");
 }
 
+function renderedMarkdown(): string[] {
+    return [...document.querySelectorAll(".rendered")].map(
+        (node) => node.textContent ?? "",
+    );
+}
+
 function openEditor(): HTMLElement | null {
     return document.querySelector("[data-monaco='open']");
 }
 
-async function doubleClickRendered(): Promise<void> {
+function openEditorCount(): number {
+    return document.querySelectorAll("[data-monaco='open']").length;
+}
+
+async function doubleClick(node: Element | null | undefined): Promise<void> {
     await act(async () => {
-        rendered()?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+        node?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     });
+}
+
+async function doubleClickRendered(): Promise<void> {
+    await doubleClick(rendered());
+}
+
+async function doubleClickRenderedMarkdown(markdown: string): Promise<void> {
+    await doubleClick(
+        [...document.querySelectorAll(".rendered")].find(
+            (node) => node.textContent === markdown,
+        ),
+    );
+}
+
+function latestEditor() {
+    return monacoEditors[monacoEditors.length - 1];
 }
 
 async function typeIntoEditor(markdown: string): Promise<void> {
     await act(async () => {
-        monacoEditors[monacoEditors.length - 1].type(markdown);
+        latestEditor().type(markdown);
     });
 }
 
-async function blurEditor(): Promise<void> {
+async function pressEscape(): Promise<void> {
     await act(async () => {
-        monacoEditors[monacoEditors.length - 1].blur();
+        window.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+    });
+}
+
+async function clickSomethingElse(): Promise<void> {
+    await act(async () => {
+        document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+}
+
+async function waitForTypingToSettle(): Promise<void> {
+    await act(async () => {
+        await new Promise((settled) =>
+            setTimeout(settled, SETTLE_AFTER_TYPING_MS + 50),
+        );
     });
 }
 
@@ -182,11 +239,7 @@ describe("editing", () => {
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
-        await act(async () => {
-            await new Promise((settled) =>
-                setTimeout(settled, SETTLE_AFTER_TYPING_MS + 50),
-            );
-        });
+        await waitForTypingToSettle();
 
         expect(cell.source).toBe("The lantern had gone out.");
         expect(openEditor()).not.toBeNull();
@@ -203,24 +256,46 @@ describe("editing", () => {
         await doubleClickRendered();
 
         await typeIntoEditor("Remember the lantern.");
-        await blurEditor();
+        await pressEscape();
 
         expect(cell.source).toBe("<!--\nRemember the lantern.\n-->");
+    });
+
+    it("stays open when something else is clicked once", async () => {
+        await mount({ cell: new Cell("markdown", "The lantern.", {}) });
+        await doubleClickRendered();
+
+        await clickSomethingElse();
+
+        expect(openEditor()).not.toBeNull();
     });
 });
 
 describe("closing the editor", () => {
-    it("commits the draft and renders it when the editor loses focus", async () => {
+    it("commits the draft and renders it when escape is pressed", async () => {
         const cell = new Cell("markdown", "The lantern.", {});
         await mount({ cell });
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
-        await blurEditor();
+        await pressEscape();
 
         expect(cell.source).toBe("The lantern had gone out.");
         expect(openEditor()).toBeNull();
         expect(rendered()?.textContent).toBe("The lantern had gone out.");
+    });
+
+    it("closes on escape after the editor has lost focus", async () => {
+        const cell = new Cell("markdown", "The lantern.", {});
+        await mount({ cell });
+        await doubleClickRendered();
+        await typeIntoEditor("The lantern had gone out.");
+
+        await clickSomethingElse();
+        await pressEscape();
+
+        expect(openEditor()).toBeNull();
+        expect(cell.source).toBe("The lantern had gone out.");
     });
 });
 
@@ -234,5 +309,43 @@ describe("a cell that changes underneath the editor", () => {
         await render({ cell });
 
         expect(monacoEditors[0].getValue()).toBe("The lantern had gone out.");
+    });
+});
+
+describe("two cells", () => {
+    it("opens the editor on the cell that was double clicked", async () => {
+        await mountBoth([
+            new Cell("markdown", "The lantern.", {}),
+            new Cell("markdown", "The night.", {}),
+        ]);
+
+        await doubleClickRenderedMarkdown("The night.");
+
+        expect(openEditorCount()).toBe(1);
+        expect(renderedMarkdown()).toEqual(["The lantern."]);
+    });
+
+    it("closes the first editor when the second cell is opened", async () => {
+        await mountBoth([
+            new Cell("markdown", "The lantern.", {}),
+            new Cell("markdown", "The night.", {}),
+        ]);
+
+        await doubleClickRenderedMarkdown("The lantern.");
+        await doubleClickRenderedMarkdown("The night.");
+
+        expect(openEditorCount()).toBe(1);
+        expect(renderedMarkdown()).toEqual(["The lantern."]);
+    });
+
+    it("commits typing that had not settled when the second cell is opened", async () => {
+        const lantern = new Cell("markdown", "The lantern.", {});
+        await mountBoth([lantern, new Cell("markdown", "The night.", {})]);
+
+        await doubleClickRenderedMarkdown("The lantern.");
+        await typeIntoEditor("The lantern had gone out.");
+        await doubleClickRenderedMarkdown("The night.");
+
+        expect(lantern.source).toBe("The lantern had gone out.");
     });
 });

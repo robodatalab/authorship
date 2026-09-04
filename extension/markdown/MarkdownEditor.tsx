@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import {
@@ -25,6 +25,36 @@ monaco.editor.addKeybindingRules([
 
 const SETTLE_AFTER_TYPING_MS = 400;
 
+interface CellBeingEditedMediator {
+    cellBeingEdited: Cell | null;
+    editCell: (cell: Cell | null) => void;
+}
+
+const CellBeingEdited = createContext<CellBeingEditedMediator | null>(null);
+
+export function MarkdownEditorMediator({ children }: { children: ReactNode }) {
+    const [cellBeingEdited, editCell] = useState<Cell | null>(null);
+    return (
+        <CellBeingEdited.Provider value={{ cellBeingEdited, editCell }}>
+            {children}
+        </CellBeingEdited.Provider>
+    );
+}
+
+function useCellBeingEdited(cell: Cell) {
+    const mediator = useContext(CellBeingEdited);
+    if (!mediator) {
+        throw new Error(
+            "A MarkdownEditor can only be rendered inside a MarkdownEditorMediator.",
+        );
+    }
+    return {
+        isEditing: mediator.cellBeingEdited === cell,
+        beginEditing: () => mediator.editCell(cell),
+        finishEditing: () => mediator.editCell(null),
+    };
+}
+
 interface MarkdownEditorProps {
     cell: Cell;
     markdownFromSource?: (source: string) => string;
@@ -39,7 +69,7 @@ export function MarkdownEditor({
     children,
 }: MarkdownEditorProps) {
     const markdown = markdownFromSource(cell.source);
-    const [isEditing, setIsEditing] = useState(false);
+    const { isEditing, beginEditing, finishEditing } = useCellBeingEdited(cell);
     const [draftMarkdown, setDraftMarkdown] = useState(markdown);
 
     useEffect(() => {
@@ -51,7 +81,7 @@ export function MarkdownEditor({
             <div
                 onDoubleClick={() => {
                     setDraftMarkdown(markdown);
-                    setIsEditing(true);
+                    beginEditing();
                 }}
             >
                 {children(markdown)}
@@ -67,7 +97,7 @@ export function MarkdownEditor({
                 cell.replaceMarkdown(sourceFromMarkdown(settled))
             }
             onFinished={() => {
-                setIsEditing(false);
+                finishEditing();
                 cell.replaceMarkdown(sourceFromMarkdown(draftMarkdown));
             }}
         />
@@ -143,12 +173,12 @@ function MonacoMarkdownEditor({
                 SETTLE_AFTER_TYPING_MS,
             );
         });
-        const blurred = editor.onDidBlurEditorWidget(() =>
-            latest.current.onFinished(),
-        );
-        editor.addCommand(monaco.KeyCode.Escape, () =>
-            latest.current.onFinished(),
-        );
+        const escaped = (event: KeyboardEvent): void => {
+            if (event.key === "Escape") {
+                latest.current.onFinished();
+            }
+        };
+        window.addEventListener("keydown", escaped, true);
         const forwardToWindow = (key: string, shiftKey = false): void => {
             window.dispatchEvent(
                 new KeyboardEvent("keydown", {
@@ -180,10 +210,11 @@ function MonacoMarkdownEditor({
 
         return () => {
             openEditor.current = null;
+            window.removeEventListener("keydown", escaped, true);
             clearTimeout(settling);
+            latest.current.onSettled(editor.getValue());
             sized.dispose();
             changed.dispose();
-            blurred.dispose();
             editor.dispose();
         };
     }, []);

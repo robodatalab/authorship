@@ -3,6 +3,7 @@ import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import type { AuthorDocumentCellRenderers } from "./author_document_cell_renderers";
 import type { AuthorDocument } from "../storydoc/model";
+import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_FILE_EDITOR_PRIMARY_COMMAND_CATEGORY = "primary";
@@ -23,27 +24,29 @@ export function AuthorFileEditorCanvas({
     return (
         <div className="author-file-editor-canvas">
             <AuthorFileEditorMainMenu commands={mainMenuCommands} />
-            <ul>
-                <li>
-                    <AuthorFileEditorInsertCellMenu
-                        commands={cellInsertCommands}
-                    />
-                </li>
-                {document.cells.map((cell, cellIndex) => {
-                    const renderCell = cellRenderers[cell.kind];
-                    if (!renderCell) {
-                        return null;
-                    }
-                    return (
-                        <li key={cellIndex}>
-                            {renderCell(document, cellIndex)}
-                            <AuthorFileEditorInsertCellMenu
-                                commands={cellInsertCommands}
-                            />
-                        </li>
-                    );
-                })}
-            </ul>
+            <MarkdownEditorMediator>
+                <ul>
+                    <li>
+                        <AuthorFileEditorInsertCellMenu
+                            commands={cellInsertCommands}
+                        />
+                    </li>
+                    {document.cells.map((cell, cellIndex) => {
+                        const renderCell = cellRenderers[cell.kind];
+                        if (!renderCell) {
+                            return null;
+                        }
+                        return (
+                            <li key={cellIndex}>
+                                {renderCell(document, cellIndex)}
+                                <AuthorFileEditorInsertCellMenu
+                                    commands={cellInsertCommands}
+                                />
+                            </li>
+                        );
+                    })}
+                </ul>
+            </MarkdownEditorMediator>
         </div>
     );
 }
