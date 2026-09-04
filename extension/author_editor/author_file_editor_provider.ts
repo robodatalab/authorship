@@ -45,7 +45,7 @@ export class AuthorFileEditorProvider
                 document.uri,
             ),
         };
-        panel.webview.html = this.html(panel.webview);
+        panel.webview.html = this.html(panel.webview, document.uri);
         this.panelsByDocument.set(document.uri.toString(), panel);
 
         const webviewSpoke = panel.webview.onDidReceiveMessage(
@@ -134,7 +134,7 @@ export class AuthorFileEditorProvider
             ?.webview.postMessage({ type: "document", text: document.text });
     }
 
-    private html(webview: vscode.Webview): string {
+    private html(webview: vscode.Webview, document: vscode.Uri): string {
         const dist = vscode.Uri.joinPath(this.context.extensionUri, "dist");
         const script = webview.asWebviewUri(
             vscode.Uri.joinPath(dist, "author_file_editor_view.js"),
@@ -142,12 +142,16 @@ export class AuthorFileEditorProvider
         const style = webview.asWebviewUri(
             vscode.Uri.joinPath(dist, "author_file_editor_view.css"),
         );
+        const folder = webview.asWebviewUri(
+            vscode.Uri.joinPath(document, ".."),
+        );
         const nonce = nonceString();
 
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
+	<base href="${folder}/">
 	<meta http-equiv="Content-Security-Policy"
 		content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
