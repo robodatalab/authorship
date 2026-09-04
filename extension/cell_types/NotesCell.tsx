@@ -33,7 +33,7 @@ export function NotesCell({ source, editCommand }: NotesCellProps) {
 
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader></AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 {isEditing ? (
                     <MarkdownEditor

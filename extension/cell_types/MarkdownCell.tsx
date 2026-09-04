@@ -33,7 +33,7 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
 
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader></AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 {isEditing ? (
                     <MarkdownEditor
