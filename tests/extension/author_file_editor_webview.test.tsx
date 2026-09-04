@@ -6,6 +6,7 @@ import type { Cell } from "../../extension/storydoc/model";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
+
 let posted: { type: string }[] = [];
 
 function markdownCell(source: string): Cell {
@@ -20,6 +21,8 @@ async function openWebview(): Promise<void> {
     });
     vi.resetModules();
     await act(async () => {
+        await import("../../extension/cell_types/MarkdownCell");
+        await import("../../extension/cell_types/NotesCell");
         await import("../../extension/author_file_editor_webview");
     });
 }

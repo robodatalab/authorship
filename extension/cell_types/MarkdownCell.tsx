@@ -7,6 +7,8 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import type { AuthorDocumentCellEditCommand } from "../author_editor/author_document_cell_edit_command";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { MARKDOWN } from "../storydoc/model";
 import { marked } from "marked";
 import "./MarkdownCell.css";
 
@@ -56,3 +58,19 @@ export function MarkdownCell({ markdown, editCommand }: MarkdownCellProps) {
         </AuthorFileEditorCell>
     );
 }
+
+registerAuthorDocumentCellType({
+    kind: MARKDOWN,
+    label: "Markdown",
+    category: "primary",
+    render: (document, cellIndex) => (
+        <MarkdownCell
+            markdown={document.cells[cellIndex].source}
+            editCommand={{
+                invoke: (markdown) =>
+                    document.replaceCellMarkdown(cellIndex, markdown),
+            }}
+        />
+    ),
+    create: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
+});

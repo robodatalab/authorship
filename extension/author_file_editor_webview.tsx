@@ -1,12 +1,27 @@
 import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentHostChannel } from "./author_editor/author_document_host_channel";
-import { authorFileEditorCellRenderers } from "./author_file_editor_cell_renderers";
+import {
+    authorDocumentCellInsertCommands,
+    authorDocumentCellRenderers,
+} from "./author_editor/author_document_cell_types";
 import { authorFileEditorCommands } from "./author_file_editor_commands";
-import { authorFileEditorCellInsertCommands } from "./author_file_editor_insertable_cell_labels";
 import { AuthorDocument } from "./storydoc/model";
 
 declare function acquireVsCodeApi(): AuthorDocumentHostChannel;
+
+declare const require: {
+    context?(
+        directory: string,
+        useSubdirectories: boolean,
+        expression: RegExp,
+    ): { keys(): string[]; (id: string): unknown };
+};
+
+if (typeof require !== "undefined" && require.context) {
+    const cellTypeModules = require.context("./cell_types", false, /\.tsx$/);
+    cellTypeModules.keys().forEach(cellTypeModules);
+}
 
 function main(): void {
     const hostChannel = acquireVsCodeApi();
@@ -19,9 +34,9 @@ function main(): void {
         root.render(
             <AuthorFileEditorCanvas
                 document={authorDocument}
-                cellRenderers={authorFileEditorCellRenderers(authorDocument)}
+                cellRenderers={authorDocumentCellRenderers()}
                 mainMenuCommands={authorFileEditorCommands(hostChannel)}
-                cellInsertCommands={authorFileEditorCellInsertCommands(
+                cellInsertCommands={authorDocumentCellInsertCommands(
                     hostChannel,
                 )}
             />,

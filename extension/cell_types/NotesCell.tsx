@@ -7,6 +7,8 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import type { AuthorDocumentCellEditCommand } from "../author_editor/author_document_cell_edit_command";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { registerAuthorDocumentCellType } from "../author_editor/author_document_cell_types";
+import { NOTE } from "../storydoc/model";
 import "./NotesCell.css";
 
 interface NotesCellProps {
@@ -65,3 +67,18 @@ function noteWithinComment(source: string): string {
             : source.slice(opened + 4);
     return inside.replace(/^\n+/, "").replace(/\n+$/, "");
 }
+
+registerAuthorDocumentCellType({
+    kind: NOTE,
+    label: "Note",
+    category: "primary",
+    render: (document, cellIndex) => (
+        <NotesCell
+            source={document.cells[cellIndex].source}
+            editCommand={{
+                invoke: (note) => document.replaceCellMarkdown(cellIndex, note),
+            }}
+        />
+    ),
+    create: () => ({ kind: NOTE, source: "", attrs: {} }),
+});
