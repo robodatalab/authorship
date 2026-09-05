@@ -20,11 +20,10 @@ function markdownOf(text: string): string {
 function shapeOf(
     authorText: string,
 ): { kind: string; source: string; attrs: Record<string, string> }[] {
-    return cellsOf(authorText).map((cell) => ({
-        kind: cell.kind,
-        source: cell.source,
-        attrs: cell.attrs,
-    }));
+    return cellsOf(authorText).map((cell) => {
+        const { id: _id, ...attrs } = cell.attrs;
+        return { kind: cell.kind, source: cell.source, attrs };
+    });
 }
 
 describe("what a document exports as", () => {

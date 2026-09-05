@@ -18,12 +18,25 @@ interface Case {
     dumped: string;
 }
 
-function cellsOfText(text: string): Cell[] {
-    return AuthorDocument.fromText(text).cells;
+const ID_ATTRIBUTE = / id="[^"]*"/g;
+
+function withoutIds(text: string): string {
+    return text.replace(ID_ATTRIBUTE, "");
+}
+
+function cellsOfText(text: string): {
+    kind: string;
+    source: string;
+    attrs: Record<string, string>;
+}[] {
+    return AuthorDocument.fromText(text).cells.map((cell) => {
+        const { id: _id, ...attrs } = cell.attrs;
+        return { kind: cell.kind, source: cell.source, attrs };
+    });
 }
 
 function textWrittenBack(text: string): string {
-    return AuthorDocument.fromText(text).toText();
+    return withoutIds(AuthorDocument.fromText(text).toText());
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(
@@ -75,9 +88,11 @@ describe("writing a document back out", () => {
     });
 
     it("escapes a quote in an attribute on the way out", () => {
-        expect(new Cell(CHAPTER, "", { title: 'She said "no"' }).marker()).toBe(
-            '<!-- cell: chapter title="She said \\"no\\"" -->',
-        );
+        expect(
+            withoutIds(
+                new Cell(CHAPTER, "", { title: 'She said "no"' }).marker(),
+            ),
+        ).toBe('<!-- cell: chapter title="She said \\"no\\"" -->');
     });
 
     it("writes every attribute a cell carries", () => {
@@ -125,7 +140,7 @@ describe("inserting a cell", () => {
 
         document.insertAt(0, blankChapter());
 
-        expect(document.cells[0].attrs).toEqual({ title: "New" });
+        expect(document.cells[0].attrs.title).toBe("New");
     });
 
     it("says the document changed", () => {
@@ -155,12 +170,7 @@ describe("inserting a cell", () => {
 });
 
 describe("what a document reads as", () => {
-    const readCells = (text: string) =>
-        AuthorDocument.fromText(text).cells.map((cell) => ({
-            kind: cell.kind,
-            source: cell.source,
-            attrs: cell.attrs,
-        }));
+    const readCells = (text: string) => cellsOfText(text);
 
     it("reads nothing out of an empty file", () => {
         expect(readCells("")).toEqual([]);
@@ -395,7 +405,7 @@ describe("folding a cell", () => {
 
         document.cells[0].fold(true);
 
-        expect(document.toText()).toBe(
+        expect(withoutIds(document.toText())).toBe(
             '<!-- cell: markdown folded="true" -->\n\none\n',
         );
     });
@@ -407,7 +417,9 @@ describe("folding a cell", () => {
 
         document.cells[0].fold(false);
 
-        expect(document.toText()).toBe("<!-- cell: markdown -->\n\none\n");
+        expect(withoutIds(document.toText())).toBe(
+            "<!-- cell: markdown -->\n\none\n",
+        );
     });
 
     it("says the document changed", () => {

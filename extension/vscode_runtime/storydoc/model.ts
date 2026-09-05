@@ -51,6 +51,8 @@ export const PRINT = "print";
 /** Whether a section is folded away to its heading. */
 export const FOLDED = "folded";
 
+export const UNIQUE_CELL_ID = "id";
+
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
@@ -81,6 +83,13 @@ export class Cell {
         changed: () => void = () => {},
     ) {
         this.#changeListeners = [changed];
+        if (!attrs[UNIQUE_CELL_ID]) {
+            this.attrs = { ...attrs, [UNIQUE_CELL_ID]: crypto.randomUUID() };
+        }
+    }
+
+    get uniqueId(): string {
+        return this.attrs[UNIQUE_CELL_ID];
     }
 
     onChanged(listener: () => void): void {
