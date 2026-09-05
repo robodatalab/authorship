@@ -171,6 +171,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                     category: command.category,
                     iconClassName: command.iconClassName,
                     tooltip: command.tooltip,
+                    visibleWhen: command.visibleWhen,
                 })),
             });
     }

@@ -334,6 +334,72 @@ describe("the commands on a cell", () => {
     });
 });
 
+describe("two commands drawn as one button", () => {
+    const FOLD_COMMANDS: WebviewAuthorDocumentCommandCard[] = [
+        {
+            name: "foldCell",
+            category: "cell",
+            iconClassName: "codicon codicon-fold-up",
+            tooltip: "Fold this section away",
+            visibleWhen: { attribute: "folded", value: "" },
+        },
+        {
+            name: "unfoldCell",
+            category: "cell",
+            iconClassName: "codicon codicon-fold-down",
+            tooltip: "Unfold this section",
+            visibleWhen: { attribute: "folded", value: "true" },
+        },
+    ];
+
+    async function buttonsBeside(cell: WebviewCell): Promise<string[]> {
+        await mountCanvas({
+            cells: [cell],
+            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            commands: FOLD_COMMANDS,
+        });
+        return [
+            ...document.querySelectorAll(
+                ".author-file-editor-cell-actions-button",
+            ),
+        ].map((button) => button.getAttribute("title") ?? "");
+    }
+
+    it("draws the one for the state the cell is in", async () => {
+        expect(await buttonsBeside(markdownCell("one"))).toEqual([
+            "Fold this section away",
+        ]);
+    });
+
+    it("draws the other one once the cell says otherwise", async () => {
+        expect(
+            await buttonsBeside({
+                kind: "markdown",
+                source: "one",
+                attrs: { folded: "true" },
+            }),
+        ).toEqual(["Unfold this section"]);
+    });
+
+    it("asks for the command that was drawn, not the one that was not", async () => {
+        await mountCanvas({
+            cells: [
+                { kind: "markdown", source: "one", attrs: { folded: "true" } },
+            ],
+            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            commands: FOLD_COMMANDS,
+        });
+
+        await click(
+            document.querySelector(".author-file-editor-cell-actions-button")!,
+        );
+
+        expect(posted).toEqual([
+            { type: "invoke", command: "unfoldCell", payload: { at: 0 } },
+        ]);
+    });
+});
+
 describe("a folded cell", () => {
     it("is marked as folded on the page", async () => {
         await mountCanvas({

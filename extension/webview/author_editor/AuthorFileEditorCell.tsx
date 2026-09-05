@@ -30,54 +30,69 @@ interface AuthorFileEditorCellCardProps {
 interface AuthorFileEditorCellCommandsProps {
     commands: WebviewAuthorDocumentCommandCard[];
     at: number;
+    attrs: Readonly<Record<string, string>>;
     postToHost: PostToHost;
     children?: ReactNode;
 }
 
 const AuthorFileEditorCellCommandsContext = createContext<
     Omit<AuthorFileEditorCellCommandsProps, "children">
->({ commands: [], at: 0, postToHost: () => undefined });
+>({ commands: [], at: 0, attrs: {}, postToHost: () => undefined });
 
 export function AuthorFileEditorCellCommands({
     commands,
     at,
+    attrs,
     postToHost,
     children,
 }: AuthorFileEditorCellCommandsProps) {
     return (
         <AuthorFileEditorCellCommandsContext.Provider
-            value={{ commands, at, postToHost }}
+            value={{ commands, at, attrs, postToHost }}
         >
             {children}
         </AuthorFileEditorCellCommandsContext.Provider>
     );
 }
 
+function commandIsVisible(
+    command: WebviewAuthorDocumentCommandCard,
+    attrs: Readonly<Record<string, string>>,
+): boolean {
+    return (
+        !command.visibleWhen ||
+        (attrs[command.visibleWhen.attribute] ?? "") ===
+            command.visibleWhen.value
+    );
+}
+
 export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
-    const { commands, at, postToHost } = useContext(
+    const { commands, at, attrs, postToHost } = useContext(
         AuthorFileEditorCellCommandsContext,
     );
     return (
         <section className="author-file-editor-cell">
             <div className="author-file-editor-cell-actions">
-                {commands.map((command) => (
-                    <button
-                        key={command.tooltip}
-                        type="button"
-                        className="author-file-editor-cell-actions-button"
-                        title={command.tooltip}
-                        aria-label={command.tooltip}
-                        onClick={() =>
-                            invokeAuthorDocumentCommand(
-                                postToHost,
-                                command.name,
-                                { at },
-                            )
-                        }
-                    >
-                        <i className={command.iconClassName} />
-                    </button>
-                ))}
+                {commands
+                    .filter((command) => commandIsVisible(command, attrs))
+                    .map((command) => (
+                        <button
+                            key={command.name}
+                            type="button"
+                            className="author-file-editor-cell-actions-button"
+                            title={command.tooltip}
+                            aria-label={command.tooltip}
+                            onClick={() =>
+                                invokeAuthorDocumentCommand(
+                                    postToHost,
+                                    command.name,
+                                    { at },
+                                )
+                            }
+                        >
+                            <i className={command.iconClassName} />
+                        </button>
+                    ))}
             </div>
             {children}
         </section>

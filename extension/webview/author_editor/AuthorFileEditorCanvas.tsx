@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorCellCommands } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import type { AuthorDocumentCommandVisibility } from "../../vscode_runtime/commands/author_document_command";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -23,6 +24,7 @@ export interface WebviewAuthorDocumentCommandCard {
     readonly category: string;
     readonly iconClassName: string;
     readonly tooltip: string;
+    readonly visibleWhen?: AuthorDocumentCommandVisibility;
 }
 
 /** How the page speaks to the host: `acquireVsCodeApi().postMessage`. */
@@ -102,6 +104,7 @@ export function AuthorFileEditorCanvas({
                                 <AuthorFileEditorCellCommands
                                     commands={cellCommands}
                                     at={cellIndex}
+                                    attrs={cell.attrs}
                                     postToHost={postToHost}
                                 >
                                     {renderCell(cell, cellIndex, postToHost)}

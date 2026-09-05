@@ -11,7 +11,18 @@ import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceMarkdownCommand } from "./replace_markdown";
 
 const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
-    new FoldCellCommand(),
+    new FoldCellCommand(
+        "foldCell",
+        "codicon codicon-fold-up",
+        "Fold this section away",
+        true,
+    ),
+    new FoldCellCommand(
+        "unfoldCell",
+        "codicon codicon-fold-down",
+        "Unfold this section",
+        false,
+    ),
     new MoveCellUpCommand(),
     new MoveCellDownCommand(),
     new DeleteCellCommand(),
