@@ -11,6 +11,11 @@ import { spawn, type ChildProcess } from 'node:child_process';
 
 import { provision } from './install';
 
+// Fixed rather than ephemeral, so that a server the extension did not start —
+// the one under the debugger, or the one belonging to another window — is
+// somewhere it can be found.
+export const MODEL_SERVER_PORT = 8765;
+
 /** Short: this only has to distinguish a live server from a free port. */
 const PROBE_TIMEOUT_MS = 1_000;
 
