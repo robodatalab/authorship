@@ -15,16 +15,10 @@ import {
     replaceCellAttribute,
     replaceCellMarkdown,
 } from "../../vscode_runtime/commands/author_document_edits";
-import { PART, PRINT } from "../../vscode_runtime/storydoc/model";
+import { PART } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     { name: "title", label: "Title" },
-    {
-        name: PRINT,
-        label: "Printed",
-        hint: "A page of its own in the book, before the chapters under it",
-        toggle: true,
-    },
 ];
 
 interface PartCellProps {

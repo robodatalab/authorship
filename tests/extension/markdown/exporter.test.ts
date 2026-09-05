@@ -41,12 +41,6 @@ describe("what a document exports as", () => {
         ).toBe("## Book One\n\n### The First Night\n");
     });
 
-    it("writes no heading for a part the book does not print", () => {
-        expect(
-            markdownOf('<!-- cell: part title="Break" print="no" -->\n'),
-        ).toBe("");
-    });
-
     it("writes the title page as the name of the book and its credits", () => {
         expect(
             markdownOf(

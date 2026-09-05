@@ -5,7 +5,6 @@ import { AuthorFileEditorCellState } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { AuthorDocumentCommandVisibility } from "../../vscode_runtime/commands/author_document_command";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
-import type { ProseError } from "../linter/LinterTooltip";
 import "./AuthorFileEditorCanvas.css";
 
 const AUTHOR_DOCUMENT_CELL_COMMAND_CATEGORY = "cell";
@@ -28,11 +27,6 @@ export interface WebviewAuthorDocumentCommandCard {
     readonly visibleWhen?: AuthorDocumentCommandVisibility;
 }
 
-/** An error a check found, as the page draws it: its cell, and where in it. */
-export interface WebviewProseError extends ProseError {
-    readonly cell: number;
-}
-
 /** How the page speaks to the host: `acquireVsCodeApi().postMessage`. */
 export type PostToHost = (message: unknown) => void;
 
@@ -52,7 +46,6 @@ export type AuthorDocumentCellRenderers = Record<
 interface AuthorFileEditorCanvasProps {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
-    proseErrors: WebviewProseError[];
     cellTypes: AuthorDocumentCellType[];
     postToHost: PostToHost;
     cellRenderers: AuthorDocumentCellRenderers;
@@ -61,7 +54,6 @@ interface AuthorFileEditorCanvasProps {
 export function AuthorFileEditorCanvas({
     cells,
     commands,
-    proseErrors,
     cellTypes,
     postToHost,
     cellRenderers,
@@ -113,9 +105,6 @@ export function AuthorFileEditorCanvas({
                                     commands={cellCommands}
                                     at={cellIndex}
                                     attrs={cell.attrs}
-                                    errors={proseErrors.filter(
-                                        (error) => error.cell === cellIndex,
-                                    )}
                                     postToHost={postToHost}
                                 >
                                     {renderCell(cell, cellIndex, postToHost)}

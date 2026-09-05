@@ -9,7 +9,6 @@ import type {
     AuthorDocumentCellRenderers,
     WebviewAuthorDocumentCommandCard,
     WebviewCell,
-    WebviewProseError,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -57,7 +56,6 @@ function cellType(kind: string, category: string): AuthorDocumentCellType {
 async function mountCanvas(options: {
     cells?: WebviewCell[];
     commands?: WebviewAuthorDocumentCommandCard[];
-    proseErrors?: WebviewProseError[];
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
 }): Promise<void> {
@@ -70,7 +68,6 @@ async function mountCanvas(options: {
             <AuthorFileEditorCanvas
                 cells={options.cells ?? []}
                 commands={options.commands ?? [INSERT_COMMAND]}
-                proseErrors={options.proseErrors ?? []}
                 cellTypes={
                     options.cellTypes ?? [cellType("markdown", "primary")]
                 }

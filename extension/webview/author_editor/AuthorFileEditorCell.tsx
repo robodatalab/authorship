@@ -4,8 +4,8 @@ import {
     invokeAuthorDocumentCommand,
     type PostToHost,
     type WebviewAuthorDocumentCommandCard,
-    type WebviewProseError,
 } from "./AuthorFileEditorCanvas";
+import type { ProseError } from "../linter/LinterTooltip";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -38,7 +38,7 @@ interface AuthorFileEditorCellStateProps {
     commands: WebviewAuthorDocumentCommandCard[];
     at: number;
     attrs: Readonly<Record<string, string>>;
-    errors: WebviewProseError[];
+    errors?: ProseError[];
     postToHost: PostToHost;
     children?: ReactNode;
 }
@@ -57,7 +57,7 @@ export function AuthorFileEditorCellState({
     commands,
     at,
     attrs,
-    errors,
+    errors = [],
     postToHost,
     children,
 }: AuthorFileEditorCellStateProps) {
@@ -148,12 +148,12 @@ export function AuthorFileEditorCellCard({
     return <div className="author-file-editor-cell-card">{children}</div>;
 }
 
-export function useAuthorFileEditorCellProseErrors(): WebviewProseError[] {
-    return useContext(AuthorFileEditorCellStateContext).errors;
+export function useAuthorFileEditorCellProseErrors(): ProseError[] {
+    return useContext(AuthorFileEditorCellStateContext).errors ?? [];
 }
 
 export function AuthorFileEditorCellWarning() {
-    const { errors } = useContext(AuthorFileEditorCellStateContext);
+    const errors = useAuthorFileEditorCellProseErrors();
 
     if (errors.length === 0) {
         return null;

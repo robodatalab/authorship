@@ -1,7 +1,5 @@
 import {
     AuthorFileEditorCell,
-    AuthorFileEditorCellWarning,
-    useAuthorFileEditorCellProseErrors,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
@@ -12,10 +10,7 @@ import type {
     PostToHost,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import {
-    fixProseError,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+import { replaceCellMarkdown } from "../../vscode_runtime/commands/author_document_edits";
 import { DISCLAIMER } from "../../vscode_runtime/storydoc/model";
 
 interface DisclaimerCellProps {
@@ -25,15 +20,12 @@ interface DisclaimerCellProps {
 }
 
 export function DisclaimerCell({ cell, at, postToHost }: DisclaimerCellProps) {
-    const errors = useAuthorFileEditorCellProseErrors();
     return (
-        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
+        <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}
-                    errors={errors}
-                    onFixAsked={(error) => fixProseError(postToHost, error.id)}
                     onMarkdownCommitted={(markdown) =>
                         replaceCellMarkdown(postToHost, at, markdown)
                     }

@@ -14,7 +14,10 @@ export class FoldCellCommand implements AuthorDocumentCommand {
         readonly tooltip: string,
         private readonly folded: boolean,
     ) {
-        this.visibleWhen = { attribute: FOLDED, value: folded ? "" : "true" };
+        this.visibleWhen = {
+            attribute: FOLDED,
+            value: folded ? "" : "true",
+        };
     }
 
     invoke(document: AuthorDocument, payload: Record<string, unknown>): void {

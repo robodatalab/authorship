@@ -4,7 +4,6 @@ import type {
     PostToHost,
     WebviewAuthorDocumentCommandCard,
     WebviewCell,
-    WebviewProseError,
 } from "./author_editor/AuthorFileEditorCanvas";
 import {
     authorDocumentCellRenderers,
@@ -35,14 +34,12 @@ function main(): void {
     );
     let cells: WebviewCell[] = [];
     let commands: WebviewAuthorDocumentCommandCard[] = [];
-    let proseErrors: WebviewProseError[] = [];
 
     function draw(): void {
         root.render(
             <AuthorFileEditorCanvas
                 cells={cells}
                 commands={commands}
-                proseErrors={proseErrors}
                 cellTypes={authorDocumentCellTypes()}
                 postToHost={postToHost}
                 cellRenderers={authorDocumentCellRenderers()}
@@ -57,9 +54,6 @@ function main(): void {
         } else if (event.data?.type === "commands") {
             commands = event.data
                 .commands as WebviewAuthorDocumentCommandCard[];
-            draw();
-        } else if (event.data?.type === "proseErrors") {
-            proseErrors = event.data.errors as WebviewProseError[];
             draw();
         }
     });

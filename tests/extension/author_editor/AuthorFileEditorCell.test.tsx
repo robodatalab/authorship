@@ -10,7 +10,7 @@ import {
     AuthorFileEditorCellState,
     AuthorFileEditorCellWarning,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { WebviewProseError } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import type { ProseError } from "../../../extension/webview/linter/LinterTooltip";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -91,11 +91,10 @@ describe("what the prose checker found", () => {
     function errorSaying(
         message: string,
         replacements: string[] = [],
-    ): WebviewProseError {
+    ): ProseError {
         return {
             id: replacements.length,
             kind: "style",
-            cell: 0,
             at: 10,
             end: 19,
             message,
@@ -104,7 +103,7 @@ describe("what the prose checker found", () => {
         };
     }
 
-    async function mountWarning(errors: WebviewProseError[]): Promise<void> {
+    async function mountWarning(errors: ProseError[]): Promise<void> {
         posted.length = 0;
         await mount(
             <AuthorFileEditorCellState

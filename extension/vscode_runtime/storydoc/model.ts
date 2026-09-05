@@ -1,31 +1,3 @@
-// A story and the layout it is published in, in one human-readable file.
-//
-// The file is `<name>.author`, and it is markdown. What makes it a story
-// document is that the markdown is cut into cells, each opened by a marker that
-// says what the cell *is*:
-//
-//     <!-- cell: chapter title="The First Night" -->
-//
-//     The lantern had gone out again.
-//
-//     <!-- cell: cover src="art/cover.jpg" -->
-//
-//     ![Cover](art/cover.jpg)
-//
-// The marker is an HTML comment, so every reader that renders markdown renders
-// the document and shows none of the scaffolding, and every editor that opens
-// text can edit it. There is no custom editor a person is obliged to use.
-//
-// Two properties are load-bearing:
-//
-// **The format is open.** A cell's kind is any name, and this module knows
-// nothing about most of them. An unrecognised kind is carried through parse and
-// save untouched, so a document written by a newer version — or by hand —
-//
-// This is the same format `server/storydoc.py` reads, and the two must agree —
-// the round-trip and parsing rules are mirrored there test for test. Deliberately
-// free of the `vscode` module, so it can be unit tested without an editor.
-
 import type * as vscode from "vscode";
 
 export const EXTENSION = ".author";
@@ -42,13 +14,6 @@ export const BLURB = "blurb";
 export const NOTE = "note";
 export const RECAP = "recap";
 
-/** What an attribute says when the answer to it is no. */
-export const NO = "no";
-
-/** Whether a part is printed as a page of the book. */
-export const PRINT = "print";
-
-/** Whether a section is folded away to its heading. */
 export const FOLDED = "folded";
 
 export const UNIQUE_CELL_ID = "id";
@@ -58,7 +23,6 @@ const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
 function readAttributes(text: string): Record<string, string> {
     const attrs: Record<string, string> = {};
-    // `matchAll` on a /g regex needs the index reset; the literal is shared.
     ATTR.lastIndex = 0;
     for (const found of text.matchAll(ATTR)) {
         attrs[found[1]] = found[2].replace(/\\(.)/g, "$1");
@@ -66,13 +30,6 @@ function readAttributes(text: string): Record<string, string> {
     return attrs;
 }
 
-/**
- * One thing the document is made of, and what it says it is.
- *
- * `kind` is the cell's identity and is never inferred from its text — a chapter
- * called "Disclaimer" is still a chapter. `attrs` is whatever the kind needs said
- * about it, and is kept even when this module has no use for it.
- */
 export class Cell {
     constructor(
         public kind: string,
@@ -140,7 +97,6 @@ export class AuthorDocument implements vscode.CustomDocument {
         this.fromText(text);
     }
 
-    /** The document VS Code holds when there is no file behind it: the webview's. */
     static fromText(text: string): AuthorDocument {
         return new AuthorDocument(undefined as unknown as vscode.Uri, text);
     }
@@ -214,7 +170,6 @@ export class AuthorDocument implements vscode.CustomDocument {
     }
 }
 
-/** Python's `"\n".join(body).strip("\n")` — blank lines off both ends, nothing else. */
 function trimBlankEnds(body: string[]): string {
     return body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
 }
