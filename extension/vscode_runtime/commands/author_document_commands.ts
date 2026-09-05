@@ -1,5 +1,7 @@
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { DeleteCellCommand } from "./delete_cell";
+import { DivideIntoPartsCommand } from "./divide_into_parts";
+import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
 import { FoldCellCommand } from "./fold_cell";
 import { ImportMarkdownCommand } from "./import_markdown";
@@ -31,6 +33,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceAttributeCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
+    new ExportEpubCommand(),
+    new DivideIntoPartsCommand(),
     new OpenAsTextCommand(),
 ];
 

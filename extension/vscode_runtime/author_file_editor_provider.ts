@@ -52,7 +52,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                     this.sendCommands(document);
                     this.sendDocument(document);
                 } else if (message?.type === "invoke" && message.command) {
-                    this.runCommand(
+                    void this.runCommand(
                         document,
                         message.command,
                         message.payload ?? {},
@@ -128,13 +128,13 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         };
     }
 
-    private runCommand(
+    private async runCommand(
         document: AuthorDocument,
         command: string,
         payload: Record<string, unknown>,
-    ): void {
+    ): Promise<void> {
         const before = document.text;
-        authorDocumentCommand(command)?.invoke(document, payload);
+        await authorDocumentCommand(command)?.invoke(document, payload);
         const after = document.text;
         if (after === before) {
             return;

@@ -23,5 +23,8 @@ export interface AuthorDocumentCommand {
     readonly iconClassName: string;
     readonly tooltip: string;
     readonly visibleWhen?: AuthorDocumentCommandVisibility;
-    invoke(document: AuthorDocument, payload: Record<string, unknown>): void;
+    invoke(
+        document: AuthorDocument,
+        payload: Record<string, unknown>,
+    ): void | Promise<void>;
 }
