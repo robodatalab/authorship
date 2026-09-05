@@ -32,6 +32,9 @@ export class AuthorFileEditorSession {
                 attrs: cell.attrs,
             })),
         });
+        // The errors say which cell they are in by its place in what was just
+        // sent, so they are only true of that list.
+        this.sendProseErrors();
     }
 
     sendProseErrors(): void {
@@ -50,6 +53,7 @@ export class AuthorFileEditorSession {
                 : [
                       {
                           id: error.id,
+                          kind: error.kind,
                           cell,
                           at: error.at,
                           end: error.end,

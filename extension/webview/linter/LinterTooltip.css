@@ -26,6 +26,31 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
+.linter-tooltip-kind {
+    margin: 0 0 2px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.linter-tooltip-grammar {
+    color: var(--vscode-editorError-foreground, #f14c4c);
+}
+
+.linter-tooltip-spelling {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.linter-tooltip-style {
+    color: var(--vscode-editorInfo-foreground, #3794ff);
+}
+
+.linter-tooltip-usage {
+    color: var(--vscode-charts-purple, #b180d7);
+}
+
 .linter-tooltip-said {
     margin: 0;
     font-weight: 600;

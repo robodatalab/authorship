@@ -11,6 +11,7 @@ export class AuthorDocumentProseError {
     constructor(
         readonly id: number,
         readonly rule: string,
+        readonly kind: string,
         readonly cell: Cell,
         readonly at: number,
         readonly end: number,
@@ -23,6 +24,7 @@ export class AuthorDocumentProseError {
         return new AuthorDocumentProseError(
             this.id,
             this.rule,
+            this.kind,
             this.cell,
             this.at + characters,
             this.end + characters,
@@ -109,6 +111,22 @@ export class AuthorDocumentProseCheck {
             this.textWhenChecked.set(error.cell, error.cell.source);
             this.watch(error.cell);
         }
+        this.notifyChanged();
+    }
+
+    /**
+     * Take one error away, because what it was about has been put right.
+     *
+     * The edit that fixed it does not always run through it — a full stop put
+     * at the end of the marked words touches none of them — so the fix says so
+     * itself rather than leaving it to be worked out from the text.
+     */
+    remove(id: number): void {
+        const kept = this.errorsFound.filter((error) => error.id !== id);
+        if (kept.length === this.errorsFound.length) {
+            return;
+        }
+        this.errorsFound = kept;
         this.notifyChanged();
     }
 

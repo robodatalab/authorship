@@ -19,6 +19,7 @@ interface At {
 /** One thing a pass found. */
 interface Finding {
     rule: string;
+    kind: string;
     message: string;
     detail: string;
     at: At;
@@ -109,6 +110,7 @@ function errorsFound(
             new AuthorDocumentProseError(
                 firstId + found,
                 finding.rule,
+                finding.kind,
                 from.cell,
                 from.offset,
                 to.offset,

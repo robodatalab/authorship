@@ -94,6 +94,7 @@ describe("what the prose checker found", () => {
     ): WebviewProseError {
         return {
             id: replacements.length,
+            kind: "style",
             cell: 0,
             at: 10,
             end: 19,

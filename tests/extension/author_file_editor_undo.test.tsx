@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
+import { authorFileEditorSession } from "../../extension/vscode_runtime/author_file_editor_session";
+import { AuthorDocumentProseError } from "../../extension/vscode_runtime/prose/model";
+import type { AuthorDocument } from "../../extension/vscode_runtime/storydoc/model";
 import { Uri, executedCommands, files } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -158,5 +161,56 @@ describe("what one Ctrl+Z asks the host for", () => {
         await pressCtrlZ();
 
         expect(executedCommands).toEqual([]);
+    });
+});
+
+describe("what a check found, while the document goes on being edited", () => {
+    function markFirstCell(): void {
+        const authorDocument = editor.fileDocument as unknown as AuthorDocument;
+        authorFileEditorSession(authorDocument)!.proseCheck.replace([
+            new AuthorDocumentProseError(
+                1,
+                "repetition",
+                "style",
+                authorDocument.cells[0],
+                0,
+                3,
+                "Repeated word",
+                "It says it twice.",
+                [],
+            ),
+        ]);
+    }
+
+    function markedCell(): number {
+        return [
+            ...document.querySelectorAll(".author-file-editor-cell"),
+        ].findIndex((cell) =>
+            cell.querySelector(".author-file-editor-cell-warning"),
+        );
+    }
+
+    it("marks the cell it was found in", async () => {
+        await act(async () => markFirstCell());
+        expect(markedCell()).toBe(0);
+    });
+
+    it("keeps the errors when a cell is added above them", async () => {
+        await act(async () => markFirstCell());
+
+        await addMarkdownCellAtTheTop();
+
+        const authorDocument = editor.fileDocument as unknown as AuthorDocument;
+        expect(
+            authorFileEditorSession(authorDocument)!.proseCheck.errors,
+        ).toHaveLength(1);
+    });
+
+    it("draws them on the cell they moved to", async () => {
+        await act(async () => markFirstCell());
+
+        await addMarkdownCellAtTheTop();
+
+        expect(markedCell()).toBe(1);
     });
 });

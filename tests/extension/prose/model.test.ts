@@ -23,6 +23,7 @@ function errorIn(
     return new AuthorDocumentProseError(
         1,
         "repetition",
+        "style",
         cell,
         at,
         end,
@@ -77,6 +78,31 @@ describe("what a check holds", () => {
             [10, 19],
             [0, 2],
         ]);
+    });
+
+    it("takes an error away when it has been put right", () => {
+        const cell = cellOf("It was very very late.");
+        const check = new AuthorDocumentProseCheck();
+        check.replace([errorIn(cell, 10, 19)]);
+        let changes = 0;
+        check.onChanged(() => changes++);
+
+        check.remove(1);
+
+        expect(check.errors).toEqual([]);
+        expect(changes).toBe(1);
+    });
+
+    it("says nothing when it never held that error", () => {
+        const check = new AuthorDocumentProseCheck();
+        check.replace([errorIn(cellOf("one"), 0, 3)]);
+        let changes = 0;
+        check.onChanged(() => changes++);
+
+        check.remove(7);
+
+        expect(check.errors).toHaveLength(1);
+        expect(changes).toBe(0);
     });
 
     it("says so when a pass lands", () => {

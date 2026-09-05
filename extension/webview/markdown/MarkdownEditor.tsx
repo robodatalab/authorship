@@ -323,7 +323,9 @@ function MonacoMarkdownEditor({
                     model.getPositionAt(error.at),
                     model.getPositionAt(error.end),
                 ),
-                options: { inlineClassName: "markdown-editor-mark" },
+                options: {
+                    inlineClassName: `markdown-editor-mark markdown-editor-mark-${error.kind}`,
+                },
             })),
         );
     }, [errors, markdown]);

@@ -145,14 +145,23 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         if (after === before) {
             return;
         }
-        document.fromText(before);
-        this.recordEdit(document, after);
+        this.recordEdit(document, before, after);
         authorFileEditorSession(document)?.sendDocument();
     }
 
-    private recordEdit(document: AuthorDocument, text: string): void {
-        const before = document.text;
-        document.fromText(text);
+    /**
+     * One undo step, over a document the command has already changed.
+     *
+     * Read back rather than re-read: parsing the text again would put a fresh
+     * set of cells in the document, and everything holding the cells it edited —
+     * the prose check above all — would be left pointing at cells the document
+     * no longer has.
+     */
+    private recordEdit(
+        document: AuthorDocument,
+        before: string,
+        text: string,
+    ): void {
         this.edited.fire({
             document,
             label: "Edit",

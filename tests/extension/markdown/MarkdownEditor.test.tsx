@@ -400,6 +400,7 @@ describe("two editors", () => {
 describe("what the checks found in the prose being written", () => {
     const REPEATED = {
         id: 3,
+        kind: "style",
         at: 10,
         end: 19,
         message: "Repeated word",
@@ -408,7 +409,7 @@ describe("what the checks found in the prose being written", () => {
     };
 
     async function openEditorWithMarks(
-        onFixChosen = vi.fn(),
+        onFixAsked = vi.fn(),
     ): Promise<ReturnType<typeof vi.fn>> {
         root = createRoot(emptyBody());
         await act(async () => {
@@ -417,7 +418,7 @@ describe("what the checks found in the prose being written", () => {
                     <MarkdownEditor
                         markdown="It was very very late."
                         errors={[REPEATED]}
-                        onFixChosen={onFixChosen}
+                        onFixAsked={onFixAsked}
                         onMarkdownCommitted={committedSpy()}
                     >
                         {(text) => <div className="rendered">{text}</div>}
@@ -426,7 +427,7 @@ describe("what the checks found in the prose being written", () => {
             );
         });
         await doubleClickRendered();
-        return onFixChosen;
+        return onFixAsked;
     }
 
     async function pointAt(offset: number | null): Promise<void> {
@@ -448,7 +449,10 @@ describe("what the checks found in the prose being written", () => {
                     from: { lineNumber: 1, column: 11 },
                     to: { lineNumber: 1, column: 20 },
                 },
-                options: { inlineClassName: "markdown-editor-mark" },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-mark markdown-editor-mark-style",
+                },
             },
         ]);
     });
@@ -472,8 +476,32 @@ describe("what the checks found in the prose being written", () => {
         expect(tooltip()).toBeNull();
     });
 
-    it("asks for the replacement the author chose", async () => {
-        const onFixChosen = await openEditorWithMarks();
+    it("offers nothing to press when the check had no answer to give", async () => {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator>
+                    <MarkdownEditor
+                        markdown="It was very very late."
+                        errors={[{ ...REPEATED, replacements: [] }]}
+                        onFixAsked={vi.fn()}
+                        onMarkdownCommitted={committedSpy()}
+                    >
+                        {(text) => <div className="rendered">{text}</div>}
+                    </MarkdownEditor>
+                </MarkdownEditorMediator>,
+            );
+        });
+        await doubleClickRendered();
+
+        await pointAt(12);
+
+        expect(tooltip()?.textContent).toContain("Repeated word");
+        expect(document.querySelector(".linter-tooltip-fix")).toBeNull();
+    });
+
+    it("asks for the fault under the pointer to be put right", async () => {
+        const onFixAsked = await openEditorWithMarks();
         await pointAt(12);
 
         await act(async () => {
@@ -482,6 +510,6 @@ describe("what the checks found in the prose being written", () => {
                 .dispatchEvent(new MouseEvent("click", { bubbles: true }));
         });
 
-        expect(onFixChosen).toHaveBeenCalledWith(REPEATED, "very");
+        expect(onFixAsked).toHaveBeenCalledWith(REPEATED);
     });
 });

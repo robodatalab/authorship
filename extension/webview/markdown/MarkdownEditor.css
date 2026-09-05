@@ -1,7 +1,40 @@
 .markdown-editor-mark {
+    text-decoration-skip-ink: none;
+    text-underline-offset: 2px;
+}
+
+/* A fault the rules can put right themselves, drawn as the editor draws its own. */
+.markdown-editor-mark-grammar {
+    text-decoration: underline wavy
+        var(--vscode-editorError-foreground, #f14c4c);
+}
+
+.markdown-editor-mark-spelling {
     text-decoration: underline wavy
         var(--vscode-editorWarning-foreground, #cca700);
-    text-underline-offset: 3px;
+}
+
+/* Something the story reads worse for, which nobody but the author can settle. */
+.markdown-editor-mark-style {
+    background-image: linear-gradient(
+        to right,
+        var(--vscode-editorInfo-foreground, #3794ff) 0 100%
+    );
+    background-repeat: repeat-x;
+    background-size: 100% 2px;
+    background-position: 0 100%;
+}
+
+/* Borrowed opinions, drawn quieter than our own: proselint reads usage guides
+   rather than the story, and is right less often about a novel. */
+.markdown-editor-mark-usage {
+    background-image: linear-gradient(
+        to right,
+        var(--vscode-charts-purple, #b180d7) 0 100%
+    );
+    background-repeat: repeat-x;
+    background-size: 100% 1px;
+    background-position: 0 100%;
 }
 
 .markdown-editor-mark-said {
