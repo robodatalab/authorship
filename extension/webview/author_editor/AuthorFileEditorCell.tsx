@@ -1,14 +1,25 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
 import {
     invokeAuthorDocumentCommand,
     type PostToHost,
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
+import { LinterTooltip } from "../linter/LinterTooltip";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
+    sidebar?: ReactNode;
     children?: ReactNode;
+}
+
+interface AuthorFileEditorCellWarningProps {
+    issues: string[];
+}
+
+interface AuthorFileEditorCellRunProps {
+    isRunning: boolean;
+    onRun: () => void;
 }
 
 interface AuthorFileEditorCellHeaderProps {
@@ -66,7 +77,10 @@ function commandIsVisible(
     );
 }
 
-export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
+export function AuthorFileEditorCell({
+    sidebar,
+    children,
+}: AuthorFileEditorCellProps) {
     const { commands, at, attrs, postToHost } = useContext(
         AuthorFileEditorCellCommandsContext,
     );
@@ -94,7 +108,8 @@ export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
                         </button>
                     ))}
             </div>
-            {children}
+            <div className="author-file-editor-cell-sidebar">{sidebar}</div>
+            <div className="author-file-editor-cell-main">{children}</div>
         </section>
     );
 }
@@ -127,4 +142,56 @@ export function AuthorFileEditorCellCard({
     children,
 }: AuthorFileEditorCellCardProps) {
     return <div className="author-file-editor-cell-card">{children}</div>;
+}
+
+/**
+ * What the prose checker found in this section, on the way to the page.
+ *
+ * The marks themselves are drawn in the editor, where the text is; a section
+ * being read rather than written says only that there is something to see.
+ */
+export function AuthorFileEditorCellWarning({
+    issues,
+}: AuthorFileEditorCellWarningProps) {
+    const [tooltipIsShown, showTooltip] = useState(false);
+
+    if (issues.length === 0) {
+        return null;
+    }
+
+    return (
+        <div
+            className="author-file-editor-cell-warning"
+            onMouseEnter={() => showTooltip(true)}
+            onMouseLeave={() => showTooltip(false)}
+        >
+            <i className="codicon codicon-warning" />
+            {tooltipIsShown && <LinterTooltip issues={issues} />}
+        </div>
+    );
+}
+
+export function AuthorFileEditorCellRun({
+    isRunning,
+    onRun,
+}: AuthorFileEditorCellRunProps) {
+    const said = isRunning ? "Writing this section…" : "Write this section";
+    return (
+        <button
+            type="button"
+            className="author-file-editor-cell-run"
+            title={said}
+            aria-label={said}
+            disabled={isRunning}
+            onClick={onRun}
+        >
+            <i
+                className={
+                    isRunning
+                        ? "codicon codicon-loading codicon-modifier-spin"
+                        : "codicon codicon-play"
+                }
+            />
+        </button>
+    );
 }

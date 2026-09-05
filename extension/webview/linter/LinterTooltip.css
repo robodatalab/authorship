@@ -1,0 +1,25 @@
+.linter-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 2;
+    width: max-content;
+    max-width: 320px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+    border-radius: 4px;
+}
+
+.linter-tooltip-issue {
+    margin: 0;
+}
+
+.linter-tooltip-issue + .linter-tooltip-issue {
+    margin-top: 4px;
+}

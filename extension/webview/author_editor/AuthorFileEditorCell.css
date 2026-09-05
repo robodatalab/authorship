@@ -1,11 +1,52 @@
 .author-file-editor-cell {
     position: relative;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
     background: var(--vscode-editor-background);
     overflow: hidden;
+}
+
+.author-file-editor-cell-sidebar {
+    display: flex;
+    flex: 0 0 28px;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding-top: 4px;
+    background: var(--vscode-editor-background);
+    border-right: 1px solid var(--vscode-panel-border);
+}
+
+.author-file-editor-cell-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.author-file-editor-cell-warning {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.author-file-editor-cell-run {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    color: var(--vscode-foreground);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.author-file-editor-cell-run:disabled {
+    color: var(--vscode-descriptionForeground);
+    cursor: default;
 }
 
 .author-file-editor-cell-actions {
