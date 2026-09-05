@@ -143,31 +143,6 @@ describe("inserting a cell", () => {
         expect(document.cells[0].attrs.title).toBe("New");
     });
 
-    it("says the document changed", () => {
-        const document = AuthorDocument.fromText(
-            "<!-- cell: markdown -->\n\none\n",
-        );
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.insertAt(0, blankChapter());
-
-        expect(changes).toBe(1);
-    });
-
-    it("leaves the inserted cell saying so when it is edited", () => {
-        const document = AuthorDocument.fromText(
-            "<!-- cell: markdown -->\n\none\n",
-        );
-        document.insertAt(0, blankChapter());
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.cells[0].replaceMarkdown("written");
-
-        expect(changes).toBe(1);
-    });
-});
 
 describe("what a document reads as", () => {
     const readCells = (text: string) => cellsOfText(text);
@@ -305,8 +280,6 @@ describe("moving a cell", () => {
 
     it("leaves the first cell where it is", () => {
         const document = threeCells();
-        let changes = 0;
-        document.onChanged(() => changes++);
 
         document.moveAt(0, -1);
 
@@ -315,13 +288,10 @@ describe("moving a cell", () => {
             "two",
             "three",
         ]);
-        expect(changes).toBe(0);
     });
 
     it("leaves the last cell where it is", () => {
         const document = threeCells();
-        let changes = 0;
-        document.onChanged(() => changes++);
 
         document.moveAt(2, 3);
 
@@ -330,19 +300,8 @@ describe("moving a cell", () => {
             "two",
             "three",
         ]);
-        expect(changes).toBe(0);
     });
 
-    it("says the document changed", () => {
-        const document = threeCells();
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.moveAt(0, 1);
-
-        expect(changes).toBe(1);
-    });
-});
 
 describe("deleting a cell", () => {
     const twoCells = () =>
@@ -358,25 +317,12 @@ describe("deleting a cell", () => {
         expect(document.cells.map((cell) => cell.kind)).toEqual([NOTE]);
     });
 
-    it("says the document changed", () => {
-        const document = twoCells();
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.removeAt(1);
-
-        expect(changes).toBe(1);
-    });
-
     it("does nothing when there is no cell there", () => {
         const document = twoCells();
-        let changes = 0;
-        document.onChanged(() => changes++);
 
         document.removeAt(2);
 
         expect(document.cells).toHaveLength(2);
-        expect(changes).toBe(0);
     });
 });
 
@@ -422,27 +368,3 @@ describe("folding a cell", () => {
         );
     });
 
-    it("says the document changed", () => {
-        const document = AuthorDocument.fromText(
-            "<!-- cell: markdown -->\n\none\n",
-        );
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.cells[0].fold(true);
-
-        expect(changes).toBe(1);
-    });
-
-    it("says nothing when it is already folded", () => {
-        const document = AuthorDocument.fromText(
-            '<!-- cell: markdown folded="true" -->\n\none\n',
-        );
-        let changes = 0;
-        document.onChanged(() => changes++);
-
-        document.cells[0].fold(true);
-
-        expect(changes).toBe(0);
-    });
-});

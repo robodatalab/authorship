@@ -74,15 +74,11 @@ function readAttributes(text: string): Record<string, string> {
  * about it, and is kept even when this module has no use for it.
  */
 export class Cell {
-    #changeListeners: (() => void)[];
-
     constructor(
         public kind: string,
         public source: string,
         public attrs: Record<string, string>,
-        changed: () => void = () => {},
     ) {
-        this.#changeListeners = [changed];
         if (!attrs[UNIQUE_CELL_ID]) {
             this.attrs = { ...attrs, [UNIQUE_CELL_ID]: crypto.randomUUID() };
         }
@@ -92,16 +88,11 @@ export class Cell {
         return this.attrs[UNIQUE_CELL_ID];
     }
 
-    onChanged(listener: () => void): void {
-        this.#changeListeners.push(listener);
-    }
-
     replaceMarkdown(markdown: string): void {
         if (this.source === markdown) {
             return;
         }
         this.source = markdown;
-        this.notifyChanged();
     }
 
     marker(): string {
@@ -129,13 +120,6 @@ export class Cell {
             delete attrs[FOLDED];
         }
         this.attrs = attrs;
-        this.notifyChanged();
-    }
-
-    private notifyChanged(): void {
-        for (const listener of this.#changeListeners) {
-            listener();
-        }
     }
 
     replaceAttribute(name: string, value: string): void {
@@ -143,14 +127,11 @@ export class Cell {
             return;
         }
         this.attrs = { ...this.attrs, [name]: value };
-        this.notifyChanged();
     }
 }
 
 export class AuthorDocument implements vscode.CustomDocument {
     private documentCells: Cell[];
-    private readonly changeListeners: (() => void)[] = [];
-
     constructor(
         readonly uri: vscode.Uri,
         text: string,
@@ -176,14 +157,12 @@ export class AuthorDocument implements vscode.CustomDocument {
             }
         }
 
-        const changed = (): void => this.notifyChanged();
         this.documentCells = sections.map(
             (section) =>
                 new Cell(
                     section.marker[1],
                     trimBlankEnds(section.body),
                     readAttributes(section.marker[2]),
-                    changed,
                 ),
         );
     }
@@ -202,11 +181,8 @@ export class AuthorDocument implements vscode.CustomDocument {
         this.documentCells.splice(
             at,
             0,
-            new Cell(cell.kind, cell.source, cell.attrs, () =>
-                this.notifyChanged(),
-            ),
+            new Cell(cell.kind, cell.source, cell.attrs),
         );
-        this.notifyChanged();
     }
 
     moveAt(at: number, to: number): void {
@@ -215,7 +191,6 @@ export class AuthorDocument implements vscode.CustomDocument {
         }
         const [moved] = this.documentCells.splice(at, 1);
         this.documentCells.splice(to, 0, moved);
-        this.notifyChanged();
     }
 
     removeAt(at: number): void {
@@ -223,7 +198,6 @@ export class AuthorDocument implements vscode.CustomDocument {
             return;
         }
         this.documentCells.splice(at, 1);
-        this.notifyChanged();
     }
 
     toText(): string {
@@ -237,16 +211,6 @@ export class AuthorDocument implements vscode.CustomDocument {
             }
         }
         return out.join("\n");
-    }
-
-    onChanged(listener: () => void): void {
-        this.changeListeners.push(listener);
-    }
-
-    notifyChanged(): void {
-        for (const listener of this.changeListeners) {
-            listener();
-        }
     }
 }
 

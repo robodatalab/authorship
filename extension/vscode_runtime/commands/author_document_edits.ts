@@ -26,7 +26,3 @@ export function replaceCellAttribute(
         value,
     });
 }
-
-export function fixProseError(postToHost: PostToHost, id: number): void {
-    invokeAuthorDocumentCommand(postToHost, "fixProseError", { id });
-}
