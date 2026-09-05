@@ -11,15 +11,44 @@
     font-weight: 400;
     line-height: 1.4;
     color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
-    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
-    border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+    background: var(
+        --vscode-editorHoverWidget-background,
+        var(--vscode-editorWidget-background)
+    );
+    border: 1px solid
+        var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
     border-radius: 4px;
 }
 
-.linter-tooltip-issue {
-    margin: 0;
+.linter-tooltip-error + .linter-tooltip-error {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--vscode-panel-border);
 }
 
-.linter-tooltip-issue + .linter-tooltip-issue {
-    margin-top: 4px;
+.linter-tooltip-said {
+    margin: 0;
+    font-weight: 600;
+}
+
+.linter-tooltip-why {
+    margin: 2px 0 0;
+    color: var(--vscode-descriptionForeground);
+}
+
+.linter-tooltip-fix {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 4px 0 0;
+    padding: 2px 8px;
+    font: inherit;
+    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    background: var(
+        --vscode-button-secondaryBackground,
+        var(--vscode-editorWidget-background)
+    );
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 3px;
+    cursor: pointer;
 }

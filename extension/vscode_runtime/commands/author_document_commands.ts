@@ -1,8 +1,11 @@
+import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
+import { FixProseErrorCommand } from "./fix_prose_error";
 import { FoldCellCommand } from "./fold_cell";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
@@ -31,6 +34,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new InsertCellCommand(),
     new ReplaceMarkdownCommand(),
     new ReplaceAttributeCommand(),
+    new FixProseErrorCommand(),
+    new CheckProseCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),
@@ -39,10 +44,16 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
 ];
 
 /** What the page needs to draw a command and to ask for it by name. */
-export function authorDocumentCommandsToDraw(): AuthorDocumentCommand[] {
+export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {
     return AUTHOR_DOCUMENT_COMMANDS.filter(
         (command) => command.iconClassName !== "",
-    );
+    ).map((command) => ({
+        name: command.name,
+        category: command.category,
+        iconClassName: command.iconClassName,
+        tooltip: command.tooltip,
+        visibleWhen: command.visibleWhen,
+    }));
 }
 
 export function authorDocumentCommand(

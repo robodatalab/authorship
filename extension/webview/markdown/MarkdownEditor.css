@@ -1,3 +1,14 @@
+.markdown-editor-mark {
+    text-decoration: underline wavy
+        var(--vscode-editorWarning-foreground, #cca700);
+    text-underline-offset: 3px;
+}
+
+.markdown-editor-mark-said {
+    position: fixed;
+    z-index: 20;
+}
+
 .markdown-editor {
     width: 100%;
     min-height: 1.4em;

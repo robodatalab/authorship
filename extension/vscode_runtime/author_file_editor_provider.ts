@@ -2,8 +2,13 @@ import * as vscode from "vscode";
 import { AuthorDocument } from "./storydoc/model";
 import {
     authorDocumentCommand,
-    authorDocumentCommandsToDraw,
+    authorDocumentCommandCards,
 } from "./commands/author_document_commands";
+import {
+    authorFileEditorSession,
+    closeAuthorFileEditorSession,
+    openAuthorFileEditorSession,
+} from "./author_file_editor_session";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";
@@ -12,8 +17,6 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         vscode.CustomDocumentEditEvent<AuthorDocument>
     >();
     readonly onDidChangeCustomDocument = this.edited.event;
-
-    private readonly panelsByDocument = new Map<string, vscode.WebviewPanel>();
 
     constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -40,7 +43,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             ),
         };
         panel.webview.html = this.html(panel.webview, document.uri);
-        this.panelsByDocument.set(document.uri.toString(), panel);
+        const session = openAuthorFileEditorSession(document, panel);
 
         const webviewSpoke = panel.webview.onDidReceiveMessage(
             (message: {
@@ -49,8 +52,11 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 payload?: Record<string, unknown>;
             }) => {
                 if (message?.type === "ready") {
-                    this.sendCommands(document);
-                    this.sendDocument(document);
+                    void panel.webview.postMessage({
+                        type: "commands",
+                        commands: authorDocumentCommandCards(),
+                    });
+                    session.sendDocument();
                 } else if (message?.type === "invoke" && message.command) {
                     void this.runCommand(
                         document,
@@ -74,14 +80,14 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 return;
             }
             document.fromText(text);
-            this.sendDocument(document);
+            session.sendDocument();
         });
 
         panel.onDidDispose(() => {
             writtenElsewhere.dispose();
             fileWatcher.dispose();
             webviewSpoke.dispose();
-            this.panelsByDocument.delete(document.uri.toString());
+            closeAuthorFileEditorSession(document);
         });
     }
 
@@ -107,7 +113,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     async revertCustomDocument(document: AuthorDocument): Promise<void> {
         const bytes = await vscode.workspace.fs.readFile(document.uri);
         document.fromText(new TextDecoder().decode(bytes));
-        this.sendDocument(document);
+        authorFileEditorSession(document)?.sendDocument();
     }
 
     async backupCustomDocument(
@@ -141,7 +147,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         }
         document.fromText(before);
         this.recordEdit(document, after);
-        this.sendDocument(document);
+        authorFileEditorSession(document)?.sendDocument();
     }
 
     private recordEdit(document: AuthorDocument, text: string): void {
@@ -152,41 +158,13 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             label: "Edit",
             undo: () => {
                 document.fromText(before);
-                this.sendDocument(document);
+                authorFileEditorSession(document)?.sendDocument();
             },
             redo: () => {
                 document.fromText(text);
-                this.sendDocument(document);
+                authorFileEditorSession(document)?.sendDocument();
             },
         });
-    }
-
-    private sendCommands(document: AuthorDocument): void {
-        void this.panelsByDocument
-            .get(document.uri.toString())
-            ?.webview.postMessage({
-                type: "commands",
-                commands: authorDocumentCommandsToDraw().map((command) => ({
-                    name: command.name,
-                    category: command.category,
-                    iconClassName: command.iconClassName,
-                    tooltip: command.tooltip,
-                    visibleWhen: command.visibleWhen,
-                })),
-            });
-    }
-
-    private sendDocument(document: AuthorDocument): void {
-        void this.panelsByDocument
-            .get(document.uri.toString())
-            ?.webview.postMessage({
-                type: "document",
-                cells: document.cells.map((cell) => ({
-                    kind: cell.kind,
-                    source: cell.source,
-                    attrs: cell.attrs,
-                })),
-            });
     }
 
     private html(webview: vscode.Webview, document: vscode.Uri): string {

@@ -7,8 +7,10 @@ import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellRun,
+    AuthorFileEditorCellState,
     AuthorFileEditorCellWarning,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
+import type { WebviewProseError } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,49 +86,60 @@ describe("the sidebar every cell has", () => {
 });
 
 describe("what the prose checker found", () => {
+    const posted: unknown[] = [];
+
+    function errorSaying(
+        message: string,
+        replacements: string[] = [],
+    ): WebviewProseError {
+        return {
+            id: replacements.length,
+            cell: 0,
+            at: 10,
+            end: 19,
+            message,
+            detail: "It says it twice.",
+            replacements,
+        };
+    }
+
+    async function mountWarning(errors: WebviewProseError[]): Promise<void> {
+        posted.length = 0;
+        await mount(
+            <AuthorFileEditorCellState
+                commands={[]}
+                at={0}
+                attrs={{}}
+                errors={errors}
+                postToHost={(message) => posted.push(message)}
+            >
+                <AuthorFileEditorCellWarning />
+            </AuthorFileEditorCellState>,
+        );
+    }
+
+    function warning(): Element {
+        return document.querySelector(".author-file-editor-cell-warning")!;
+    }
+
     it("says nothing when it found nothing", async () => {
-        await mount(<AuthorFileEditorCellWarning issues={[]} />);
+        await mountWarning([]);
         expect(
             document.querySelector(".author-file-editor-cell-warning"),
         ).toBeNull();
     });
 
     it("marks the cell when it found something", async () => {
-        await mount(<AuthorFileEditorCellWarning issues={["Repeated word"]} />);
-        expect(
-            document.querySelector(".author-file-editor-cell-warning i")
-                ?.className,
-        ).toBe("codicon codicon-warning");
-    });
-
-    it("says what it found when the pointer stops on it", async () => {
-        await mount(
-            <AuthorFileEditorCellWarning
-                issues={["Repeated word", "Passive voice"]}
-            />,
+        await mountWarning([errorSaying("Repeated word")]);
+        expect(warning().querySelector("i")?.className).toBe(
+            "codicon codicon-warning",
         );
-        const warning = document.querySelector(
-            ".author-file-editor-cell-warning",
-        )!;
-        expect(document.querySelector(".linter-tooltip")).toBeNull();
-
-        await hover(warning, "mouseover");
-
-        expect(
-            [...document.querySelectorAll(".linter-tooltip-issue")].map(
-                (issue) => issue.textContent,
-            ),
-        ).toEqual(["Repeated word", "Passive voice"]);
     });
 
-    it("takes it back when the pointer moves off", async () => {
-        await mount(<AuthorFileEditorCellWarning issues={["Repeated word"]} />);
-        const warning = document.querySelector(
-            ".author-file-editor-cell-warning",
-        )!;
+    it("says no more than that, since a mark is what carries the words", async () => {
+        await mountWarning([errorSaying("Repeated word", ["very"])]);
 
-        await hover(warning, "mouseover");
-        await hover(warning, "mouseout");
+        await hover(warning(), "mouseover");
 
         expect(document.querySelector(".linter-tooltip")).toBeNull();
     });

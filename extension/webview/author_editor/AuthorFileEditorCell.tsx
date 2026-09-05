@@ -1,20 +1,16 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 import {
     invokeAuthorDocumentCommand,
     type PostToHost,
     type WebviewAuthorDocumentCommandCard,
+    type WebviewProseError,
 } from "./AuthorFileEditorCanvas";
-import { LinterTooltip } from "../linter/LinterTooltip";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
     sidebar?: ReactNode;
     children?: ReactNode;
-}
-
-interface AuthorFileEditorCellWarningProps {
-    issues: string[];
 }
 
 interface AuthorFileEditorCellRunProps {
@@ -38,31 +34,40 @@ interface AuthorFileEditorCellCardProps {
     children?: ReactNode;
 }
 
-interface AuthorFileEditorCellCommandsProps {
+interface AuthorFileEditorCellStateProps {
     commands: WebviewAuthorDocumentCommandCard[];
     at: number;
     attrs: Readonly<Record<string, string>>;
+    errors: WebviewProseError[];
     postToHost: PostToHost;
     children?: ReactNode;
 }
 
-const AuthorFileEditorCellCommandsContext = createContext<
-    Omit<AuthorFileEditorCellCommandsProps, "children">
->({ commands: [], at: 0, attrs: {}, postToHost: () => undefined });
+const AuthorFileEditorCellStateContext = createContext<
+    Omit<AuthorFileEditorCellStateProps, "children">
+>({
+    commands: [],
+    at: 0,
+    attrs: {},
+    errors: [],
+    postToHost: () => undefined,
+});
 
-export function AuthorFileEditorCellCommands({
+/** What the host says about one cell, given to every part that draws it. */
+export function AuthorFileEditorCellState({
     commands,
     at,
     attrs,
+    errors,
     postToHost,
     children,
-}: AuthorFileEditorCellCommandsProps) {
+}: AuthorFileEditorCellStateProps) {
     return (
-        <AuthorFileEditorCellCommandsContext.Provider
-            value={{ commands, at, attrs, postToHost }}
+        <AuthorFileEditorCellStateContext.Provider
+            value={{ commands, at, attrs, errors, postToHost }}
         >
             {children}
-        </AuthorFileEditorCellCommandsContext.Provider>
+        </AuthorFileEditorCellStateContext.Provider>
     );
 }
 
@@ -82,7 +87,7 @@ export function AuthorFileEditorCell({
     children,
 }: AuthorFileEditorCellProps) {
     const { commands, at, attrs, postToHost } = useContext(
-        AuthorFileEditorCellCommandsContext,
+        AuthorFileEditorCellStateContext,
     );
     return (
         <section className="author-file-editor-cell">
@@ -150,23 +155,24 @@ export function AuthorFileEditorCellCard({
  * The marks themselves are drawn in the editor, where the text is; a section
  * being read rather than written says only that there is something to see.
  */
-export function AuthorFileEditorCellWarning({
-    issues,
-}: AuthorFileEditorCellWarningProps) {
-    const [tooltipIsShown, showTooltip] = useState(false);
+/** What the checks found in the cell being drawn, for the parts that draw it. */
+export function useAuthorFileEditorCellProseErrors(): WebviewProseError[] {
+    return useContext(AuthorFileEditorCellStateContext).errors;
+}
 
-    if (issues.length === 0) {
+export function AuthorFileEditorCellWarning() {
+    const { errors } = useContext(AuthorFileEditorCellStateContext);
+
+    if (errors.length === 0) {
         return null;
     }
 
     return (
         <div
             className="author-file-editor-cell-warning"
-            onMouseEnter={() => showTooltip(true)}
-            onMouseLeave={() => showTooltip(false)}
+            aria-label={`${errors.length} to look at`}
         >
             <i className="codicon codicon-warning" />
-            {tooltipIsShown && <LinterTooltip issues={issues} />}
         </div>
     );
 }

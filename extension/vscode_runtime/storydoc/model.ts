@@ -72,7 +72,7 @@ function readAttributes(text: string): Record<string, string> {
  * about it, and is kept even when this module has no use for it.
  */
 export class Cell {
-    #changed: () => void;
+    #changeListeners: (() => void)[];
 
     constructor(
         public kind: string,
@@ -80,7 +80,11 @@ export class Cell {
         public attrs: Record<string, string>,
         changed: () => void = () => {},
     ) {
-        this.#changed = changed;
+        this.#changeListeners = [changed];
+    }
+
+    onChanged(listener: () => void): void {
+        this.#changeListeners.push(listener);
     }
 
     replaceMarkdown(markdown: string): void {
@@ -88,7 +92,7 @@ export class Cell {
             return;
         }
         this.source = markdown;
-        this.#changed();
+        this.notifyChanged();
     }
 
     marker(): string {
@@ -116,7 +120,13 @@ export class Cell {
             delete attrs[FOLDED];
         }
         this.attrs = attrs;
-        this.#changed();
+        this.notifyChanged();
+    }
+
+    private notifyChanged(): void {
+        for (const listener of this.#changeListeners) {
+            listener();
+        }
     }
 
     replaceAttribute(name: string, value: string): void {
@@ -124,7 +134,7 @@ export class Cell {
             return;
         }
         this.attrs = { ...this.attrs, [name]: value };
-        this.#changed();
+        this.notifyChanged();
     }
 }
 

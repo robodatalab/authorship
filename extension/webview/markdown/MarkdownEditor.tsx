@@ -7,6 +7,7 @@ import {
     useState,
 } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import * as monaco from "monaco-editor/editor/editor.api";
 import {
     conf as markdownConfiguration,
@@ -14,6 +15,7 @@ import {
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
 import { marked } from "marked";
+import { LinterTooltip, type ProseError } from "../linter/LinterTooltip";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -31,6 +33,8 @@ monaco.editor.addKeybindingRules([
 ]);
 
 const SETTLE_AFTER_TYPING_MS = 400;
+/** Long enough to reach the tooltip from the word it belongs to. */
+const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 
 interface MarkdownEditorBeingEdited {
@@ -71,12 +75,16 @@ function useMarkdownEditorBeingEdited(editorId: string) {
 interface MarkdownEditorProps {
     markdown: string;
     onMarkdownCommitted: (markdown: string) => void;
+    errors?: ProseError[];
+    onFixAsked?: (error: ProseError) => void;
     children?: (markdown: string) => ReactNode;
 }
 
 export function MarkdownEditor({
     markdown,
     onMarkdownCommitted,
+    errors = [],
+    onFixAsked = () => undefined,
     children,
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
@@ -94,7 +102,10 @@ export function MarkdownEditor({
 
     if (!isEditing && children) {
         return (
-            <div className="markdown-rendered" onDoubleClick={openOnDoubleClick}>
+            <div
+                className="markdown-rendered"
+                onDoubleClick={openOnDoubleClick}
+            >
                 {children(markdown)}
             </div>
         );
@@ -115,6 +126,8 @@ export function MarkdownEditor({
     return (
         <MonacoMarkdownEditor
             markdown={draftMarkdown}
+            errors={errors}
+            onFixAsked={onFixAsked}
             onMarkdownChanged={setDraftMarkdown}
             onSettled={onMarkdownCommitted}
             onFinished={() => {
@@ -127,19 +140,40 @@ export function MarkdownEditor({
 
 interface MonacoMarkdownEditorProps {
     markdown: string;
+    errors: ProseError[];
+    onFixAsked: (error: ProseError) => void;
     onMarkdownChanged: (markdown: string) => void;
     onSettled: (markdown: string) => void;
     onFinished: () => void;
 }
 
+/** An error the pointer is on, and where in the editor to say so. */
+interface MarkdownEditorErrorUnderPointer {
+    error: ProseError;
+    top: number;
+    left: number;
+}
+
 function MonacoMarkdownEditor({
     markdown,
+    errors,
+    onFixAsked,
     onMarkdownChanged,
     onSettled,
     onFinished,
 }: MonacoMarkdownEditorProps) {
     const host = useRef<HTMLDivElement>(null);
     const openEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const marks = useRef<monaco.editor.IEditorDecorationsCollection | null>(
+        null,
+    );
+    const errorsFound = useRef(errors);
+    errorsFound.current = errors;
+    const [errorUnderPointer, sayErrorUnderPointer] =
+        useState<MarkdownEditorErrorUnderPointer | null>(null);
+    const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(
+        undefined,
+    );
     const latest = useRef({ onMarkdownChanged, onSettled, onFinished });
     latest.current = { onMarkdownChanged, onSettled, onFinished };
 
@@ -197,7 +231,48 @@ function MonacoMarkdownEditor({
             editor.layout();
         };
 
+        marks.current = editor.createDecorationsCollection([]);
+
+        const pointedAt = (
+            event: monaco.editor.IEditorMouseEvent,
+        ): MarkdownEditorErrorUnderPointer | null => {
+            const model = editor.getModel();
+            const position = event.target.position;
+            if (!model || !position) {
+                return null;
+            }
+            const offset = model.getOffsetAt(position);
+            const error = errorsFound.current.find(
+                (found) => offset >= found.at && offset <= found.end,
+            );
+            const drawnAt =
+                error && editor.getScrolledVisiblePosition(position);
+            if (!error || !drawnAt) {
+                return null;
+            }
+            // The page it is drawn on is clipped by the cell it is in, so the
+            // words are put on the window itself rather than in the editor.
+            const editorBox = node.getBoundingClientRect();
+            return {
+                error,
+                top: editorBox.top + drawnAt.top + drawnAt.height,
+                left: editorBox.left + drawnAt.left,
+            };
+        };
+
         const sized = editor.onDidContentSizeChange(fitToContent);
+        const pointed = editor.onMouseMove((event) => {
+            const found = pointedAt(event);
+            if (found) {
+                clearTimeout(leaving.current);
+                sayErrorUnderPointer(found);
+            } else {
+                leaving.current = setTimeout(
+                    () => sayErrorUnderPointer(null),
+                    HOLD_TOOLTIP_MS,
+                );
+            }
+        });
         let settling: ReturnType<typeof setTimeout> | undefined;
         const changed = editor.onDidChangeModelContent(() => {
             latest.current.onMarkdownChanged(editor.getValue());
@@ -222,7 +297,9 @@ function MonacoMarkdownEditor({
             openEditor.current = null;
             window.removeEventListener("keydown", escaped, true);
             clearTimeout(settling);
+            clearTimeout(leaving.current);
             sized.dispose();
+            pointed.dispose();
             changed.dispose();
             editor.dispose();
         };
@@ -235,5 +312,43 @@ function MonacoMarkdownEditor({
         }
     }, [markdown]);
 
-    return <div className="markdown-editor" ref={host} />;
+    useEffect(() => {
+        const model = openEditor.current?.getModel();
+        if (!model) {
+            return;
+        }
+        marks.current?.set(
+            errors.map((error) => ({
+                range: monaco.Range.fromPositions(
+                    model.getPositionAt(error.at),
+                    model.getPositionAt(error.end),
+                ),
+                options: { inlineClassName: "markdown-editor-mark" },
+            })),
+        );
+    }, [errors, markdown]);
+
+    return (
+        <>
+            <div className="markdown-editor" ref={host} />
+            {errorUnderPointer &&
+                createPortal(
+                    <div
+                        className="markdown-editor-mark-said"
+                        style={{
+                            top: errorUnderPointer.top,
+                            left: errorUnderPointer.left,
+                        }}
+                        onMouseEnter={() => clearTimeout(leaving.current)}
+                        onMouseLeave={() => sayErrorUnderPointer(null)}
+                    >
+                        <LinterTooltip
+                            errors={[errorUnderPointer.error]}
+                            onFixAsked={onFixAsked}
+                        />
+                    </div>,
+                    document.body,
+                )}
+        </>
+    );
 }

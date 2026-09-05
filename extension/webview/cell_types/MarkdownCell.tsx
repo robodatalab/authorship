@@ -1,5 +1,7 @@
 import {
     AuthorFileEditorCell,
+    AuthorFileEditorCellWarning,
+    useAuthorFileEditorCellProseErrors,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
@@ -11,6 +13,7 @@ import type {
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
+    fixProseError,
     replaceCellAttribute,
     replaceCellMarkdown,
 } from "../../vscode_runtime/commands/author_document_edits";
@@ -23,12 +26,15 @@ interface MarkdownCellProps {
 }
 
 export function MarkdownCell({ cell, at, postToHost }: MarkdownCellProps) {
+    const errors = useAuthorFileEditorCellProseErrors();
     return (
-        <AuthorFileEditorCell>
+        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
             <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
                     markdown={cell.source}
+                    errors={errors}
+                    onFixAsked={(error) => fixProseError(postToHost, error.id)}
                     onMarkdownCommitted={(markdown) =>
                         replaceCellMarkdown(postToHost, at, markdown)
                     }
