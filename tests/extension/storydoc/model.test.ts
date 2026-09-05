@@ -142,7 +142,7 @@ describe("inserting a cell", () => {
 
         expect(document.cells[0].attrs.title).toBe("New");
     });
-
+});
 
 describe("what a document reads as", () => {
     const readCells = (text: string) => cellsOfText(text);
@@ -301,7 +301,7 @@ describe("moving a cell", () => {
             "three",
         ]);
     });
-
+});
 
 describe("deleting a cell", () => {
     const twoCells = () =>
@@ -367,4 +367,4 @@ describe("folding a cell", () => {
             "<!-- cell: markdown -->\n\none\n",
         );
     });
-
+});
