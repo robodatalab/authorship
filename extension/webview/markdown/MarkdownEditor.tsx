@@ -33,7 +33,6 @@ monaco.editor.addKeybindingRules([
 ]);
 
 const SETTLE_AFTER_TYPING_MS = 400;
-/** Long enough to reach the tooltip from the word it belongs to. */
 const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 
@@ -147,7 +146,6 @@ interface MonacoMarkdownEditorProps {
     onFinished: () => void;
 }
 
-/** An error the pointer is on, and where in the editor to say so. */
 interface MarkdownEditorErrorUnderPointer {
     error: ProseError;
     top: number;
@@ -250,8 +248,6 @@ function MonacoMarkdownEditor({
             if (!error || !drawnAt) {
                 return null;
             }
-            // The page it is drawn on is clipped by the cell it is in, so the
-            // words are put on the window itself rather than in the editor.
             const editorBox = node.getBoundingClientRect();
             return {
                 error,

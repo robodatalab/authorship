@@ -1,9 +1,7 @@
 import "./LinterTooltip.css";
 
-/** One thing a check found, where it is in a text, and what could go there. */
 export interface ProseError {
     readonly id: number;
-    /** What sort of fault it is, which is what it is drawn in. */
     readonly kind: string;
     readonly at: number;
     readonly end: number;

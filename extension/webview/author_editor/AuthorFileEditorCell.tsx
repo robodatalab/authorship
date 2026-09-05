@@ -53,7 +53,6 @@ const AuthorFileEditorCellStateContext = createContext<
     postToHost: () => undefined,
 });
 
-/** What the host says about one cell, given to every part that draws it. */
 export function AuthorFileEditorCellState({
     commands,
     at,
@@ -149,13 +148,6 @@ export function AuthorFileEditorCellCard({
     return <div className="author-file-editor-cell-card">{children}</div>;
 }
 
-/**
- * What the prose checker found in this section, on the way to the page.
- *
- * The marks themselves are drawn in the editor, where the text is; a section
- * being read rather than written says only that there is something to see.
- */
-/** What the checks found in the cell being drawn, for the parts that draw it. */
 export function useAuthorFileEditorCellProseErrors(): WebviewProseError[] {
     return useContext(AuthorFileEditorCellStateContext).errors;
 }

@@ -2,10 +2,8 @@ import { MODEL_SERVER_PORT } from "./process";
 
 const POLL_MS = 400;
 const TIMEOUT_MS = 180_000;
-/** A poll that went astray is not a job that stopped; a run of them is. */
 const POLLS_UNANSWERED = 5;
 
-/** What every job on the model server says about itself. */
 export interface ModelServerJob {
     running: boolean;
     error: string | null;
