@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import type { AuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { fromMarkdown } from "../markdown/exporter";
 
@@ -10,21 +11,19 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
     readonly tooltip =
         "Import Markdown — replace this document with an existing markdown manuscript";
 
-    constructor(private readonly document: vscode.Uri) {}
-
     /**
      * Replace the document with an existing markdown manuscript.
      *
      * This throws away what is here, so it asks first — and it asks with the
      * file's name in the question, because "are you sure" answers nothing.
      */
-    invoke = async (): Promise<void> => {
+    async invoke(document: AuthorDocument): Promise<void> {
         const picked = await vscode.window.showOpenDialog({
             title: "Import Markdown",
             openLabel: "Import",
             // Opened where the story lives, so the manuscript is usually already
             // on screen rather than several folders away.
-            defaultUri: vscode.Uri.joinPath(this.document, ".."),
+            defaultUri: vscode.Uri.joinPath(document.uri, ".."),
             canSelectFiles: true,
             canSelectFolders: false,
             canSelectMany: false,
@@ -40,7 +39,7 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         }
         const manuscript = picked[0];
         const confirmed = await vscode.window.showWarningMessage(
-            `Replace everything in ${vscode.workspace.asRelativePath(this.document)} with ${vscode.workspace.asRelativePath(manuscript)}?`,
+            `Replace everything in ${vscode.workspace.asRelativePath(document.uri)} with ${vscode.workspace.asRelativePath(manuscript)}?`,
             { modal: true },
             "Replace",
         );
@@ -49,13 +48,13 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         }
         const bytes = await vscode.workspace.fs.readFile(manuscript);
         await vscode.workspace.fs.writeFile(
-            this.document,
+            document.uri,
             new TextEncoder().encode(
                 fromMarkdown(new TextDecoder().decode(bytes)),
             ),
         );
         void vscode.window.showInformationMessage(
-            `Imported ${vscode.workspace.asRelativePath(manuscript)} into ${vscode.workspace.asRelativePath(this.document)}`,
+            `Imported ${vscode.workspace.asRelativePath(manuscript)} into ${vscode.workspace.asRelativePath(document.uri)}`,
         );
-    };
+    }
 }

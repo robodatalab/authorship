@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { AuthorDocument } from "./storydoc/model";
-import { authorDocumentCommand } from "./commands/author_document_commands";
+import {
+    authorDocumentCommand,
+    authorDocumentCommandsToDraw,
+} from "./commands/author_document_commands";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";
@@ -46,20 +49,13 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 payload?: Record<string, unknown>;
             }) => {
                 if (message?.type === "ready") {
+                    this.sendCommands(document);
                     this.sendDocument(document);
                 } else if (message?.type === "invoke" && message.command) {
                     this.runCommand(
                         document,
                         message.command,
                         message.payload ?? {},
-                    );
-                } else if (message?.type === "command" && message.command) {
-                    void vscode.commands.executeCommand(message.command);
-                } else if (message?.type === "openAsText") {
-                    void vscode.commands.executeCommand(
-                        "vscode.openWith",
-                        document.uri,
-                        "default",
                     );
                 }
             },
@@ -163,6 +159,20 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 this.sendDocument(document);
             },
         });
+    }
+
+    private sendCommands(document: AuthorDocument): void {
+        void this.panelsByDocument
+            .get(document.uri.toString())
+            ?.webview.postMessage({
+                type: "commands",
+                commands: authorDocumentCommandsToDraw().map((command) => ({
+                    name: command.name,
+                    category: command.category,
+                    iconClassName: command.iconClassName,
+                    tooltip: command.tooltip,
+                })),
+            });
     }
 
     private sendDocument(document: AuthorDocument): void {

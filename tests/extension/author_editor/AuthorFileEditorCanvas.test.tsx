@@ -1,16 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 import { AuthorFileEditorCell } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { WebviewAuthorDocumentCommandCard } from "../../../extension/vscode_runtime/commands/author_document_command";
+import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,
+    WebviewAuthorDocumentCommandCard,
     WebviewCell,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+
+interface Invocation {
+    type: string;
+    command: string;
+    payload: Record<string, unknown>;
+}
+
+let posted: Invocation[] = [];
 
 function markdownCell(source: string): WebviewCell {
     return { kind: "markdown", source, attrs: {} };
@@ -21,30 +30,36 @@ const CELL_RENDERERS: AuthorDocumentCellRenderers = {
 };
 
 function command(
-    tooltip: string,
+    name: string,
     category: string,
-): WebviewAuthorDocumentCommandCard & { invoke: ReturnType<typeof vi.fn> } {
+): WebviewAuthorDocumentCommandCard {
     return {
-        name: tooltip,
+        name,
         category,
-        iconClassName: `codicon codicon-${tooltip.toLowerCase()}`,
-        tooltip,
-        invoke: vi.fn(),
+        iconClassName: `codicon codicon-${name.toLowerCase()}`,
+        tooltip: name,
     };
 }
 
-const insertPositionsAsked: number[] = [];
-const cellPositionsAsked: number[] = [];
+const INSERT_COMMAND = command("insertCell", "insert");
+
+function cellType(kind: string, category: string): AuthorDocumentCellType {
+    return {
+        kind,
+        label: kind,
+        category,
+        render: () => null,
+        create: () => ({ kind, source: "", attrs: {} }),
+    };
+}
 
 async function mountCanvas(options: {
     cells?: WebviewCell[];
-    mainMenuCommands?: WebviewAuthorDocumentCommandCard[];
-    cellInsertCommands?: WebviewAuthorDocumentCommandCard[];
-    cellCommands?: WebviewAuthorDocumentCommandCard[];
+    commands?: WebviewAuthorDocumentCommandCard[];
+    cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
 }): Promise<void> {
-    insertPositionsAsked.length = 0;
-    cellPositionsAsked.length = 0;
+    posted = [];
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
@@ -52,17 +67,12 @@ async function mountCanvas(options: {
         createRoot(container).render(
             <AuthorFileEditorCanvas
                 cells={options.cells ?? []}
-                postToHost={() => undefined}
+                commands={options.commands ?? [INSERT_COMMAND]}
+                cellTypes={
+                    options.cellTypes ?? [cellType("markdown", "primary")]
+                }
+                postToHost={(message) => posted.push(message as Invocation)}
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
-                mainMenuCommands={options.mainMenuCommands ?? []}
-                cellInsertCommandsAt={(at) => {
-                    insertPositionsAsked.push(at);
-                    return options.cellInsertCommands ?? [];
-                }}
-                cellCommandsAt={(at) => {
-                    cellPositionsAsked.push(at);
-                    return options.cellCommands ?? [];
-                }}
             />,
         );
     });
@@ -130,53 +140,58 @@ describe("where the insert menus go", () => {
         });
         expect(insertMenus()).toHaveLength(2);
     });
+
+    it("draws no menu at all until the host has sent the insert command", async () => {
+        await mountCanvas({ cells: [markdownCell("one")], commands: [] });
+        expect(insertMenus()).toHaveLength(0);
+    });
 });
 
-describe("invoking a cell insert command", () => {
-    it("calls the command the button was drawn from", async () => {
-        const addMarkdown = command("Markdown", "primary");
-        const addChapter = command("Chapter", "primary");
+describe("adding a cell", () => {
+    it("asks for the kind of cell the button was drawn from", async () => {
         await mountCanvas({
             cells: [markdownCell("one")],
-            cellInsertCommands: [addMarkdown, addChapter],
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("chapter", "primary"),
+            ],
         });
 
-        const buttons = insertMenus()[0].querySelectorAll("button");
-        await click(buttons[1]);
+        await click(insertMenus()[0].querySelectorAll("button")[1]);
 
-        expect(addChapter.invoke).toHaveBeenCalledTimes(1);
-        expect(addMarkdown.invoke).not.toHaveBeenCalled();
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                command: "insertCell",
+                payload: {
+                    at: 0,
+                    cell: { kind: "chapter", source: "", attrs: {} },
+                },
+            },
+        ]);
     });
 
-    it("keeps each menu wired to the same commands", async () => {
-        const addMarkdown = command("Markdown", "primary");
+    it("asks each menu for the place it inserts at", async () => {
         await mountCanvas({
-            cells: [markdownCell("one")],
-            cellInsertCommands: [addMarkdown],
+            cells: [markdownCell("one"), markdownCell("two")],
         });
 
         for (const menu of insertMenus()) {
             await click(menu.querySelector("button")!);
         }
 
-        expect(addMarkdown.invoke).toHaveBeenCalledTimes(2);
+        expect(posted.map((invocation) => invocation.payload.at)).toEqual([
+            0, 1, 2,
+        ]);
     });
 
-    it("asks each menu for the commands of the place it inserts at", async () => {
-        await mountCanvas({
-            cells: [markdownCell("one"), markdownCell("two")],
-            cellInsertCommands: [command("Markdown", "primary")],
-        });
-
-        expect(insertPositionsAsked).toEqual([0, 1, 2]);
-    });
-
-    it("holds a command that is not primary behind the ellipsis", async () => {
-        const addMarkdown = command("Markdown", "primary");
-        const addCover = command("Cover", "secondary");
+    it("holds a kind that is not primary behind the ellipsis", async () => {
         await mountCanvas({
             cells: [],
-            cellInsertCommands: [addMarkdown, addCover],
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("cover", "secondary"),
+            ],
         });
 
         const menu = insertMenus()[0];
@@ -192,13 +207,17 @@ describe("invoking a cell insert command", () => {
         )!;
         expect(dropdown).not.toBeNull();
         await click(dropdown.querySelector("button")!);
-        expect(addCover.invoke).toHaveBeenCalledTimes(1);
+        expect(posted[0].payload.cell).toEqual({
+            kind: "cover",
+            source: "",
+            attrs: {},
+        });
     });
 
-    it("draws no ellipsis when every command is primary", async () => {
+    it("draws no ellipsis when every kind is primary", async () => {
         await mountCanvas({
             cells: [],
-            cellInsertCommands: [command("Markdown", "primary")],
+            cellTypes: [cellType("markdown", "primary")],
         });
         expect(
             insertMenus()[0].querySelector(
@@ -209,26 +228,32 @@ describe("invoking a cell insert command", () => {
 });
 
 describe("invoking a main menu command", () => {
-    it("calls the command the button was drawn from", async () => {
-        const runAll = command("Run All", "manuscript");
-        const viewSource = command("View Source", "view");
-        await mountCanvas({ mainMenuCommands: [runAll, viewSource] });
+    it("asks for the command the button was drawn from", async () => {
+        await mountCanvas({
+            commands: [
+                command("compile", "manuscript"),
+                command("openAsText", "view"),
+            ],
+        });
 
         const buttons = document.querySelectorAll(
             ".author-file-editor-main-menu-tool",
         );
         await click(buttons[1]);
 
-        expect(viewSource.invoke).toHaveBeenCalledTimes(1);
-        expect(runAll.invoke).not.toHaveBeenCalled();
+        expect(posted).toEqual([
+            { type: "invoke", command: "openAsText", payload: {} },
+        ]);
     });
 
-    it("draws a button for every command it is given", async () => {
+    it("draws a button for every command that belongs in the menu", async () => {
         await mountCanvas({
-            mainMenuCommands: [
-                command("Run All", "manuscript"),
-                command("Export", "transfer"),
-                command("View Source", "view"),
+            commands: [
+                command("compile", "manuscript"),
+                command("exportMarkdown", "transfer"),
+                command("openAsText", "view"),
+                command("deleteCell", "cell"),
+                INSERT_COMMAND,
             ],
         });
         expect(
@@ -238,11 +263,11 @@ describe("invoking a main menu command", () => {
 
     it("separates the categories with one divider between each", async () => {
         await mountCanvas({
-            mainMenuCommands: [
-                command("Run All", "manuscript"),
-                command("Check", "manuscript"),
-                command("Export", "transfer"),
-                command("View Source", "view"),
+            commands: [
+                command("compile", "manuscript"),
+                command("checkProse", "manuscript"),
+                command("exportMarkdown", "transfer"),
+                command("openAsText", "view"),
             ],
         });
         expect(
@@ -252,22 +277,13 @@ describe("invoking a main menu command", () => {
 });
 
 describe("the commands on a cell", () => {
-    it("asks for the commands of the cell it is drawing", async () => {
-        await mountCanvas({
-            cells: [markdownCell("one"), markdownCell("two")],
-            cellCommands: [command("Move up", "cell")],
-        });
-
-        expect(cellPositionsAsked).toEqual([0, 1]);
-    });
-
     it("draws one button for each, inside the cell it belongs to", async () => {
         await mountCanvas({
             cells: [markdownCell("one")],
             cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
-            cellCommands: [
-                command("Move up", "cell"),
-                command("Delete", "cell"),
+            commands: [
+                command("moveCellUp", "cell"),
+                command("deleteCell", "cell"),
             ],
         });
 
@@ -278,13 +294,14 @@ describe("the commands on a cell", () => {
         ).toHaveLength(2);
     });
 
-    it("calls the command the button was drawn from", async () => {
-        const moveUp = command("Move up", "cell");
-        const remove = command("Delete", "cell");
+    it("asks for the command the button was drawn from", async () => {
         await mountCanvas({
             cells: [markdownCell("one")],
             cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
-            cellCommands: [moveUp, remove],
+            commands: [
+                command("moveCellUp", "cell"),
+                command("deleteCell", "cell"),
+            ],
         });
 
         await click(
@@ -293,8 +310,27 @@ describe("the commands on a cell", () => {
             )[1],
         );
 
-        expect(remove.invoke).toHaveBeenCalledTimes(1);
-        expect(moveUp.invoke).not.toHaveBeenCalled();
+        expect(posted).toEqual([
+            { type: "invoke", command: "deleteCell", payload: { at: 0 } },
+        ]);
+    });
+
+    it("asks for the cell the button was drawn beside", async () => {
+        await mountCanvas({
+            cells: [markdownCell("one"), markdownCell("two")],
+            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            commands: [command("deleteCell", "cell")],
+        });
+
+        for (const button of document.querySelectorAll(
+            ".author-file-editor-cell-actions-button",
+        )) {
+            await click(button);
+        }
+
+        expect(posted.map((invocation) => invocation.payload.at)).toEqual([
+            0, 1,
+        ]);
     });
 });
 

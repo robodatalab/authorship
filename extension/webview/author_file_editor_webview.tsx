@@ -1,13 +1,14 @@
 import { createRoot } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
-import type { WebviewCell } from "./author_editor/AuthorFileEditorCanvas";
-import { authorDocumentCellRenderers } from "../vscode_runtime/commands/author_document_cell_types";
-import type { PostToHost } from "../vscode_runtime/commands/author_file_editor_buttons";
+import type {
+    PostToHost,
+    WebviewAuthorDocumentCommandCard,
+    WebviewCell,
+} from "./author_editor/AuthorFileEditorCanvas";
 import {
-    authorDocumentCellCommands,
-    authorDocumentCellInsertCommands,
-    authorFileEditorCommands,
-} from "../vscode_runtime/commands/author_file_editor_buttons";
+    authorDocumentCellRenderers,
+    authorDocumentCellTypes,
+} from "../vscode_runtime/commands/author_document_cell_types";
 
 declare function acquireVsCodeApi(): { postMessage: PostToHost };
 
@@ -32,20 +33,16 @@ function main(): void {
         document.getElementById("author-file-editor-root")!,
     );
     let cells: WebviewCell[] = [];
+    let commands: WebviewAuthorDocumentCommandCard[] = [];
 
     function draw(): void {
         root.render(
             <AuthorFileEditorCanvas
                 cells={cells}
+                commands={commands}
+                cellTypes={authorDocumentCellTypes()}
                 postToHost={postToHost}
                 cellRenderers={authorDocumentCellRenderers()}
-                mainMenuCommands={authorFileEditorCommands(postToHost)}
-                cellInsertCommandsAt={(at) =>
-                    authorDocumentCellInsertCommands(postToHost, at)
-                }
-                cellCommandsAt={(at) =>
-                    authorDocumentCellCommands(postToHost, at)
-                }
             />,
         );
     }
@@ -53,6 +50,10 @@ function main(): void {
     window.addEventListener("message", (event: MessageEvent) => {
         if (event.data?.type === "document") {
             cells = event.data.cells as WebviewCell[];
+            draw();
+        } else if (event.data?.type === "commands") {
+            commands = event.data
+                .commands as WebviewAuthorDocumentCommandCard[];
             draw();
         }
     });

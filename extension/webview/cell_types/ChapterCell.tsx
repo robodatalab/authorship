@@ -7,12 +7,14 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type { WebviewCell } from "../author_editor/AuthorFileEditorCanvas";
+import type {
+    PostToHost,
+    WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import {
     replaceCellAttribute,
     replaceCellMarkdown,
-    type PostToHost,
-} from "../../vscode_runtime/commands/author_file_editor_buttons";
+} from "../../vscode_runtime/commands/author_document_edits";
 import { CHAPTER } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];

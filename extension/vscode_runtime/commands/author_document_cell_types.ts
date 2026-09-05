@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 
 import type {
     AuthorDocumentCellRenderers,
+    PostToHost,
     WebviewCell,
 } from "../../webview/author_editor/AuthorFileEditorCanvas";
-import type { PostToHost } from "./author_file_editor_buttons";
 
 export interface AuthorDocumentCellType {
     kind: string;

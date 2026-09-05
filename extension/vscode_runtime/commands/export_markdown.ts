@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { toMarkdown } from "../markdown/exporter";
-import { AuthorDocument } from "../storydoc/model";
+import type { AuthorDocument } from "../storydoc/model";
 
 /** `story.author` is exported beside itself as `story.md`. */
 function markdownBeside(document: vscode.Uri): vscode.Uri {
@@ -18,22 +18,14 @@ export class ExportMarkdownCommand implements AuthorDocumentCommand {
     readonly tooltip =
         "Export Markdown — write this document out as one plain markdown manuscript";
 
-    constructor(private readonly document: vscode.Uri) {}
-
-    invoke = async (): Promise<void> => {
-        const bytes = await vscode.workspace.fs.readFile(this.document);
-        const manuscript = markdownBeside(this.document);
+    async invoke(document: AuthorDocument): Promise<void> {
+        const manuscript = markdownBeside(document.uri);
         await vscode.workspace.fs.writeFile(
             manuscript,
-            new TextEncoder().encode(
-                toMarkdown(
-                    AuthorDocument.fromText(new TextDecoder().decode(bytes))
-                        .cells,
-                ),
-            ),
+            new TextEncoder().encode(toMarkdown(document.cells)),
         );
         void vscode.window.showInformationMessage(
-            `Exported ${vscode.workspace.asRelativePath(this.document)} to ${vscode.workspace.asRelativePath(manuscript)}`,
+            `Exported ${vscode.workspace.asRelativePath(document.uri)} to ${vscode.workspace.asRelativePath(manuscript)}`,
         );
-    };
+    }
 }

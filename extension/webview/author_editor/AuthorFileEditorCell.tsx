@@ -1,6 +1,10 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import type { WebviewAuthorDocumentCommandCard } from "../../vscode_runtime/commands/author_document_command";
+import {
+    invokeAuthorDocumentCommand,
+    type PostToHost,
+    type WebviewAuthorDocumentCommandCard,
+} from "./AuthorFileEditorCanvas";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -23,28 +27,36 @@ interface AuthorFileEditorCellCardProps {
     children?: ReactNode;
 }
 
-const AuthorFileEditorCellCommandsContext = createContext<
-    WebviewAuthorDocumentCommandCard[]
->([]);
-
 interface AuthorFileEditorCellCommandsProps {
     commands: WebviewAuthorDocumentCommandCard[];
+    at: number;
+    postToHost: PostToHost;
     children?: ReactNode;
 }
 
+const AuthorFileEditorCellCommandsContext = createContext<
+    Omit<AuthorFileEditorCellCommandsProps, "children">
+>({ commands: [], at: 0, postToHost: () => undefined });
+
 export function AuthorFileEditorCellCommands({
     commands,
+    at,
+    postToHost,
     children,
 }: AuthorFileEditorCellCommandsProps) {
     return (
-        <AuthorFileEditorCellCommandsContext.Provider value={commands}>
+        <AuthorFileEditorCellCommandsContext.Provider
+            value={{ commands, at, postToHost }}
+        >
             {children}
         </AuthorFileEditorCellCommandsContext.Provider>
     );
 }
 
 export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
-    const commands = useContext(AuthorFileEditorCellCommandsContext);
+    const { commands, at, postToHost } = useContext(
+        AuthorFileEditorCellCommandsContext,
+    );
     return (
         <section className="author-file-editor-cell">
             <div className="author-file-editor-cell-actions">
@@ -55,7 +67,13 @@ export function AuthorFileEditorCell({ children }: AuthorFileEditorCellProps) {
                         className="author-file-editor-cell-actions-button"
                         title={command.tooltip}
                         aria-label={command.tooltip}
-                        onClick={command.invoke}
+                        onClick={() =>
+                            invokeAuthorDocumentCommand(
+                                postToHost,
+                                command.name,
+                                { at },
+                            )
+                        }
                     >
                         <i className={command.iconClassName} />
                     </button>

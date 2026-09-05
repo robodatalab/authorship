@@ -13,12 +13,3 @@ export interface AuthorDocumentCommand {
     readonly tooltip: string;
     invoke(document: AuthorDocument, payload: Record<string, unknown>): void;
 }
-
-/** A command as the page has it: what to draw, and the asking a click does. */
-export interface WebviewAuthorDocumentCommandCard {
-    readonly name: string;
-    readonly category: string;
-    readonly iconClassName: string;
-    readonly tooltip: string;
-    readonly invoke: () => void;
-}

@@ -1,13 +1,19 @@
 import { Fragment } from "react";
-import type { WebviewAuthorDocumentCommandCard } from "../../vscode_runtime/commands/author_document_command";
+import {
+    invokeAuthorDocumentCommand,
+    type PostToHost,
+    type WebviewAuthorDocumentCommandCard,
+} from "./AuthorFileEditorCanvas";
 import "./AuthorFileEditorMainMenu.css";
 
 interface AuthorFileEditorMainMenuProps {
     commands: WebviewAuthorDocumentCommandCard[];
+    postToHost: PostToHost;
 }
 
 export function AuthorFileEditorMainMenu({
     commands,
+    postToHost,
 }: AuthorFileEditorMainMenuProps) {
     const categories = [
         ...new Set(commands.map((command) => command.category)),
@@ -29,7 +35,13 @@ export function AuthorFileEditorMainMenu({
                                 className="author-file-editor-main-menu-tool"
                                 title={command.tooltip}
                                 aria-label={command.tooltip}
-                                onClick={command.invoke}
+                                onClick={() =>
+                                    invokeAuthorDocumentCommand(
+                                        postToHost,
+                                        command.name,
+                                        {},
+                                    )
+                                }
                             >
                                 <i className={command.iconClassName} />
                             </button>
