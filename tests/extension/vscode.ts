@@ -22,11 +22,24 @@ export interface StubUri {
     path: string;
     fsPath: string;
     toString(): string;
+    with(replaced: { path: string }): StubUri;
 }
 
 function uriOf(path: string): StubUri {
-    return { path, fsPath: path, toString: () => path };
+    return {
+        path,
+        fsPath: path,
+        toString: () => path,
+        with: ({ path: replaced }) => uriOf(replaced),
+    };
 }
+
+export const shownMessages: string[] = [];
+
+export const dialogs: {
+    filesTheAuthorChose: StubUri[];
+    answerToTheWarning: string | undefined;
+} = { filesTheAuthorChose: [], answerToTheWarning: undefined };
 
 export const Uri = {
     parse: uriOf,
@@ -59,10 +72,18 @@ export const workspace = {
             files.set(uri.toString(), new TextDecoder().decode(bytes));
             return Promise.resolve();
         },
-        delete: (): Promise<void> => Promise.resolve(),
+        delete: (uri: StubUri): Promise<void> => {
+            files.delete(uri.toString());
+            return Promise.resolve();
+        },
+        createDirectory: (): Promise<void> => Promise.resolve(),
+        readDirectory: (): Promise<[string, number][]> => Promise.resolve([]),
     },
     getWorkspaceFolder: (): undefined => undefined,
+    asRelativePath: (uri: StubUri): string => uri.toString(),
 };
+
+export const FileType = { File: 1, Directory: 2 };
 
 export const commands = {
     executeCommand: (command: string): Promise<void> => {
@@ -75,4 +96,22 @@ export const window = {
     registerCustomEditorProvider: (): { dispose(): void } => ({
         dispose: () => undefined,
     }),
+    showInformationMessage: (said: string): Promise<undefined> => {
+        shownMessages.push(said);
+        return Promise.resolve(undefined);
+    },
+    showErrorMessage: (said: string): Promise<undefined> => {
+        shownMessages.push(said);
+        return Promise.resolve(undefined);
+    },
+    showWarningMessage: (said: string): Promise<string | undefined> => {
+        shownMessages.push(said);
+        return Promise.resolve(dialogs.answerToTheWarning);
+    },
+    showOpenDialog: (): Promise<StubUri[] | undefined> =>
+        Promise.resolve(
+            dialogs.filesTheAuthorChose.length > 0
+                ? dialogs.filesTheAuthorChose
+                : undefined,
+        ),
 };

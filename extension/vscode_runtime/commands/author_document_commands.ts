@@ -5,6 +5,7 @@ import { DeleteCellCommand } from "./delete_cell";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
+import { FixProseCommand } from "./fix_prose";
 import { FoldCellCommand } from "./fold_cell";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
@@ -38,6 +39,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ExportEpubCommand(),
     new DivideIntoPartsCommand(),
     new CheckProseCommand(),
+    new FixProseCommand(),
     new OpenAsTextCommand(),
 ];
 
