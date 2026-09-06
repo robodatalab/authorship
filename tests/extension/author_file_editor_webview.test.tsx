@@ -37,7 +37,7 @@ async function hostSends(cells: WebviewCell[]): Promise<void> {
 
 function renderedCellText(): string[] {
     return [...document.querySelectorAll(".author-file-editor-cell-body")].map(
-        (body) => body.textContent?.trim() ?? "",
+        (cellBody) => cellBody.textContent?.trim() ?? "",
     );
 }
 

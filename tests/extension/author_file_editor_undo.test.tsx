@@ -32,7 +32,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
         {} as never,
     );
 
-    let receive: (message: unknown) => void = () => undefined;
+    let receiveFromThePage: (message: unknown) => void = () => undefined;
     const panel = {
         webview: {
             options: {},
@@ -46,7 +46,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
                 return Promise.resolve(true);
             },
             onDidReceiveMessage: (listener: (message: unknown) => void) => {
-                receive = listener;
+                receiveFromThePage = listener;
                 return { dispose: () => undefined };
             },
         },
@@ -56,27 +56,27 @@ async function openEditor(text: string): Promise<OpenEditor> {
 
     document.body.innerHTML = '<div id="author-file-editor-root"></div>';
     (globalThis as Record<string, unknown>).acquireVsCodeApi = () => ({
-        postMessage: (message: unknown) => receive(message),
+        postMessage: (message: unknown) => receiveFromThePage(message),
     });
     vi.resetModules();
     for (const [type, listener] of listeningForThePage) {
         window.removeEventListener(type, listener);
     }
     listeningForThePage.length = 0;
-    const listen = window.addEventListener.bind(window);
+    const addEventListenerItself = window.addEventListener.bind(window);
     window.addEventListener = ((
         type: string,
         listener: EventListenerOrEventListenerObject,
         options?: boolean | AddEventListenerOptions,
     ) => {
         listeningForThePage.push([type, listener]);
-        listen(type, listener, options);
+        addEventListenerItself(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
         await import("../../extension/webview/cell_types/MarkdownCell");
         await import("../../extension/webview/author_file_editor_webview");
     });
-    window.addEventListener = listen;
+    window.addEventListener = addEventListenerItself;
 
     return {
         fileDocument: fileDocument as unknown as { text: string },

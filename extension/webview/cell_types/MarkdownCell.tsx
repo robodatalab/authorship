@@ -18,11 +18,15 @@ import { MARKDOWN } from "../../vscode_runtime/storydoc/model";
 
 interface MarkdownCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function MarkdownCell({ cell, at, postToHost }: MarkdownCellProps) {
+export function MarkdownCell({
+    cell,
+    cellIndex,
+    postToHost,
+}: MarkdownCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
@@ -30,7 +34,7 @@ export function MarkdownCell({ cell, at, postToHost }: MarkdownCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, at, markdown)
+                        replaceCellMarkdown(postToHost, cellIndex, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -44,7 +48,11 @@ registerAuthorDocumentCellType({
     menuLabel: "Markdown",
     insertMenuGroup: "primary",
     render: (cell, cellIndex, postToHost) => (
-        <MarkdownCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <MarkdownCell
+            cell={cell}
+            cellIndex={cellIndex}
+            postToHost={postToHost}
+        />
     ),
     newCell: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
 });

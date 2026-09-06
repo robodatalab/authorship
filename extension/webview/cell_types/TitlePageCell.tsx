@@ -18,31 +18,44 @@ import {
 import { TITLE_PAGE } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
-    { name: "title", label: "Title" },
-    { name: "subtitle", label: "Subtitle" },
-    { name: "author", label: "Author" },
-    { name: "publisher", label: "Publisher" },
-    { name: "date", label: "Date", hint: "YYYY-MM-DD" },
-    { name: "version", label: "Version", hint: "e.g. 1.0" },
-    { name: "isbn", label: "ISBN", hint: "e.g. 978-0-000-00000-0" },
+    { attributeName: "title", label: "Title" },
+    { attributeName: "subtitle", label: "Subtitle" },
+    { attributeName: "author", label: "Author" },
+    { attributeName: "publisher", label: "Publisher" },
+    { attributeName: "date", label: "Date", placeholder: "YYYY-MM-DD" },
+    { attributeName: "version", label: "Version", placeholder: "e.g. 1.0" },
+    {
+        attributeName: "isbn",
+        label: "ISBN",
+        placeholder: "e.g. 978-0-000-00000-0",
+    },
 ];
 
 interface TitlePageCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function TitlePageCell({ cell, at, postToHost }: TitlePageCellProps) {
+export function TitlePageCell({
+    cell,
+    cellIndex,
+    postToHost,
+}: TitlePageCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Title Page</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellFields
                     fields={FIELDS}
-                    attributes={cell.attrs}
-                    onAttributeChanged={(name, value) =>
-                        replaceCellAttribute(postToHost, at, name, value)
+                    cellAttributes={cell.attrs}
+                    onAttributeChanged={(attributeName, attributeValue) =>
+                        replaceCellAttribute(
+                            postToHost,
+                            cellIndex,
+                            attributeName,
+                            attributeValue,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -56,7 +69,11 @@ registerAuthorDocumentCellType({
     menuLabel: "Title Page",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <TitlePageCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <TitlePageCell
+            cell={cell}
+            cellIndex={cellIndex}
+            postToHost={postToHost}
+        />
     ),
     newCell: () => ({
         kind: TITLE_PAGE,

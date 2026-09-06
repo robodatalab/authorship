@@ -30,18 +30,18 @@ function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
 
 describe("cellsLaidOutByPlan — the document laid out as the server planned it", () => {
     it("carries the author’s own cells across by index", () => {
-        const mine = cover("art/mine.png");
-        const cells = [chapter("One"), mine];
-        const laid = cellsLaidOutByPlan(cells, [
+        const authorsOwnCover = cover("art/mine.png");
+        const cells = [chapter("One"), authorsOwnCover];
+        const laidOut = cellsLaidOutByPlan(cells, [
             { kind: "cover", at: 1 },
             { kind: CHAPTER, at: 0 },
         ]);
-        expect(laid[0]).toBe(mine);
-        expect(laid[1]).toBe(cells[0]);
+        expect(laidOut[0]).toBe(authorsOwnCover);
+        expect(laidOut[1]).toBe(cells[0]);
     });
 
     it("writes a blank for a section the document has not got", () => {
-        const laid = cellsLaidOutByPlan(
+        const laidOut = cellsLaidOutByPlan(
             [chapter("One")],
             [
                 { kind: "cover", at: null },
@@ -49,13 +49,13 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
                 { kind: "about", at: null },
             ],
         );
-        expect(laid.map((cell) => cell.kind)).toEqual([
+        expect(laidOut.map((cell) => cell.kind)).toEqual([
             "cover",
             CHAPTER,
             "about",
         ]);
-        expect(laid[0]).toEqual(blankOf("cover"));
-        expect(laid[2]).toEqual(blankOf("about"));
+        expect(laidOut[0]).toEqual(blankOf("cover"));
+        expect(laidOut[2]).toEqual(blankOf("about"));
     });
 
     it("keeps the story in the order the plan gives", () => {
@@ -64,13 +64,13 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
             markdown("The lantern."),
             chapter("Two"),
         ];
-        const laid = cellsLaidOutByPlan(cells, [
+        const laidOut = cellsLaidOutByPlan(cells, [
             { kind: "contents", at: null },
             { kind: CHAPTER, at: 0 },
             { kind: "markdown", at: 1 },
             { kind: CHAPTER, at: 2 },
         ]);
-        expect(laid.slice(1)).toEqual(cells);
+        expect(laidOut.slice(1)).toEqual(cells);
     });
 
     it("carries a kind it has never heard of", () => {
@@ -167,21 +167,21 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
     });
 
     it("reports adding and moving together", () => {
-        const said = saidAfterLayingOut(
+        const toldTheAuthor = saidAfterLayingOut(
             "story.author",
             report({ added: ["cover"], moved: ["about"] }),
         );
-        expect(said).toBe(
+        expect(toldTheAuthor).toBe(
             "Added Cover and moved About the Author into place in story.author.",
         );
     });
 
     it("says nothing about marks when nothing is left to write", () => {
-        const said = saidAfterLayingOut(
+        const toldTheAuthor = saidAfterLayingOut(
             "story.author",
             report({ moved: ["about"] }),
         );
-        expect(said).not.toContain("marked");
+        expect(toldTheAuthor).not.toContain("marked");
     });
 });
 

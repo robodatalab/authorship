@@ -21,19 +21,19 @@ import { RECAP } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     {
-        name: "documents",
+        attributeName: "documents",
         label: "Documents",
-        hint: "parts/part_1.author, parts/part_2.author",
+        placeholder: "parts/part_1.author, parts/part_2.author",
     },
 ];
 
 interface RecapCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function RecapCell({ cell, at, postToHost }: RecapCellProps) {
+export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>
@@ -43,9 +43,14 @@ export function RecapCell({ cell, at, postToHost }: RecapCellProps) {
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields
                         fields={FIELDS}
-                        attributes={cell.attrs}
-                        onAttributeChanged={(name, value) =>
-                            replaceCellAttribute(postToHost, at, name, value)
+                        cellAttributes={cell.attrs}
+                        onAttributeChanged={(attributeName, attributeValue) =>
+                            replaceCellAttribute(
+                                postToHost,
+                                cellIndex,
+                                attributeName,
+                                attributeValue,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -53,7 +58,7 @@ export function RecapCell({ cell, at, postToHost }: RecapCellProps) {
                     <MarkdownEditor
                         markdown={cell.source}
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(postToHost, at, markdown)
+                            replaceCellMarkdown(postToHost, cellIndex, markdown)
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -68,7 +73,7 @@ registerAuthorDocumentCellType({
     menuLabel: "The Story So Far",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <RecapCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <RecapCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({ kind: RECAP, source: "", attrs: {} }),
 });

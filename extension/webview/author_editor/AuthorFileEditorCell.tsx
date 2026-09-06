@@ -35,10 +35,10 @@ interface AuthorFileEditorCellCardProps {
 }
 
 interface AuthorFileEditorCellStateProps {
-    commands: WebviewAuthorDocumentCommandCard[];
-    at: number;
-    attrs: Readonly<Record<string, string>>;
-    errors?: ProseError[];
+    cellCommands: WebviewAuthorDocumentCommandCard[];
+    cellIndex: number;
+    cellAttributes: Readonly<Record<string, string>>;
+    proseErrors?: ProseError[];
     postToHost: PostToHost;
     children?: ReactNode;
 }
@@ -46,38 +46,44 @@ interface AuthorFileEditorCellStateProps {
 const AuthorFileEditorCellStateContext = createContext<
     Omit<AuthorFileEditorCellStateProps, "children">
 >({
-    commands: [],
-    at: 0,
-    attrs: {},
-    errors: [],
+    cellCommands: [],
+    cellIndex: 0,
+    cellAttributes: {},
+    proseErrors: [],
     postToHost: () => undefined,
 });
 
 export function AuthorFileEditorCellState({
-    commands,
-    at,
-    attrs,
-    errors = [],
+    cellCommands,
+    cellIndex,
+    cellAttributes,
+    proseErrors = [],
     postToHost,
     children,
 }: AuthorFileEditorCellStateProps) {
     return (
         <AuthorFileEditorCellStateContext.Provider
-            value={{ commands, at, attrs, errors, postToHost }}
+            value={{
+                cellCommands,
+                cellIndex,
+                cellAttributes,
+                proseErrors,
+                postToHost,
+            }}
         >
             {children}
         </AuthorFileEditorCellStateContext.Provider>
     );
 }
 
-function commandIsVisible(
+function isDrawnOnCell(
     command: WebviewAuthorDocumentCommandCard,
-    attrs: Readonly<Record<string, string>>,
+    cellAttributes: Readonly<Record<string, string>>,
 ): boolean {
     return (
         !command.drawnWhenCellAttributeIs ||
-        (attrs[command.drawnWhenCellAttributeIs.attributeName] ?? "") ===
-            command.drawnWhenCellAttributeIs.attributeValue
+        (cellAttributes[command.drawnWhenCellAttributeIs.attributeName] ??
+            "") === command.drawnWhenCellAttributeIs.attributeValue
     );
 }
 
@@ -85,14 +91,14 @@ export function AuthorFileEditorCell({
     sidebar,
     children,
 }: AuthorFileEditorCellProps) {
-    const { commands, at, attrs, postToHost } = useContext(
+    const { cellCommands, cellIndex, cellAttributes, postToHost } = useContext(
         AuthorFileEditorCellStateContext,
     );
     return (
         <section className="author-file-editor-cell">
             <div className="author-file-editor-cell-actions">
-                {commands
-                    .filter((command) => commandIsVisible(command, attrs))
+                {cellCommands
+                    .filter((command) => isDrawnOnCell(command, cellAttributes))
                     .map((command) => (
                         <button
                             key={command.commandName}
@@ -104,7 +110,7 @@ export function AuthorFileEditorCell({
                                 invokeAuthorDocumentCommand(
                                     postToHost,
                                     command.commandName,
-                                    { cellIndex: at },
+                                    { cellIndex },
                                 )
                             }
                         >
@@ -149,20 +155,20 @@ export function AuthorFileEditorCellCard({
 }
 
 export function useAuthorFileEditorCellProseErrors(): ProseError[] {
-    return useContext(AuthorFileEditorCellStateContext).errors ?? [];
+    return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
 }
 
 export function AuthorFileEditorCellWarning() {
-    const errors = useAuthorFileEditorCellProseErrors();
+    const proseErrors = useAuthorFileEditorCellProseErrors();
 
-    if (errors.length === 0) {
+    if (proseErrors.length === 0) {
         return null;
     }
 
     return (
         <div
             className="author-file-editor-cell-warning"
-            aria-label={`${errors.length} to look at`}
+            aria-label={`${proseErrors.length} to look at`}
         >
             <i className="codicon codicon-warning" />
         </div>
@@ -173,13 +179,13 @@ export function AuthorFileEditorCellRun({
     isRunning,
     onRun,
 }: AuthorFileEditorCellRunProps) {
-    const said = isRunning ? "Writing this section…" : "Write this section";
+    const label = isRunning ? "Writing this section…" : "Write this section";
     return (
         <button
             type="button"
             className="author-file-editor-cell-run"
-            title={said}
-            aria-label={said}
+            title={label}
+            aria-label={label}
             disabled={isRunning}
             onClick={onRun}
         >

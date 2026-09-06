@@ -4,36 +4,40 @@ import { chmod } from "node:fs/promises";
 
 const UV_RELEASE = "latest/download";
 
-export interface Environment {
+export interface ModelEnvironment {
     python: vscode.Uri;
 }
 
-type Report = vscode.Progress<{ message?: string }>;
+type InstallProgress = vscode.Progress<{ message?: string }>;
 
 export async function provision(
     context: vscode.ExtensionContext,
     log: vscode.OutputChannel,
-): Promise<Environment> {
-    const home = context.globalStorageUri;
-    const venv = vscode.Uri.joinPath(home, "venv");
+): Promise<ModelEnvironment> {
+    const extensionStorage = context.globalStorageUri;
+    const virtualEnvironment = vscode.Uri.joinPath(extensionStorage, "venv");
     const python =
         process.platform === "win32"
-            ? vscode.Uri.joinPath(venv, "Scripts", "python.exe")
-            : vscode.Uri.joinPath(venv, "bin", "python");
+            ? vscode.Uri.joinPath(virtualEnvironment, "Scripts", "python.exe")
+            : vscode.Uri.joinPath(virtualEnvironment, "bin", "python");
 
-    const version = context.extension.packageJSON.version as string;
-    const stamp = vscode.Uri.joinPath(home, `installed-${version}`);
-    if (await exists(stamp)) {
+    const extensionVersion = context.extension.packageJSON.version as string;
+    const installedStamp = vscode.Uri.joinPath(
+        extensionStorage,
+        `installed-${extensionVersion}`,
+    );
+    if (await fileExists(installedStamp)) {
         return { python };
     }
 
-    await vscode.workspace.fs.createDirectory(home);
+    await vscode.workspace.fs.createDirectory(extensionStorage);
 
-    const env: NodeJS.ProcessEnv = {
+    const uvEnvironment: NodeJS.ProcessEnv = {
         ...process.env,
-        UV_PROJECT_ENVIRONMENT: venv.fsPath,
-        UV_CACHE_DIR: vscode.Uri.joinPath(home, "cache").fsPath,
-        UV_PYTHON_INSTALL_DIR: vscode.Uri.joinPath(home, "python").fsPath,
+        UV_PROJECT_ENVIRONMENT: virtualEnvironment.fsPath,
+        UV_CACHE_DIR: vscode.Uri.joinPath(extensionStorage, "cache").fsPath,
+        UV_PYTHON_INSTALL_DIR: vscode.Uri.joinPath(extensionStorage, "python")
+            .fsPath,
         UV_PYTHON_PREFERENCE: "only-managed",
         UV_PYTHON_DOWNLOADS: "automatic",
         NO_COLOR: "1",
@@ -45,70 +49,73 @@ export async function provision(
             title: "Authorship: installing the writing model",
         },
         async (progress) => {
-            const uv = await installer(home, log, progress);
+            const uv = await uvExecutable(extensionStorage, log, progress);
             log.appendLine(
-                `installing the model environment into ${venv.fsPath}`,
+                `installing the model environment into ${virtualEnvironment.fsPath}`,
             );
-            await run(
+            await runToCompletion(
                 uv.fsPath,
                 ["sync", "--frozen", "--no-dev"],
                 context.extensionUri.fsPath,
-                env,
+                uvEnvironment,
                 log,
                 progress,
             );
         },
     );
 
-    await vscode.workspace.fs.writeFile(stamp, new Uint8Array());
+    await vscode.workspace.fs.writeFile(installedStamp, new Uint8Array());
     return { python };
 }
 
-async function installer(
-    home: vscode.Uri,
+async function uvExecutable(
+    extensionStorage: vscode.Uri,
     log: vscode.OutputChannel,
-    progress: Report,
+    progress: InstallProgress,
 ): Promise<vscode.Uri> {
-    const windows = process.platform === "win32";
-    const into = vscode.Uri.joinPath(home, "uv");
-    const uv = vscode.Uri.joinPath(into, windows ? "uv.exe" : "uv");
-    if (await exists(uv)) {
+    const onWindows = process.platform === "win32";
+    const uvFolder = vscode.Uri.joinPath(extensionStorage, "uv");
+    const uv = vscode.Uri.joinPath(uvFolder, onWindows ? "uv.exe" : "uv");
+    if (await fileExists(uv)) {
         return uv;
     }
 
-    const name = `uv-${target()}${windows ? ".zip" : ".tar.gz"}`;
-    const url = `https://github.com/astral-sh/uv/releases/${UV_RELEASE}/${name}`;
-    log.appendLine(`fetching ${url}`);
+    const archiveName = `uv-${uvBuildForThisMachine()}${onWindows ? ".zip" : ".tar.gz"}`;
+    const archiveUrl = `https://github.com/astral-sh/uv/releases/${UV_RELEASE}/${archiveName}`;
+    log.appendLine(`fetching ${archiveUrl}`);
     progress.report({ message: "fetching the installer" });
 
-    const response = await fetch(url);
+    const response = await fetch(archiveUrl);
     if (!response.ok) {
-        throw new Error(`${url} answered ${response.status}`);
+        throw new Error(`${archiveUrl} answered ${response.status}`);
     }
-    const archive = vscode.Uri.joinPath(home, name);
+    const archive = vscode.Uri.joinPath(extensionStorage, archiveName);
     await vscode.workspace.fs.writeFile(
         archive,
         new Uint8Array(await response.arrayBuffer()),
     );
-    await vscode.workspace.fs.createDirectory(into);
+    await vscode.workspace.fs.createDirectory(uvFolder);
 
-    const strip = windows ? [] : ["--strip-components=1"];
-    await run(
+    const uvArchiveWrapsItsFilesInAFolder = !onWindows;
+    const unwrapTheArchive = uvArchiveWrapsItsFilesInAFolder
+        ? ["--strip-components=1"]
+        : [];
+    await runToCompletion(
         "tar",
-        ["-xf", archive.fsPath, "-C", into.fsPath, ...strip],
-        home.fsPath,
+        ["-xf", archive.fsPath, "-C", uvFolder.fsPath, ...unwrapTheArchive],
+        extensionStorage.fsPath,
         process.env,
         log,
     );
     await vscode.workspace.fs.delete(archive);
 
-    if (!windows) {
+    if (!onWindows) {
         await chmod(uv.fsPath, 0o755);
     }
     return uv;
 }
 
-function target(): string {
+function uvBuildForThisMachine(): string {
     switch (`${process.platform}-${process.arch}`) {
         case "darwin-arm64":
             return "aarch64-apple-darwin";
@@ -129,40 +136,43 @@ function target(): string {
     }
 }
 
-function run(
+function runToCompletion(
     command: string,
-    args: readonly string[],
-    cwd: string,
-    env: NodeJS.ProcessEnv,
+    commandArguments: readonly string[],
+    workingDirectory: string,
+    environment: NodeJS.ProcessEnv,
     log: vscode.OutputChannel,
-    progress?: Report,
+    progress?: InstallProgress,
 ): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const child = spawn(command, args, { cwd, env });
+    return new Promise((finished, failed) => {
+        const commandProcess = spawn(command, commandArguments, {
+            cwd: workingDirectory,
+            env: environment,
+        });
 
-        const write = (chunk: Buffer): void => {
-            const text = chunk.toString();
-            log.append(text);
-            const last = text.trimEnd().split("\n").pop()?.trim();
-            if (last) {
-                progress?.report({ message: last });
+        const writeToTheLog = (output: Buffer): void => {
+            const written = output.toString();
+            log.append(written);
+            const lastLine = written.trimEnd().split("\n").pop()?.trim();
+            if (lastLine) {
+                progress?.report({ message: lastLine });
             }
         };
-        child.stdout.on("data", write);
-        child.stderr.on("data", write);
+        commandProcess.stdout.on("data", writeToTheLog);
+        commandProcess.stderr.on("data", writeToTheLog);
 
-        child.on("error", reject);
-        child.on("close", (code) =>
-            code === 0
-                ? resolve()
-                : reject(new Error(`${command} exited with ${code}`)),
+        commandProcess.on("error", failed);
+        commandProcess.on("close", (exitCode) =>
+            exitCode === 0
+                ? finished()
+                : failed(new Error(`${command} exited with ${exitCode}`)),
         );
     });
 }
 
-async function exists(uri: vscode.Uri): Promise<boolean> {
+async function fileExists(file: vscode.Uri): Promise<boolean> {
     try {
-        await vscode.workspace.fs.stat(uri);
+        await vscode.workspace.fs.stat(file);
         return true;
     } catch {
         return false;

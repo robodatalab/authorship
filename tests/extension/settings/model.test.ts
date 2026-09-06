@@ -40,7 +40,7 @@ describe("what Authorship starts a workspace with", () => {
 
 describe("parseSettings — reading what the author wrote", () => {
     it("takes what the file says", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             JSON.stringify({
                 templates: {
                     disclaimer: {
@@ -57,21 +57,21 @@ describe("parseSettings — reading what the author wrote", () => {
                 },
             }),
         );
-        expect(said.disclaimer).toEqual({
+        expect(templates.disclaimer).toEqual({
             title: "A Word Before",
             text: "All of it invented.",
         });
-        expect(said.about.text).toBe("Writes at night.");
-        expect(said["title-page"].author).toBe("A. Writer");
+        expect(templates.about.text).toBe("Writes at night.");
+        expect(templates["title-page"].author).toBe("A. Writer");
     });
 
     it("takes what the file mentions and leaves the rest empty", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             '{"templates": {"disclaimer": {"title": "Warning"}}}',
         );
-        expect(said.disclaimer.title).toBe("Warning");
-        expect(said.disclaimer.text).toBe("");
-        expect(said.about).toEqual(EMPTY_TEMPLATES.about);
+        expect(templates.disclaimer.title).toBe("Warning");
+        expect(templates.disclaimer.text).toBe("");
+        expect(templates.about).toEqual(EMPTY_TEMPLATES.about);
     });
 
     it("reads an empty file, and one with nothing of ours in it, as nothing said", () => {
@@ -81,29 +81,29 @@ describe("parseSettings — reading what the author wrote", () => {
     });
 
     it("ignores anything that is not text where text was expected", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             '{"templates": {"disclaimer": {"text": 12}, "about": ["not an object"]}}',
         );
-        expect(said.disclaimer.text).toBe("");
-        expect(said.about).toEqual(EMPTY_TEMPLATES.about);
+        expect(templates.disclaimer.text).toBe("");
+        expect(templates.about).toEqual(EMPTY_TEMPLATES.about);
     });
 
     it("reads a paragraph written a line to a line", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             JSON.stringify({
                 templates: {
                     disclaimer: { text: ["All of it invented.", "", "Enjoy!"] },
                 },
             }),
         );
-        expect(said.disclaimer.text).toBe("All of it invented.\n\nEnjoy!");
+        expect(templates.disclaimer.text).toBe("All of it invented.\n\nEnjoy!");
     });
 
     it("still reads a paragraph written as one string", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             '{"templates": {"disclaimer": {"text": "A\\nB"}}}',
         );
-        expect(said.disclaimer.text).toBe("A\nB");
+        expect(templates.disclaimer.text).toBe("A\nB");
     });
 
     it("reads no lines as nothing said, not as a blank line", () => {
@@ -113,10 +113,10 @@ describe("parseSettings — reading what the author wrote", () => {
     });
 
     it("ignores a list with something in it that is not a line", () => {
-        const said = parseSettings(
+        const templates = parseSettings(
             '{"templates": {"disclaimer": {"text": ["A", 2]}}}',
         );
-        expect(said.disclaimer.text).toBe("");
+        expect(templates.disclaimer.text).toBe("");
     });
 
     it("refuses a file that is not JSON at all, rather than quietly ignoring it", () => {
@@ -165,10 +165,10 @@ describe("the templates in use", () => {
     });
 
     it("is whatever was last read", () => {
-        const said = parseSettings(
+        const readFromTheFile = parseSettings(
             '{"templates": {"about": {"text": "Writes at night."}}}',
         );
-        useTemplates(said);
+        useTemplates(readFromTheFile);
         expect(templates().about.text).toBe("Writes at night.");
     });
 });

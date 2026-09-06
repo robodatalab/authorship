@@ -37,7 +37,7 @@ export function invokeAuthorDocumentCommand(
 
 export type AuthorDocumentCellRenderers = Record<
     string,
-    (cell: WebviewCell, at: number, postToHost: PostToHost) => ReactNode
+    (cell: WebviewCell, cellIndex: number, postToHost: PostToHost) => ReactNode
 >;
 
 interface AuthorFileEditorCanvasProps {
@@ -77,9 +77,9 @@ export function AuthorFileEditorCanvas({
                 <ul>
                     <li>
                         <AuthorFileEditorInsertCellMenu
-                            command={insertCommand}
+                            insertCommand={insertCommand}
                             cellTypes={cellTypes}
-                            at={0}
+                            insertAtCellIndex={0}
                             postToHost={postToHost}
                         />
                     </li>
@@ -98,17 +98,17 @@ export function AuthorFileEditorCanvas({
                                 }
                             >
                                 <AuthorFileEditorCellState
-                                    commands={cellCommands}
-                                    at={cellIndex}
-                                    attrs={cell.attrs}
+                                    cellCommands={cellCommands}
+                                    cellIndex={cellIndex}
+                                    cellAttributes={cell.attrs}
                                     postToHost={postToHost}
                                 >
                                     {renderCell(cell, cellIndex, postToHost)}
                                 </AuthorFileEditorCellState>
                                 <AuthorFileEditorInsertCellMenu
-                                    command={insertCommand}
+                                    insertCommand={insertCommand}
                                     cellTypes={cellTypes}
-                                    at={cellIndex + 1}
+                                    insertAtCellIndex={cellIndex + 1}
                                     postToHost={postToHost}
                                 />
                             </li>
@@ -121,62 +121,62 @@ export function AuthorFileEditorCanvas({
 }
 
 interface AuthorFileEditorInsertCellMenuProps {
-    command?: WebviewAuthorDocumentCommandCard;
+    insertCommand?: WebviewAuthorDocumentCommandCard;
     cellTypes: AuthorDocumentCellType[];
-    at: number;
+    insertAtCellIndex: number;
     postToHost: PostToHost;
 }
 
 function AuthorFileEditorInsertCellMenu({
-    command,
+    insertCommand,
     cellTypes,
-    at,
+    insertAtCellIndex,
     postToHost,
 }: AuthorFileEditorInsertCellMenuProps) {
-    const [overflowIsOpen, setOverflowIsOpen] = useState(false);
+    const [everyKindIsShown, showEveryKind] = useState(false);
 
-    if (!command) {
+    if (!insertCommand) {
         return null;
     }
 
-    const primaryCellTypes = cellTypes.filter(
+    const cellTypesAlwaysShown = cellTypes.filter(
         (cellType) => cellType.insertMenuGroup === PRIMARY_INSERT_MENU_GROUP,
     );
-    const overflowCellTypes = cellTypes.filter(
+    const cellTypesBehindTheEllipsis = cellTypes.filter(
         (cellType) => cellType.insertMenuGroup !== PRIMARY_INSERT_MENU_GROUP,
     );
 
     return (
         <div className="author-file-editor-insert-cell-menu">
-            {primaryCellTypes.map((cellType) => (
+            {cellTypesAlwaysShown.map((cellType) => (
                 <AuthorFileEditorInsertCellMenuButton
                     key={cellType.cellKind}
-                    command={command}
+                    insertCommand={insertCommand}
                     cellType={cellType}
-                    at={at}
+                    insertAtCellIndex={insertAtCellIndex}
                     postToHost={postToHost}
                 />
             ))}
-            {overflowCellTypes.length > 0 && (
+            {cellTypesBehindTheEllipsis.length > 0 && (
                 <div className="author-file-editor-insert-cell-menu-overflow">
                     <button
                         type="button"
                         className="author-file-editor-insert-cell-menu-button"
                         title="Add any kind of section here"
                         aria-label="Add any kind of section here"
-                        aria-expanded={overflowIsOpen}
-                        onClick={() => setOverflowIsOpen(!overflowIsOpen)}
+                        aria-expanded={everyKindIsShown}
+                        onClick={() => showEveryKind(!everyKindIsShown)}
                     >
                         <i className="codicon codicon-ellipsis" />
                     </button>
-                    {overflowIsOpen && (
+                    {everyKindIsShown && (
                         <div className="author-file-editor-insert-cell-menu-dropdown">
-                            {overflowCellTypes.map((cellType) => (
+                            {cellTypesBehindTheEllipsis.map((cellType) => (
                                 <AuthorFileEditorInsertCellMenuButton
                                     key={cellType.cellKind}
-                                    command={command}
+                                    insertCommand={insertCommand}
                                     cellType={cellType}
-                                    at={at}
+                                    insertAtCellIndex={insertAtCellIndex}
                                     postToHost={postToHost}
                                 />
                             ))}
@@ -189,16 +189,16 @@ function AuthorFileEditorInsertCellMenu({
 }
 
 interface AuthorFileEditorInsertCellMenuButtonProps {
-    command: WebviewAuthorDocumentCommandCard;
+    insertCommand: WebviewAuthorDocumentCommandCard;
     cellType: AuthorDocumentCellType;
-    at: number;
+    insertAtCellIndex: number;
     postToHost: PostToHost;
 }
 
 function AuthorFileEditorInsertCellMenuButton({
-    command,
+    insertCommand,
     cellType,
-    at,
+    insertAtCellIndex,
     postToHost,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
     return (
@@ -207,13 +207,17 @@ function AuthorFileEditorInsertCellMenuButton({
             className="author-file-editor-insert-cell-menu-button"
             title={`Add a ${cellType.menuLabel.toLowerCase()} section here`}
             onClick={() =>
-                invokeAuthorDocumentCommand(postToHost, command.commandName, {
-                    cellIndex: at,
-                    newCell: cellType.newCell(),
-                })
+                invokeAuthorDocumentCommand(
+                    postToHost,
+                    insertCommand.commandName,
+                    {
+                        cellIndex: insertAtCellIndex,
+                        newCell: cellType.newCell(),
+                    },
+                )
             }
         >
-            <i className={command.iconClassName} />
+            <i className={insertCommand.iconClassName} />
             {cellType.menuLabel}
         </button>
     );

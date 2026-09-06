@@ -1214,11 +1214,14 @@ export class AuthorEditorProvider implements vscode.CustomTextEditorProvider {
 	 */
 	private async partition(document: vscode.TextDocument): Promise<void> {
 		const cells = parse(document.getText());
-		const { folder, parts } = await divideManuscript(document.uri, cells);
+		const { partsFolder, partFilesWritten } = await divideManuscript(
+			document.uri,
+			cells
+		);
 		void vscode.window.showInformationMessage(
-			parts === 0
+			partFilesWritten === 0
 				? `Nothing to divide — add a Part where ${basename(document.uri)} should break.`
-				: `Wrote ${parts} ${parts === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(folder)}`
+				: `Wrote ${partFilesWritten} ${partFilesWritten === 1 ? 'part' : 'parts'} to ${vscode.workspace.asRelativePath(partsFolder)}`
 		);
 	}
 

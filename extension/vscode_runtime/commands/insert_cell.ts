@@ -11,14 +11,14 @@ export class InsertCellCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        const added = commandArguments.newCell as {
+        const newCell = commandArguments.newCell as {
             kind: string;
             source: string;
             attrs: Record<string, string>;
         };
         document.insertAt(
             commandArguments.cellIndex as number,
-            new Cell(added.kind, added.source, added.attrs),
+            new Cell(newCell.kind, newCell.source, newCell.attrs),
         );
     }
 }

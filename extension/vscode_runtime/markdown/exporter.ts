@@ -11,130 +11,135 @@ import {
     TITLE_PAGE,
 } from "../storydoc/model";
 
-const LEVELS: string[] = [TITLE_PAGE, PART, CHAPTER];
+const KINDS_WRITTEN_AS_HEADINGS: string[] = [TITLE_PAGE, PART, CHAPTER];
 
-const HEADING = /^(#{1,3})\s+(.*)$/;
+const MARKDOWN_HEADING = /^(#{1,3})\s+(.*)$/;
 
-const ASIDES: string[] = [NOTE];
+const KINDS_WRITTEN_AS_COMMENTS: string[] = [NOTE];
 
-const UNPUBLISHED: string[] = [NOTE, BLURB, RECAP];
+const KINDS_LEFT_OUT_OF_THE_MANUSCRIPT: string[] = [NOTE, BLURB, RECAP];
 
-const AUTHOR_LINKS: [string, string][] = [
+const AUTHOR_LINK_ATTRIBUTES: [string, string][] = [
     ["kdp", "Books on Amazon"],
     ["website", "Website"],
     ["substack", "Substack"],
 ];
 
-function headingFor(kind: string): string {
-    return "#".repeat(LEVELS.indexOf(kind) + 1);
+function headingHashesFor(cellKind: string): string {
+    return "#".repeat(KINDS_WRITTEN_AS_HEADINGS.indexOf(cellKind) + 1);
 }
 
-function commented(source: string): string {
-    return `<!--\n${source.replace(/-->/g, "--&gt;")}\n-->`;
+function insideAnHtmlComment(prose: string): string {
+    return `<!--\n${prose.replace(/-->/g, "--&gt;")}\n-->`;
 }
 
 function titlePageMarkdown(cell: Cell): string[] {
-    const out = [`${headingFor(TITLE_PAGE)} ${cell.attrs.title || "Untitled"}`];
+    const lines = [
+        `${headingHashesFor(TITLE_PAGE)} ${cell.attrs.title || "Untitled"}`,
+    ];
     if (cell.attrs.subtitle) {
-        out.push(`*${cell.attrs.subtitle}*`);
+        lines.push(`*${cell.attrs.subtitle}*`);
     }
     const credits = ["author", "publisher", "date", "version", "isbn"]
-        .map((name) => cell.attrs[name])
+        .map((attributeName) => cell.attrs[attributeName])
         .filter(Boolean);
     if (credits.length > 0) {
-        out.push(credits.join(" · "));
+        lines.push(credits.join(" · "));
     }
-    return out;
+    return lines;
 }
 
-function aboutMarkdown(cell: Cell): string[] {
-    const said: string[] = [];
+function aboutTheAuthorMarkdown(cell: Cell): string[] {
+    const lines: string[] = [];
     if (cell.source) {
-        said.push(cell.source);
+        lines.push(cell.source);
     }
-    const links = AUTHOR_LINKS.filter(([name]) => cell.attrs[name]).map(
-        ([name, label]) => `[${label}](${cell.attrs[name]})`,
+    const links = AUTHOR_LINK_ATTRIBUTES.filter(
+        ([attributeName]) => cell.attrs[attributeName],
+    ).map(
+        ([attributeName, label]) => `[${label}](${cell.attrs[attributeName]})`,
     );
     if (links.length > 0) {
-        said.push(links.join(" · "));
+        lines.push(links.join(" · "));
     }
 
-    return said.length > 0
-        ? [`${headingFor(CHAPTER)} About the Author`, ...said]
+    return lines.length > 0
+        ? [`${headingHashesFor(CHAPTER)} About the Author`, ...lines]
         : [];
 }
 
 export function fromMarkdown(markdown: string): string {
     const document = AuthorDocument.fromText("");
-    for (const cell of cellsFromMarkdown(markdown)) {
+    for (const cell of cellsReadFromMarkdown(markdown)) {
         document.insertAt(document.cells.length, cell);
     }
     return document.toText();
 }
 
-function cellsFromMarkdown(text: string): Cell[] {
+function cellsReadFromMarkdown(markdown: string): Cell[] {
     const cells: Cell[] = [];
-    let prose: string[] = [];
+    let proseSinceTheLastHeading: string[] = [];
 
-    const flush = (): void => {
-        const source = prose.join("\n").trim();
-        if (source) {
-            cells.push(new Cell(MARKDOWN, source, {}));
+    const closeTheProseCell = (): void => {
+        const prose = proseSinceTheLastHeading.join("\n").trim();
+        if (prose) {
+            cells.push(new Cell(MARKDOWN, prose, {}));
         }
-        prose = [];
+        proseSinceTheLastHeading = [];
     };
 
-    for (const line of text.split("\n")) {
-        const heading = HEADING.exec(line.trim());
+    for (const line of markdown.split("\n")) {
+        const heading = MARKDOWN_HEADING.exec(line.trim());
         if (!heading) {
-            prose.push(line);
+            proseSinceTheLastHeading.push(line);
             continue;
         }
-        flush();
+        const [, hashes, headingText] = heading;
+        closeTheProseCell();
         cells.push(
-            new Cell(LEVELS[heading[1].length - 1], "", {
-                title: heading[2].trim(),
+            new Cell(KINDS_WRITTEN_AS_HEADINGS[hashes.length - 1], "", {
+                title: headingText.trim(),
             }),
         );
     }
-    flush();
+    closeTheProseCell();
     return cells;
 }
 
 export function toMarkdown(cells: Cell[]): string {
-    const out: string[] = [];
+    const manuscript: string[] = [];
     for (const cell of cells) {
-        if (ASIDES.includes(cell.kind)) {
+        if (KINDS_WRITTEN_AS_COMMENTS.includes(cell.kind)) {
             if (cell.source) {
-                out.push(commented(cell.source));
+                manuscript.push(insideAnHtmlComment(cell.source));
             }
             continue;
         }
 
-        if (UNPUBLISHED.includes(cell.kind)) {
+        if (KINDS_LEFT_OUT_OF_THE_MANUSCRIPT.includes(cell.kind)) {
             continue;
         }
         if (cell.kind === TITLE_PAGE) {
-            out.push(...titlePageMarkdown(cell));
+            manuscript.push(...titlePageMarkdown(cell));
             continue;
         }
         if (cell.kind === PART || cell.kind === CHAPTER) {
-            out.push(
-                `${headingFor(cell.kind)} ${cell.attrs.title || "Untitled"}`,
+            manuscript.push(
+                `${headingHashesFor(cell.kind)} ${cell.attrs.title || "Untitled"}`,
             );
             continue;
         }
         if (cell.kind === ABOUT) {
-            out.push(...aboutMarkdown(cell));
+            manuscript.push(...aboutTheAuthorMarkdown(cell));
             continue;
         }
 
         if (cell.attrs.title) {
-            out.push(`${headingFor(CHAPTER)} ${cell.attrs.title}`);
+            manuscript.push(`${headingHashesFor(CHAPTER)} ${cell.attrs.title}`);
         }
         if (cell.source) {
-            out.push(cell.source);
+            manuscript.push(cell.source);
         }
     }
-    return out.join("\n\n") + (out.length > 0 ? "\n" : "");
+    return manuscript.join("\n\n") + (manuscript.length > 0 ? "\n" : "");
 }

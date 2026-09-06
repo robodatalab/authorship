@@ -136,12 +136,12 @@ describe("what a markdown manuscript imports as", () => {
 
 describe("a manuscript that goes out and comes back", () => {
     it("keeps the story's levels and its prose", () => {
-        const text =
+        const authorText =
             '<!-- cell: part title="Book One" -->\n\n<!-- cell: chapter title="Night" -->\n\n<!-- cell: markdown -->\n\nIt began badly.\n';
 
-        const back = fromMarkdown(markdownOf(text));
+        const cameBack = fromMarkdown(markdownOf(authorText));
 
-        expect(shapeOf(back)).toEqual([
+        expect(shapeOf(cameBack)).toEqual([
             { kind: "part", source: "", attrs: { title: "Book One" } },
             { kind: "chapter", source: "", attrs: { title: "Night" } },
             { kind: "markdown", source: "It began badly.", attrs: {} },

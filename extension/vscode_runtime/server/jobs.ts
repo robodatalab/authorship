@@ -1,8 +1,8 @@
 import { MODEL_SERVER_PORT } from "./process";
 
-const POLL_MS = 400;
-const TIMEOUT_MS = 180_000;
-const POLLS_UNANSWERED = 5;
+const MILLISECONDS_BETWEEN_POLLS = 400;
+const MILLISECONDS_BEFORE_GIVING_UP = 180_000;
+const UNANSWERED_POLLS_BEFORE_GIVING_UP = 5;
 
 export interface ModelServerJob {
     running: boolean;
@@ -12,42 +12,44 @@ export interface ModelServerJob {
 
 export async function startModelServerJob(
     route: string,
-    asked: unknown,
+    requestBody: unknown,
 ): Promise<string> {
-    const started = await fetch(
+    const startedJob = await fetch(
         `http://127.0.0.1:${MODEL_SERVER_PORT}${route}`,
         {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(asked),
+            body: JSON.stringify(requestBody),
         },
     );
-    if (!started.ok) {
-        throw new Error(`${route} answered ${started.status}`);
+    if (!startedJob.ok) {
+        throw new Error(`${route} answered ${startedJob.status}`);
     }
-    return ((await started.json()) as { id: string }).id;
+    return ((await startedJob.json()) as { id: string }).id;
 }
 
 export async function awaitModelServerJob<Job extends ModelServerJob>(
     route: string,
-    id: string,
+    jobId: string,
 ): Promise<Job> {
-    const deadline = Date.now() + TIMEOUT_MS;
-    let unanswered = 0;
-    while (Date.now() < deadline) {
-        await new Promise((wake) => setTimeout(wake, POLL_MS));
+    const givingUpAt = Date.now() + MILLISECONDS_BEFORE_GIVING_UP;
+    let pollsUnanswered = 0;
+    while (Date.now() < givingUpAt) {
+        await new Promise((wake) =>
+            setTimeout(wake, MILLISECONDS_BETWEEN_POLLS),
+        );
         let response: Response;
         try {
             response = await fetch(
-                `http://127.0.0.1:${MODEL_SERVER_PORT}${route}?id=${encodeURIComponent(id)}`,
+                `http://127.0.0.1:${MODEL_SERVER_PORT}${route}?id=${encodeURIComponent(jobId)}`,
             );
-        } catch (err: unknown) {
-            if ((unanswered += 1) > POLLS_UNANSWERED) {
-                throw err;
+        } catch (unanswered: unknown) {
+            if ((pollsUnanswered += 1) > UNANSWERED_POLLS_BEFORE_GIVING_UP) {
+                throw unanswered;
             }
             continue;
         }
-        unanswered = 0;
+        pollsUnanswered = 0;
         if (!response.ok) {
             throw new Error(`${route} answered ${response.status}`);
         }

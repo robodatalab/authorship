@@ -20,9 +20,9 @@ import { type Cell } from '../storydoc_model';
 import { dumps } from '../storydoc_model';
 
 /** What a division came to. */
-export interface Division {
-	folder: vscode.Uri;
-	parts: number;
+export interface DividedManuscript {
+	partsFolder: vscode.Uri;
+	partFilesWritten: number;
 }
 
 /**
@@ -39,28 +39,28 @@ export interface Division {
 export async function divideManuscript(
 	document: vscode.Uri,
 	cells: readonly Cell[]
-): Promise<Division> {
+): Promise<DividedManuscript> {
 	const parts = intoParts(sectionsOf(cells));
-	const folder = vscode.Uri.joinPath(document, '..', PARTS_FOLDER);
+	const partsFolder = vscode.Uri.joinPath(document, '..', PARTS_FOLDER);
 	if (parts.length === 0) {
-		return { folder, parts: 0 };
+		return { partsFolder, partFilesWritten: 0 };
 	}
 
 	const furniture = furnitureOf(cells);
-	await vscode.workspace.fs.createDirectory(folder);
-	await clearParts(folder);
+	await vscode.workspace.fs.createDirectory(partsFolder);
+	await clearParts(partsFolder);
 
 	// Sequentially, so a folder half-written by two divisions racing is not a
 	// state anyone has to reason about.
 	for (const [index, part] of parts.entries()) {
 		const number = index + 1;
 		await vscode.workspace.fs.writeFile(
-			vscode.Uri.joinPath(folder, partFileName(number)),
+			vscode.Uri.joinPath(partsFolder, partFileName(number)),
 			new TextEncoder().encode(dumps(partCells(furniture, number, part)))
 		);
 	}
 
-	return { folder, parts: parts.length };
+	return { partsFolder, partFilesWritten: parts.length };
 }
 
 /** Take out what an earlier division left, and only that — whatever else is in

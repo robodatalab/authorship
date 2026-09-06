@@ -160,23 +160,28 @@ function MonacoMarkdownEditor({
     onSettled,
     onFinished,
 }: MonacoMarkdownEditorProps) {
-    const host = useRef<HTMLDivElement>(null);
-    const openEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-    const marks = useRef<monaco.editor.IEditorDecorationsCollection | null>(
+    const editorHost = useRef<HTMLDivElement>(null);
+    const monacoEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(
         null,
     );
-    const errorsFound = useRef(errors);
-    errorsFound.current = errors;
+    const drawnMarks =
+        useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const errorsNow = useRef(errors);
+    errorsNow.current = errors;
     const [errorUnderPointer, sayErrorUnderPointer] =
         useState<MarkdownEditorErrorUnderPointer | null>(null);
-    const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(
+    const hidingTheTooltip = useRef<ReturnType<typeof setTimeout> | undefined>(
         undefined,
     );
-    const latest = useRef({ onMarkdownChanged, onSettled, onFinished });
-    latest.current = { onMarkdownChanged, onSettled, onFinished };
+    const latestCallbacks = useRef({
+        onMarkdownChanged,
+        onSettled,
+        onFinished,
+    });
+    latestCallbacks.current = { onMarkdownChanged, onSettled, onFinished };
 
     useEffect(() => {
-        const node = host.current;
+        const node = editorHost.current;
         if (!node) {
             return;
         }
@@ -229,9 +234,9 @@ function MonacoMarkdownEditor({
             editor.layout();
         };
 
-        marks.current = editor.createDecorationsCollection([]);
+        drawnMarks.current = editor.createDecorationsCollection([]);
 
-        const pointedAt = (
+        const errorUnderPointer = (
             event: monaco.editor.IEditorMouseEvent,
         ): MarkdownEditorErrorUnderPointer | null => {
             const model = editor.getModel();
@@ -240,80 +245,80 @@ function MonacoMarkdownEditor({
                 return null;
             }
             const offset = model.getOffsetAt(position);
-            const error = errorsFound.current.find(
-                (found) => offset >= found.at && offset <= found.end,
+            const error = errorsNow.current.find(
+                (marked) => offset >= marked.at && offset <= marked.end,
             );
-            const drawnAt =
+            const wordsDrawnAt =
                 error && editor.getScrolledVisiblePosition(position);
-            if (!error || !drawnAt) {
+            if (!error || !wordsDrawnAt) {
                 return null;
             }
             const editorBox = node.getBoundingClientRect();
             return {
                 error,
-                top: editorBox.top + drawnAt.top + drawnAt.height,
-                left: editorBox.left + drawnAt.left,
+                top: editorBox.top + wordsDrawnAt.top + wordsDrawnAt.height,
+                left: editorBox.left + wordsDrawnAt.left,
             };
         };
 
-        const sized = editor.onDidContentSizeChange(fitToContent);
-        const pointed = editor.onMouseMove((event) => {
-            const found = pointedAt(event);
-            if (found) {
-                clearTimeout(leaving.current);
-                sayErrorUnderPointer(found);
+        const contentResized = editor.onDidContentSizeChange(fitToContent);
+        const pointerMoved = editor.onMouseMove((event) => {
+            const underPointer = errorUnderPointer(event);
+            if (underPointer) {
+                clearTimeout(hidingTheTooltip.current);
+                sayErrorUnderPointer(underPointer);
             } else {
-                leaving.current = setTimeout(
+                hidingTheTooltip.current = setTimeout(
                     () => sayErrorUnderPointer(null),
                     HOLD_TOOLTIP_MS,
                 );
             }
         });
-        let settling: ReturnType<typeof setTimeout> | undefined;
-        const changed = editor.onDidChangeModelContent(() => {
-            latest.current.onMarkdownChanged(editor.getValue());
-            clearTimeout(settling);
-            settling = setTimeout(
-                () => latest.current.onSettled(editor.getValue()),
+        let settlingAfterTyping: ReturnType<typeof setTimeout> | undefined;
+        const contentChanged = editor.onDidChangeModelContent(() => {
+            latestCallbacks.current.onMarkdownChanged(editor.getValue());
+            clearTimeout(settlingAfterTyping);
+            settlingAfterTyping = setTimeout(
+                () => latestCallbacks.current.onSettled(editor.getValue()),
                 SETTLE_AFTER_TYPING_MS,
             );
         });
-        const escaped = (event: KeyboardEvent): void => {
+        const escapePressed = (event: KeyboardEvent): void => {
             if (event.key === "Escape") {
-                latest.current.onFinished();
+                latestCallbacks.current.onFinished();
             }
         };
-        window.addEventListener("keydown", escaped, true);
-        openEditor.current = editor;
+        window.addEventListener("keydown", escapePressed, true);
+        monacoEditor.current = editor;
 
         fitToContent();
         editor.focus();
 
         return () => {
-            openEditor.current = null;
-            window.removeEventListener("keydown", escaped, true);
-            clearTimeout(settling);
-            clearTimeout(leaving.current);
-            sized.dispose();
-            pointed.dispose();
-            changed.dispose();
+            monacoEditor.current = null;
+            window.removeEventListener("keydown", escapePressed, true);
+            clearTimeout(settlingAfterTyping);
+            clearTimeout(hidingTheTooltip.current);
+            contentResized.dispose();
+            pointerMoved.dispose();
+            contentChanged.dispose();
             editor.dispose();
         };
     }, []);
 
     useEffect(() => {
-        const editor = openEditor.current;
+        const editor = monacoEditor.current;
         if (editor && editor.getValue() !== markdown) {
             editor.setValue(markdown);
         }
     }, [markdown]);
 
     useEffect(() => {
-        const model = openEditor.current?.getModel();
+        const model = monacoEditor.current?.getModel();
         if (!model) {
             return;
         }
-        marks.current?.set(
+        drawnMarks.current?.set(
             errors.map((error) => ({
                 range: monaco.Range.fromPositions(
                     model.getPositionAt(error.at),
@@ -328,7 +333,7 @@ function MonacoMarkdownEditor({
 
     return (
         <>
-            <div className="markdown-editor" ref={host} />
+            <div className="markdown-editor" ref={editorHost} />
             {errorUnderPointer &&
                 createPortal(
                     <div
@@ -337,7 +342,9 @@ function MonacoMarkdownEditor({
                             top: errorUnderPointer.top,
                             left: errorUnderPointer.left,
                         }}
-                        onMouseEnter={() => clearTimeout(leaving.current)}
+                        onMouseEnter={() =>
+                            clearTimeout(hidingTheTooltip.current)
+                        }
                         onMouseLeave={() => sayErrorUnderPointer(null)}
                     >
                         <LinterTooltip

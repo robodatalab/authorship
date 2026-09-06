@@ -18,11 +18,11 @@ import { COVER } from "../../vscode_runtime/storydoc/model";
 
 interface CoverCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function CoverCell({ cell, at, postToHost }: CoverCellProps) {
+export function CoverCell({ cell, cellIndex, postToHost }: CoverCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Cover</AuthorFileEditorCellHeader>
@@ -30,7 +30,7 @@ export function CoverCell({ cell, at, postToHost }: CoverCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, at, markdown)
+                        replaceCellMarkdown(postToHost, cellIndex, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -44,7 +44,7 @@ registerAuthorDocumentCellType({
     menuLabel: "Cover",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <CoverCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <CoverCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({
         kind: COVER,

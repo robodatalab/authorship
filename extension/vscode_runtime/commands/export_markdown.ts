@@ -4,9 +4,9 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 import { toMarkdown } from "../markdown/exporter";
 import type { AuthorDocument } from "../storydoc/model";
 
-function markdownBeside(document: vscode.Uri): vscode.Uri {
-    return document.with({
-        path: document.path.replace(/\.author$/i, "") + ".md",
+function markdownFileBeside(authorFile: vscode.Uri): vscode.Uri {
+    return authorFile.with({
+        path: authorFile.path.replace(/\.author$/i, "") + ".md",
     });
 }
 
@@ -18,7 +18,7 @@ export class ExportMarkdownCommand implements AuthorDocumentCommand {
         "Export Markdown — write this document out as one plain markdown manuscript";
 
     async invoke(document: AuthorDocument): Promise<void> {
-        const manuscript = markdownBeside(document.uri);
+        const manuscript = markdownFileBeside(document.uri);
         await vscode.workspace.fs.writeFile(
             manuscript,
             new TextEncoder().encode(toMarkdown(document.cells)),

@@ -15,19 +15,21 @@ export function AuthorFileEditorMainMenu({
     commands,
     postToHost,
 }: AuthorFileEditorMainMenuProps) {
-    const categories = [
+    const buttonGroups = [
         ...new Set(commands.map((command) => command.buttonGroup)),
     ];
 
     return (
         <nav className="author-file-editor-main-menu">
-            {categories.map((category, categoryIndex) => (
-                <Fragment key={category}>
-                    {categoryIndex > 0 && (
+            {buttonGroups.map((buttonGroup, buttonGroupIndex) => (
+                <Fragment key={buttonGroup}>
+                    {buttonGroupIndex > 0 && (
                         <span className="author-file-editor-main-menu-divider" />
                     )}
                     {commands
-                        .filter((command) => command.buttonGroup === category)
+                        .filter(
+                            (command) => command.buttonGroup === buttonGroup,
+                        )
                         .map((command) => (
                             <button
                                 key={command.iconClassName}

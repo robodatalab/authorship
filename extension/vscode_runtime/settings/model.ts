@@ -14,78 +14,78 @@ export const EMPTY_TEMPLATES: Templates = {
     "title-page": { author: "", publisher: "" },
 };
 
-let inUse: Templates = EMPTY_TEMPLATES;
+let templatesInUse: Templates = EMPTY_TEMPLATES;
 
 export function templates(): Templates {
-    return inUse;
+    return templatesInUse;
 }
 
-export function useTemplates(said: Templates): void {
-    inUse = said;
+export function useTemplates(templates: Templates): void {
+    templatesInUse = templates;
 }
 
-export function parseSettings(text: string): Templates {
-    const said = within(JSON.parse(text) as unknown, "templates");
-    const disclaimer = within(said, "disclaimer");
-    const about = within(said, "about");
-    const titlePage = within(said, "title-page");
+export function parseSettings(settingsJson: string): Templates {
+    const templates = fieldOf(JSON.parse(settingsJson) as unknown, "templates");
+    const disclaimer = fieldOf(templates, "disclaimer");
+    const about = fieldOf(templates, "about");
+    const titlePage = fieldOf(templates, "title-page");
     return {
         disclaimer: {
-            title: worded(disclaimer, "title"),
-            text: worded(disclaimer, "text"),
+            title: textOf(disclaimer, "title"),
+            text: textOf(disclaimer, "text"),
         },
         about: {
-            text: worded(about, "text"),
-            kdp: worded(about, "kdp"),
-            website: worded(about, "website"),
-            substack: worded(about, "substack"),
+            text: textOf(about, "text"),
+            kdp: textOf(about, "kdp"),
+            website: textOf(about, "website"),
+            substack: textOf(about, "substack"),
         },
         "title-page": {
-            author: worded(titlePage, "author"),
-            publisher: worded(titlePage, "publisher"),
+            author: textOf(titlePage, "author"),
+            publisher: textOf(titlePage, "publisher"),
         },
     };
 }
 
-export function settingsText(said: Templates): string {
-    const written = {
+export function settingsText(templates: Templates): string {
+    const settings = {
         templates: {
             disclaimer: {
-                title: said.disclaimer.title,
-                text: prose(said.disclaimer.text),
+                title: templates.disclaimer.title,
+                text: asLines(templates.disclaimer.text),
             },
             about: {
-                text: prose(said.about.text),
-                kdp: said.about.kdp,
-                website: said.about.website,
-                substack: said.about.substack,
+                text: asLines(templates.about.text),
+                kdp: templates.about.kdp,
+                website: templates.about.website,
+                substack: templates.about.substack,
             },
-            "title-page": said["title-page"],
+            "title-page": templates["title-page"],
         },
     };
-    return JSON.stringify(written, null, 2) + "\n";
+    return JSON.stringify(settings, null, 2) + "\n";
 }
 
-function prose(text: string): string | string[] {
+function asLines(text: string): string | string[] {
     return text === "" ? "" : text.split("\n");
 }
 
-function within(said: unknown, name: string): unknown {
-    return said !== null && typeof said === "object"
-        ? (said as Record<string, unknown>)[name]
+function fieldOf(settings: unknown, fieldName: string): unknown {
+    return settings !== null && typeof settings === "object"
+        ? (settings as Record<string, unknown>)[fieldName]
         : undefined;
 }
 
-function worded(said: unknown, name: string): string {
-    const value = within(said, name);
-    if (typeof value === "string") {
-        return value;
+function textOf(settings: unknown, fieldName: string): string {
+    const written = fieldOf(settings, fieldName);
+    if (typeof written === "string") {
+        return written;
     }
     if (
-        Array.isArray(value) &&
-        value.every((line) => typeof line === "string")
+        Array.isArray(written) &&
+        written.every((line) => typeof line === "string")
     ) {
-        return (value as string[]).join("\n");
+        return (written as string[]).join("\n");
     }
     return "";
 }

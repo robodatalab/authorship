@@ -103,14 +103,14 @@ describe("what the prose checker found", () => {
         };
     }
 
-    async function mountWarning(errors: ProseError[]): Promise<void> {
+    async function mountWarning(proseErrors: ProseError[]): Promise<void> {
         posted.length = 0;
         await mount(
             <AuthorFileEditorCellState
-                commands={[]}
-                at={0}
-                attrs={{}}
-                errors={errors}
+                cellCommands={[]}
+                cellIndex={0}
+                cellAttributes={{}}
+                proseErrors={proseErrors}
                 postToHost={(message) => posted.push(message)}
             >
                 <AuthorFileEditorCellWarning />

@@ -19,11 +19,11 @@ import "./NotesCell.css";
 
 interface NotesCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function NotesCell({ cell, at, postToHost }: NotesCellProps) {
+export function NotesCell({ cell, cellIndex, postToHost }: NotesCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
@@ -33,7 +33,7 @@ export function NotesCell({ cell, at, postToHost }: NotesCellProps) {
                     onMarkdownCommitted={(note) =>
                         replaceCellMarkdown(
                             postToHost,
-                            at,
+                            cellIndex,
                             `<!--\n${note}\n-->`,
                         )
                     }
@@ -66,7 +66,7 @@ registerAuthorDocumentCellType({
     menuLabel: "Note",
     insertMenuGroup: "primary",
     render: (cell, cellIndex, postToHost) => (
-        <NotesCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <NotesCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({ kind: NOTE, source: "", attrs: {} }),
 });

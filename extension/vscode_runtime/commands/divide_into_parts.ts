@@ -12,14 +12,14 @@ export class DivideIntoPartsCommand implements AuthorDocumentCommand {
         "Divide into Parts — cut the story into part_1.author, part_2.author… beside it";
 
     async invoke(document: AuthorDocument): Promise<void> {
-        const { folder, parts } = await divideManuscript(
+        const dividedManuscript = await divideManuscript(
             document.uri,
             document.cells,
         );
         void vscode.window.showInformationMessage(
-            parts === 0
+            dividedManuscript.partFilesWritten === 0
                 ? `Nothing to divide — add a Part where ${vscode.workspace.asRelativePath(document.uri)} should break.`
-                : `Wrote ${parts} ${parts === 1 ? "part" : "parts"} to ${vscode.workspace.asRelativePath(folder)}`,
+                : `Wrote ${dividedManuscript.partFilesWritten} ${dividedManuscript.partFilesWritten === 1 ? "part" : "parts"} to ${vscode.workspace.asRelativePath(dividedManuscript.partsFolder)}`,
         );
     }
 }

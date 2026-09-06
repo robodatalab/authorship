@@ -18,11 +18,11 @@ import { BLURB } from "../../vscode_runtime/storydoc/model";
 
 interface BlurbCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function BlurbCell({ cell, at, postToHost }: BlurbCellProps) {
+export function BlurbCell({ cell, cellIndex, postToHost }: BlurbCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
@@ -30,7 +30,7 @@ export function BlurbCell({ cell, at, postToHost }: BlurbCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, at, markdown)
+                        replaceCellMarkdown(postToHost, cellIndex, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -44,7 +44,7 @@ registerAuthorDocumentCellType({
     menuLabel: "Blurb",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <BlurbCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <BlurbCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({ kind: BLURB, source: "", attrs: {} }),
 });

@@ -20,18 +20,26 @@ import { ABOUT } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
 const FIELDS: AuthorFileEditorCellField[] = [
-    { name: "kdp", label: "KDP", hint: "https://amazon.com/author/…" },
-    { name: "website", label: "Website", hint: "https://…" },
-    { name: "substack", label: "Substack", hint: "https://….substack.com" },
+    {
+        attributeName: "kdp",
+        label: "KDP",
+        placeholder: "https://amazon.com/author/…",
+    },
+    { attributeName: "website", label: "Website", placeholder: "https://…" },
+    {
+        attributeName: "substack",
+        label: "Substack",
+        placeholder: "https://….substack.com",
+    },
 ];
 
 interface AboutCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function AboutCell({ cell, at, postToHost }: AboutCellProps) {
+export function AboutCell({ cell, cellIndex, postToHost }: AboutCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>
@@ -41,9 +49,14 @@ export function AboutCell({ cell, at, postToHost }: AboutCellProps) {
                 <AuthorFileEditorCellCard>
                     <AuthorFileEditorCellFields
                         fields={FIELDS}
-                        attributes={cell.attrs}
-                        onAttributeChanged={(name, value) =>
-                            replaceCellAttribute(postToHost, at, name, value)
+                        cellAttributes={cell.attrs}
+                        onAttributeChanged={(attributeName, attributeValue) =>
+                            replaceCellAttribute(
+                                postToHost,
+                                cellIndex,
+                                attributeName,
+                                attributeValue,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -51,7 +64,7 @@ export function AboutCell({ cell, at, postToHost }: AboutCellProps) {
                     <MarkdownEditor
                         markdown={cell.source}
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(postToHost, at, markdown)
+                            replaceCellMarkdown(postToHost, cellIndex, markdown)
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -66,7 +79,7 @@ registerAuthorDocumentCellType({
     menuLabel: "About the Author",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <AboutCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <AboutCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({ kind: ABOUT, source: "", attrs: {} }),
 });

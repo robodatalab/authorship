@@ -17,24 +17,31 @@ import {
 } from "../../vscode_runtime/commands/author_document_edits";
 import { CHAPTER } from "../../vscode_runtime/storydoc/model";
 
-const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
+const FIELDS: AuthorFileEditorCellField[] = [
+    { attributeName: "title", label: "Title" },
+];
 
 interface ChapterCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function ChapterCell({ cell, at, postToHost }: ChapterCellProps) {
+export function ChapterCell({ cell, cellIndex, postToHost }: ChapterCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Chapter</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellFields
                     fields={FIELDS}
-                    attributes={cell.attrs}
-                    onAttributeChanged={(name, value) =>
-                        replaceCellAttribute(postToHost, at, name, value)
+                    cellAttributes={cell.attrs}
+                    onAttributeChanged={(attributeName, attributeValue) =>
+                        replaceCellAttribute(
+                            postToHost,
+                            cellIndex,
+                            attributeName,
+                            attributeValue,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -48,7 +55,11 @@ registerAuthorDocumentCellType({
     menuLabel: "Chapter",
     insertMenuGroup: "primary",
     render: (cell, cellIndex, postToHost) => (
-        <ChapterCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <ChapterCell
+            cell={cell}
+            cellIndex={cellIndex}
+            postToHost={postToHost}
+        />
     ),
     newCell: () => ({
         kind: CHAPTER,

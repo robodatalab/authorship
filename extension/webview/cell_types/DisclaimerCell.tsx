@@ -15,11 +15,15 @@ import { DISCLAIMER } from "../../vscode_runtime/storydoc/model";
 
 interface DisclaimerCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function DisclaimerCell({ cell, at, postToHost }: DisclaimerCellProps) {
+export function DisclaimerCell({
+    cell,
+    cellIndex,
+    postToHost,
+}: DisclaimerCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
@@ -27,7 +31,7 @@ export function DisclaimerCell({ cell, at, postToHost }: DisclaimerCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, at, markdown)
+                        replaceCellMarkdown(postToHost, cellIndex, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -41,7 +45,11 @@ registerAuthorDocumentCellType({
     menuLabel: "Disclaimer",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <DisclaimerCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <DisclaimerCell
+            cell={cell}
+            cellIndex={cellIndex}
+            postToHost={postToHost}
+        />
     ),
     newCell: () => ({ kind: DISCLAIMER, source: "", attrs: {} }),
 });

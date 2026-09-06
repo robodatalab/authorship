@@ -27,7 +27,7 @@ try {
     void 0;
 }
 
-function main(): void {
+function openTheAuthorFileEditor(): void {
     const postToHost: PostToHost = acquireVsCodeApi().postMessage;
     const root = createRoot(
         document.getElementById("author-file-editor-root")!,
@@ -35,7 +35,7 @@ function main(): void {
     let cells: WebviewCell[] = [];
     let commands: WebviewAuthorDocumentCommandCard[] = [];
 
-    function draw(): void {
+    function drawTheCanvas(): void {
         root.render(
             <AuthorFileEditorCanvas
                 cells={cells}
@@ -50,16 +50,16 @@ function main(): void {
     window.addEventListener("message", (event: MessageEvent) => {
         if (event.data?.type === "document") {
             cells = event.data.cells as WebviewCell[];
-            draw();
+            drawTheCanvas();
         } else if (event.data?.type === "commands") {
             commands = event.data
                 .commands as WebviewAuthorDocumentCommandCard[];
-            draw();
+            drawTheCanvas();
         }
     });
 
-    draw();
+    drawTheCanvas();
     postToHost({ type: "ready" });
 }
 
-main();
+openTheAuthorFileEditor();

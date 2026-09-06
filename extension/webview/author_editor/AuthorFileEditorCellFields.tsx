@@ -1,21 +1,21 @@
 import "./AuthorFileEditorCellFields.css";
 
 export interface AuthorFileEditorCellField {
-    name: string;
+    attributeName: string;
     label: string;
-    hint?: string;
-    toggle?: boolean;
+    placeholder?: string;
+    isCheckbox?: boolean;
 }
 
 interface AuthorFileEditorCellFieldsProps {
     fields: AuthorFileEditorCellField[];
-    attributes: Record<string, string>;
-    onAttributeChanged: (name: string, value: string) => void;
+    cellAttributes: Record<string, string>;
+    onAttributeChanged: (attributeName: string, attributeValue: string) => void;
 }
 
 export function AuthorFileEditorCellFields({
     fields,
-    attributes,
+    cellAttributes,
     onAttributeChanged,
 }: AuthorFileEditorCellFieldsProps) {
     return (
@@ -23,18 +23,20 @@ export function AuthorFileEditorCellFields({
             {fields.map((field) => (
                 <label
                     className="author-file-editor-cell-field"
-                    key={field.name}
+                    key={field.attributeName}
                 >
                     <span className="author-file-editor-cell-field-label">
                         {field.label}
                     </span>
-                    {field.toggle ? (
+                    {field.isCheckbox ? (
                         <input
                             type="checkbox"
-                            checked={attributes[field.name] !== "no"}
+                            checked={
+                                cellAttributes[field.attributeName] !== "no"
+                            }
                             onChange={(event) =>
                                 onAttributeChanged(
-                                    field.name,
+                                    field.attributeName,
                                     event.currentTarget.checked ? "yes" : "no",
                                 )
                             }
@@ -43,11 +45,11 @@ export function AuthorFileEditorCellFields({
                         <input
                             type="text"
                             className="author-file-editor-cell-field-input"
-                            value={attributes[field.name] ?? ""}
-                            placeholder={field.hint ?? ""}
+                            value={cellAttributes[field.attributeName] ?? ""}
+                            placeholder={field.placeholder ?? ""}
                             onChange={(event) =>
                                 onAttributeChanged(
-                                    field.name,
+                                    field.attributeName,
                                     event.currentTarget.value,
                                 )
                             }

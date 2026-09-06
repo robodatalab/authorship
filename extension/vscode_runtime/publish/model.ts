@@ -1,3 +1,3 @@
-export function authorshipPathFor(mdPath: string): string {
-    return mdPath.replace(/\.md$/i, "") + ".authorship.md";
+export function authorshipPathFor(markdownPath: string): string {
+    return markdownPath.replace(/\.md$/i, "") + ".authorship.md";
 }

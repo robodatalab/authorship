@@ -10,34 +10,38 @@ import {
 } from "./model";
 
 export function settingsUri(document: vscode.Uri): vscode.Uri | undefined {
-    const project = vscode.workspace.getWorkspaceFolder(document);
-    return project
-        ? vscode.Uri.joinPath(project.uri, SETTINGS_FOLDER, SETTINGS_FILE)
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document);
+    return workspaceFolder
+        ? vscode.Uri.joinPath(
+              workspaceFolder.uri,
+              SETTINGS_FOLDER,
+              SETTINGS_FILE,
+          )
         : undefined;
 }
 
 export async function loadTemplates(document: vscode.Uri): Promise<Templates> {
-    const uri = settingsUri(document);
-    if (!uri) {
+    const settingsFile = settingsUri(document);
+    if (!settingsFile) {
         return EMPTY_TEMPLATES;
     }
-    if (!(await exists(uri))) {
-        await seed(uri);
+    if (!(await fileExists(settingsFile))) {
+        await writeEmptySettings(settingsFile);
         return EMPTY_TEMPLATES;
     }
-    let text: string;
+    let settingsJson: string;
     try {
-        text = new TextDecoder().decode(
-            await vscode.workspace.fs.readFile(uri),
+        settingsJson = new TextDecoder().decode(
+            await vscode.workspace.fs.readFile(settingsFile),
         );
     } catch {
         return EMPTY_TEMPLATES;
     }
     try {
-        return parseSettings(text);
-    } catch (err) {
+        return parseSettings(settingsJson);
+    } catch (unreadable) {
         void vscode.window.showWarningMessage(
-            `${SETTINGS_FOLDER}/${SETTINGS_FILE} could not be read (${describe(err)}). ` +
+            `${SETTINGS_FOLDER}/${SETTINGS_FILE} could not be read (${whatWentWrong(unreadable)}). ` +
                 "Authorship is starting these pages empty until it is fixed.",
         );
         return EMPTY_TEMPLATES;
@@ -46,48 +50,48 @@ export async function loadTemplates(document: vscode.Uri): Promise<Templates> {
 
 export function watchSettings(
     document: vscode.Uri,
-    changed: () => void,
+    settingsChanged: () => void,
 ): vscode.Disposable {
-    const project = vscode.workspace.getWorkspaceFolder(document);
-    if (!project) {
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document);
+    if (!workspaceFolder) {
         return new vscode.Disposable(() => undefined);
     }
-    const watcher = vscode.workspace.createFileSystemWatcher(
+    const settingsWatcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(
-            project,
+            workspaceFolder,
             `${SETTINGS_FOLDER}/${SETTINGS_FILE}`,
         ),
     );
     return vscode.Disposable.from(
-        watcher.onDidCreate(changed),
-        watcher.onDidChange(changed),
-        watcher.onDidDelete(changed),
-        watcher,
+        settingsWatcher.onDidCreate(settingsChanged),
+        settingsWatcher.onDidChange(settingsChanged),
+        settingsWatcher.onDidDelete(settingsChanged),
+        settingsWatcher,
     );
 }
 
-async function seed(uri: vscode.Uri): Promise<void> {
+async function writeEmptySettings(settingsFile: vscode.Uri): Promise<void> {
     try {
         await vscode.workspace.fs.createDirectory(
-            vscode.Uri.joinPath(uri, ".."),
+            vscode.Uri.joinPath(settingsFile, ".."),
         );
         await vscode.workspace.fs.writeFile(
-            uri,
+            settingsFile,
             new TextEncoder().encode(settingsText(EMPTY_TEMPLATES)),
         );
     } catch {}
 }
 
-async function exists(uri: vscode.Uri): Promise<boolean> {
+async function fileExists(file: vscode.Uri): Promise<boolean> {
     try {
-        await vscode.workspace.fs.stat(uri);
+        await vscode.workspace.fs.stat(file);
         return true;
     } catch {
         return false;
     }
 }
 
-function describe(err: unknown): string {
-    const message = (err as { message?: unknown } | null)?.message;
-    return typeof message === "string" ? message : String(err);
+function whatWentWrong(failure: unknown): string {
+    const message = (failure as { message?: unknown } | null)?.message;
+    return typeof message === "string" ? message : String(failure);
 }

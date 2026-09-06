@@ -17,24 +17,31 @@ import {
 } from "../../vscode_runtime/commands/author_document_edits";
 import { PART } from "../../vscode_runtime/storydoc/model";
 
-const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
+const FIELDS: AuthorFileEditorCellField[] = [
+    { attributeName: "title", label: "Title" },
+];
 
 interface PartCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function PartCell({ cell, at, postToHost }: PartCellProps) {
+export function PartCell({ cell, cellIndex, postToHost }: PartCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Part</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellFields
                     fields={FIELDS}
-                    attributes={cell.attrs}
-                    onAttributeChanged={(name, value) =>
-                        replaceCellAttribute(postToHost, at, name, value)
+                    cellAttributes={cell.attrs}
+                    onAttributeChanged={(attributeName, attributeValue) =>
+                        replaceCellAttribute(
+                            postToHost,
+                            cellIndex,
+                            attributeName,
+                            attributeValue,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -48,7 +55,7 @@ registerAuthorDocumentCellType({
     menuLabel: "Part",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <PartCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <PartCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
     ),
     newCell: () => ({ kind: PART, source: "", attrs: { title: "Untitled" } }),
 });

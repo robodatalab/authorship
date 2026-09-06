@@ -1,6 +1,6 @@
 import type * as vscode from "vscode";
 
-export const EXTENSION = ".author";
+export const AUTHOR_FILE_EXTENSION = ".author";
 
 export const MARKDOWN = "markdown";
 export const CHAPTER = "chapter";
@@ -18,16 +18,20 @@ export const FOLDED = "folded";
 
 export const UNIQUE_CELL_ID = "id";
 
-const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
-const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
+const CELL_MARKER_LINE =
+    /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
+const MARKER_ATTRIBUTE =
+    /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
-function readAttributes(text: string): Record<string, string> {
-    const attrs: Record<string, string> = {};
-    ATTR.lastIndex = 0;
-    for (const found of text.matchAll(ATTR)) {
-        attrs[found[1]] = found[2].replace(/\\(.)/g, "$1");
+function readAttributes(marker: string): Record<string, string> {
+    const attributes: Record<string, string> = {};
+    MARKER_ATTRIBUTE.lastIndex = 0;
+    for (const [, attributeName, attributeValue] of marker.matchAll(
+        MARKER_ATTRIBUTE,
+    )) {
+        attributes[attributeName] = attributeValue.replace(/\\(.)/g, "$1");
     }
-    return attrs;
+    return attributes;
 }
 
 export class Cell {
@@ -53,13 +57,13 @@ export class Cell {
     }
 
     marker(): string {
-        const said = Object.entries(this.attrs)
+        const attributes = Object.entries(this.attrs)
             .map(
-                ([name, value]) =>
-                    ` ${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+                ([attributeName, attributeValue]) =>
+                    ` ${attributeName}="${attributeValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
             )
             .join("");
-        return `<!-- cell: ${this.kind}${said} -->`;
+        return `<!-- cell: ${this.kind}${attributes} -->`;
     }
 
     isFolded(): boolean {
@@ -70,20 +74,20 @@ export class Cell {
         if (this.isFolded() === folded) {
             return;
         }
-        const attrs = { ...this.attrs };
+        const attributes = { ...this.attrs };
         if (folded) {
-            attrs[FOLDED] = "true";
+            attributes[FOLDED] = "true";
         } else {
-            delete attrs[FOLDED];
+            delete attributes[FOLDED];
         }
-        this.attrs = attrs;
+        this.attrs = attributes;
     }
 
-    replaceAttribute(name: string, value: string): void {
-        if (this.attrs[name] === value) {
+    replaceAttribute(attributeName: string, attributeValue: string): void {
+        if (this.attrs[attributeName] === attributeValue) {
             return;
         }
-        this.attrs = { ...this.attrs, [name]: value };
+        this.attrs = { ...this.attrs, [attributeName]: attributeValue };
     }
 }
 
@@ -102,25 +106,28 @@ export class AuthorDocument implements vscode.CustomDocument {
     }
 
     fromText(text: string): void {
-        const sections: { marker: RegExpExecArray; body: string[] }[] = [];
+        const sections: {
+            markerLine: RegExpExecArray;
+            proseLines: string[];
+        }[] = [];
 
         for (const line of text.split("\n")) {
-            const marker = MARKER.exec(line);
-            if (marker) {
-                sections.push({ marker, body: [] });
+            const markerLine = CELL_MARKER_LINE.exec(line);
+            if (markerLine) {
+                sections.push({ markerLine, proseLines: [] });
             } else if (sections.length > 0) {
-                sections[sections.length - 1].body.push(line);
+                sections[sections.length - 1].proseLines.push(line);
             }
         }
 
-        this.documentCells = sections.map(
-            (section) =>
-                new Cell(
-                    section.marker[1],
-                    trimBlankEnds(section.body),
-                    readAttributes(section.marker[2]),
-                ),
-        );
+        this.documentCells = sections.map((section) => {
+            const [, cellKind, markerAttributes] = section.markerLine;
+            return new Cell(
+                cellKind,
+                withoutBlankLinesAtTheEnds(section.proseLines),
+                readAttributes(markerAttributes),
+            );
+        });
     }
 
     dispose(): void {}
@@ -133,43 +140,47 @@ export class AuthorDocument implements vscode.CustomDocument {
         return this.documentCells;
     }
 
-    insertAt(at: number, cell: Cell): void {
+    insertAt(cellIndex: number, cell: Cell): void {
         this.documentCells.splice(
-            at,
+            cellIndex,
             0,
             new Cell(cell.kind, cell.source, cell.attrs),
         );
     }
 
-    moveAt(at: number, to: number): void {
-        if (to === at || to < 0 || to >= this.documentCells.length) {
+    moveAt(cellIndex: number, toCellIndex: number): void {
+        if (
+            toCellIndex === cellIndex ||
+            toCellIndex < 0 ||
+            toCellIndex >= this.documentCells.length
+        ) {
             return;
         }
-        const [moved] = this.documentCells.splice(at, 1);
-        this.documentCells.splice(to, 0, moved);
+        const [moved] = this.documentCells.splice(cellIndex, 1);
+        this.documentCells.splice(toCellIndex, 0, moved);
     }
 
-    removeAt(at: number): void {
-        if (at < 0 || at >= this.documentCells.length) {
+    removeAt(cellIndex: number): void {
+        if (cellIndex < 0 || cellIndex >= this.documentCells.length) {
             return;
         }
-        this.documentCells.splice(at, 1);
+        this.documentCells.splice(cellIndex, 1);
     }
 
     toText(): string {
-        const out: string[] = [];
+        const lines: string[] = [];
         for (const cell of this.documentCells) {
-            out.push(cell.marker());
-            out.push("");
+            lines.push(cell.marker());
+            lines.push("");
             if (cell.source) {
-                out.push(cell.source);
-                out.push("");
+                lines.push(cell.source);
+                lines.push("");
             }
         }
-        return out.join("\n");
+        return lines.join("\n");
     }
 }
 
-function trimBlankEnds(body: string[]): string {
-    return body.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
+function withoutBlankLinesAtTheEnds(proseLines: string[]): string {
+    return proseLines.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
 }

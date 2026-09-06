@@ -12,7 +12,7 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         "Import Markdown — replace this document with an existing markdown manuscript";
 
     async invoke(document: AuthorDocument): Promise<void> {
-        const picked = await vscode.window.showOpenDialog({
+        const chosenFiles = await vscode.window.showOpenDialog({
             title: "Import Markdown",
             openLabel: "Import",
             defaultUri: vscode.Uri.joinPath(document.uri, ".."),
@@ -24,23 +24,23 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
                 "All Files": ["*"],
             },
         });
-        if (!picked || picked.length === 0) {
+        if (!chosenFiles || chosenFiles.length === 0) {
             return;
         }
-        const manuscript = picked[0];
-        const confirmed = await vscode.window.showWarningMessage(
+        const manuscript = chosenFiles[0];
+        const answer = await vscode.window.showWarningMessage(
             `Replace everything in ${vscode.workspace.asRelativePath(document.uri)} with ${vscode.workspace.asRelativePath(manuscript)}?`,
             { modal: true },
             "Replace",
         );
-        if (confirmed !== "Replace") {
+        if (answer !== "Replace") {
             return;
         }
-        const bytes = await vscode.workspace.fs.readFile(manuscript);
+        const manuscriptBytes = await vscode.workspace.fs.readFile(manuscript);
         await vscode.workspace.fs.writeFile(
             document.uri,
             new TextEncoder().encode(
-                fromMarkdown(new TextDecoder().decode(bytes)),
+                fromMarkdown(new TextDecoder().decode(manuscriptBytes)),
             ),
         );
         void vscode.window.showInformationMessage(

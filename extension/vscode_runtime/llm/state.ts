@@ -1,4 +1,4 @@
-export type Phase =
+export type ModelServerPhase =
     | "offline"
     | "unloaded"
     | "downloading"
@@ -7,25 +7,25 @@ export type Phase =
     | "fixing"
     | "scoring";
 
-export interface StatusDisplay {
+export interface StatusBarReading {
     text: string;
     tooltip: string;
 }
 
-export function phaseFor(status: string | undefined): Phase {
-    if (status === "serving") {
+export function phaseFor(serverStatus: string | undefined): ModelServerPhase {
+    if (serverStatus === "serving") {
         return "ready";
     }
-    if (status === "unloaded") {
+    if (serverStatus === "unloaded") {
         return "unloaded";
     }
-    if (status !== undefined && /\d+% downloaded$/.test(status)) {
+    if (serverStatus !== undefined && /\d+% downloaded$/.test(serverStatus)) {
         return "downloading";
     }
     return "offline";
 }
 
-export function renderStatus(phase: Phase): StatusDisplay {
+export function renderStatus(phase: ModelServerPhase): StatusBarReading {
     switch (phase) {
         case "offline":
             return {

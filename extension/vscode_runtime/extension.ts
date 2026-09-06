@@ -13,19 +13,24 @@ export function activate(context: vscode.ExtensionContext) {
         new ModelServer(context, MODEL_SERVER_PORT, log),
     );
 
-    const gemini = new GeminiAccount(context, MODEL_SERVER_PORT);
-    context.subscriptions.push(gemini);
-    for (const [name, run] of Object.entries(gemini.commands)) {
+    const geminiAccount = new GeminiAccount(context, MODEL_SERVER_PORT);
+    context.subscriptions.push(geminiAccount);
+    for (const [commandName, runTheCommand] of Object.entries(
+        geminiAccount.commands,
+    )) {
         context.subscriptions.push(
-            vscode.commands.registerCommand(`authorship.gemini.${name}`, run),
+            vscode.commands.registerCommand(
+                `authorship.gemini.${commandName}`,
+                runTheCommand,
+            ),
         );
     }
 
-    const authorEditor = new AuthorFileEditorProvider(context);
+    const authorFileEditor = new AuthorFileEditorProvider(context);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
             AuthorFileEditorProvider.viewType,
-            authorEditor,
+            authorFileEditor,
             {
                 webviewOptions: { retainContextWhenHidden: true },
                 supportsMultipleEditorsPerDocument: false,
@@ -36,13 +41,12 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             "authorship.manuscript",
-            new PublishView(context, MODEL_SERVER_PORT, gemini),
+            new PublishView(context, MODEL_SERVER_PORT, geminiAccount),
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
     );
 
-    const health = new ModelHealth(MODEL_SERVER_PORT);
-    context.subscriptions.push(health);
+    context.subscriptions.push(new ModelHealth(MODEL_SERVER_PORT));
 }
 
 export function deactivate() {}

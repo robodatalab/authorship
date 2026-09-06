@@ -18,11 +18,15 @@ import { CONTENTS } from "../../vscode_runtime/storydoc/model";
 
 interface ContentsCellProps {
     cell: WebviewCell;
-    at: number;
+    cellIndex: number;
     postToHost: PostToHost;
 }
 
-export function ContentsCell({ cell, at, postToHost }: ContentsCellProps) {
+export function ContentsCell({
+    cell,
+    cellIndex,
+    postToHost,
+}: ContentsCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>
@@ -32,7 +36,7 @@ export function ContentsCell({ cell, at, postToHost }: ContentsCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, at, markdown)
+                        replaceCellMarkdown(postToHost, cellIndex, markdown)
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -46,7 +50,11 @@ registerAuthorDocumentCellType({
     menuLabel: "Table of Contents",
     insertMenuGroup: "secondary",
     render: (cell, cellIndex, postToHost) => (
-        <ContentsCell cell={cell} at={cellIndex} postToHost={postToHost} />
+        <ContentsCell
+            cell={cell}
+            cellIndex={cellIndex}
+            postToHost={postToHost}
+        />
     ),
     newCell: () => ({ kind: CONTENTS, source: "", attrs: {} }),
 });

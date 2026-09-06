@@ -24,10 +24,10 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         uri: vscode.Uri,
         openContext: vscode.CustomDocumentOpenContext,
     ): Promise<AuthorDocument> {
-        const from = openContext.backupId
+        const fileToOpen = openContext.backupId
             ? vscode.Uri.parse(openContext.backupId)
             : uri;
-        const bytes = await vscode.workspace.fs.readFile(from);
+        const bytes = await vscode.workspace.fs.readFile(fileToOpen);
         return new AuthorDocument(uri, new TextDecoder().decode(bytes));
     }
 
@@ -37,7 +37,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): void {
         panel.webview.options = {
             enableScripts: true,
-            localResourceRoots: assetRoots(
+            localResourceRoots: whereTheWebviewMayReadFrom(
                 this.context.extensionUri,
                 document.uri,
             ),
@@ -45,7 +45,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         panel.webview.html = this.html(panel.webview, document.uri);
         const session = openAuthorFileEditorSession(document, panel);
 
-        const webviewSpoke = panel.webview.onDidReceiveMessage(
+        const pageSpoke = panel.webview.onDidReceiveMessage(
             (message: {
                 type?: string;
                 commandName?: string;
@@ -73,20 +73,20 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 document.uri.path.split("/").pop() ?? "",
             ),
         );
-        const writtenElsewhere = fileWatcher.onDidChange(async () => {
+        const savedElsewhere = fileWatcher.onDidChange(async () => {
             const bytes = await vscode.workspace.fs.readFile(document.uri);
-            const text = new TextDecoder().decode(bytes);
-            if (text === document.text) {
+            const savedText = new TextDecoder().decode(bytes);
+            if (savedText === document.text) {
                 return;
             }
-            document.fromText(text);
+            document.fromText(savedText);
             session.sendDocument();
         });
 
         panel.onDidDispose(() => {
-            writtenElsewhere.dispose();
+            savedElsewhere.dispose();
             fileWatcher.dispose();
-            webviewSpoke.dispose();
+            pageSpoke.dispose();
             closeAuthorFileEditorSession(document);
         });
     }
@@ -182,7 +182,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const folder = webview.asWebviewUri(
             vscode.Uri.joinPath(document, ".."),
         );
-        const nonce = nonceString();
+        const nonce = scriptNonce();
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -203,7 +203,10 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     }
 }
 
-function assetRoots(extension: vscode.Uri, document: vscode.Uri): vscode.Uri[] {
+function whereTheWebviewMayReadFrom(
+    extension: vscode.Uri,
+    document: vscode.Uri,
+): vscode.Uri[] {
     const project = vscode.workspace.getWorkspaceFolder(document);
     return [
         vscode.Uri.joinPath(extension, "media"),
@@ -213,12 +216,14 @@ function assetRoots(extension: vscode.Uri, document: vscode.Uri): vscode.Uri[] {
     ];
 }
 
-function nonceString(): string {
-    const chars =
+function scriptNonce(): string {
+    const characters =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let out = "";
-    for (let i = 0; i < 32; i++) {
-        out += chars.charAt(Math.floor(Math.random() * chars.length));
+    let nonce = "";
+    for (let character = 0; character < 32; character++) {
+        nonce += characters.charAt(
+            Math.floor(Math.random() * characters.length),
+        );
     }
-    return out;
+    return nonce;
 }
