@@ -73,7 +73,7 @@ export function fromMarkdown(markdown: string): string {
     for (const cell of cellsReadFromMarkdown(markdown)) {
         document.insertAt(document.cells.length, cell);
     }
-    return document.toText();
+    return document.text;
 }
 
 function cellsReadFromMarkdown(markdown: string): Cell[] {

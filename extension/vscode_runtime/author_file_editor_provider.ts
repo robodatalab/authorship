@@ -106,7 +106,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Thenable<void> {
         return vscode.workspace.fs.writeFile(
             destination,
-            new TextEncoder().encode(document.toText()),
+            new TextEncoder().encode(document.text),
         );
     }
 

@@ -5,24 +5,36 @@ import {
     intoParts,
     partCells,
     partFileName,
+    partIsPrintedInTheBook,
     partNumber,
     partTitle,
     sectionsOf,
-} from "../../../../extension/graveyard/parts/model";
-import { type Cell } from "../../../../extension/graveyard/storydoc_model";
+} from "../../../extension/vscode_runtime/parts/manuscript_parts";
 import {
-    chapter,
-    markdown,
-    part,
-    printsPage,
-} from "../../../../extension/graveyard/storydoc_model";
+    CHAPTER,
+    Cell,
+    MARKDOWN,
+    PART,
+} from "../../../extension/vscode_runtime/storydoc/model";
+
+function chapter(title: string): Cell {
+    return new Cell(CHAPTER, "", { title });
+}
+
+function markdown(source: string): Cell {
+    return new Cell(MARKDOWN, source, {});
+}
+
+function part(title: string, printed = true): Cell {
+    return new Cell(PART, "", printed ? { title } : { title, print: "no" });
+}
 
 function titlePage(attrs: Record<string, string>): Cell {
-    return { kind: "title-page", source: "", attrs };
+    return new Cell("title-page", "", attrs);
 }
 
 function cover(src: string): Cell {
-    return { kind: "cover", source: `![Cover](${src})`, attrs: { src } };
+    return new Cell("cover", `![Cover](${src})`, { src });
 }
 
 /** A part that places a cut and prints no page: an author saying "break here"
@@ -199,11 +211,11 @@ describe("sectionsOf — the sections a division cuts along", () => {
     it("leaves the furniture, the blurb and the story so far out of the story", () => {
         const sections = sectionsOf([
             titlePage({ title: "Veriona" }),
-            { kind: "recap", source: "She has lost her name.", attrs: {} },
+            new Cell("recap", "She has lost her name.", {}),
             chapter("One"),
             markdown("alpha"),
-            { kind: "blurb", source: "A woman loses her name.", attrs: {} },
-            { kind: "about", source: "A. Writer lives by the sea.", attrs: {} },
+            new Cell("blurb", "A woman loses her name.", {}),
+            new Cell("about", "A. Writer lives by the sea.", {}),
         ]);
         expect(sections).toHaveLength(1);
         expect(sections[0].cells.map((cell) => cell.source)).toEqual([
@@ -216,11 +228,7 @@ describe("sectionsOf — the sections a division cuts along", () => {
         const sections = sectionsOf([
             chapter("One"),
             prose(10),
-            {
-                kind: "note",
-                source: "She has to find the letter here.",
-                attrs: {},
-            },
+            new Cell("note", "She has to find the letter here.", {}),
         ]);
         expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
             "chapter",
@@ -237,7 +245,7 @@ describe("furnitureOf — what stands before the story and after it", () => {
             titlePage({ title: "Veriona" }),
             chapter("One"),
             markdown("alpha"),
-            { kind: "about", source: "A. Writer lives by the sea.", attrs: {} },
+            new Cell("about", "A. Writer lives by the sea.", {}),
         ]);
         expect(front.map((cell) => cell.kind)).toEqual(["cover", "title-page"]);
         expect(back.map((cell) => cell.kind)).toEqual(["about"]);
@@ -426,7 +434,7 @@ describe("partCells — a part as a document of its own", () => {
             seam(),
             chapter("Two"),
             markdown("beta"),
-            { kind: "about", source: "A. Writer lives by the sea.", attrs: {} },
+            new Cell("about", "A. Writer lives by the sea.", {}),
         ];
         const parts = intoParts(sectionsOf(cells));
         const second = partCells(furnitureOf(cells), 2, parts[1]);
@@ -443,11 +451,7 @@ describe("partCells — a part as a document of its own", () => {
     });
 
     it("carries a note into the part its chapter went to, and no other", () => {
-        const note: Cell = {
-            kind: "note",
-            source: "She has to find the letter here.",
-            attrs: {},
-        };
+        const note = new Cell("note", "She has to find the letter here.", {});
         const cells = [
             chapter("One"),
             prose(10),
@@ -530,9 +534,11 @@ describe("partCells — a part as a document of its own", () => {
             "chapter",
             "markdown",
         ]);
-        expect(printsPage(second[1])).toBe(false);
+        expect(partIsPrintedInTheBook(second[1])).toBe(false);
         expect(
-            second.filter((cell) => printsPage(cell) && cell.kind === "part"),
+            second.filter(
+                (cell) => partIsPrintedInTheBook(cell) && cell.kind === "part",
+            ),
         ).toEqual([]);
     });
 
@@ -566,7 +572,7 @@ describe("partCells — a part as a document of its own", () => {
         // What a cover written by hand looks like, and what the exporter falls back
         // to reading when there is no attribute to read.
         const cells = [
-            { kind: "cover", source: "![Cover](art/c.jpg)", attrs: {} },
+            new Cell("cover", "![Cover](art/c.jpg)", {}),
             seam(),
             chapter("One"),
             markdown("alpha"),
@@ -575,7 +581,7 @@ describe("partCells — a part as a document of its own", () => {
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only[0].source).toBe("![Cover](../art/c.jpg)");
-        expect(only[0].attrs).toEqual({});
+        expect(only[0].attrs.src).toBeUndefined();
     });
 
     it("climbs one further out of a path that already climbs", () => {
@@ -594,11 +600,7 @@ describe("partCells — a part as a document of its own", () => {
 
     it("moves the path and not an alt text that happens to match it", () => {
         const cells = [
-            {
-                kind: "cover",
-                source: "![c.jpg](c.jpg)",
-                attrs: { src: "c.jpg" },
-            },
+            new Cell("cover", "![c.jpg](c.jpg)", { src: "c.jpg" }),
             seam(),
             chapter("One"),
             markdown("a"),

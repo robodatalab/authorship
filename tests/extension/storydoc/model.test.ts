@@ -36,7 +36,7 @@ function cellsOfText(text: string): {
 }
 
 function textWrittenBack(text: string): string {
-    return withoutIds(AuthorDocument.fromText(text).toText());
+    return withoutIds(AuthorDocument.fromText(text).text);
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(
@@ -346,7 +346,7 @@ describe("folding a cell", () => {
 
         document.cells[0].fold(true);
 
-        expect(withoutIds(document.toText())).toBe(
+        expect(withoutIds(document.text)).toBe(
             '<!-- cell: markdown folded="true" -->\n\none\n',
         );
     });
@@ -358,7 +358,7 @@ describe("folding a cell", () => {
 
         document.cells[0].fold(false);
 
-        expect(withoutIds(document.toText())).toBe(
+        expect(withoutIds(document.text)).toBe(
             "<!-- cell: markdown -->\n\none\n",
         );
     });

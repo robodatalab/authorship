@@ -1,9 +1,9 @@
 import {
-    blankOf,
-    fieldsOf,
-    labelOf,
-} from "../../graveyard/author_editor/model";
-import type { Cell } from "../../graveyard/storydoc_model";
+    blankCellOfKind,
+    fieldsOfCellKind,
+    labelOfCellKind,
+} from "../storydoc/cell_kinds";
+import type { Cell } from "../storydoc/model";
 
 const NEEDS_ARTWORK = "art";
 const NEEDS_TEXT = "text";
@@ -32,7 +32,7 @@ export function cellsLaidOutByPlan(
     plan: PlannedSection[],
 ): Cell[] {
     return plan.map((section) =>
-        section.at === null ? blankOf(section.kind) : cells[section.at],
+        section.at === null ? blankCellOfKind(section.kind) : cells[section.at],
     );
 }
 
@@ -44,7 +44,7 @@ export function wordsForWhatIsMissing(
     cellKind: string,
     missing: string[],
 ): string {
-    const fields = fieldsOf(cellKind);
+    const fields = fieldsOfCellKind(cellKind);
     return missing
         .map((name) => {
             if (name === NEEDS_ARTWORK) {
@@ -53,13 +53,16 @@ export function wordsForWhatIsMissing(
             if (name === NEEDS_TEXT) {
                 return "something written in it";
             }
-            return fields.find((field) => field.name === name)?.label ?? name;
+            return (
+                fields.find((field) => field.attributeName === name)?.label ??
+                name
+            );
         })
         .join(", ");
 }
 
 function labelsFor(kinds: string[]): string {
-    return kinds.map((kind) => labelOf(kind)).join(", ");
+    return kinds.map((kind) => labelOfCellKind(kind)).join(", ");
 }
 
 export function askedBeforeBinding(
@@ -75,7 +78,7 @@ export function askedBeforeBinding(
     }
     for (const section of report.wanting) {
         lines.push(
-            `${labelOf(section.kind)} needs ${wordsForWhatIsMissing(section.kind, section.needs)}`,
+            `${labelOfCellKind(section.kind)} needs ${wordsForWhatIsMissing(section.kind, section.needs)}`,
         );
     }
     lines.push(

@@ -133,7 +133,7 @@ export class AuthorDocument implements vscode.CustomDocument {
     dispose(): void {}
 
     get text(): string {
-        return this.toText();
+        return authorFileText(this.documentCells);
     }
 
     get cells(): Cell[] {
@@ -166,19 +166,19 @@ export class AuthorDocument implements vscode.CustomDocument {
         }
         this.documentCells.splice(cellIndex, 1);
     }
+}
 
-    toText(): string {
-        const lines: string[] = [];
-        for (const cell of this.documentCells) {
-            lines.push(cell.marker());
+export function authorFileText(cells: readonly Cell[]): string {
+    const lines: string[] = [];
+    for (const cell of cells) {
+        lines.push(cell.marker());
+        lines.push("");
+        if (cell.source) {
+            lines.push(cell.source);
             lines.push("");
-            if (cell.source) {
-                lines.push(cell.source);
-                lines.push("");
-            }
         }
-        return lines.join("\n");
     }
+    return lines.join("\n");
 }
 
 function withoutBlankLinesAtTheEnds(proseLines: string[]): string {

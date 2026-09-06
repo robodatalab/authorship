@@ -55,7 +55,7 @@ const extensionConfig = {
 const publishViewConfig = {
   target: 'web',
   mode: 'development',
-  entry: './extension/graveyard/publish/view.ts',
+  entry: './extension/webview/publish_sidebar_webview.ts',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'publish_view.js'
@@ -93,23 +93,6 @@ const publishViewConfig = {
   },
 };
 
-/**
- * The .author editor's cell surface, in its own webview and so its own bundle.
- *
- * @type WebpackConfig
- */
-const authorViewConfig = {
-  ...publishViewConfig,
-  entry: './extension/graveyard/author_editor/view.ts',
-  output: {
-    path: path.resolve(__dirname, 'dist'),
-    filename: 'author_view.js'
-  },
-  plugins: [
-    new MiniCssExtractPlugin({ filename: 'author_view.css' })
-  ],
-};
-
 /** @type WebpackConfig */
 const authorFileEditorViewConfig = {
   ...publishViewConfig,
@@ -123,4 +106,4 @@ const authorFileEditorViewConfig = {
   ],
 };
 
-module.exports = [ extensionConfig, publishViewConfig, authorViewConfig, authorFileEditorViewConfig ];
+module.exports = [ extensionConfig, publishViewConfig, authorFileEditorViewConfig ];

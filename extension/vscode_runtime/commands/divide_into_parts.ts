@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { divideManuscript } from "../../graveyard/parts/divide";
+import { divideManuscript } from "../parts/divide_manuscript";
 import type { AuthorDocument } from "../storydoc/model";
 
 export class DivideIntoPartsCommand implements AuthorDocumentCommand {

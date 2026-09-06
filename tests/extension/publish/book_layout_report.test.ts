@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { blankOf } from "../../../extension/graveyard/author_editor/model";
+import { blankCellOfKind } from "../../../extension/vscode_runtime/storydoc/cell_kinds";
 import {
     cellsLaidOutByPlan,
     askedBeforeBinding,
@@ -9,13 +9,24 @@ import {
     kindsStillToWrite,
     type BookLayoutReport,
 } from "../../../extension/vscode_runtime/publish/book_layout_report";
-import { CHAPTER } from "../../../extension/vscode_runtime/storydoc/model";
 import {
-    type Cell,
-    chapter,
-    cover,
-    markdown,
-} from "../../../extension/graveyard/storydoc_model";
+    CHAPTER,
+    COVER,
+    Cell,
+    MARKDOWN,
+} from "../../../extension/vscode_runtime/storydoc/model";
+
+function chapter(title: string): Cell {
+    return new Cell(CHAPTER, "", { title });
+}
+
+function markdown(source: string): Cell {
+    return new Cell(MARKDOWN, source, {});
+}
+
+function cover(src: string): Cell {
+    return new Cell(COVER, `![Cover](${src})`, { src });
+}
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {
@@ -54,8 +65,8 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
             CHAPTER,
             "about",
         ]);
-        expect(laidOut[0]).toEqual(blankOf("cover"));
-        expect(laidOut[2]).toEqual(blankOf("about"));
+        expect(laidOut[0].source).toBe(blankCellOfKind("cover").source);
+        expect(laidOut[2].source).toBe(blankCellOfKind("about").source);
     });
 
     it("keeps the story in the order the plan gives", () => {
@@ -74,11 +85,7 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
     });
 
     it("carries a kind it has never heard of", () => {
-        const strange: Cell = {
-            kind: "epigraph",
-            source: "Whom the gods…",
-            attrs: {},
-        };
+        const strange = new Cell("epigraph", "Whom the gods…", {});
         expect(
             cellsLaidOutByPlan([strange], [{ kind: "epigraph", at: 0 }]),
         ).toEqual([strange]);
