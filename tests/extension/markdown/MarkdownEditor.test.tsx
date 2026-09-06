@@ -474,6 +474,23 @@ describe("what the checks found in the prose being written", () => {
         expect(tooltip()?.textContent).toContain("says it twice");
     });
 
+    it("keeps the tooltip up while the pointer is on it, however it got there", async () => {
+        await openEditorWithMarks();
+
+        await pointAt(12);
+        await act(async () => {
+            tooltip()!.parentElement!.dispatchEvent(
+                new MouseEvent("mouseover", { bubbles: true }),
+            );
+        });
+        await act(async () => {
+            latestEditor().pointAway();
+            await new Promise((over) => setTimeout(over, 250));
+        });
+
+        expect(tooltip()).not.toBeNull();
+    });
+
     it("takes the tooltip away when the pointer leaves the editor", async () => {
         await openEditorWithMarks();
 

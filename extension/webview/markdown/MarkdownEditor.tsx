@@ -174,6 +174,7 @@ function MonacoMarkdownEditor({
     const hidingTheTooltip = useRef<ReturnType<typeof setTimeout> | undefined>(
         undefined,
     );
+    const pointerIsOnTheTooltip = useRef(false);
     const latestCallbacks = useRef({
         onMarkdownChanged,
         onSettled,
@@ -266,10 +267,12 @@ function MonacoMarkdownEditor({
 
         const contentResized = editor.onDidContentSizeChange(fitToContent);
         const hideTheTooltipUnlessItIsPointedAt = (): void => {
-            hidingTheTooltip.current = setTimeout(
-                () => sayErrorUnderPointer(null),
-                HOLD_TOOLTIP_MS,
-            );
+            clearTimeout(hidingTheTooltip.current);
+            hidingTheTooltip.current = setTimeout(() => {
+                if (!pointerIsOnTheTooltip.current) {
+                    sayErrorUnderPointer(null);
+                }
+            }, HOLD_TOOLTIP_MS);
         };
         const pointerMoved = editor.onMouseMove((event) => {
             const underPointer = errorUnderPointer(event);
@@ -352,10 +355,14 @@ function MonacoMarkdownEditor({
                             top: errorUnderPointer.top,
                             left: errorUnderPointer.left,
                         }}
-                        onMouseEnter={() =>
-                            clearTimeout(hidingTheTooltip.current)
-                        }
-                        onMouseLeave={() => sayErrorUnderPointer(null)}
+                        onMouseEnter={() => {
+                            pointerIsOnTheTooltip.current = true;
+                            clearTimeout(hidingTheTooltip.current);
+                        }}
+                        onMouseLeave={() => {
+                            pointerIsOnTheTooltip.current = false;
+                            sayErrorUnderPointer(null);
+                        }}
                     >
                         <LinterTooltip
                             errors={[errorUnderPointer.error]}
