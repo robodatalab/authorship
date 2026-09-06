@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckProseCommand } from "../../../extension/vscode_runtime/commands/check_prose";
-import { shownMessages } from "../vscode";
+import {
+    closeAuthorFileEditorSession,
+    openAuthorFileEditorSession,
+} from "../../../extension/vscode_runtime/author_file_editor_session";
 import { forgetWhatTheEditorDid, storyOfThreeCells } from "./open_story";
 
-const ONE_ERROR = {
+const A_STYLE_ERROR = {
     cellId: "c2",
     startOffsetInCell: 4,
     endOffsetInCell: 7,
@@ -14,11 +17,21 @@ const ONE_ERROR = {
     correctVersion: "",
 };
 
+const A_GRAMMAR_ERROR = {
+    cellId: "c3",
+    startOffsetInCell: 0,
+    endOffsetInCell: 2,
+    ruleThatFoundTheError: "grammar:agreement",
+    isAnErrorOf: "grammar",
+    reasonForError: "He hear the bell.",
+    correctVersion: "He heard",
+};
+
 beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("CheckProseCommand — checks the document's prose", () => {
-    it("sends the document to the checker and waits for what it found", async () => {
+    it("asks the rules and then the model, drawing what the rules found first", async () => {
         const asked: string[] = [];
         vi.stubGlobal("fetch", (url: string) => {
             asked.push(url);
@@ -30,17 +43,36 @@ describe("CheckProseCommand — checks the document's prose", () => {
                             ? {
                                   running: false,
                                   error: null,
-                                  findings: [ONE_ERROR],
+                                  findings: url.includes("grammar")
+                                      ? [A_GRAMMAR_ERROR]
+                                      : [A_STYLE_ERROR],
                               }
                             : { id: "job-1" },
                     ),
             });
         });
 
-        await new CheckProseCommand().invoke(storyOfThreeCells());
+        const document = storyOfThreeCells();
+        const sentToThePage: unknown[] = [];
+        openAuthorFileEditorSession(document, {
+            webview: {
+                postMessage: (message: unknown) => sentToThePage.push(message),
+            },
+        } as never);
+
+        await new CheckProseCommand().invoke(document);
+        closeAuthorFileEditorSession(document);
 
         expect(asked[0]).toContain("/check/prose");
         expect(asked[1]).toContain("/check/prose/status?id=job-1");
-        expect(shownMessages[0]).toContain("1 errors");
+        expect(asked[2]).toContain("/check/grammar");
+        expect(asked[3]).toContain("/check/grammar/status?id=job-1");
+        expect(sentToThePage).toEqual([
+            { type: "proseErrors", proseErrors: [A_STYLE_ERROR] },
+            {
+                type: "proseErrors",
+                proseErrors: [A_STYLE_ERROR, A_GRAMMAR_ERROR],
+            },
+        ]);
     });
 });

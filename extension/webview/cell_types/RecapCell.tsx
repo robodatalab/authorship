@@ -4,6 +4,8 @@ import {
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellCard,
+    AuthorFileEditorCellWarning,
+    useAuthorFileEditorCellProseErrors,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -14,6 +16,7 @@ import type {
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
+    fixProseError,
     replaceCellAttribute,
     replaceCellMarkdown,
 } from "../../vscode_runtime/commands/author_document_edits";
@@ -34,8 +37,10 @@ interface RecapCellProps {
 }
 
 export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
+    const proseErrors = useAuthorFileEditorCellProseErrors();
+
     return (
-        <AuthorFileEditorCell>
+        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
             <AuthorFileEditorCellHeader>
                 The Story So Far
             </AuthorFileEditorCellHeader>
@@ -57,6 +62,10 @@ export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
                         markdown={cell.source}
+                        errors={proseErrors}
+                        onFixAsked={(proseError) =>
+                            fixProseError(postToHost, proseError)
+                        }
                         onMarkdownCommitted={(markdown) =>
                             replaceCellMarkdown(postToHost, cellIndex, markdown)
                         }

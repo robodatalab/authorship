@@ -9,6 +9,7 @@ import {
     authorDocumentCellRenderers,
     authorDocumentCellTypes,
 } from "../vscode_runtime/commands/author_document_cell_types";
+import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 
 declare function acquireVsCodeApi(): { postMessage: PostToHost };
 
@@ -34,6 +35,7 @@ function openTheAuthorFileEditor(): void {
     );
     let cells: WebviewCell[] = [];
     let commands: WebviewAuthorDocumentCommandCard[] = [];
+    let proseErrors: ProseCheckError[] = [];
 
     function drawTheCanvas(): void {
         root.render(
@@ -43,6 +45,7 @@ function openTheAuthorFileEditor(): void {
                 cellTypes={authorDocumentCellTypes()}
                 postToHost={postToHost}
                 cellRenderers={authorDocumentCellRenderers()}
+                proseErrors={proseErrors}
             />,
         );
     }
@@ -54,6 +57,9 @@ function openTheAuthorFileEditor(): void {
         } else if (event.data?.type === "commands") {
             commands = event.data
                 .commands as WebviewAuthorDocumentCommandCard[];
+            drawTheCanvas();
+        } else if (event.data?.type === "proseErrors") {
+            proseErrors = event.data.proseErrors as ProseCheckError[];
             drawTheCanvas();
         }
     });

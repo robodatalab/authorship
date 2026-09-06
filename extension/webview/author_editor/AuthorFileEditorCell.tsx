@@ -5,7 +5,7 @@ import {
     type PostToHost,
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
-import type { ProseError } from "../linter/LinterTooltip";
+import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -38,7 +38,7 @@ interface AuthorFileEditorCellStateProps {
     cellCommands: WebviewAuthorDocumentCommandCard[];
     cellIndex: number;
     cellAttributes: Readonly<Record<string, string>>;
-    proseErrors?: ProseError[];
+    proseErrors?: ProseCheckError[];
     postToHost: PostToHost;
     children?: ReactNode;
 }
@@ -154,7 +154,7 @@ export function AuthorFileEditorCellCard({
     return <div className="author-file-editor-cell-card">{children}</div>;
 }
 
-export function useAuthorFileEditorCellProseErrors(): ProseError[] {
+export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
 }
 

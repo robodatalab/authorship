@@ -4,6 +4,7 @@ import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorCellState } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
+import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -46,6 +47,7 @@ interface AuthorFileEditorCanvasProps {
     cellTypes: AuthorDocumentCellType[];
     postToHost: PostToHost;
     cellRenderers: AuthorDocumentCellRenderers;
+    proseErrors?: ProseCheckError[];
 }
 
 export function AuthorFileEditorCanvas({
@@ -54,6 +56,7 @@ export function AuthorFileEditorCanvas({
     cellTypes,
     postToHost,
     cellRenderers,
+    proseErrors = [],
 }: AuthorFileEditorCanvasProps) {
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
@@ -101,6 +104,10 @@ export function AuthorFileEditorCanvas({
                                     cellCommands={cellCommands}
                                     cellIndex={cellIndex}
                                     cellAttributes={cell.attrs}
+                                    proseErrors={proseErrors.filter(
+                                        (proseError) =>
+                                            proseError.cellId === cell.attrs.id,
+                                    )}
                                     postToHost={postToHost}
                                 >
                                     {renderCell(cell, cellIndex, postToHost)}

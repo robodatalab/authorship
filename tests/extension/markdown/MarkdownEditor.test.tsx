@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
+
 const monacoEditors = vi.hoisted(() => {
     return [] as {
         type: (markdown: string) => void;
         getValue: () => string;
         point: (offset: number | null) => void;
+        pointAway: () => void;
         marks: () => {
             range: unknown;
             options: { inlineClassName: string };
@@ -42,6 +45,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                 let value = options.value;
                 let changed = (): void => {};
                 let pointed: (event: unknown) => void = () => {};
+                let pointedAway = (): void => {};
                 let marks: {
                     range: unknown;
                     options: { inlineClassName: string };
@@ -63,6 +67,10 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     },
                     onMouseMove: (listener: (event: unknown) => void) => {
                         pointed = listener;
+                        return disposable;
+                    },
+                    onMouseLeave: (listener: () => void) => {
+                        pointedAway = listener;
                         return disposable;
                     },
                     createDecorationsCollection: () => ({
@@ -98,6 +106,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                                         : { lineNumber: 1, column: offset + 1 },
                             },
                         }),
+                    pointAway: () => pointedAway(),
                     type: (markdown: string) => {
                         value = markdown;
                         changed();
@@ -398,14 +407,14 @@ describe("two editors", () => {
 });
 
 describe("what the checks found in the prose being written", () => {
-    const REPEATED = {
-        id: 3,
-        kind: "style",
-        at: 10,
-        end: 19,
-        message: "Repeated word",
-        detail: "“very very” says it twice.",
-        replacements: ["very"],
+    const REPEATED: ProseCheckError = {
+        cellId: "c1",
+        startOffsetInCell: 10,
+        endOffsetInCell: 19,
+        ruleThatFoundTheError: "echo",
+        isAnErrorOf: "style",
+        reasonForError: "“very very” says it twice.",
+        correctVersion: "very",
     };
 
     async function openEditorWithMarks(
@@ -462,7 +471,19 @@ describe("what the checks found in the prose being written", () => {
 
         await pointAt(12);
 
-        expect(tooltip()?.textContent).toContain("Repeated word");
+        expect(tooltip()?.textContent).toContain("says it twice");
+    });
+
+    it("takes the tooltip away when the pointer leaves the editor", async () => {
+        await openEditorWithMarks();
+
+        await pointAt(12);
+        await act(async () => {
+            latestEditor().pointAway();
+            await new Promise((over) => setTimeout(over, 250));
+        });
+
+        expect(tooltip()).toBeNull();
     });
 
     it("says nothing when the pointer is on prose it had no quarrel with", async () => {
@@ -483,7 +504,7 @@ describe("what the checks found in the prose being written", () => {
                 <MarkdownEditorMediator>
                     <MarkdownEditor
                         markdown="It was very very late."
-                        errors={[{ ...REPEATED, replacements: [] }]}
+                        errors={[{ ...REPEATED, correctVersion: "" }]}
                         onFixAsked={vi.fn()}
                         onMarkdownCommitted={committedSpy()}
                     >
@@ -496,7 +517,7 @@ describe("what the checks found in the prose being written", () => {
 
         await pointAt(12);
 
-        expect(tooltip()?.textContent).toContain("Repeated word");
+        expect(tooltip()?.textContent).toContain("says it twice");
         expect(document.querySelector(".linter-tooltip-fix")).toBeNull();
     });
 

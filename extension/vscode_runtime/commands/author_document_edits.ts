@@ -2,6 +2,7 @@ import {
     invokeAuthorDocumentCommand,
     type PostToHost,
 } from "../../webview/author_editor/AuthorFileEditorCanvas";
+import type { ProseCheckError } from "./check_prose";
 
 export function replaceCellMarkdown(
     postToHost: PostToHost,
@@ -25,4 +26,11 @@ export function replaceCellAttribute(
         attributeName,
         attributeValue,
     });
+}
+
+export function fixProseError(
+    postToHost: PostToHost,
+    proseError: ProseCheckError,
+): void {
+    invokeAuthorDocumentCommand(postToHost, "fixProse", { ...proseError });
 }

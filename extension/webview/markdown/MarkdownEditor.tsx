@@ -15,7 +15,8 @@ import {
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
 import { marked } from "marked";
-import { LinterTooltip, type ProseError } from "../linter/LinterTooltip";
+import { LinterTooltip } from "../linter/LinterTooltip";
+import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -74,8 +75,8 @@ function useMarkdownEditorBeingEdited(editorId: string) {
 interface MarkdownEditorProps {
     markdown: string;
     onMarkdownCommitted: (markdown: string) => void;
-    errors?: ProseError[];
-    onFixAsked?: (error: ProseError) => void;
+    errors?: ProseCheckError[];
+    onFixAsked?: (error: ProseCheckError) => void;
     children?: (markdown: string) => ReactNode;
 }
 
@@ -139,15 +140,15 @@ export function MarkdownEditor({
 
 interface MonacoMarkdownEditorProps {
     markdown: string;
-    errors: ProseError[];
-    onFixAsked: (error: ProseError) => void;
+    errors: ProseCheckError[];
+    onFixAsked: (error: ProseCheckError) => void;
     onMarkdownChanged: (markdown: string) => void;
     onSettled: (markdown: string) => void;
     onFinished: () => void;
 }
 
 interface MarkdownEditorErrorUnderPointer {
-    error: ProseError;
+    error: ProseCheckError;
     top: number;
     left: number;
 }
@@ -246,7 +247,9 @@ function MonacoMarkdownEditor({
             }
             const offset = model.getOffsetAt(position);
             const error = errorsNow.current.find(
-                (marked) => offset >= marked.at && offset <= marked.end,
+                (marked) =>
+                    offset >= marked.startOffsetInCell &&
+                    offset <= marked.endOffsetInCell,
             );
             const wordsDrawnAt =
                 error && editor.getScrolledVisiblePosition(position);
@@ -262,18 +265,24 @@ function MonacoMarkdownEditor({
         };
 
         const contentResized = editor.onDidContentSizeChange(fitToContent);
+        const hideTheTooltipUnlessItIsPointedAt = (): void => {
+            hidingTheTooltip.current = setTimeout(
+                () => sayErrorUnderPointer(null),
+                HOLD_TOOLTIP_MS,
+            );
+        };
         const pointerMoved = editor.onMouseMove((event) => {
             const underPointer = errorUnderPointer(event);
             if (underPointer) {
                 clearTimeout(hidingTheTooltip.current);
                 sayErrorUnderPointer(underPointer);
             } else {
-                hidingTheTooltip.current = setTimeout(
-                    () => sayErrorUnderPointer(null),
-                    HOLD_TOOLTIP_MS,
-                );
+                hideTheTooltipUnlessItIsPointedAt();
             }
         });
+        const pointerLeft = editor.onMouseLeave(
+            hideTheTooltipUnlessItIsPointedAt,
+        );
         let settlingAfterTyping: ReturnType<typeof setTimeout> | undefined;
         const contentChanged = editor.onDidChangeModelContent(() => {
             latestCallbacks.current.onMarkdownChanged(editor.getValue());
@@ -301,6 +310,7 @@ function MonacoMarkdownEditor({
             clearTimeout(hidingTheTooltip.current);
             contentResized.dispose();
             pointerMoved.dispose();
+            pointerLeft.dispose();
             contentChanged.dispose();
             editor.dispose();
         };
@@ -321,11 +331,11 @@ function MonacoMarkdownEditor({
         drawnMarks.current?.set(
             errors.map((error) => ({
                 range: monaco.Range.fromPositions(
-                    model.getPositionAt(error.at),
-                    model.getPositionAt(error.end),
+                    model.getPositionAt(error.startOffsetInCell),
+                    model.getPositionAt(error.endOffsetInCell),
                 ),
                 options: {
-                    inlineClassName: `markdown-editor-mark markdown-editor-mark-${error.kind}`,
+                    inlineClassName: `markdown-editor-mark markdown-editor-mark-${error.isAnErrorOf}`,
                 },
             })),
         );

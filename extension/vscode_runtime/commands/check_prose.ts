@@ -6,6 +6,7 @@ import {
     startModelServerJob,
     type ModelServerJob,
 } from "../server/jobs";
+import { authorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocument } from "../storydoc/model";
 
 export interface ProseCheckError {
@@ -22,6 +23,23 @@ interface ProseCheckJob extends ModelServerJob {
     findings: ProseCheckError[];
 }
 
+interface DocumentToCheck {
+    path: string;
+    text: string;
+}
+
+async function startAndAwaitServerJob(
+    route: string,
+    documentToCheck: DocumentToCheck,
+): Promise<ProseCheckError[]> {
+    const jobId = await startModelServerJob(route, documentToCheck);
+    const checked = await awaitModelServerJob<ProseCheckJob>(
+        `${route}/status`,
+        jobId,
+    );
+    return checked.findings;
+}
+
 export class CheckProseCommand implements AuthorDocumentCommand {
     readonly commandName = "checkProse";
     readonly buttonGroup = "check";
@@ -30,18 +48,24 @@ export class CheckProseCommand implements AuthorDocumentCommand {
         "Check Prose — read the whole document for faults of usage and style";
 
     async invoke(document: AuthorDocument): Promise<void> {
+        const documentToCheck = {
+            path: document.uri.fsPath,
+            text: document.text,
+        };
         try {
-            const jobId = await startModelServerJob("/check/prose", {
-                path: document.uri.fsPath,
-                text: document.text,
-            });
-            const checkedProse = await awaitModelServerJob<ProseCheckJob>(
-                "/check/prose/status",
-                jobId,
+            const rulesFound = await startAndAwaitServerJob(
+                "/check/prose",
+                documentToCheck,
             );
-            void vscode.window.showInformationMessage(
-                `Checked the prose of ${vscode.workspace.asRelativePath(document.uri)}: ${checkedProse.findings.length} errors.`,
+            authorFileEditorSession(document)?.showProseErrors(rulesFound);
+            const grammarFound = await startAndAwaitServerJob(
+                "/check/grammar",
+                documentToCheck,
             );
+            authorFileEditorSession(document)?.showProseErrors([
+                ...rulesFound,
+                ...grammarFound,
+            ]);
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot check the prose — is the model server running? (${failure instanceof Error ? failure.message : String(failure)})`,

@@ -10,7 +10,7 @@ import {
     AuthorFileEditorCellState,
     AuthorFileEditorCellWarning,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { ProseError } from "../../../extension/webview/linter/LinterTooltip";
+import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -89,21 +89,21 @@ describe("what the prose checker found", () => {
     const posted: unknown[] = [];
 
     function errorSaying(
-        message: string,
-        replacements: string[] = [],
-    ): ProseError {
+        reasonForError: string,
+        correctVersion = "",
+    ): ProseCheckError {
         return {
-            id: replacements.length,
-            kind: "style",
-            at: 10,
-            end: 19,
-            message,
-            detail: "It says it twice.",
-            replacements,
+            cellId: "c1",
+            startOffsetInCell: 10,
+            endOffsetInCell: 19,
+            ruleThatFoundTheError: "echo",
+            isAnErrorOf: "style",
+            reasonForError,
+            correctVersion,
         };
     }
 
-    async function mountWarning(proseErrors: ProseError[]): Promise<void> {
+    async function mountWarning(proseErrors: ProseCheckError[]): Promise<void> {
         posted.length = 0;
         await mount(
             <AuthorFileEditorCellState
@@ -137,7 +137,7 @@ describe("what the prose checker found", () => {
     });
 
     it("says no more than that, since a mark is what carries the words", async () => {
-        await mountWarning([errorSaying("Repeated word", ["very"])]);
+        await mountWarning([errorSaying("Repeated word", "very")]);
 
         await hover(warning(), "mouseover");
 

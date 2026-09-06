@@ -1,35 +1,28 @@
+import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import "./LinterTooltip.css";
 
-export interface ProseError {
-    readonly id: number;
-    readonly kind: string;
-    readonly at: number;
-    readonly end: number;
-    readonly message: string;
-    readonly detail: string;
-    readonly replacements: string[];
-}
-
 interface LinterTooltipProps {
-    errors: ProseError[];
-    onFixAsked: (error: ProseError) => void;
+    errors: ProseCheckError[];
+    onFixAsked: (error: ProseCheckError) => void;
 }
 
 export function LinterTooltip({ errors, onFixAsked }: LinterTooltipProps) {
     return (
         <div className="linter-tooltip" role="tooltip">
             {errors.map((error) => (
-                <div key={error.id} className="linter-tooltip-error">
+                <div
+                    key={`${error.cellId}:${error.startOffsetInCell}`}
+                    className="linter-tooltip-error"
+                >
                     <p
-                        className={`linter-tooltip-kind linter-tooltip-${error.kind}`}
+                        className={`linter-tooltip-kind linter-tooltip-${error.isAnErrorOf}`}
                     >
-                        {error.kind}
+                        {error.isAnErrorOf}
                     </p>
-                    <p className="linter-tooltip-said">{error.message}</p>
-                    {error.detail && (
-                        <p className="linter-tooltip-why">{error.detail}</p>
-                    )}
-                    {error.replacements.length > 0 && (
+                    <p className="linter-tooltip-said">
+                        {error.reasonForError}
+                    </p>
+                    {error.correctVersion !== "" && (
                         <button
                             type="button"
                             className="linter-tooltip-fix"

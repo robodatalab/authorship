@@ -1,14 +1,29 @@
 import type * as vscode from "vscode";
 
+import type { ProseCheckError } from "./commands/check_prose";
 import type { AuthorDocument } from "./storydoc/model";
 
 const openSessions = new Map<string, AuthorFileEditorSession>();
 
 export class AuthorFileEditorSession {
+    private proseErrors: ProseCheckError[] = [];
+
     constructor(
         readonly document: AuthorDocument,
         private readonly panel: vscode.WebviewPanel,
     ) {}
+
+    showProseErrors(proseErrors: ProseCheckError[]): void {
+        this.proseErrors = proseErrors;
+        this.sendProseErrors();
+    }
+
+    sendProseErrors(): void {
+        void this.panel.webview.postMessage({
+            type: "proseErrors",
+            proseErrors: this.proseErrors,
+        });
+    }
 
     sendDocument(): void {
         void this.panel.webview.postMessage({
