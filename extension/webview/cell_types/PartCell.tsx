@@ -17,9 +17,7 @@ import {
 } from "../../vscode_runtime/commands/author_document_edits";
 import { PART } from "../../vscode_runtime/storydoc/model";
 
-const FIELDS: AuthorFileEditorCellField[] = [
-    { name: "title", label: "Title" },
-];
+const FIELDS: AuthorFileEditorCellField[] = [{ name: "title", label: "Title" }];
 
 interface PartCellProps {
     cell: WebviewCell;
@@ -46,11 +44,11 @@ export function PartCell({ cell, at, postToHost }: PartCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: PART,
-    label: "Part",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <PartCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: PART,
+    menuLabel: "Part",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <PartCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: PART, source: "", attrs: { title: "Untitled" } }),
+    newCell: () => ({ kind: PART, source: "", attrs: { title: "Untitled" } }),
 });

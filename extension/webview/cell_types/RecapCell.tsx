@@ -64,11 +64,11 @@ export function RecapCell({ cell, at, postToHost }: RecapCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: RECAP,
-    label: "The Story So Far",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <RecapCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: RECAP,
+    menuLabel: "The Story So Far",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <RecapCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: RECAP, source: "", attrs: {} }),
+    newCell: () => ({ kind: RECAP, source: "", attrs: {} }),
 });

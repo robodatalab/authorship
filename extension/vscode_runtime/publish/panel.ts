@@ -1,19 +1,3 @@
-// The Authorship sidebar: what the machinery behind the editor is doing.
-//
-// It used to be where a book was assembled. It is not any more — a story and the
-// layout it publishes in are one `.author` document now, and the editor for that
-// document is where the author works. What is left here is the part that was
-// never about a particular book: which models are resident, what they are
-// holding, and what work the server has in hand.
-//
-// So this owns no files and edits nothing. It polls, and it draws what it hears —
-// with one exception. The Gemini account is here too, at the top, because this
-// drawer is already the answer to "what can Authorship reach, and what state is
-// it in", and an account that sends the manuscript off this machine is the most
-// important entry that question has. VS Code's own Accounts menu lists a session
-// once there is one, which is no help at all to somebody looking for where to
-// make one.
-
 import * as vscode from "vscode";
 
 import {
@@ -22,10 +6,8 @@ import {
     styleFixEnabled,
 } from "../gemini/account";
 
-/** How often the drawers refresh. */
 const STATUS_POLL_MS = 1500;
 
-/** Generous, because loading weights starves the event loop for seconds. */
 const STATUS_REQUEST_TIMEOUT_MS = 10_000;
 
 export class PublishView implements vscode.WebviewViewProvider {
@@ -35,14 +17,6 @@ export class PublishView implements vscode.WebviewViewProvider {
     private watching?: vscode.Disposable;
     private settings?: vscode.Disposable;
 
-    /**
-     * The models this key can reach, once they have been asked for.
-     *
-     * Held for as long as the panel is, because the list is a question for
-     * Google and the drawer is repainted whenever anything about the account
-     * changes — including changing which model is chosen, which is no reason to
-     * ask again. Dropped on signing out, since the next key may see other models.
-     */
     private models?: GeminiModel[];
     private shipped = "";
 
@@ -80,14 +54,9 @@ export class PublishView implements vscode.WebviewViewProvider {
             }
         });
 
-        // The account is news rather than a reading, so it is not polled: signing
-        // in or out says so, and nothing else changes it.
         this.watching = this.account.onDidChangeSessions(
             () => void this.showAccount(),
         );
-        // The model can also be changed from the settings editor or the command,
-        // and a dropdown showing something other than the truth is worse than no
-        // dropdown at all.
         this.settings = vscode.workspace.onDidChangeConfiguration((changed) => {
             if (changed.affectsConfiguration("authorship")) {
                 void this.showAccount();
@@ -110,25 +79,16 @@ export class PublishView implements vscode.WebviewViewProvider {
         });
     }
 
-    /**
-     * Say whether there is a Gemini account, and what it is called.
-     *
-     * The key itself never leaves the host: what the drawer is told is the label
-     * VS Code would show, which is the masked tail and nothing more.
-     */
     private async showAccount(refresh = false): Promise<void> {
         if (!this.view) {
             return;
         }
-        // The account exists for the style pass and for nothing else, so with
-        // the experiment off the drawer is about a feature that is not there.
         if (!styleFixEnabled()) {
             void this.view.webview.postMessage({ type: "account", off: true });
             return;
         }
         const [session] = await this.account.getSessions();
         if (!session) {
-            // The next key may not see the same models.
             this.models = undefined;
         } else if (refresh || this.models === undefined) {
             await this.loadModels(session.accessToken);
@@ -136,21 +96,12 @@ export class PublishView implements vscode.WebviewViewProvider {
         void this.view.webview.postMessage({
             type: "account",
             account: session ? session.account.label : null,
-            // What the setting holds; empty is "whichever one Authorship ships
-            // with", which is a choice and not the absence of one.
             model: configuredModel() ?? "",
             shipped: this.shipped,
             models: this.models ?? [],
         });
     }
 
-    /**
-     * Ask which models this key can write with.
-     *
-     * Failure is quiet. The drawer draws the dropdown from whatever it has, and
-     * a server that is still starting up is not worth a dialog over — the list
-     * fills in the next time the account is looked at.
-     */
     private async loadModels(key: string): Promise<void> {
         try {
             const response = await fetch(
@@ -171,20 +122,13 @@ export class PublishView implements vscode.WebviewViewProvider {
             };
             this.shipped = body.default ?? "";
             this.models = body.models ?? [];
-        } catch {
-            // Said by the offline notice beside this, if it is that.
-        }
+        } catch {}
     }
 
-    /** Remember which Gemini to use. Empty is back to the one we ship with. */
     private async setModel(model: string): Promise<void> {
         await vscode.workspace
             .getConfiguration("authorship")
-            .update(
-                "gemini.model",
-                model,
-                vscode.ConfigurationTarget.Global,
-            );
+            .update("gemini.model", model, vscode.ConfigurationTarget.Global);
     }
 
     private async poll(): Promise<void> {
@@ -195,7 +139,6 @@ export class PublishView implements vscode.WebviewViewProvider {
         ]);
     }
 
-    /** Poll the server for what is loaded, and paint the Serving Status drawer. */
     private async pollModels(): Promise<void> {
         if (!this.view) {
             return;
@@ -213,8 +156,6 @@ export class PublishView implements vscode.WebviewViewProvider {
                 models: body.models,
             });
         } catch (err) {
-            // A timeout means the server is busy loading, not gone — leave the last
-            // reading up. Only a refused connection reads as offline.
             if (!isTimeout(err)) {
                 void this.view.webview.postMessage({
                     type: "models",
@@ -224,7 +165,6 @@ export class PublishView implements vscode.WebviewViewProvider {
         }
     }
 
-    /** Poll what the model is holding, and paint the Memory drawer. */
     private async pollMemory(): Promise<void> {
         if (!this.view) {
             return;
@@ -248,7 +188,6 @@ export class PublishView implements vscode.WebviewViewProvider {
         }
     }
 
-    /** Poll the server for the work it has in hand, and paint the Jobs Status drawer. */
     private async pollJobs(): Promise<void> {
         if (!this.view) {
             return;
@@ -267,9 +206,6 @@ export class PublishView implements vscode.WebviewViewProvider {
             };
             const jobs = body.jobs.map((job) => ({
                 kind: job.kind,
-                // The path the server keys the job by, which is what stopping one
-                // has to name. Shown root-relative beside it: the panel is narrow,
-                // and the end of a path is the part that says which file it is.
                 path: job.path,
                 name: vscode.workspace.asRelativePath(
                     vscode.Uri.file(job.path),
@@ -280,19 +216,14 @@ export class PublishView implements vscode.WebviewViewProvider {
             void this.view.webview.postMessage({ type: "jobs", jobs });
         } catch (err) {
             if (!isTimeout(err)) {
-                void this.view.webview.postMessage({ type: "jobs", jobs: null });
+                void this.view.webview.postMessage({
+                    type: "jobs",
+                    jobs: null,
+                });
             }
         }
     }
 
-    /**
-     * Ask the server to stop a job, and repaint the drawer on the click rather
-     * than at the next tick.
-     *
-     * A job that finished between the click and this is no failure — what was
-     * asked for is a job that is not running, and there is not one. Either way
-     * what the drawer then shows is what the server says now.
-     */
     private async stopJob(path: string): Promise<void> {
         try {
             await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
@@ -301,10 +232,7 @@ export class PublishView implements vscode.WebviewViewProvider {
                 body: JSON.stringify({ path }),
                 signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
             });
-        } catch {
-            // A server that cannot be reached is already said so by the polling
-            // beside this; there is nothing here to tell the author twice.
-        }
+        } catch {}
         await this.pollJobs();
     }
 
@@ -360,14 +288,12 @@ export class PublishView implements vscode.WebviewViewProvider {
     }
 }
 
-/** One Gemini the account can write with, as the drawer lists it. */
 interface GeminiModel {
     model: string;
     label: string;
     detail: string;
 }
 
-/** `AbortSignal.timeout` rejects with a `TimeoutError`; a refused connection does not. */
 function isTimeout(err: unknown): boolean {
     return err instanceof Error && err.name === "TimeoutError";
 }

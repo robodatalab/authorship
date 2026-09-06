@@ -7,11 +7,15 @@ import type {
 } from "../../webview/author_editor/AuthorFileEditorCanvas";
 
 export interface AuthorDocumentCellType {
-    kind: string;
-    label: string;
-    category: string;
-    render(cell: WebviewCell, at: number, postToHost: PostToHost): ReactNode;
-    create(): WebviewCell;
+    cellKind: string;
+    menuLabel: string;
+    insertMenuGroup: string;
+    render(
+        cell: WebviewCell,
+        cellIndex: number,
+        postToHost: PostToHost,
+    ): ReactNode;
+    newCell(): WebviewCell;
 }
 
 const registeredCellTypes = new Map<string, AuthorDocumentCellType>();
@@ -19,7 +23,7 @@ const registeredCellTypes = new Map<string, AuthorDocumentCellType>();
 export function registerAuthorDocumentCellType(
     cellType: AuthorDocumentCellType,
 ): void {
-    registeredCellTypes.set(cellType.kind, cellType);
+    registeredCellTypes.set(cellType.cellKind, cellType);
 }
 
 export function authorDocumentCellTypes(): AuthorDocumentCellType[] {
@@ -29,7 +33,7 @@ export function authorDocumentCellTypes(): AuthorDocumentCellType[] {
 export function authorDocumentCellRenderers(): AuthorDocumentCellRenderers {
     const renderers: AuthorDocumentCellRenderers = {};
     for (const cellType of registeredCellTypes.values()) {
-        renderers[cellType.kind] = cellType.render;
+        renderers[cellType.cellKind] = cellType.render;
     }
     return renderers;
 }

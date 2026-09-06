@@ -2,14 +2,17 @@ import type { AuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class ReplaceMarkdownCommand implements AuthorDocumentCommand {
-    readonly name = "replaceMarkdown";
-    readonly category = "edit";
+    readonly commandName = "replaceMarkdown";
+    readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
 
-    invoke(document: AuthorDocument, payload: Record<string, unknown>): void {
-        document.cells[payload.at as number]?.replaceMarkdown(
-            payload.markdown as string,
+    invoke(
+        document: AuthorDocument,
+        commandArguments: Record<string, unknown>,
+    ): void {
+        document.cells[commandArguments.cellIndex as number]?.replaceMarkdown(
+            commandArguments.markdown as string,
         );
     }
 }

@@ -52,13 +52,13 @@ export function TitlePageCell({ cell, at, postToHost }: TitlePageCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: TITLE_PAGE,
-    label: "Title Page",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <TitlePageCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: TITLE_PAGE,
+    menuLabel: "Title Page",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <TitlePageCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({
+    newCell: () => ({
         kind: TITLE_PAGE,
         source: "",
         attrs: { title: "Untitled" },

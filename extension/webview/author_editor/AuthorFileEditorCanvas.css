@@ -1,27 +1,26 @@
 body {
-	margin: 0;
-	padding: 0;
-	font-family: var(--vscode-font-family);
-	font-size: var(--vscode-font-size);
-	color: var(--vscode-foreground);
-	background: var(--vscode-editor-background);
+    margin: 0;
+    padding: 0;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-background);
 }
 
 .author-file-editor-canvas {
-	display: flex;
-	flex-direction: column;
-	height: 100vh;
-	overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .author-file-editor-canvas > ul {
-	flex: 1 1 auto;
-	overflow-y: auto;
-	margin: 0;
-	padding: 6px 12px 40vh;
-	list-style: none;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    margin: 0;
+    padding: 6px 12px 40vh;
+    list-style: none;
 }
-
 
 .author-file-editor-insert-cell-menu {
     display: flex;
@@ -38,7 +37,8 @@ body {
     opacity: 1;
 }
 
-.author-file-editor-canvas > ul:hover
+.author-file-editor-canvas
+    > ul:hover
     .author-file-editor-insert-cell-menu:not(:hover) {
     opacity: 0;
 }
@@ -48,7 +48,10 @@ body {
     content: "";
     flex: 1;
     height: 1px;
-    background: var(--vscode-widget-border, var(--vscode-panel-border, currentColor));
+    background: var(
+        --vscode-widget-border,
+        var(--vscode-panel-border, currentColor)
+    );
     opacity: 0.4;
 }
 
@@ -61,14 +64,18 @@ body {
     font-size: 0.9em;
     color: var(--vscode-foreground);
     background: var(--vscode-editorWidget-background);
-    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
 }
 
 .author-file-editor-insert-cell-menu-button:hover {
-    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
 }
 
 .author-file-editor-insert-cell-menu-overflow {
@@ -85,8 +92,15 @@ body {
     flex-direction: column;
     min-width: 180px;
     padding: 4px 0;
-    background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
-    border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
+    background: var(
+        --vscode-menu-background,
+        var(--vscode-editorWidget-background)
+    );
+    border: 1px solid
+        var(
+            --vscode-menu-border,
+            var(--vscode-widget-border, var(--vscode-panel-border, transparent))
+        );
     border-radius: 4px;
     box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
 }
@@ -104,6 +118,12 @@ body {
 
 .author-file-editor-insert-cell-menu-dropdown
     .author-file-editor-insert-cell-menu-button:hover {
-    color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
-    background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+    color: var(
+        --vscode-menu-selectionForeground,
+        var(--vscode-list-activeSelectionForeground)
+    );
+    background: var(
+        --vscode-menu-selectionBackground,
+        var(--vscode-list-activeSelectionBackground)
+    );
 }

@@ -5,30 +5,20 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 import { fromMarkdown } from "../markdown/exporter";
 
 export class ImportMarkdownCommand implements AuthorDocumentCommand {
-    readonly name = "importMarkdown";
-    readonly category = "transfer";
+    readonly commandName = "importMarkdown";
+    readonly buttonGroup = "transfer";
     readonly iconClassName = "aicon aicon-import-markdown";
     readonly tooltip =
         "Import Markdown — replace this document with an existing markdown manuscript";
 
-    /**
-     * Replace the document with an existing markdown manuscript.
-     *
-     * This throws away what is here, so it asks first — and it asks with the
-     * file's name in the question, because "are you sure" answers nothing.
-     */
     async invoke(document: AuthorDocument): Promise<void> {
         const picked = await vscode.window.showOpenDialog({
             title: "Import Markdown",
             openLabel: "Import",
-            // Opened where the story lives, so the manuscript is usually already
-            // on screen rather than several folders away.
             defaultUri: vscode.Uri.joinPath(document.uri, ".."),
             canSelectFiles: true,
             canSelectFolders: false,
             canSelectMany: false,
-            // `All Files` last, as a way out: a filter is a convenience, and a
-            // manuscript saved under some other extension should still be openable.
             filters: {
                 Markdown: ["md", "markdown", "mdown", "txt"],
                 "All Files": ["*"],

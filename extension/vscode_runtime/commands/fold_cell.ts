@@ -1,26 +1,29 @@
 import { FOLDED, type AuthorDocument } from "../storydoc/model";
 import type {
     AuthorDocumentCommand,
-    AuthorDocumentCommandVisibility,
+    CellAttributeCondition,
 } from "./author_document_command";
 
 export class FoldCellCommand implements AuthorDocumentCommand {
-    readonly category = "cell";
-    readonly visibleWhen: AuthorDocumentCommandVisibility;
+    readonly buttonGroup = "cell";
+    readonly drawnWhenCellAttributeIs: CellAttributeCondition;
 
     constructor(
-        readonly name: string,
+        readonly commandName: string,
         readonly iconClassName: string,
         readonly tooltip: string,
         private readonly folded: boolean,
     ) {
-        this.visibleWhen = {
-            attribute: FOLDED,
-            value: folded ? "" : "true",
+        this.drawnWhenCellAttributeIs = {
+            attributeName: FOLDED,
+            attributeValue: folded ? "" : "true",
         };
     }
 
-    invoke(document: AuthorDocument, payload: Record<string, unknown>): void {
-        document.cells[payload.at as number]?.fold(this.folded);
+    invoke(
+        document: AuthorDocument,
+        commandArguments: Record<string, unknown>,
+    ): void {
+        document.cells[commandArguments.cellIndex as number]?.fold(this.folded);
     }
 }

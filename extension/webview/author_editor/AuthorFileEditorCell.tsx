@@ -75,9 +75,9 @@ function commandIsVisible(
     attrs: Readonly<Record<string, string>>,
 ): boolean {
     return (
-        !command.visibleWhen ||
-        (attrs[command.visibleWhen.attribute] ?? "") ===
-            command.visibleWhen.value
+        !command.drawnWhenCellAttributeIs ||
+        (attrs[command.drawnWhenCellAttributeIs.attributeName] ?? "") ===
+            command.drawnWhenCellAttributeIs.attributeValue
     );
 }
 
@@ -95,7 +95,7 @@ export function AuthorFileEditorCell({
                     .filter((command) => commandIsVisible(command, attrs))
                     .map((command) => (
                         <button
-                            key={command.name}
+                            key={command.commandName}
                             type="button"
                             className="author-file-editor-cell-actions-button"
                             title={command.tooltip}
@@ -103,8 +103,8 @@ export function AuthorFileEditorCell({
                             onClick={() =>
                                 invokeAuthorDocumentCommand(
                                     postToHost,
-                                    command.name,
-                                    { at },
+                                    command.commandName,
+                                    { cellIndex: at },
                                 )
                             }
                         >

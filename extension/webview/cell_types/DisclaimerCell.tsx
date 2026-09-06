@@ -37,11 +37,11 @@ export function DisclaimerCell({ cell, at, postToHost }: DisclaimerCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: DISCLAIMER,
-    label: "Disclaimer",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <DisclaimerCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: DISCLAIMER,
+    menuLabel: "Disclaimer",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <DisclaimerCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: DISCLAIMER, source: "", attrs: {} }),
+    newCell: () => ({ kind: DISCLAIMER, source: "", attrs: {} }),
 });

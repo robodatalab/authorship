@@ -40,11 +40,11 @@ export function BlurbCell({ cell, at, postToHost }: BlurbCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: BLURB,
-    label: "Blurb",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <BlurbCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: BLURB,
+    menuLabel: "Blurb",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <BlurbCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: BLURB, source: "", attrs: {} }),
+    newCell: () => ({ kind: BLURB, source: "", attrs: {} }),
 });

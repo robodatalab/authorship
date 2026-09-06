@@ -42,11 +42,11 @@ export function ContentsCell({ cell, at, postToHost }: ContentsCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: CONTENTS,
-    label: "Table of Contents",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <ContentsCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: CONTENTS,
+    menuLabel: "Table of Contents",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <ContentsCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: CONTENTS, source: "", attrs: {} }),
+    newCell: () => ({ kind: CONTENTS, source: "", attrs: {} }),
 });

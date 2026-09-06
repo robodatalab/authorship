@@ -54,12 +54,12 @@ import {
 	styleFixEnabled,
 } from '../../vscode_runtime/gemini/account';
 import {
-	applyPlan,
-	askOf,
-	doneOf,
-	wantingKinds,
-	type Report,
-} from '../../vscode_runtime/publish/layout';
+	cellsLaidOutByPlan as applyPlan,
+	askedBeforeBinding as askOf,
+	saidAfterLayingOut as doneOf,
+	kindsStillToWrite as wantingKinds,
+	type BookLayoutReport as Report,
+} from '../../vscode_runtime/publish/book_layout_report';
 import { loadTemplates, watchSettings } from '../../vscode_runtime/settings/file';
 import { useTemplates } from '../../vscode_runtime/settings/model';
 import { MARKDOWN, RECAP, type Cell } from '../storydoc_model';

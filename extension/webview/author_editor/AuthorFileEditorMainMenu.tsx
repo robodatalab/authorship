@@ -16,7 +16,7 @@ export function AuthorFileEditorMainMenu({
     postToHost,
 }: AuthorFileEditorMainMenuProps) {
     const categories = [
-        ...new Set(commands.map((command) => command.category)),
+        ...new Set(commands.map((command) => command.buttonGroup)),
     ];
 
     return (
@@ -27,7 +27,7 @@ export function AuthorFileEditorMainMenu({
                         <span className="author-file-editor-main-menu-divider" />
                     )}
                     {commands
-                        .filter((command) => command.category === category)
+                        .filter((command) => command.buttonGroup === category)
                         .map((command) => (
                             <button
                                 key={command.iconClassName}
@@ -38,7 +38,7 @@ export function AuthorFileEditorMainMenu({
                                 onClick={() =>
                                     invokeAuthorDocumentCommand(
                                         postToHost,
-                                        command.name,
+                                        command.commandName,
                                         {},
                                     )
                                 }

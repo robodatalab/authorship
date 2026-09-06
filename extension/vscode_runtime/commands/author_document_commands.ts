@@ -39,21 +39,22 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new OpenAsTextCommand(),
 ];
 
-/** What the page needs to draw a command and to ask for it by name. */
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {
     return AUTHOR_DOCUMENT_COMMANDS.filter(
         (command) => command.iconClassName !== "",
     ).map((command) => ({
-        name: command.name,
-        category: command.category,
+        commandName: command.commandName,
+        buttonGroup: command.buttonGroup,
         iconClassName: command.iconClassName,
         tooltip: command.tooltip,
-        visibleWhen: command.visibleWhen,
+        drawnWhenCellAttributeIs: command.drawnWhenCellAttributeIs,
     }));
 }
 
 export function authorDocumentCommand(
-    name: string,
+    commandName: string,
 ): AuthorDocumentCommand | undefined {
-    return AUTHOR_DOCUMENT_COMMANDS.find((command) => command.name === name);
+    return AUTHOR_DOCUMENT_COMMANDS.find(
+        (command) => command.commandName === commandName,
+    );
 }

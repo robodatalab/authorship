@@ -40,11 +40,11 @@ export function MarkdownCell({ cell, at, postToHost }: MarkdownCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: MARKDOWN,
-    label: "Markdown",
-    category: "primary",
-    render: (cell, at, postToHost) => (
-        <MarkdownCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: MARKDOWN,
+    menuLabel: "Markdown",
+    insertMenuGroup: "primary",
+    render: (cell, cellIndex, postToHost) => (
+        <MarkdownCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
+    newCell: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
 });

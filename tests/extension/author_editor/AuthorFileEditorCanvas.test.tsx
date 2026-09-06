@@ -15,8 +15,8 @@ import type {
 
 interface Invocation {
     type: string;
-    command: string;
-    payload: Record<string, unknown>;
+    commandName: string;
+    commandArguments: Record<string, unknown>;
 }
 
 let posted: Invocation[] = [];
@@ -30,26 +30,29 @@ const CELL_RENDERERS: AuthorDocumentCellRenderers = {
 };
 
 function command(
-    name: string,
-    category: string,
+    commandName: string,
+    buttonGroup: string,
 ): WebviewAuthorDocumentCommandCard {
     return {
-        name,
-        category,
-        iconClassName: `codicon codicon-${name.toLowerCase()}`,
-        tooltip: name,
+        commandName,
+        buttonGroup,
+        iconClassName: `codicon codicon-${commandName.toLowerCase()}`,
+        tooltip: commandName,
     };
 }
 
 const INSERT_COMMAND = command("insertCell", "insert");
 
-function cellType(kind: string, category: string): AuthorDocumentCellType {
+function cellType(
+    cellKind: string,
+    insertMenuGroup: string,
+): AuthorDocumentCellType {
     return {
-        kind,
-        label: kind,
-        category,
+        cellKind,
+        menuLabel: cellKind,
+        insertMenuGroup,
         render: () => null,
-        create: () => ({ kind, source: "", attrs: {} }),
+        newCell: () => ({ kind: cellKind, source: "", attrs: {} }),
     };
 }
 
@@ -162,10 +165,10 @@ describe("adding a cell", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                command: "insertCell",
-                payload: {
-                    at: 0,
-                    cell: { kind: "chapter", source: "", attrs: {} },
+                commandName: "insertCell",
+                commandArguments: {
+                    cellIndex: 0,
+                    newCell: { kind: "chapter", source: "", attrs: {} },
                 },
             },
         ]);
@@ -180,9 +183,9 @@ describe("adding a cell", () => {
             await click(menu.querySelector("button")!);
         }
 
-        expect(posted.map((invocation) => invocation.payload.at)).toEqual([
-            0, 1, 2,
-        ]);
+        expect(
+            posted.map((invocation) => invocation.commandArguments.cellIndex),
+        ).toEqual([0, 1, 2]);
     });
 
     it("holds a kind that is not primary behind the ellipsis", async () => {
@@ -207,7 +210,7 @@ describe("adding a cell", () => {
         )!;
         expect(dropdown).not.toBeNull();
         await click(dropdown.querySelector("button")!);
-        expect(posted[0].payload.cell).toEqual({
+        expect(posted[0].commandArguments.newCell).toEqual({
             kind: "cover",
             source: "",
             attrs: {},
@@ -242,7 +245,11 @@ describe("invoking a main menu command", () => {
         await click(buttons[1]);
 
         expect(posted).toEqual([
-            { type: "invoke", command: "openAsText", payload: {} },
+            {
+                type: "invoke",
+                commandName: "openAsText",
+                commandArguments: {},
+            },
         ]);
     });
 
@@ -311,7 +318,11 @@ describe("the commands on a cell", () => {
         );
 
         expect(posted).toEqual([
-            { type: "invoke", command: "deleteCell", payload: { at: 0 } },
+            {
+                type: "invoke",
+                commandName: "deleteCell",
+                commandArguments: { cellIndex: 0 },
+            },
         ]);
     });
 
@@ -328,27 +339,33 @@ describe("the commands on a cell", () => {
             await click(button);
         }
 
-        expect(posted.map((invocation) => invocation.payload.at)).toEqual([
-            0, 1,
-        ]);
+        expect(
+            posted.map((invocation) => invocation.commandArguments.cellIndex),
+        ).toEqual([0, 1]);
     });
 });
 
 describe("two commands drawn as one button", () => {
     const FOLD_COMMANDS: WebviewAuthorDocumentCommandCard[] = [
         {
-            name: "foldCell",
-            category: "cell",
+            commandName: "foldCell",
+            buttonGroup: "cell",
             iconClassName: "codicon codicon-fold-up",
             tooltip: "Fold this section away",
-            visibleWhen: { attribute: "folded", value: "" },
+            drawnWhenCellAttributeIs: {
+                attributeName: "folded",
+                attributeValue: "",
+            },
         },
         {
-            name: "unfoldCell",
-            category: "cell",
+            commandName: "unfoldCell",
+            buttonGroup: "cell",
             iconClassName: "codicon codicon-fold-down",
             tooltip: "Unfold this section",
-            visibleWhen: { attribute: "folded", value: "true" },
+            drawnWhenCellAttributeIs: {
+                attributeName: "folded",
+                attributeValue: "true",
+            },
         },
     ];
 
@@ -395,7 +412,11 @@ describe("two commands drawn as one button", () => {
         );
 
         expect(posted).toEqual([
-            { type: "invoke", command: "unfoldCell", payload: { at: 0 } },
+            {
+                type: "invoke",
+                commandName: "unfoldCell",
+                commandArguments: { cellIndex: 0 },
+            },
         ]);
     });
 });

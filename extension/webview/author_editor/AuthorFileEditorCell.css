@@ -75,7 +75,10 @@
 }
 
 .author-file-editor-cell-actions-button:hover {
-    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
 }
 
 .author-file-editor-cell-header {

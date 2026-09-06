@@ -48,8 +48,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const webviewSpoke = panel.webview.onDidReceiveMessage(
             (message: {
                 type?: string;
-                command?: string;
-                payload?: Record<string, unknown>;
+                commandName?: string;
+                commandArguments?: Record<string, unknown>;
             }) => {
                 if (message?.type === "ready") {
                     void panel.webview.postMessage({
@@ -57,11 +57,11 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                         commands: authorDocumentCommandCards(),
                     });
                     session.sendDocument();
-                } else if (message?.type === "invoke" && message.command) {
+                } else if (message?.type === "invoke" && message.commandName) {
                     void this.runCommand(
                         document,
-                        message.command,
-                        message.payload ?? {},
+                        message.commandName,
+                        message.commandArguments ?? {},
                     );
                 }
             },
@@ -136,11 +136,14 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
 
     private async runCommand(
         document: AuthorDocument,
-        command: string,
-        payload: Record<string, unknown>,
+        commandName: string,
+        commandArguments: Record<string, unknown>,
     ): Promise<void> {
         const before = document.text;
-        await authorDocumentCommand(command)?.invoke(document, payload);
+        await authorDocumentCommand(commandName)?.invoke(
+            document,
+            commandArguments,
+        );
         const after = document.text;
         if (after === before) {
             return;

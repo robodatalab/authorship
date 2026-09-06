@@ -62,11 +62,11 @@ function noteWithinComment(source: string): string {
 }
 
 registerAuthorDocumentCellType({
-    kind: NOTE,
-    label: "Note",
-    category: "primary",
-    render: (cell, at, postToHost) => (
-        <NotesCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: NOTE,
+    menuLabel: "Note",
+    insertMenuGroup: "primary",
+    render: (cell, cellIndex, postToHost) => (
+        <NotesCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: NOTE, source: "", attrs: {} }),
+    newCell: () => ({ kind: NOTE, source: "", attrs: {} }),
 });

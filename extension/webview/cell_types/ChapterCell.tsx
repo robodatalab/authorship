@@ -44,11 +44,15 @@ export function ChapterCell({ cell, at, postToHost }: ChapterCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: CHAPTER,
-    label: "Chapter",
-    category: "primary",
-    render: (cell, at, postToHost) => (
-        <ChapterCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: CHAPTER,
+    menuLabel: "Chapter",
+    insertMenuGroup: "primary",
+    render: (cell, cellIndex, postToHost) => (
+        <ChapterCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: CHAPTER, source: "", attrs: { title: "Untitled" } }),
+    newCell: () => ({
+        kind: CHAPTER,
+        source: "",
+        attrs: { title: "Untitled" },
+    }),
 });

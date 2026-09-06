@@ -62,11 +62,11 @@ export function AboutCell({ cell, at, postToHost }: AboutCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: ABOUT,
-    label: "About the Author",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <AboutCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: ABOUT,
+    menuLabel: "About the Author",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <AboutCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({ kind: ABOUT, source: "", attrs: {} }),
+    newCell: () => ({ kind: ABOUT, source: "", attrs: {} }),
 });

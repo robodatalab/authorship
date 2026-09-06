@@ -40,13 +40,13 @@ export function CoverCell({ cell, at, postToHost }: CoverCellProps) {
 }
 
 registerAuthorDocumentCellType({
-    kind: COVER,
-    label: "Cover",
-    category: "secondary",
-    render: (cell, at, postToHost) => (
-        <CoverCell cell={cell} at={at} postToHost={postToHost} />
+    cellKind: COVER,
+    menuLabel: "Cover",
+    insertMenuGroup: "secondary",
+    render: (cell, cellIndex, postToHost) => (
+        <CoverCell cell={cell} at={cellIndex} postToHost={postToHost} />
     ),
-    create: () => ({
+    newCell: () => ({
         kind: COVER,
         source: "![Cover](cover.jpg)",
         attrs: { src: "cover.jpg" },

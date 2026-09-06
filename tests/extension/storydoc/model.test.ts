@@ -44,17 +44,12 @@ const CORPUS: { cases: Case[] } = JSON.parse(
 );
 
 describe("the shared corpus — the same documents server/storydoc.py reads", () => {
-    // The same file drives the Python tests, so a rule added in one language
-    // cannot quietly go unimplemented in the other.
     for (const testCase of CORPUS.cases) {
         it(testCase.name, () => {
             expect(cellsOfText(testCase.text)).toEqual(testCase.cells);
         });
     }
 
-    // Round-tripping through this library alone would let the two implementations
-    // drift apart while both stayed self-consistent, so the corpus pins the bytes
-    // rather than the behaviour.
     for (const testCase of CORPUS.cases) {
         it(`writes back byte for byte: ${testCase.name}`, () => {
             expect(textWrittenBack(testCase.text)).toBe(testCase.dumped);

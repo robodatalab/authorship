@@ -5,24 +5,24 @@ import {
 
 export function replaceCellMarkdown(
     postToHost: PostToHost,
-    at: number,
+    cellIndex: number,
     markdown: string,
 ): void {
     invokeAuthorDocumentCommand(postToHost, "replaceMarkdown", {
-        at,
+        cellIndex,
         markdown,
     });
 }
 
 export function replaceCellAttribute(
     postToHost: PostToHost,
-    at: number,
-    name: string,
-    value: string,
+    cellIndex: number,
+    attributeName: string,
+    attributeValue: string,
 ): void {
     invokeAuthorDocumentCommand(postToHost, "replaceAttribute", {
-        at,
-        name,
-        value,
+        cellIndex,
+        attributeName,
+        attributeValue,
     });
 }
