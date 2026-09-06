@@ -8,65 +8,19 @@ import {
 } from "../server/jobs";
 import type { AuthorDocument } from "../storydoc/model";
 
-export interface ProseSpan {
+export interface ProseCheckError {
     startLineIndex: number;
     startCharacterIndexInLine: number;
     endLineIndex: number;
     endCharacterIndexInLine: number;
-}
-
-export interface ProseCheckError extends ProseSpan {
     ruleThatFoundTheError: string;
     isAnErrorOf: "style" | "grammar";
     reasonForError: string;
     correctVersion: string;
 }
 
-interface PlaceAsTheServerSendsIt {
-    line: number;
-    character: number;
-}
-
-interface ErrorAsTheServerSendsIt {
-    rule: string;
-    kind: "style" | "usage";
-    detail: string;
-    at: PlaceAsTheServerSendsIt;
-    end: PlaceAsTheServerSendsIt;
-    related: { at: PlaceAsTheServerSendsIt; end: PlaceAsTheServerSendsIt }[];
-    replacements: string[];
-}
-
 interface ProseCheckJob extends ModelServerJob {
-    findings: ErrorAsTheServerSendsIt[];
-}
-
-function proseSpan(
-    at: PlaceAsTheServerSendsIt,
-    end: PlaceAsTheServerSendsIt,
-): ProseSpan {
-    return {
-        startLineIndex: at.line,
-        startCharacterIndexInLine: at.character,
-        endLineIndex: end.line,
-        endCharacterIndexInLine: end.character,
-    };
-}
-
-function proseCheckErrors(
-    errorFromTheServer: ErrorAsTheServerSendsIt,
-): ProseCheckError[] {
-    const everywhereTheErrorRuns = [
-        { at: errorFromTheServer.at, end: errorFromTheServer.end },
-        ...errorFromTheServer.related,
-    ];
-    return everywhereTheErrorRuns.map((span) => ({
-        ...proseSpan(span.at, span.end),
-        ruleThatFoundTheError: errorFromTheServer.rule,
-        isAnErrorOf: errorFromTheServer.kind === "style" ? "style" : "grammar",
-        reasonForError: errorFromTheServer.detail,
-        correctVersion: errorFromTheServer.replacements[0] ?? "",
-    }));
+    findings: ProseCheckError[];
 }
 
 export class CheckProseCommand implements AuthorDocumentCommand {
@@ -86,9 +40,8 @@ export class CheckProseCommand implements AuthorDocumentCommand {
                 "/check/prose/status",
                 jobId,
             );
-            const errors = checkedProse.findings.flatMap(proseCheckErrors);
             void vscode.window.showInformationMessage(
-                `Checked the prose of ${vscode.workspace.asRelativePath(document.uri)}: ${errors.length} errors.`,
+                `Checked the prose of ${vscode.workspace.asRelativePath(document.uri)}: ${checkedProse.findings.length} errors.`,
             );
         } catch (failure) {
             void vscode.window.showErrorMessage(

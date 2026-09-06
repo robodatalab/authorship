@@ -763,10 +763,11 @@ class ProseCheckJob(Job):
         if self.cancelled:
             return
         self.findings = [
-            _reported(finding)
+            error
             for finding in prose_check.check(
                 _story_lines(self._document, start, end), crutches
             )
+            for error in _prose_check_errors(finding)
         ]
 
 
@@ -796,40 +797,32 @@ class GrammarCheckJob(Job):
     def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
         self.findings = [
-            _reported(finding)
+            error
             for finding in grammar_check.check(
                 self._model,
                 _story_lines(self._document, start, end),
                 _known(self._document)[1],
             )
+            for error in _prose_check_errors(finding)
         ]
 
 
-def _at(place: prose_check.Place) -> dict[str, int]:
-    return {"line": place.line, "character": place.character}
-
-
-def _reported(finding: prose_check.Finding) -> dict[str, Any]:
-    """A finding as the editor is told it.
-
-    `message` is what fits under the underline and `detail` is what the author
-    reads when they stop on it; a mark that can afford only one of the two ends
-    up saying neither well. `kind` is what colour it is drawn in and `rule` is
-    what it is — the first for whoever reads the underline, the second for
-    whatever has to act on it.
-    """
-    return {
-        "rule": finding.rule,
-        "kind": finding.kind,
-        "message": finding.message,
-        "detail": finding.detail,
-        "at": _at(finding.at),
-        "end": _at(finding.end),
-        "related": [{"at": _at(at), "end": _at(end)} for at, end in finding.related],
-        # A rule that already knows what belongs there says so, and the editor
-        # puts it in without troubling the model at all.
-        "replacements": list(finding.replacements),
-    }
+def _prose_check_errors(finding: prose_check.Finding) -> list[dict[str, Any]]:
+    return [
+        {
+            "startLineIndex": at.line,
+            "startCharacterIndexInLine": at.character,
+            "endLineIndex": end.line,
+            "endCharacterIndexInLine": end.character,
+            "ruleThatFoundTheError": finding.rule,
+            "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
+            "reasonForError": finding.detail,
+            "correctVersion": finding.replacements[0]
+            if finding.replacements
+            else "",
+        }
+        for at, end in [(finding.at, finding.end), *finding.related]
+    ]
 
 
 @app.post("/check/prose", status_code=202)
