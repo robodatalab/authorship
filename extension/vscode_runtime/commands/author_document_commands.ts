@@ -1,5 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
@@ -36,6 +37,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),
     new DivideIntoPartsCommand(),
+    new CheckProseCommand(),
     new OpenAsTextCommand(),
 ];
 
