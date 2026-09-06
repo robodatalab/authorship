@@ -9,10 +9,9 @@ import {
 import type { AuthorDocument } from "../storydoc/model";
 
 export interface ProseCheckError {
-    startLineIndex: number;
-    startCharacterIndexInLine: number;
-    endLineIndex: number;
-    endCharacterIndexInLine: number;
+    cellId: string;
+    startOffsetInCell: number;
+    endOffsetInCell: number;
     ruleThatFoundTheError: string;
     isAnErrorOf: "style" | "grammar";
     reasonForError: string;

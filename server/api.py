@@ -767,7 +767,7 @@ class ProseCheckJob(Job):
             for finding in prose_check.check(
                 _story_lines(self._document, start, end), crutches
             )
-            for error in _prose_check_errors(finding)
+            for error in _prose_check_errors(self._document, finding)
         ]
 
 
@@ -803,26 +803,32 @@ class GrammarCheckJob(Job):
                 _story_lines(self._document, start, end),
                 _known(self._document)[1],
             )
-            for error in _prose_check_errors(finding)
+            for error in _prose_check_errors(self._document, finding)
         ]
 
 
-def _prose_check_errors(finding: prose_check.Finding) -> list[dict[str, Any]]:
-    return [
-        {
-            "startLineIndex": at.line,
-            "startCharacterIndexInLine": at.character,
-            "endLineIndex": end.line,
-            "endCharacterIndexInLine": end.character,
-            "ruleThatFoundTheError": finding.rule,
-            "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
-            "reasonForError": finding.detail,
-            "correctVersion": finding.replacements[0]
-            if finding.replacements
-            else "",
-        }
-        for at, end in [(finding.at, finding.end), *finding.related]
-    ]
+def _prose_check_errors(
+    document: Document, finding: prose_check.Finding
+) -> list[dict[str, Any]]:
+    errors = []
+    for at, end in [(finding.at, finding.end), *finding.related]:
+        cell = document.cell_at(at.line)
+        if cell is None or cell is not document.cell_at(end.line):
+            continue
+        errors.append(
+            {
+                "cellId": cell.unique_id,
+                "startOffsetInCell": cell.offset_of(at.line, at.character),
+                "endOffsetInCell": cell.offset_of(end.line, end.character),
+                "ruleThatFoundTheError": finding.rule,
+                "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
+                "reasonForError": finding.detail,
+                "correctVersion": finding.replacements[0]
+                if finding.replacements
+                else "",
+            }
+        )
+    return errors
 
 
 @app.post("/check/prose", status_code=202)

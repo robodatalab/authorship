@@ -77,10 +77,20 @@ class Cell:
     kind: str
     source: str = ""
     attrs: dict[str, str] = field(default_factory=dict)
+    at: tuple[int, int] | None = field(default=None, compare=False)
 
     @property
     def title(self) -> str:
         return self.attrs.get("title", "")
+
+    @property
+    def unique_id(self) -> str:
+        return self.attrs.get("id", "")
+
+    def offset_of(self, line: int, character: int) -> int:
+        assert self.at is not None
+        above = self.source.splitlines()[: line - self.at[0]]
+        return sum(len(written) + 1 for written in above) + character
 
     def with_source(self, source: str) -> "Cell":
         return replace(self, source=source)
@@ -88,19 +98,21 @@ class Cell:
 
 def parse(text: str) -> list[Cell]:
     cells: list[Cell] = []
-    kind = MARKDOWN
-    attrs: dict[str, str] = {}
-    body: list[str] = []
+    kind, attrs, body, first = MARKDOWN, {}, [], 0
 
     def close() -> None:
+        # `dumps` strips blank lines off both ends of a cell's text, so the lines
+        # it occupies are the ones between the outermost non-blank ones.
+        written = [i for i, line in enumerate(body) if line != ""]
         source = "\n".join(body).strip("\n")
         # The run of text above the first marker is only a cell if the author
         # wrote something there; a document that opens with a marker does not
         # start with an empty one.
         if source or cells or attrs or kind != MARKDOWN:
-            cells.append(Cell(kind, source, dict(attrs)))
+            at = (first + written[0], first + written[-1]) if written else None
+            cells.append(Cell(kind, source, dict(attrs), at))
 
-    for line in text.splitlines():
+    for index, line in enumerate(text.splitlines()):
         marker = _MARKER.match(line)
         if not marker:
             body.append(line)
@@ -109,6 +121,7 @@ def parse(text: str) -> list[Cell]:
         kind = marker.group(1)
         attrs = _read_attrs(marker.group(2))
         body = []
+        first = index + 1
     close()
     return cells
 
@@ -285,45 +298,6 @@ def prose_of(lines: list[tuple[int, str]]) -> str:
     return "\n".join(written)
 
 
-@dataclass(frozen=True)
-class Placed:
-    """A cell and where its text sits in the file, 0-based and inclusive.
-
-    The server works in line numbers — correcting a passage means naming the
-    lines it is on, and a search result is a run of them — so a cell has to be
-    able to say where it is. `at` is None for a cell with no text of its own.
-    """
-
-    cell: Cell
-    at: tuple[int, int] | None
-
-
-def place(text: str) -> list[Placed]:
-    """Every cell, with the lines its text occupies."""
-    placed: list[Placed] = []
-    kind, attrs, body, first = MARKDOWN, {}, [], 0
-
-    def close() -> None:
-        # `dumps` strips blank lines off both ends of a cell's text, so the lines
-        # it occupies are the ones between the outermost non-blank ones.
-        written = [i for i, line in enumerate(body) if line != ""]
-        source = "\n".join(body).strip("\n")
-        if not (source or placed or attrs or kind != MARKDOWN):
-            return
-        at = (first + written[0], first + written[-1]) if written else None
-        placed.append(Placed(Cell(kind, source, dict(attrs)), at))
-
-    for index, line in enumerate(text.splitlines()):
-        marker = _MARKER.match(line)
-        if not marker:
-            body.append(line)
-            continue
-        close()
-        kind, attrs, body, first = marker.group(1), _read_attrs(marker.group(2)), [], index + 1
-    close()
-    return placed
-
-
 class Document:
     """A story document, and the file it is written in.
 
@@ -340,8 +314,7 @@ class Document:
     def _read(self, text: str) -> None:
         self.text = text
         self.lines = text.splitlines()
-        self.placed = place(text)
-        self.cells = [p.cell for p in self.placed]
+        self.cells = parse(text)
 
     @classmethod
     def load(cls, path: Path) -> "Document":
@@ -370,10 +343,10 @@ class Document:
         be asking it to disagree with the chapters.
         """
         last = len(self.lines) - 1 if end is None else end
-        for placed in self.placed:
-            if placed.at is None or placed.cell.kind in BUILT_KINDS:
+        for cell in self.cells:
+            if cell.at is None or cell.kind in BUILT_KINDS:
                 continue
-            first, final = placed.at
+            first, final = cell.at
             covered = list(range(first, final + 1))
             # A cell's prose may carry the author's own notes, and those are no
             # more story than the markers around them.
@@ -407,23 +380,28 @@ class Document:
         tool.
         """
         found: list[tuple[str, list[tuple[int, str]]]] = []
-        for placed in self.placed:
-            if placed.cell.kind == CHAPTER:
-                found.append((placed.cell.title or f"Chapter {len(found) + 1}", []))
-            elif found and placed.at and placed.cell.kind not in PRIVATE_KINDS:
-                found[-1][1].extend(self.story_lines(*placed.at))
+        for cell in self.cells:
+            if cell.kind == CHAPTER:
+                found.append((cell.title or f"Chapter {len(found) + 1}", []))
+            elif found and cell.at and cell.kind not in PRIVATE_KINDS:
+                found[-1][1].extend(self.story_lines(*cell.at))
         return [(title, prose_of(lines)) for title, lines in found if lines]
 
     def __str__(self) -> str:
         return self.text
 
+    def cell_at(self, line: int) -> Cell | None:
+        """The cell `line` falls in."""
+        for cell in self.cells:
+            if cell.at and cell.at[0] <= line <= cell.at[1]:
+                return cell
+        return None
+
     def lines_at(self, line: int) -> tuple[int, int] | None:
         """The lines of the cell that `line` falls in — what to correct when the
         author names a cursor rather than a selection."""
-        for placed in self.placed:
-            if placed.at and placed.at[0] <= line <= placed.at[1]:
-                return placed.at
-        return None
+        cell = self.cell_at(line)
+        return cell.at if cell else None
 
     def beside(self, suffix: str) -> Path:
         """A file named after this one — `story.author` gives `story.epub`."""
