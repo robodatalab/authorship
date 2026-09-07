@@ -106,7 +106,9 @@ export function AuthorFileEditorCanvas({
                                     cellAttributes={cell.attrs}
                                     proseErrors={proseErrors.filter(
                                         (proseError) =>
-                                            proseError.cellId === cell.attrs.id,
+                                            proseError.cellId ===
+                                                cell.attrs.id &&
+                                            proseError.isVisible,
                                     )}
                                     postToHost={postToHost}
                                 >
