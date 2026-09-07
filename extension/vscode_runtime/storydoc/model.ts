@@ -140,6 +140,9 @@ export class AuthorDocument implements vscode.CustomDocument {
         return this.documentCells;
     }
 
+    cellWithId(cellId: string): Cell | undefined {
+        return this.documentCells.find((cell) => cell.uniqueId === cellId);
+    }
     insertAt(cellIndex: number, cell: Cell): void {
         this.documentCells.splice(
             cellIndex,
