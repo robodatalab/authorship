@@ -15,8 +15,12 @@ interface AuthorFileEditorCellProps {
 
 interface AuthorFileEditorCellRunProps {
     isRunning: boolean;
+    howFarAlong: number;
     onRun: () => void;
 }
+
+const RUN_RING_RADIUS = 7;
+const RUN_RING_CIRCUMFERENCE = 2 * Math.PI * RUN_RING_RADIUS;
 
 interface AuthorFileEditorCellHeaderProps {
     children?: ReactNode;
@@ -177,25 +181,48 @@ export function AuthorFileEditorCellWarning() {
 
 export function AuthorFileEditorCellRun({
     isRunning,
+    howFarAlong,
     onRun,
 }: AuthorFileEditorCellRunProps) {
-    const label = isRunning ? "Writing this section…" : "Write this section";
+    if (isRunning) {
+        return (
+            <div
+                className="author-file-editor-cell-run-progress"
+                role="progressbar"
+                aria-label="Writing this section…"
+                aria-valuenow={Math.round(howFarAlong * 100)}
+            >
+                <svg viewBox="0 0 16 16" width="16" height="16">
+                    <circle
+                        className="author-file-editor-cell-run-progress-track"
+                        cx="8"
+                        cy="8"
+                        r={RUN_RING_RADIUS}
+                    />
+                    <circle
+                        className="author-file-editor-cell-run-progress-written"
+                        cx="8"
+                        cy="8"
+                        r={RUN_RING_RADIUS}
+                        strokeDasharray={RUN_RING_CIRCUMFERENCE}
+                        strokeDashoffset={
+                            RUN_RING_CIRCUMFERENCE * (1 - howFarAlong)
+                        }
+                    />
+                </svg>
+            </div>
+        );
+    }
+
     return (
         <button
             type="button"
             className="author-file-editor-cell-run"
-            title={label}
-            aria-label={label}
-            disabled={isRunning}
+            title="Write this section"
+            aria-label="Write this section"
             onClick={onRun}
         >
-            <i
-                className={
-                    isRunning
-                        ? "codicon codicon-loading codicon-modifier-spin"
-                        : "codicon codicon-play"
-                }
-            />
+            <i className="codicon codicon-play" />
         </button>
     );
 }

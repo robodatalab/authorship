@@ -52,6 +52,7 @@ describe("the sidebar every cell has", () => {
                 sidebar={
                     <AuthorFileEditorCellRun
                         isRunning={false}
+                        howFarAlong={0}
                         onRun={() => undefined}
                     />
                 }
@@ -148,9 +149,25 @@ describe("what the prose checker found", () => {
 });
 
 describe("running a cell that writes itself", () => {
+    function ring(): Element {
+        return document.querySelector(".author-file-editor-cell-run-progress")!;
+    }
+
+    function written(): Element {
+        return document.querySelector(
+            ".author-file-editor-cell-run-progress-written",
+        )!;
+    }
+
     it("offers to run it", async () => {
         const run = vi.fn();
-        await mount(<AuthorFileEditorCellRun isRunning={false} onRun={run} />);
+        await mount(
+            <AuthorFileEditorCellRun
+                isRunning={false}
+                howFarAlong={0}
+                onRun={run}
+            />,
+        );
         const button = document.querySelector(".author-file-editor-cell-run")!;
         expect(button.querySelector("i")?.className).toBe(
             "codicon codicon-play",
@@ -163,16 +180,49 @@ describe("running a cell that writes itself", () => {
         expect(run).toHaveBeenCalledTimes(1);
     });
 
-    it("turns while it runs, and cannot be asked twice", async () => {
-        const run = vi.fn();
-        await mount(<AuthorFileEditorCellRun isRunning={true} onRun={run} />);
-        const button = document.querySelector(
-            ".author-file-editor-cell-run",
-        ) as HTMLButtonElement;
-
-        expect(button.querySelector("i")?.className).toBe(
-            "codicon codicon-loading codicon-modifier-spin",
+    it("becomes a ring while it runs, and offers nothing to press", async () => {
+        await mount(
+            <AuthorFileEditorCellRun
+                isRunning={true}
+                howFarAlong={0}
+                onRun={vi.fn()}
+            />,
         );
-        expect(button.disabled).toBe(true);
+
+        expect(
+            document.querySelector(".author-file-editor-cell-run"),
+        ).toBeNull();
+        expect(ring().getAttribute("aria-valuenow")).toBe("0");
+    });
+
+    it("fills the ring as far as the writing has got", async () => {
+        await mount(
+            <AuthorFileEditorCellRun
+                isRunning={true}
+                howFarAlong={0.25}
+                onRun={vi.fn()}
+            />,
+        );
+
+        const circumference = 2 * Math.PI * 7;
+        expect(written().getAttribute("stroke-dasharray")).toBe(
+            String(circumference),
+        );
+        expect(written().getAttribute("stroke-dashoffset")).toBe(
+            String(circumference * 0.75),
+        );
+        expect(ring().getAttribute("aria-valuenow")).toBe("25");
+    });
+
+    it("closes the ring when the writing is done", async () => {
+        await mount(
+            <AuthorFileEditorCellRun
+                isRunning={true}
+                howFarAlong={1}
+                onRun={vi.fn()}
+            />,
+        );
+
+        expect(written().getAttribute("stroke-dashoffset")).toBe("0");
     });
 });

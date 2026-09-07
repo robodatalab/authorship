@@ -44,9 +44,27 @@
     cursor: pointer;
 }
 
-.author-file-editor-cell-run:disabled {
-    color: var(--vscode-descriptionForeground);
-    cursor: default;
+.author-file-editor-cell-run-progress {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+}
+
+.author-file-editor-cell-run-progress svg {
+    transform: rotate(-90deg);
+}
+
+.author-file-editor-cell-run-progress-track {
+    fill: none;
+    stroke: var(--vscode-panel-border);
+    stroke-width: 2;
+}
+
+.author-file-editor-cell-run-progress-written {
+    fill: none;
+    stroke: var(--vscode-progressBar-background, #0078d4);
+    stroke-width: 2;
+    transition: stroke-dashoffset 0.2s linear;
 }
 
 .author-file-editor-cell-actions {
