@@ -16,7 +16,7 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
     it("names the documents to summarise and writes what came back", async () => {
         const asked: { url: string; body: unknown }[] = [];
         vi.stubGlobal("fetch", (url: string, sent?: { body: string }) => {
-            asked.push({ url, body: sent && JSON.parse(sent.body) });
+            asked.push({ url, body: sent?.body && JSON.parse(sent.body) });
             return Promise.resolve({
                 ok: true,
                 json: () =>

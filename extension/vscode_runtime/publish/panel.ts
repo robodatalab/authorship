@@ -5,6 +5,7 @@ import {
     configuredModel,
     styleFixEnabled,
 } from "../gemini/account";
+import { fetchFromServer } from "../server/fetch";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -22,7 +23,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private readonly port: number,
         private readonly account: GeminiAccount,
     ) {}
 
@@ -109,27 +109,14 @@ export class PublishView implements vscode.WebviewViewProvider {
 
     private async readModelsThisKeyCanUse(apiKey: string): Promise<void> {
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/gemini/models`,
-                {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                        key: apiKey,
-                        model: configuredModel(),
-                    }),
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-                    ),
-                },
-            );
-            if (!response.ok) {
-                return;
-            }
-            const answered = (await response.json()) as {
+            const answered = await fetchFromServer<{
                 default?: string;
                 models?: GeminiModel[];
-            };
+            }>(
+                "/gemini/models",
+                { key: apiKey, model: configuredModel() },
+                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
+            );
             this.modelShippedWithAuthorship = answered.default ?? "";
             this.geminiModels = answered.models ?? [];
         } catch {}
@@ -154,15 +141,11 @@ export class PublishView implements vscode.WebviewViewProvider {
             return;
         }
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/models`,
-                {
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-                    ),
-                },
+            const answered = await fetchFromServer<{ models: unknown }>(
+                "/models",
+                undefined,
+                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
             );
-            const answered = (await response.json()) as { models: unknown };
             void this.view.webview.postMessage({
                 type: "models",
                 models: answered.models,
@@ -182,15 +165,11 @@ export class PublishView implements vscode.WebviewViewProvider {
             return;
         }
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/memory`,
-                {
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-                    ),
-                },
+            const memory = await fetchFromServer(
+                "/memory",
+                undefined,
+                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
             );
-            const memory = await response.json();
             void this.view.webview.postMessage({ type: "memory", memory });
         } catch (unanswered) {
             if (!isTimeout(unanswered)) {
@@ -207,19 +186,18 @@ export class PublishView implements vscode.WebviewViewProvider {
             return;
         }
         try {
-            const response = await fetch(`http://127.0.0.1:${this.port}/jobs`, {
-                signal: AbortSignal.timeout(
-                    MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-                ),
-            });
-            const answered = (await response.json()) as {
+            const answered = await fetchFromServer<{
                 jobs: {
                     kind: string;
                     path: string;
                     status: string;
                     cancelled: boolean;
                 }[];
-            };
+            }>(
+                "/jobs",
+                undefined,
+                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
+            );
             const jobs = answered.jobs.map((job) => ({
                 kind: job.kind,
                 path: job.path,
@@ -242,14 +220,11 @@ export class PublishView implements vscode.WebviewViewProvider {
 
     private async stopJob(documentPath: string): Promise<void> {
         try {
-            await fetch(`http://127.0.0.1:${this.port}/jobs/cancel`, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ path: documentPath }),
-                signal: AbortSignal.timeout(
-                    MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-                ),
-            });
+            await fetchFromServer(
+                "/jobs/cancel",
+                { path: documentPath },
+                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
+            );
         } catch {}
         await this.showRunningJobs();
     }

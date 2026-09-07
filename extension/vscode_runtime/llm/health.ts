@@ -1,10 +1,9 @@
 import * as vscode from "vscode";
 
+import { serverHealth, theServerTookTooLongToAnswer } from "../server/health";
 import { phaseFor, renderStatus, type ModelServerPhase } from "./state";
 
 const MILLISECONDS_BETWEEN_SERVER_PHASE_READINGS = 2_000;
-
-const MILLISECONDS_BEFORE_A_PHASE_READING_TIMES_OUT = 10_000;
 
 export class ModelHealth implements vscode.Disposable {
     private readonly statusBarItem: vscode.StatusBarItem;
@@ -14,7 +13,7 @@ export class ModelHealth implements vscode.Disposable {
     private fixing = false;
     private scoring = false;
 
-    constructor(private readonly port: number) {
+    constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Right,
             100,
@@ -31,20 +30,10 @@ export class ModelHealth implements vscode.Disposable {
 
     private async readTheServerPhase(): Promise<void> {
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/health`,
-                {
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_A_PHASE_READING_TIMES_OUT,
-                    ),
-                },
-            );
-            const health = (await response.json()) as {
-                inference_server_status?: string;
-            };
+            const health = await serverHealth();
             this.serverPhase = phaseFor(health.inference_server_status);
         } catch (unanswered) {
-            if (!isTimeout(unanswered)) {
+            if (!theServerTookTooLongToAnswer(unanswered)) {
                 this.serverPhase = "offline";
             }
         }
@@ -86,8 +75,4 @@ export class ModelHealth implements vscode.Disposable {
         clearInterval(this.phaseReadingTimer);
         this.statusBarItem.dispose();
     }
-}
-
-function isTimeout(failure: unknown): boolean {
-    return failure instanceof Error && failure.name === "TimeoutError";
 }

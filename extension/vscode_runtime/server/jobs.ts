@@ -1,34 +1,23 @@
-import { modelServerPort } from "./process";
+import { fetchFromServer } from "./fetch";
 
 const MILLISECONDS_BETWEEN_POLLS = 400;
 const MILLISECONDS_BEFORE_GIVING_UP = 180_000;
 const UNANSWERED_POLLS_BEFORE_GIVING_UP = 5;
 
-export interface ModelServerJob {
+export interface ServerJob {
     running: boolean;
     error: string | null;
     cancelled?: boolean;
 }
 
-export async function startModelServerJob(
+export async function startServerJob(
     route: string,
     requestBody: unknown,
 ): Promise<string> {
-    const startedJob = await fetch(
-        `http://127.0.0.1:${modelServerPort()}${route}`,
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(requestBody),
-        },
-    );
-    if (!startedJob.ok) {
-        throw new Error(`${route} answered ${startedJob.status}`);
-    }
-    return ((await startedJob.json()) as { id: string }).id;
+    return (await fetchFromServer<{ id: string }>(route, requestBody)).id;
 }
 
-export async function awaitModelServerJob<Job extends ModelServerJob>(
+export async function awaitServerJob<Job extends ServerJob>(
     route: string,
     jobId: string,
 ): Promise<Job> {
@@ -38,10 +27,10 @@ export async function awaitModelServerJob<Job extends ModelServerJob>(
         await new Promise((wake) =>
             setTimeout(wake, MILLISECONDS_BETWEEN_POLLS),
         );
-        let response: Response;
+        let job: Job;
         try {
-            response = await fetch(
-                `http://127.0.0.1:${modelServerPort()}${route}?id=${encodeURIComponent(jobId)}`,
+            job = await fetchFromServer<Job>(
+                `${route}?id=${encodeURIComponent(jobId)}`,
             );
         } catch (unanswered: unknown) {
             if ((pollsUnanswered += 1) > UNANSWERED_POLLS_BEFORE_GIVING_UP) {
@@ -50,10 +39,6 @@ export async function awaitModelServerJob<Job extends ModelServerJob>(
             continue;
         }
         pollsUnanswered = 0;
-        if (!response.ok) {
-            throw new Error(`${route} answered ${response.status}`);
-        }
-        const job = (await response.json()) as Job;
         if (job.error) {
             throw new Error(job.error);
         }

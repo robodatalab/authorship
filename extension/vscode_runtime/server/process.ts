@@ -2,31 +2,8 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 
 import { provision } from "./install";
-
-const MODEL_SERVER_PORT_THE_EXTENSION_SHIPS_WITH = 8765;
-
-const MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION =
-    "AUTHORSHIP_MODEL_SERVER_PORT";
-
-const MILLISECONDS_BEFORE_A_PROBE_TIMES_OUT = 1_000;
-
-export function modelServerPort(): number {
-    const portForThisWindow =
-        process.env[MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION] ??
-        vscode.workspace
-            .getConfiguration("authorship")
-            .get<number>("modelServerPort");
-    return (
-        Number(portForThisWindow) || MODEL_SERVER_PORT_THE_EXTENSION_SHIPS_WITH
-    );
-}
-
-function theLaunchConfigurationOwnsTheServer(): boolean {
-    return (
-        process.env[MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION] !==
-        undefined
-    );
-}
+import { somethingIsAnsweringOnTheServerPort } from "./health";
+import { theLaunchConfigurationOwnsTheServer } from "./fetch";
 
 export class ModelServer implements vscode.Disposable {
     private serverProcess: ChildProcess | undefined;
@@ -48,7 +25,7 @@ export class ModelServer implements vscode.Disposable {
             return;
         }
 
-        if (await somethingIsListeningOn(this.port)) {
+        if (await somethingIsAnsweringOnTheServerPort()) {
             this.log.appendLine(
                 `a server is already listening on ${this.port}, so this window will use that one`,
             );
@@ -104,16 +81,5 @@ export class ModelServer implements vscode.Disposable {
     dispose(): void {
         this.disposed = true;
         this.serverProcess?.kill();
-    }
-}
-
-async function somethingIsListeningOn(port: number): Promise<boolean> {
-    try {
-        const response = await fetch(`http://127.0.0.1:${port}/health`, {
-            signal: AbortSignal.timeout(MILLISECONDS_BEFORE_A_PROBE_TIMES_OUT),
-        });
-        return response.ok;
-    } catch {
-        return false;
     }
 }

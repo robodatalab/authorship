@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 
+import { fetchFromServer } from "../server/fetch";
+
 export const GEMINI_AUTHENTICATION_PROVIDER = "gemini";
 const GEMINI_ACCOUNTS_MENU_LABEL = "Google Gemini";
 
@@ -37,10 +39,7 @@ export class GeminiAccount
 
     private readonly providerRegistration: vscode.Disposable;
 
-    constructor(
-        private readonly context: vscode.ExtensionContext,
-        private readonly port: number,
-    ) {
+    constructor(private readonly context: vscode.ExtensionContext) {
         this.providerRegistration =
             vscode.authentication.registerAuthenticationProvider(
                 GEMINI_AUTHENTICATION_PROVIDER,
@@ -204,24 +203,13 @@ export class GeminiAccount
         apiKey: string,
     ): Promise<{ model: string; label: string; detail: string }[] | undefined> {
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/gemini/models`,
-                {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ key: apiKey }),
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_ASKING_GEMINI_TIMES_OUT,
-                    ),
-                },
-            );
-            if (!response.ok) {
-                const refusal = (await response.json()) as { detail?: string };
-                throw new Error(refusal.detail ?? response.statusText);
-            }
-            const answered = (await response.json()) as {
+            const answered = await fetchFromServer<{
                 models: { model: string; label: string; detail: string }[];
-            };
+            }>(
+                "/gemini/models",
+                { key: apiKey },
+                MILLISECONDS_BEFORE_ASKING_GEMINI_TIMES_OUT,
+            );
             return answered.models;
         } catch (failure: unknown) {
             const message = (failure as { message?: unknown } | null)?.message;
@@ -265,27 +253,14 @@ export class GeminiAccount
         apiKey: string,
     ): Promise<string | undefined> {
         try {
-            const response = await fetch(
-                `http://127.0.0.1:${this.port}/auth/gemini`,
-                {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                        key: apiKey,
-                        model: configuredModel(),
-                    }),
-                    signal: AbortSignal.timeout(
-                        MILLISECONDS_BEFORE_ASKING_GEMINI_TIMES_OUT,
-                    ),
-                },
-            );
-            if (!response.ok) {
-                return undefined;
-            }
-            const answered = (await response.json()) as {
+            const answered = await fetchFromServer<{
                 ok: boolean;
                 detail?: string;
-            };
+            }>(
+                "/auth/gemini",
+                { key: apiKey, model: configuredModel() },
+                MILLISECONDS_BEFORE_ASKING_GEMINI_TIMES_OUT,
+            );
             return answered.ok
                 ? undefined
                 : (answered.detail ?? "the key was not accepted");

@@ -9,7 +9,7 @@ import {
 } from "../publish/book_layout_report";
 import { loadTemplates } from "../settings/file";
 import { useTemplates } from "../settings/model";
-import { modelServerPort } from "../server/process";
+import { fetchFromServer } from "../server/fetch";
 import { AuthorDocument, Cell } from "../storydoc/model";
 
 function fileNameOf(file: vscode.Uri): string {
@@ -39,24 +39,13 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
                 document.uri,
                 new TextEncoder().encode(document.text),
             );
-            const response = await fetch(
-                `http://127.0.0.1:${modelServerPort()}/export/epub`,
+            const report = await fetchFromServer<BookLayoutReport>(
+                "/export/epub",
                 {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                        path: document.uri.fsPath,
-                        force: bindWhateverIsThere,
-                    }),
+                    path: document.uri.fsPath,
+                    force: bindWhateverIsThere,
                 },
             );
-            if (!response.ok) {
-                void vscode.window.showErrorMessage(
-                    `Export failed: ${response.statusText}`,
-                );
-                return;
-            }
-            const report = (await response.json()) as BookLayoutReport;
             if (report.path) {
                 void vscode.window.showInformationMessage(
                     `Exported ${fileNameOf(vscode.Uri.file(report.path))}`,

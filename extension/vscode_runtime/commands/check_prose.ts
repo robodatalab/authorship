@@ -1,11 +1,7 @@
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import {
-    awaitModelServerJob,
-    startModelServerJob,
-    type ModelServerJob,
-} from "../server/jobs";
+import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import { authorFileEditorSession } from "../author_file_editor_session";
 import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 import type { AuthorDocument } from "../storydoc/model";
@@ -17,7 +13,7 @@ export interface ProseCheckError extends SynchronizedRepresentation {
     correctVersion: string;
 }
 
-interface ProseCheckJob extends ModelServerJob {
+interface ProseCheckJob extends ServerJob {
     findings: ProseCheckError[];
 }
 
@@ -30,8 +26,8 @@ async function startAndAwaitServerJob(
     route: string,
     documentToCheck: DocumentToCheck,
 ): Promise<ProseCheckError[]> {
-    const jobId = await startModelServerJob(route, documentToCheck);
-    const checked = await awaitModelServerJob<ProseCheckJob>(
+    const jobId = await startServerJob(route, documentToCheck);
+    const checked = await awaitServerJob<ProseCheckJob>(
         `${route}/status`,
         jobId,
     );

@@ -3,16 +3,16 @@ import { AuthorFileEditorProvider } from "./author_file_editor_provider";
 import { GeminiAccount } from "./gemini/account";
 import { PublishView } from "./publish/panel";
 import { ModelHealth } from "./llm/health";
-import { modelServerPort, ModelServer } from "./server/process";
+import { ModelServer } from "./server/process";
+import { serverPort } from "./server/fetch";
 
 export function activate(context: vscode.ExtensionContext) {
     const log = vscode.window.createOutputChannel("Authorship");
     context.subscriptions.push(log);
 
-    const port = modelServerPort();
-    context.subscriptions.push(new ModelServer(context, port, log));
+    context.subscriptions.push(new ModelServer(context, serverPort(), log));
 
-    const geminiAccount = new GeminiAccount(context, port);
+    const geminiAccount = new GeminiAccount(context);
     context.subscriptions.push(geminiAccount);
     for (const [commandName, runTheCommand] of Object.entries(
         geminiAccount.commands,
@@ -40,12 +40,12 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             "authorship.manuscript",
-            new PublishView(context, port, geminiAccount),
+            new PublishView(context, geminiAccount),
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
     );
 
-    context.subscriptions.push(new ModelHealth(port));
+    context.subscriptions.push(new ModelHealth());
 }
 
 export function deactivate() {}

@@ -1,9 +1,12 @@
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { authorFileEditorSession } from "../author_file_editor_session";
-import { writeTheCellFromTheServer } from "./written_cells";
+import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import type { AuthorDocument } from "../storydoc/model";
+
+interface WrittenSection extends ServerJob {
+    text: string;
+}
 
 export class WriteBlurbCommand implements AuthorDocumentCommand {
     readonly commandName = "writeBlurb";
@@ -20,14 +23,22 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
             return;
         }
         try {
-            await writeTheCellFromTheServer(document, cell, "/generate/blurb", {
+            await vscode.workspace.fs.writeFile(
+                document.uri,
+                new TextEncoder().encode(document.text),
+            );
+            const jobId = await startServerJob("/generate/blurb", {
                 path: document.uri.fsPath,
             });
+            const blurb = await awaitServerJob<WrittenSection>(
+                "/generate/status",
+                jobId,
+            );
+            cell.replaceMarkdown(blurb.text);
         } catch (failure) {
             void vscode.window.showErrorMessage(
-                `Cannot write the blurb — is the model server running? (${failure instanceof Error ? failure.message : String(failure)})`,
+                `Cannot write the blurb — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
             );
-            authorFileEditorSession(document)?.stopWritingCell(cell.uniqueId);
         }
     }
 }
