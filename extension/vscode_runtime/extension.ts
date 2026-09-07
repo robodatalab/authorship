@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { AuthorFileEditorProvider } from "./author_file_editor_provider";
 import { GeminiAccount } from "./gemini/account";
 import { PublishView } from "./publish/panel";
-import { ModelHealth } from "./llm/health";
+import { ServerStatusBarItem } from "./llm/status_bar";
 import { ModelServer } from "./server/process";
 import { serverPort } from "./server/fetch";
 
@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
         ),
     );
 
-    context.subscriptions.push(new ModelHealth());
+    context.subscriptions.push(new ServerStatusBarItem());
 }
 
 export function deactivate() {}

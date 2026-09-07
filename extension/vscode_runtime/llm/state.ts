@@ -1,18 +1,11 @@
-export type ModelServerPhase =
-    | "offline"
-    | "unloaded"
-    | "downloading"
-    | "ready"
-    | "building"
-    | "fixing"
-    | "scoring";
+export type ServerPhase = "offline" | "unloaded" | "downloading" | "ready";
 
 export interface StatusBarReading {
     text: string;
     tooltip: string;
 }
 
-export function phaseFor(serverStatus: string | undefined): ModelServerPhase {
+export function phaseFor(serverStatus: string | undefined): ServerPhase {
     if (serverStatus === "serving") {
         return "ready";
     }
@@ -25,7 +18,7 @@ export function phaseFor(serverStatus: string | undefined): ModelServerPhase {
     return "offline";
 }
 
-export function renderStatus(phase: ModelServerPhase): StatusBarReading {
+export function renderStatus(phase: ServerPhase): StatusBarReading {
     switch (phase) {
         case "offline":
             return {
@@ -48,22 +41,6 @@ export function renderStatus(phase: ModelServerPhase): StatusBarReading {
             return {
                 text: "$(book) Authorship: ok",
                 tooltip: "The model is loaded and serving.",
-            };
-        case "building":
-            return {
-                text: "$(sync~spin) Authorship: building",
-                tooltip: "Reading the manuscript.",
-            };
-        case "fixing":
-            return {
-                text: "$(sync~spin) Authorship: fixing grammar",
-                tooltip:
-                    "Correcting the selected lines, or the section the cursor is in.",
-            };
-        case "scoring":
-            return {
-                text: "$(sync~spin) Authorship: scoring",
-                tooltip: "Weighing the lines of the section the cursor is in.",
             };
     }
 }
