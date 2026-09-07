@@ -3,9 +3,30 @@ import { spawn, type ChildProcess } from "node:child_process";
 
 import { provision } from "./install";
 
-export const MODEL_SERVER_PORT = 8765;
+const MODEL_SERVER_PORT_THE_EXTENSION_SHIPS_WITH = 8765;
+
+const MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION =
+    "AUTHORSHIP_MODEL_SERVER_PORT";
 
 const MILLISECONDS_BEFORE_A_PROBE_TIMES_OUT = 1_000;
+
+export function modelServerPort(): number {
+    const portForThisWindow =
+        process.env[MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION] ??
+        vscode.workspace
+            .getConfiguration("authorship")
+            .get<number>("modelServerPort");
+    return (
+        Number(portForThisWindow) || MODEL_SERVER_PORT_THE_EXTENSION_SHIPS_WITH
+    );
+}
+
+function theLaunchConfigurationOwnsTheServer(): boolean {
+    return (
+        process.env[MODEL_SERVER_PORT_FROM_THE_LAUNCH_CONFIGURATION] !==
+        undefined
+    );
+}
 
 export class ModelServer implements vscode.Disposable {
     private serverProcess: ChildProcess | undefined;
@@ -20,16 +41,16 @@ export class ModelServer implements vscode.Disposable {
     }
 
     private async startTheServer(): Promise<void> {
-        if (this.context.extensionMode === vscode.ExtensionMode.Development) {
+        if (theLaunchConfigurationOwnsTheServer()) {
             this.log.appendLine(
-                "development host: leaving the server to the launch configuration",
+                `the launch configuration owns the server on ${this.port}`,
             );
             return;
         }
 
         if (await somethingIsListeningOn(this.port)) {
             this.log.appendLine(
-                `a server is already listening on ${this.port}`,
+                `a server is already listening on ${this.port}, so this window will use that one`,
             );
             return;
         }

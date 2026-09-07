@@ -1,4 +1,4 @@
-import { MODEL_SERVER_PORT } from "./process";
+import { modelServerPort } from "./process";
 
 const MILLISECONDS_BETWEEN_POLLS = 400;
 const MILLISECONDS_BEFORE_GIVING_UP = 180_000;
@@ -15,7 +15,7 @@ export async function startModelServerJob(
     requestBody: unknown,
 ): Promise<string> {
     const startedJob = await fetch(
-        `http://127.0.0.1:${MODEL_SERVER_PORT}${route}`,
+        `http://127.0.0.1:${modelServerPort()}${route}`,
         {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -41,7 +41,7 @@ export async function awaitModelServerJob<Job extends ModelServerJob>(
         let response: Response;
         try {
             response = await fetch(
-                `http://127.0.0.1:${MODEL_SERVER_PORT}${route}?id=${encodeURIComponent(jobId)}`,
+                `http://127.0.0.1:${modelServerPort()}${route}?id=${encodeURIComponent(jobId)}`,
             );
         } catch (unanswered: unknown) {
             if ((pollsUnanswered += 1) > UNANSWERED_POLLS_BEFORE_GIVING_UP) {

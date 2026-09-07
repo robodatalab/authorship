@@ -9,7 +9,7 @@ import {
 } from "../publish/book_layout_report";
 import { loadTemplates } from "../settings/file";
 import { useTemplates } from "../settings/model";
-import { MODEL_SERVER_PORT } from "../server/process";
+import { modelServerPort } from "../server/process";
 import { AuthorDocument, Cell } from "../storydoc/model";
 
 function fileNameOf(file: vscode.Uri): string {
@@ -40,7 +40,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
                 new TextEncoder().encode(document.text),
             );
             const response = await fetch(
-                `http://127.0.0.1:${MODEL_SERVER_PORT}/export/epub`,
+                `http://127.0.0.1:${modelServerPort()}/export/epub`,
                 {
                     method: "POST",
                     headers: { "content-type": "application/json" },

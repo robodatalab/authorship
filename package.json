@@ -129,6 +129,18 @@
         ],
         "configuration": [
             {
+                "title": "Model server",
+                "order": 0,
+                "properties": {
+                    "authorship.modelServerPort": {
+                        "type": "number",
+                        "default": 8765,
+                        "scope": "window",
+                        "markdownDescription": "The port the model server listens on. Every window that finds a server already answering there uses it rather than starting a second one, so one server serves them all. Give a window a port of its own — or set `AUTHORSHIP_MODEL_SERVER_PORT` in a launch configuration — when it should start and own a server nobody else shares."
+                    }
+                }
+            },
+            {
                 "title": "Experimental",
                 "order": 1,
                 "properties": {

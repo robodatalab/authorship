@@ -79,6 +79,11 @@ export const workspace = {
         createDirectory: (): Promise<void> => Promise.resolve(),
         readDirectory: (): Promise<[string, number][]> => Promise.resolve([]),
     },
+    getConfiguration: (): {
+        get<Setting>(named: string): Setting | undefined;
+    } => ({
+        get: () => undefined,
+    }),
     getWorkspaceFolder: (): undefined => undefined,
     asRelativePath: (uri: StubUri): string => uri.toString(),
 };
