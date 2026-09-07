@@ -21,7 +21,7 @@ async function openWebview(): Promise<void> {
     await act(async () => {
         await import("../../extension/webview/cell_types/MarkdownCell");
         await import("../../extension/webview/cell_types/NotesCell");
-        await import("../../extension/webview/author_file_editor_webview");
+        await import("../../extension/webview/message_queue_between_vscode_and_webview");
     });
 }
 

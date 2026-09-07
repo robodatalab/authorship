@@ -1,17 +1,20 @@
 import {
     AuthorFileEditorCell,
+    AuthorFileEditorCellRun,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    useAuthorFileEditorCellIsBeingWritten,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
     replaceCellAttribute,
+    writeTableOfContents,
     replaceCellMarkdown,
 } from "../../vscode_runtime/commands/author_document_edits";
 import { CONTENTS } from "../../vscode_runtime/storydoc/model";
@@ -19,16 +22,27 @@ import { CONTENTS } from "../../vscode_runtime/storydoc/model";
 interface ContentsCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function ContentsCell({
     cell,
     cellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: ContentsCellProps) {
+    const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
     return (
-        <AuthorFileEditorCell>
+        <AuthorFileEditorCell
+            sidebar={
+                <AuthorFileEditorCellRun
+                    isRunning={howFarTheCellHasBeenWritten !== undefined}
+                    howFarAlong={howFarTheCellHasBeenWritten ?? 0}
+                    onRun={() =>
+                        writeTableOfContents(sendMessagesToVscode, cellIndex)
+                    }
+                />
+            }
+        >
             <AuthorFileEditorCellHeader>
                 Table of Contents
             </AuthorFileEditorCellHeader>
@@ -36,7 +50,11 @@ export function ContentsCell({
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, cellIndex, markdown)
+                        replaceCellMarkdown(
+                            sendMessagesToVscode,
+                            cellIndex,
+                            markdown,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -49,11 +67,11 @@ registerAuthorDocumentCellType({
     cellKind: CONTENTS,
     menuLabel: "Table of Contents",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
+    render: (cell, cellIndex, sendMessagesToVscode) => (
         <ContentsCell
             cell={cell}
             cellIndex={cellIndex}
-            postToHost={postToHost}
+            sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
     newCell: () => ({ kind: CONTENTS, source: "", attrs: {} }),

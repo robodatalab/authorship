@@ -14,6 +14,9 @@ import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceMarkdownCommand } from "./replace_markdown";
+import { WriteBlurbCommand } from "./write_blurb";
+import { WriteStorySoFarCommand } from "./write_story_so_far";
+import { WriteTableOfContentsCommand } from "./write_table_of_contents";
 
 const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new FoldCellCommand(
@@ -41,6 +44,9 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new OpenAsTextCommand(),
+    new WriteBlurbCommand(),
+    new WriteStorySoFarCommand(),
+    new WriteTableOfContentsCommand(),
 ];
 
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {

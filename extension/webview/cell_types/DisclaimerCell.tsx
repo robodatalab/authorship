@@ -9,7 +9,7 @@ import {
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -21,13 +21,13 @@ import { DISCLAIMER } from "../../vscode_runtime/storydoc/model";
 interface DisclaimerCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function DisclaimerCell({
     cell,
     cellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: DisclaimerCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
@@ -39,10 +39,14 @@ export function DisclaimerCell({
                     markdown={cell.source}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
-                        fixProseError(postToHost, proseError)
+                        fixProseError(sendMessagesToVscode, proseError)
                     }
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, cellIndex, markdown)
+                        replaceCellMarkdown(
+                            sendMessagesToVscode,
+                            cellIndex,
+                            markdown,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -55,11 +59,11 @@ registerAuthorDocumentCellType({
     cellKind: DISCLAIMER,
     menuLabel: "Disclaimer",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
+    render: (cell, cellIndex, sendMessagesToVscode) => (
         <DisclaimerCell
             cell={cell}
             cellIndex={cellIndex}
-            postToHost={postToHost}
+            sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
     newCell: () => ({ kind: DISCLAIMER, source: "", attrs: {} }),

@@ -74,7 +74,9 @@ async function mountCanvas(options: {
                 cellTypes={
                     options.cellTypes ?? [cellType("markdown", "primary")]
                 }
-                postToHost={(message) => posted.push(message as Invocation)}
+                sendMessagesToVscode={(message) =>
+                    posted.push(message as Invocation)
+                }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
             />,
         );

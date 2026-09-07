@@ -114,7 +114,7 @@ describe("what the prose checker found", () => {
                 cellIndex={0}
                 cellAttributes={{}}
                 proseErrors={proseErrors}
-                postToHost={(message) => posted.push(message)}
+                sendMessagesToVscode={(message) => posted.push(message)}
             >
                 <AuthorFileEditorCellWarning />
             </AuthorFileEditorCellState>,

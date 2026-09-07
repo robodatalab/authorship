@@ -8,7 +8,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -24,10 +24,14 @@ const FIELDS: AuthorFileEditorCellField[] = [
 interface PartCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function PartCell({ cell, cellIndex, postToHost }: PartCellProps) {
+export function PartCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: PartCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Part</AuthorFileEditorCellHeader>
@@ -37,7 +41,7 @@ export function PartCell({ cell, cellIndex, postToHost }: PartCellProps) {
                     cellAttributes={cell.attrs}
                     onAttributeChanged={(attributeName, attributeValue) =>
                         replaceCellAttribute(
-                            postToHost,
+                            sendMessagesToVscode,
                             cellIndex,
                             attributeName,
                             attributeValue,
@@ -54,8 +58,12 @@ registerAuthorDocumentCellType({
     cellKind: PART,
     menuLabel: "Part",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
-        <PartCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
+    render: (cell, cellIndex, sendMessagesToVscode) => (
+        <PartCell
+            cell={cell}
+            cellIndex={cellIndex}
+            sendMessagesToVscode={sendMessagesToVscode}
+        />
     ),
     newCell: () => ({ kind: PART, source: "", attrs: { title: "Untitled" } }),
 });

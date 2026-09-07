@@ -9,7 +9,7 @@ import {
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -22,13 +22,13 @@ import { MARKDOWN } from "../../vscode_runtime/storydoc/model";
 interface MarkdownCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function MarkdownCell({
     cell,
     cellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: MarkdownCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
@@ -40,10 +40,14 @@ export function MarkdownCell({
                     markdown={cell.source}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
-                        fixProseError(postToHost, proseError)
+                        fixProseError(sendMessagesToVscode, proseError)
                     }
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, cellIndex, markdown)
+                        replaceCellMarkdown(
+                            sendMessagesToVscode,
+                            cellIndex,
+                            markdown,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -56,11 +60,11 @@ registerAuthorDocumentCellType({
     cellKind: MARKDOWN,
     menuLabel: "Markdown",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, postToHost) => (
+    render: (cell, cellIndex, sendMessagesToVscode) => (
         <MarkdownCell
             cell={cell}
             cellIndex={cellIndex}
-            postToHost={postToHost}
+            sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
     newCell: () => ({ kind: MARKDOWN, source: "", attrs: {} }),

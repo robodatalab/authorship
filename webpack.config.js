@@ -96,7 +96,7 @@ const publishViewConfig = {
 /** @type WebpackConfig */
 const authorFileEditorViewConfig = {
   ...publishViewConfig,
-  entry: './extension/webview/author_file_editor_webview.tsx',
+  entry: './extension/webview/message_queue_between_vscode_and_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'author_file_editor_view.js'

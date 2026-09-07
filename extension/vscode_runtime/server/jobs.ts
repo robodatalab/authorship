@@ -20,6 +20,7 @@ export async function startServerJob(
 export async function awaitServerJob<Job extends ServerJob>(
     route: string,
     jobId: string,
+    whileTheJobRuns: (job: Job) => void = () => undefined,
 ): Promise<Job> {
     const givingUpAt = Date.now() + MILLISECONDS_BEFORE_GIVING_UP;
     let pollsUnanswered = 0;
@@ -45,6 +46,7 @@ export async function awaitServerJob<Job extends ServerJob>(
         if (!job.running) {
             return job;
         }
+        whileTheJobRuns(job);
     }
     throw new Error("the job is taking longer than expected");
 }

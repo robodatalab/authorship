@@ -7,7 +7,7 @@ import {
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -20,10 +20,14 @@ import "./NotesCell.css";
 interface NotesCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function NotesCell({ cell, cellIndex, postToHost }: NotesCellProps) {
+export function NotesCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: NotesCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
@@ -32,7 +36,7 @@ export function NotesCell({ cell, cellIndex, postToHost }: NotesCellProps) {
                     markdown={noteWithinComment(cell.source)}
                     onMarkdownCommitted={(note) =>
                         replaceCellMarkdown(
-                            postToHost,
+                            sendMessagesToVscode,
                             cellIndex,
                             `<!--\n${note}\n-->`,
                         )
@@ -65,8 +69,12 @@ registerAuthorDocumentCellType({
     cellKind: NOTE,
     menuLabel: "Note",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, postToHost) => (
-        <NotesCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
+    render: (cell, cellIndex, sendMessagesToVscode) => (
+        <NotesCell
+            cell={cell}
+            cellIndex={cellIndex}
+            sendMessagesToVscode={sendMessagesToVscode}
+        />
     ),
     newCell: () => ({ kind: NOTE, source: "", attrs: {} }),
 });

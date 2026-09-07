@@ -1,36 +1,65 @@
 import {
     invokeAuthorDocumentCommand,
-    type PostToHost,
+    type SendMessagesToVscode,
 } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { ProseCheckError } from "./check_prose";
 
 export function replaceCellMarkdown(
-    postToHost: PostToHost,
+    sendMessagesToVscode: SendMessagesToVscode,
     cellIndex: number,
     markdown: string,
 ): void {
-    invokeAuthorDocumentCommand(postToHost, "replaceMarkdown", {
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "replaceMarkdown", {
         cellIndex,
         markdown,
     });
 }
 
 export function replaceCellAttribute(
-    postToHost: PostToHost,
+    sendMessagesToVscode: SendMessagesToVscode,
     cellIndex: number,
     attributeName: string,
     attributeValue: string,
 ): void {
-    invokeAuthorDocumentCommand(postToHost, "replaceAttribute", {
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "replaceAttribute", {
         cellIndex,
         attributeName,
         attributeValue,
     });
 }
 
+export function writeBlurb(
+    sendMessagesToVscode: SendMessagesToVscode,
+    cellIndex: number,
+): void {
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "writeBlurb", {
+        cellIndex,
+    });
+}
+
+export function writeTableOfContents(
+    sendMessagesToVscode: SendMessagesToVscode,
+    cellIndex: number,
+): void {
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "writeTableOfContents", {
+        cellIndex,
+    });
+}
+
+export function writeStorySoFar(
+    sendMessagesToVscode: SendMessagesToVscode,
+    cellIndex: number,
+): void {
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "writeStorySoFar", {
+        cellIndex,
+    });
+}
+
 export function fixProseError(
-    postToHost: PostToHost,
+    sendMessagesToVscode: SendMessagesToVscode,
     proseError: ProseCheckError,
 ): void {
-    invokeAuthorDocumentCommand(postToHost, "fixProse", { ...proseError });
+    invokeAuthorDocumentCommand(sendMessagesToVscode, "fixProse", {
+        ...proseError,
+    });
 }

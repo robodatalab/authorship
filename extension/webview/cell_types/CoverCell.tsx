@@ -7,7 +7,7 @@ import {
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -19,10 +19,14 @@ import { COVER } from "../../vscode_runtime/storydoc/model";
 interface CoverCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function CoverCell({ cell, cellIndex, postToHost }: CoverCellProps) {
+export function CoverCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: CoverCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Cover</AuthorFileEditorCellHeader>
@@ -30,7 +34,11 @@ export function CoverCell({ cell, cellIndex, postToHost }: CoverCellProps) {
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(postToHost, cellIndex, markdown)
+                        replaceCellMarkdown(
+                            sendMessagesToVscode,
+                            cellIndex,
+                            markdown,
+                        )
                     }
                 />
             </AuthorFileEditorCellBody>
@@ -43,8 +51,12 @@ registerAuthorDocumentCellType({
     cellKind: COVER,
     menuLabel: "Cover",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
-        <CoverCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
+    render: (cell, cellIndex, sendMessagesToVscode) => (
+        <CoverCell
+            cell={cell}
+            cellIndex={cellIndex}
+            sendMessagesToVscode={sendMessagesToVscode}
+        />
     ),
     newCell: () => ({
         kind: COVER,

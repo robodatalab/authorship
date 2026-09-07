@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type {
     AuthorDocumentCellRenderers,
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../../webview/author_editor/AuthorFileEditorCanvas";
 
@@ -13,7 +13,7 @@ export interface AuthorDocumentCellType {
     render(
         cell: WebviewCell,
         cellIndex: number,
-        postToHost: PostToHost,
+        sendMessagesToVscode: SendMessagesToVscode,
     ): ReactNode;
     newCell(): WebviewCell;
 }

@@ -1,22 +1,25 @@
 import {
     AuthorFileEditorCell,
+    AuthorFileEditorCellRun,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellCard,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
+    useAuthorFileEditorCellIsBeingWritten,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
     fixProseError,
+    writeStorySoFar,
     replaceCellAttribute,
     replaceCellMarkdown,
 } from "../../vscode_runtime/commands/author_document_edits";
@@ -33,14 +36,32 @@ const FIELDS: AuthorFileEditorCellField[] = [
 interface RecapCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
+export function RecapCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: RecapCellProps) {
+    const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
     return (
-        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
+        <AuthorFileEditorCell
+            sidebar={
+                <>
+                    <AuthorFileEditorCellRun
+                        isRunning={howFarTheCellHasBeenWritten !== undefined}
+                        howFarAlong={howFarTheCellHasBeenWritten ?? 0}
+                        onRun={() =>
+                            writeStorySoFar(sendMessagesToVscode, cellIndex)
+                        }
+                    />
+                    <AuthorFileEditorCellWarning />
+                </>
+            }
+        >
             <AuthorFileEditorCellHeader>
                 The Story So Far
             </AuthorFileEditorCellHeader>
@@ -51,7 +72,7 @@ export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
                         cellAttributes={cell.attrs}
                         onAttributeChanged={(attributeName, attributeValue) =>
                             replaceCellAttribute(
-                                postToHost,
+                                sendMessagesToVscode,
                                 cellIndex,
                                 attributeName,
                                 attributeValue,
@@ -64,10 +85,14 @@ export function RecapCell({ cell, cellIndex, postToHost }: RecapCellProps) {
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
-                            fixProseError(postToHost, proseError)
+                            fixProseError(sendMessagesToVscode, proseError)
                         }
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(postToHost, cellIndex, markdown)
+                            replaceCellMarkdown(
+                                sendMessagesToVscode,
+                                cellIndex,
+                                markdown,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -81,8 +106,12 @@ registerAuthorDocumentCellType({
     cellKind: RECAP,
     menuLabel: "The Story So Far",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
-        <RecapCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
+    render: (cell, cellIndex, sendMessagesToVscode) => (
+        <RecapCell
+            cell={cell}
+            cellIndex={cellIndex}
+            sendMessagesToVscode={sendMessagesToVscode}
+        />
     ),
     newCell: () => ({ kind: RECAP, source: "", attrs: {} }),
 });

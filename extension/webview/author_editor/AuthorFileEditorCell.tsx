@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 import {
     invokeAuthorDocumentCommand,
-    type PostToHost,
+    type SendMessagesToVscode,
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
@@ -43,7 +43,8 @@ interface AuthorFileEditorCellStateProps {
     cellIndex: number;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
-    postToHost: PostToHost;
+    howFarTheCellHasBeenWritten?: number;
+    sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
 }
 
@@ -54,7 +55,8 @@ const AuthorFileEditorCellStateContext = createContext<
     cellIndex: 0,
     cellAttributes: {},
     proseErrors: [],
-    postToHost: () => undefined,
+    howFarTheCellHasBeenWritten: undefined,
+    sendMessagesToVscode: () => undefined,
 });
 
 export function AuthorFileEditorCellState({
@@ -62,7 +64,8 @@ export function AuthorFileEditorCellState({
     cellIndex,
     cellAttributes,
     proseErrors = [],
-    postToHost,
+    howFarTheCellHasBeenWritten,
+    sendMessagesToVscode,
     children,
 }: AuthorFileEditorCellStateProps) {
     return (
@@ -72,7 +75,8 @@ export function AuthorFileEditorCellState({
                 cellIndex,
                 cellAttributes,
                 proseErrors,
-                postToHost,
+                howFarTheCellHasBeenWritten,
+                sendMessagesToVscode,
             }}
         >
             {children}
@@ -95,9 +99,8 @@ export function AuthorFileEditorCell({
     sidebar,
     children,
 }: AuthorFileEditorCellProps) {
-    const { cellCommands, cellIndex, cellAttributes, postToHost } = useContext(
-        AuthorFileEditorCellStateContext,
-    );
+    const { cellCommands, cellIndex, cellAttributes, sendMessagesToVscode } =
+        useContext(AuthorFileEditorCellStateContext);
     return (
         <section className="author-file-editor-cell">
             <div className="author-file-editor-cell-actions">
@@ -112,7 +115,7 @@ export function AuthorFileEditorCell({
                             aria-label={command.tooltip}
                             onClick={() =>
                                 invokeAuthorDocumentCommand(
-                                    postToHost,
+                                    sendMessagesToVscode,
                                     command.commandName,
                                     { cellIndex },
                                 )
@@ -160,6 +163,11 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function useAuthorFileEditorCellIsBeingWritten(): number | undefined {
+    return useContext(AuthorFileEditorCellStateContext)
+        .howFarTheCellHasBeenWritten;
 }
 
 export function AuthorFileEditorCellWarning() {

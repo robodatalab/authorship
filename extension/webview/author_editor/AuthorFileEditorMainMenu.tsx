@@ -1,19 +1,19 @@
 import { Fragment } from "react";
 import {
     invokeAuthorDocumentCommand,
-    type PostToHost,
+    type SendMessagesToVscode,
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import "./AuthorFileEditorMainMenu.css";
 
 interface AuthorFileEditorMainMenuProps {
     commands: WebviewAuthorDocumentCommandCard[];
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorMainMenu({
     commands,
-    postToHost,
+    sendMessagesToVscode,
 }: AuthorFileEditorMainMenuProps) {
     const buttonGroups = [
         ...new Set(commands.map((command) => command.buttonGroup)),
@@ -39,7 +39,7 @@ export function AuthorFileEditorMainMenu({
                                 aria-label={command.tooltip}
                                 onClick={() =>
                                     invokeAuthorDocumentCommand(
-                                        postToHost,
+                                        sendMessagesToVscode,
                                         command.commandName,
                                         {},
                                     )

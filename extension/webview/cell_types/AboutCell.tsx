@@ -11,7 +11,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -39,10 +39,14 @@ const FIELDS: AuthorFileEditorCellField[] = [
 interface AboutCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function AboutCell({ cell, cellIndex, postToHost }: AboutCellProps) {
+export function AboutCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: AboutCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
     return (
@@ -57,7 +61,7 @@ export function AboutCell({ cell, cellIndex, postToHost }: AboutCellProps) {
                         cellAttributes={cell.attrs}
                         onAttributeChanged={(attributeName, attributeValue) =>
                             replaceCellAttribute(
-                                postToHost,
+                                sendMessagesToVscode,
                                 cellIndex,
                                 attributeName,
                                 attributeValue,
@@ -70,10 +74,14 @@ export function AboutCell({ cell, cellIndex, postToHost }: AboutCellProps) {
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
-                            fixProseError(postToHost, proseError)
+                            fixProseError(sendMessagesToVscode, proseError)
                         }
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(postToHost, cellIndex, markdown)
+                            replaceCellMarkdown(
+                                sendMessagesToVscode,
+                                cellIndex,
+                                markdown,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>
@@ -87,8 +95,12 @@ registerAuthorDocumentCellType({
     cellKind: ABOUT,
     menuLabel: "About the Author",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
-        <AboutCell cell={cell} cellIndex={cellIndex} postToHost={postToHost} />
+    render: (cell, cellIndex, sendMessagesToVscode) => (
+        <AboutCell
+            cell={cell}
+            cellIndex={cellIndex}
+            sendMessagesToVscode={sendMessagesToVscode}
+        />
     ),
     newCell: () => ({ kind: ABOUT, source: "", attrs: {} }),
 });

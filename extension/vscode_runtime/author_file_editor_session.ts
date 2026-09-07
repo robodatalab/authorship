@@ -8,6 +8,7 @@ const openSessions = new Map<string, AuthorFileEditorSession>();
 
 export class AuthorFileEditorSession {
     private readonly proseErrors: ProseCheckError[] = [];
+    private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly synchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private documentAsTheLastSynchronizationLeftIt: AuthorDocument;
 
@@ -27,6 +28,25 @@ export class AuthorFileEditorSession {
             this.document.text,
         );
         this.sendProseErrors();
+    }
+
+    writingCell(cellId: string, howFarAlong: number): void {
+        this.howFarEachCellHasBeenWritten.set(cellId, howFarAlong);
+        this.sendCellsBeingWritten();
+    }
+
+    stopWritingCell(cellId: string): void {
+        this.howFarEachCellHasBeenWritten.delete(cellId);
+        this.sendCellsBeingWritten();
+    }
+
+    sendCellsBeingWritten(): void {
+        void this.panel.webview.postMessage({
+            type: "cellsBeingWritten",
+            cellsBeingWritten: Object.fromEntries(
+                this.howFarEachCellHasBeenWritten,
+            ),
+        });
     }
 
     sendProseErrors(): void {

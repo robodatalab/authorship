@@ -26,37 +26,43 @@ export interface WebviewAuthorDocumentCommandCard {
     readonly drawnWhenCellAttributeIs?: CellAttributeCondition;
 }
 
-export type PostToHost = (message: unknown) => void;
+export type SendMessagesToVscode = (message: unknown) => void;
 
 export function invokeAuthorDocumentCommand(
-    postToHost: PostToHost,
+    sendMessagesToVscode: SendMessagesToVscode,
     commandName: string,
     commandArguments: Record<string, unknown>,
 ): void {
-    postToHost({ type: "invoke", commandName, commandArguments });
+    sendMessagesToVscode({ type: "invoke", commandName, commandArguments });
 }
 
 export type AuthorDocumentCellRenderers = Record<
     string,
-    (cell: WebviewCell, cellIndex: number, postToHost: PostToHost) => ReactNode
+    (
+        cell: WebviewCell,
+        cellIndex: number,
+        sendMessagesToVscode: SendMessagesToVscode,
+    ) => ReactNode
 >;
 
 interface AuthorFileEditorCanvasProps {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
     cellTypes: AuthorDocumentCellType[];
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
+    cellsBeingWritten?: Readonly<Record<string, number>>;
 }
 
 export function AuthorFileEditorCanvas({
     cells,
     commands,
     cellTypes,
-    postToHost,
+    sendMessagesToVscode,
     cellRenderers,
     proseErrors = [],
+    cellsBeingWritten = {},
 }: AuthorFileEditorCanvasProps) {
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
@@ -74,7 +80,7 @@ export function AuthorFileEditorCanvas({
         <div className="author-file-editor-canvas">
             <AuthorFileEditorMainMenu
                 commands={mainMenuCommands}
-                postToHost={postToHost}
+                sendMessagesToVscode={sendMessagesToVscode}
             />
             <MarkdownEditorMediator>
                 <ul>
@@ -83,7 +89,7 @@ export function AuthorFileEditorCanvas({
                             insertCommand={insertCommand}
                             cellTypes={cellTypes}
                             insertAtCellIndex={0}
-                            postToHost={postToHost}
+                            sendMessagesToVscode={sendMessagesToVscode}
                         />
                     </li>
                     {cells.map((cell, cellIndex) => {
@@ -110,15 +116,22 @@ export function AuthorFileEditorCanvas({
                                                 cell.attrs.id &&
                                             proseError.isVisible,
                                     )}
-                                    postToHost={postToHost}
+                                    howFarTheCellHasBeenWritten={
+                                        cellsBeingWritten[cell.attrs.id]
+                                    }
+                                    sendMessagesToVscode={sendMessagesToVscode}
                                 >
-                                    {renderCell(cell, cellIndex, postToHost)}
+                                    {renderCell(
+                                        cell,
+                                        cellIndex,
+                                        sendMessagesToVscode,
+                                    )}
                                 </AuthorFileEditorCellState>
                                 <AuthorFileEditorInsertCellMenu
                                     insertCommand={insertCommand}
                                     cellTypes={cellTypes}
                                     insertAtCellIndex={cellIndex + 1}
-                                    postToHost={postToHost}
+                                    sendMessagesToVscode={sendMessagesToVscode}
                                 />
                             </li>
                         );
@@ -133,14 +146,14 @@ interface AuthorFileEditorInsertCellMenuProps {
     insertCommand?: WebviewAuthorDocumentCommandCard;
     cellTypes: AuthorDocumentCellType[];
     insertAtCellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenu({
     insertCommand,
     cellTypes,
     insertAtCellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuProps) {
     const [everyKindIsShown, showEveryKind] = useState(false);
 
@@ -163,7 +176,7 @@ function AuthorFileEditorInsertCellMenu({
                     insertCommand={insertCommand}
                     cellType={cellType}
                     insertAtCellIndex={insertAtCellIndex}
-                    postToHost={postToHost}
+                    sendMessagesToVscode={sendMessagesToVscode}
                 />
             ))}
             {cellTypesBehindTheEllipsis.length > 0 && (
@@ -186,7 +199,7 @@ function AuthorFileEditorInsertCellMenu({
                                     insertCommand={insertCommand}
                                     cellType={cellType}
                                     insertAtCellIndex={insertAtCellIndex}
-                                    postToHost={postToHost}
+                                    sendMessagesToVscode={sendMessagesToVscode}
                                 />
                             ))}
                         </div>
@@ -201,14 +214,14 @@ interface AuthorFileEditorInsertCellMenuButtonProps {
     insertCommand: WebviewAuthorDocumentCommandCard;
     cellType: AuthorDocumentCellType;
     insertAtCellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenuButton({
     insertCommand,
     cellType,
     insertAtCellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
     return (
         <button
@@ -217,7 +230,7 @@ function AuthorFileEditorInsertCellMenuButton({
             title={`Add a ${cellType.menuLabel.toLowerCase()} section here`}
             onClick={() =>
                 invokeAuthorDocumentCommand(
-                    postToHost,
+                    sendMessagesToVscode,
                     insertCommand.commandName,
                     {
                         cellIndex: insertAtCellIndex,

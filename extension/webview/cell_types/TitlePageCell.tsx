@@ -8,7 +8,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -34,13 +34,13 @@ const FIELDS: AuthorFileEditorCellField[] = [
 interface TitlePageCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function TitlePageCell({
     cell,
     cellIndex,
-    postToHost,
+    sendMessagesToVscode,
 }: TitlePageCellProps) {
     return (
         <AuthorFileEditorCell>
@@ -51,7 +51,7 @@ export function TitlePageCell({
                     cellAttributes={cell.attrs}
                     onAttributeChanged={(attributeName, attributeValue) =>
                         replaceCellAttribute(
-                            postToHost,
+                            sendMessagesToVscode,
                             cellIndex,
                             attributeName,
                             attributeValue,
@@ -68,11 +68,11 @@ registerAuthorDocumentCellType({
     cellKind: TITLE_PAGE,
     menuLabel: "Title Page",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, postToHost) => (
+    render: (cell, cellIndex, sendMessagesToVscode) => (
         <TitlePageCell
             cell={cell}
             cellIndex={cellIndex}
-            postToHost={postToHost}
+            sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
     newCell: () => ({

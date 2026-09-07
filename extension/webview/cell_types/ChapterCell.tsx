@@ -8,7 +8,7 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type {
-    PostToHost,
+    SendMessagesToVscode,
     WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import {
@@ -24,10 +24,14 @@ const FIELDS: AuthorFileEditorCellField[] = [
 interface ChapterCellProps {
     cell: WebviewCell;
     cellIndex: number;
-    postToHost: PostToHost;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function ChapterCell({ cell, cellIndex, postToHost }: ChapterCellProps) {
+export function ChapterCell({
+    cell,
+    cellIndex,
+    sendMessagesToVscode,
+}: ChapterCellProps) {
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Chapter</AuthorFileEditorCellHeader>
@@ -37,7 +41,7 @@ export function ChapterCell({ cell, cellIndex, postToHost }: ChapterCellProps) {
                     cellAttributes={cell.attrs}
                     onAttributeChanged={(attributeName, attributeValue) =>
                         replaceCellAttribute(
-                            postToHost,
+                            sendMessagesToVscode,
                             cellIndex,
                             attributeName,
                             attributeValue,
@@ -54,11 +58,11 @@ registerAuthorDocumentCellType({
     cellKind: CHAPTER,
     menuLabel: "Chapter",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, postToHost) => (
+    render: (cell, cellIndex, sendMessagesToVscode) => (
         <ChapterCell
             cell={cell}
             cellIndex={cellIndex}
-            postToHost={postToHost}
+            sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
     newCell: () => ({
