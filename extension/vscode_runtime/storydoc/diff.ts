@@ -1,102 +1,118 @@
 import { AuthorDocument, Cell } from "./model";
 
-export const CELL_ADDED = "cellAdded";
-export const CELL_DELETED = "cellDeleted";
-export const CELL_MARKDOWN_EDITED = "cellMarkdownEdited";
-export const CELL_ATTRIBUTE_EDITED = "cellAttributeEdited";
-
-export interface CellAdded {
-    whatHappened: typeof CELL_ADDED;
+export interface AuthorDocCellDiff {
     cellId: string;
-    atCellIndex: number;
-}
-
-export interface CellDeleted {
-    whatHappened: typeof CELL_DELETED;
-    cellId: string;
-}
-
-export interface CellMarkdownEdited {
-    whatHappened: typeof CELL_MARKDOWN_EDITED;
-    cellId: string;
+    cellIsInRhs: boolean;
+    atCellIndexInRhs: number;
     editedFromOffsetInCell: number;
     charactersRemoved: number;
     insertedText: string;
+    attributesChanged: Record<string, string | undefined>;
 }
 
-export interface CellAttributeEdited {
-    whatHappened: typeof CELL_ATTRIBUTE_EDITED;
-    cellId: string;
-    attributeName: string;
-    attributeValueNow: string | undefined;
+function cellOnlyInLhs(cellInLhs: Cell): AuthorDocCellDiff {
+    return {
+        cellId: cellInLhs.uniqueId,
+        cellIsInRhs: false,
+        atCellIndexInRhs: -1,
+        editedFromOffsetInCell: 0,
+        charactersRemoved: 0,
+        insertedText: "",
+        attributesChanged: {},
+    };
 }
 
-export type AuthorDocumentChange =
-    | CellAdded
-    | CellDeleted
-    | CellMarkdownEdited
-    | CellAttributeEdited;
+function cellOnlyInRhs(
+    cellInRhs: Cell,
+    atCellIndexInRhs: number,
+): AuthorDocCellDiff {
+    return {
+        cellId: cellInRhs.uniqueId,
+        cellIsInRhs: true,
+        atCellIndexInRhs,
+        editedFromOffsetInCell: 0,
+        charactersRemoved: 0,
+        insertedText: cellInRhs.source,
+        attributesChanged: { ...cellInRhs.attrs },
+    };
+}
 
 function markdownEditBetween(
-    markdownBefore: string,
-    markdownNow: string,
-): Omit<CellMarkdownEdited, "whatHappened" | "cellId"> | undefined {
-    if (markdownBefore === markdownNow) {
-        return undefined;
-    }
+    markdownInLhs: string,
+    markdownInRhs: string,
+): Pick<
+    AuthorDocCellDiff,
+    "editedFromOffsetInCell" | "charactersRemoved" | "insertedText"
+> {
     let charactersSameAtTheStart = 0;
     while (
-        charactersSameAtTheStart < markdownBefore.length &&
-        charactersSameAtTheStart < markdownNow.length &&
-        markdownBefore[charactersSameAtTheStart] ===
-            markdownNow[charactersSameAtTheStart]
+        charactersSameAtTheStart < markdownInLhs.length &&
+        charactersSameAtTheStart < markdownInRhs.length &&
+        markdownInLhs[charactersSameAtTheStart] ===
+            markdownInRhs[charactersSameAtTheStart]
     ) {
         charactersSameAtTheStart += 1;
     }
     let charactersSameAtTheEnd = 0;
     while (
         charactersSameAtTheEnd <
-            markdownBefore.length - charactersSameAtTheStart &&
+            markdownInLhs.length - charactersSameAtTheStart &&
         charactersSameAtTheEnd <
-            markdownNow.length - charactersSameAtTheStart &&
-        markdownBefore[markdownBefore.length - 1 - charactersSameAtTheEnd] ===
-            markdownNow[markdownNow.length - 1 - charactersSameAtTheEnd]
+            markdownInRhs.length - charactersSameAtTheStart &&
+        markdownInLhs[markdownInLhs.length - 1 - charactersSameAtTheEnd] ===
+            markdownInRhs[markdownInRhs.length - 1 - charactersSameAtTheEnd]
     ) {
         charactersSameAtTheEnd += 1;
     }
     return {
         editedFromOffsetInCell: charactersSameAtTheStart,
         charactersRemoved:
-            markdownBefore.length -
+            markdownInLhs.length -
             charactersSameAtTheStart -
             charactersSameAtTheEnd,
-        insertedText: markdownNow.slice(
+        insertedText: markdownInRhs.slice(
             charactersSameAtTheStart,
-            markdownNow.length - charactersSameAtTheEnd,
+            markdownInRhs.length - charactersSameAtTheEnd,
         ),
     };
 }
 
-function attributeEditsBetween(
-    cellBefore: Cell,
-    cellNow: Cell,
-): CellAttributeEdited[] {
+function attributesChangedBetween(
+    cellInLhs: Cell,
+    cellInRhs: Cell,
+): Record<string, string | undefined> {
     const attributeNames = new Set([
-        ...Object.keys(cellBefore.attrs),
-        ...Object.keys(cellNow.attrs),
+        ...Object.keys(cellInLhs.attrs),
+        ...Object.keys(cellInRhs.attrs),
     ]);
-    return [...attributeNames]
-        .filter(
-            (attributeName) =>
-                cellBefore.attrs[attributeName] !==
-                cellNow.attrs[attributeName],
-        )
-        .map((attributeName) => ({
-            whatHappened: CELL_ATTRIBUTE_EDITED as typeof CELL_ATTRIBUTE_EDITED,
-            cellId: cellNow.uniqueId,
-            attributeName,
-            attributeValueNow: cellNow.attrs[attributeName],
-        }));
+    const changed: Record<string, string | undefined> = {};
+    for (const attributeName of attributeNames) {
+        if (cellInLhs.attrs[attributeName] !== cellInRhs.attrs[attributeName]) {
+            changed[attributeName] = cellInRhs.attrs[attributeName];
+        }
+    }
+    return changed;
+}
+
+function cellInBoth(
+    cellInLhs: Cell,
+    cellInRhs: Cell,
+    atCellIndexInRhs: number,
+): AuthorDocCellDiff | undefined {
+    const attributesChanged = attributesChangedBetween(cellInLhs, cellInRhs);
+    if (
+        cellInLhs.source === cellInRhs.source &&
+        Object.keys(attributesChanged).length === 0
+    ) {
+        return undefined;
+    }
+    return {
+        cellId: cellInRhs.uniqueId,
+        cellIsInRhs: true,
+        atCellIndexInRhs,
+        ...markdownEditBetween(cellInLhs.source, cellInRhs.source),
+        attributesChanged,
+    };
 }
 
 /**
@@ -110,38 +126,23 @@ function attributeEditsBetween(
 export function diff(
     lhs: AuthorDocument,
     rhs: AuthorDocument,
-): AuthorDocumentChange[] {
-    const changes: AuthorDocumentChange[] = [];
-    for (const cellBefore of lhs.cells) {
-        if (!rhs.cellWithId(cellBefore.uniqueId)) {
-            changes.push({
-                whatHappened: CELL_DELETED,
-                cellId: cellBefore.uniqueId,
-            });
+): AuthorDocCellDiff[] {
+    const differences: AuthorDocCellDiff[] = [];
+    for (const cellInLhs of lhs.cells) {
+        if (!rhs.cellWithId(cellInLhs.uniqueId)) {
+            differences.push(cellOnlyInLhs(cellInLhs));
         }
     }
-    rhs.cells.forEach((cellNow, atCellIndex) => {
-        const cellBefore = lhs.cellWithId(cellNow.uniqueId);
-        if (!cellBefore) {
-            changes.push({
-                whatHappened: CELL_ADDED,
-                cellId: cellNow.uniqueId,
-                atCellIndex,
-            });
+    rhs.cells.forEach((cellInRhs, atCellIndexInRhs) => {
+        const cellInLhs = lhs.cellWithId(cellInRhs.uniqueId);
+        if (!cellInLhs) {
+            differences.push(cellOnlyInRhs(cellInRhs, atCellIndexInRhs));
             return;
         }
-        const markdownEdit = markdownEditBetween(
-            cellBefore.source,
-            cellNow.source,
-        );
-        if (markdownEdit) {
-            changes.push({
-                whatHappened: CELL_MARKDOWN_EDITED,
-                cellId: cellNow.uniqueId,
-                ...markdownEdit,
-            });
+        const difference = cellInBoth(cellInLhs, cellInRhs, atCellIndexInRhs);
+        if (difference) {
+            differences.push(difference);
         }
-        changes.push(...attributeEditsBetween(cellBefore, cellNow));
     });
-    return changes;
+    return differences;
 }

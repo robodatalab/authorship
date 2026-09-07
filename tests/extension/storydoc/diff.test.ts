@@ -16,26 +16,6 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([]);
     });
 
-    it("names a cell the second has and the first has not, and where it stands", () => {
-        expect(
-            diff(
-                AuthorDocument.fromText(SHE_SAW),
-                AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
-            ),
-        ).toEqual([
-            { whatHappened: "cellAdded", cellId: "c2", atCellIndex: 1 },
-        ]);
-    });
-
-    it("names a cell the first has and the second has not", () => {
-        expect(
-            diff(
-                AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
-                AuthorDocument.fromText(HE_HEARD),
-            ),
-        ).toEqual([{ whatHappened: "cellDeleted", cellId: "c1" }]);
-    });
-
     it("says nothing when the same cells stand in a different order", () => {
         expect(
             diff(
@@ -43,6 +23,44 @@ describe("diff — what would have to change to turn one document into the other
                 AuthorDocument.fromText(HE_HEARD + "\n" + SHE_SAW),
             ),
         ).toEqual([]);
+    });
+
+    it("gives a cell the second has and the first has not, with all of its text", () => {
+        expect(
+            diff(
+                AuthorDocument.fromText(SHE_SAW),
+                AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
+            ),
+        ).toEqual([
+            {
+                cellId: "c2",
+                cellIsInRhs: true,
+                atCellIndexInRhs: 1,
+                editedFromOffsetInCell: 0,
+                charactersRemoved: 0,
+                insertedText: "He heard the bell.",
+                attributesChanged: { id: "c2" },
+            },
+        ]);
+    });
+
+    it("gives a cell the first has and the second has not, standing nowhere", () => {
+        expect(
+            diff(
+                AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
+                AuthorDocument.fromText(HE_HEARD),
+            ),
+        ).toEqual([
+            {
+                cellId: "c1",
+                cellIsInRhs: false,
+                atCellIndexInRhs: -1,
+                editedFromOffsetInCell: 0,
+                charactersRemoved: 0,
+                insertedText: "",
+                attributesChanged: {},
+            },
+        ]);
     });
 
     it("says where a cell's markdown differs, what goes and what comes", () => {
@@ -55,11 +73,13 @@ describe("diff — what would have to change to turn one document into the other
             ),
         ).toEqual([
             {
-                whatHappened: "cellMarkdownEdited",
                 cellId: "c1",
+                cellIsInRhs: true,
+                atCellIndexInRhs: 0,
                 editedFromOffsetInCell: 4,
                 charactersRemoved: 3,
                 insertedText: "opened",
+                attributesChanged: {},
             },
         ]);
     });
@@ -74,16 +94,18 @@ describe("diff — what would have to change to turn one document into the other
             ),
         ).toEqual([
             {
-                whatHappened: "cellMarkdownEdited",
                 cellId: "c1",
+                cellIsInRhs: true,
+                atCellIndexInRhs: 0,
                 editedFromOffsetInCell: 1,
                 charactersRemoved: 0,
                 insertedText: "lowly, S",
+                attributesChanged: {},
             },
         ]);
     });
 
-    it("names an attribute written, changed, or missing from the second", () => {
+    it("gives every attribute written, changed, or missing from the second", () => {
         expect(
             diff(
                 AuthorDocument.fromText(
@@ -95,44 +117,48 @@ describe("diff — what would have to change to turn one document into the other
             ),
         ).toEqual([
             {
-                whatHappened: "cellAttributeEdited",
                 cellId: "c1",
-                attributeName: "title",
-                attributeValueNow: "Two",
-            },
-            {
-                whatHappened: "cellAttributeEdited",
-                cellId: "c1",
-                attributeName: "folded",
-                attributeValueNow: undefined,
-            },
-            {
-                whatHappened: "cellAttributeEdited",
-                cellId: "c1",
-                attributeName: "printed",
-                attributeValueNow: "no",
+                cellIsInRhs: true,
+                atCellIndexInRhs: 0,
+                editedFromOffsetInCell: 0,
+                charactersRemoved: 0,
+                insertedText: "",
+                attributesChanged: {
+                    title: "Two",
+                    folded: undefined,
+                    printed: "no",
+                },
             },
         ]);
     });
 
-    it("says all of it at once when the two differ in several ways", () => {
+    it("gives one difference per cell, however many ways the two differ", () => {
         expect(
             diff(
                 AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
                 AuthorDocument.fromText(
-                    '<!-- cell: markdown id="c2" title="Bells" -->\n\nHe heard the bell.\n' +
-                        '\n<!-- cell: markdown id="c3" -->\n\nShe waited.\n',
+                    '<!-- cell: markdown id="c2" title="Bells" -->\n\nHe heard a bell.\n',
                 ),
             ),
         ).toEqual([
-            { whatHappened: "cellDeleted", cellId: "c1" },
             {
-                whatHappened: "cellAttributeEdited",
-                cellId: "c2",
-                attributeName: "title",
-                attributeValueNow: "Bells",
+                cellId: "c1",
+                cellIsInRhs: false,
+                atCellIndexInRhs: -1,
+                editedFromOffsetInCell: 0,
+                charactersRemoved: 0,
+                insertedText: "",
+                attributesChanged: {},
             },
-            { whatHappened: "cellAdded", cellId: "c3", atCellIndex: 1 },
+            {
+                cellId: "c2",
+                cellIsInRhs: true,
+                atCellIndexInRhs: 0,
+                editedFromOffsetInCell: 9,
+                charactersRemoved: 3,
+                insertedText: "a",
+                attributesChanged: { title: "Bells" },
+            },
         ]);
     });
 });
