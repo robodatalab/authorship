@@ -94,8 +94,10 @@ describe("what the prose checker found", () => {
     ): ProseCheckError {
         return {
             cellId: "c1",
-            startOffsetInCell: 10,
-            endOffsetInCell: 19,
+            startCharacterOffsetInCell: 10,
+            endCharacterOffsetInCell: 19,
+            wordsInTheCell: "very very",
+            isVisible: true,
             ruleThatFoundTheError: "echo",
             isAnErrorOf: "style",
             reasonForError,

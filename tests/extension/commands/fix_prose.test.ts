@@ -8,8 +8,10 @@ describe("FixProseCommand — fixes one prose error", () => {
         const document = storyOfThreeCells();
         new FixProseCommand().invoke(document, {
             cellId: "c2",
-            startOffsetInCell: 4,
-            endOffsetInCell: 7,
+            startCharacterOffsetInCell: 4,
+            endCharacterOffsetInCell: 7,
+            wordsInTheCell: "saw",
+            isVisible: true,
             ruleThatFoundTheError: "filter-word",
             isAnErrorOf: "style",
             reasonForError: "It reports.",
@@ -22,8 +24,10 @@ describe("FixProseCommand — fixes one prose error", () => {
         const document = storyOfThreeCells();
         new FixProseCommand().invoke(document, {
             cellId: "c2",
-            startOffsetInCell: 4,
-            endOffsetInCell: 7,
+            startCharacterOffsetInCell: 4,
+            endCharacterOffsetInCell: 7,
+            wordsInTheCell: "saw",
+            isVisible: true,
             ruleThatFoundTheError: "monotony",
             isAnErrorOf: "style",
             reasonForError: "Every sentence opens the same way.",

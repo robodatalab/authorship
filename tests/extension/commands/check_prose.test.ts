@@ -9,8 +9,10 @@ import { forgetWhatTheEditorDid, storyOfThreeCells } from "./open_story";
 
 const A_STYLE_ERROR = {
     cellId: "c2",
-    startOffsetInCell: 4,
-    endOffsetInCell: 7,
+    startCharacterOffsetInCell: 4,
+    endCharacterOffsetInCell: 7,
+    wordsInTheCell: "saw",
+    isVisible: true,
     ruleThatFoundTheError: "filter-word",
     isAnErrorOf: "style",
     reasonForError: "It reports rather than shows.",
@@ -19,8 +21,10 @@ const A_STYLE_ERROR = {
 
 const A_GRAMMAR_ERROR = {
     cellId: "c3",
-    startOffsetInCell: 0,
-    endOffsetInCell: 2,
+    startCharacterOffsetInCell: 0,
+    endCharacterOffsetInCell: 2,
+    wordsInTheCell: "He",
+    isVisible: true,
     ruleThatFoundTheError: "grammar:agreement",
     isAnErrorOf: "grammar",
     reasonForError: "He hear the bell.",

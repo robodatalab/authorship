@@ -249,8 +249,8 @@ function MonacoMarkdownEditor({
             const offset = model.getOffsetAt(position);
             const error = errorsNow.current.find(
                 (marked) =>
-                    offset >= marked.startOffsetInCell &&
-                    offset <= marked.endOffsetInCell,
+                    offset >= marked.startCharacterOffsetInCell &&
+                    offset <= marked.endCharacterOffsetInCell,
             );
             const wordsDrawnAt =
                 error && editor.getScrolledVisiblePosition(position);
@@ -334,8 +334,8 @@ function MonacoMarkdownEditor({
         drawnMarks.current?.set(
             errors.map((error) => ({
                 range: monaco.Range.fromPositions(
-                    model.getPositionAt(error.startOffsetInCell),
-                    model.getPositionAt(error.endOffsetInCell),
+                    model.getPositionAt(error.startCharacterOffsetInCell),
+                    model.getPositionAt(error.endCharacterOffsetInCell),
                 ),
                 options: {
                     inlineClassName: `markdown-editor-mark markdown-editor-mark-${error.isAnErrorOf}`,

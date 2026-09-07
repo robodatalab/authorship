@@ -20,9 +20,9 @@ export class FixProseCommand implements AuthorDocumentCommand {
             return;
         }
         cell.replaceMarkdown(
-            cell.source.slice(0, error.startOffsetInCell) +
+            cell.source.slice(0, error.startCharacterOffsetInCell) +
                 error.correctVersion +
-                cell.source.slice(error.endOffsetInCell),
+                cell.source.slice(error.endCharacterOffsetInCell),
         );
     }
 }

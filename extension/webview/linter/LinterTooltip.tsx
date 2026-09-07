@@ -11,7 +11,7 @@ export function LinterTooltip({ errors, onFixAsked }: LinterTooltipProps) {
         <div className="linter-tooltip" role="tooltip">
             {errors.map((error) => (
                 <div
-                    key={`${error.cellId}:${error.startOffsetInCell}`}
+                    key={`${error.cellId}:${error.startCharacterOffsetInCell}`}
                     className="linter-tooltip-error"
                 >
                     <p

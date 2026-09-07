@@ -409,8 +409,10 @@ describe("two editors", () => {
 describe("what the checks found in the prose being written", () => {
     const REPEATED: ProseCheckError = {
         cellId: "c1",
-        startOffsetInCell: 10,
-        endOffsetInCell: 19,
+        startCharacterOffsetInCell: 10,
+        endCharacterOffsetInCell: 19,
+        wordsInTheCell: "very very",
+        isVisible: true,
         ruleThatFoundTheError: "echo",
         isAnErrorOf: "style",
         reasonForError: "“very very” says it twice.",

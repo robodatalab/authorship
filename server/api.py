@@ -818,8 +818,14 @@ def _prose_check_errors(
         errors.append(
             {
                 "cellId": cell.unique_id,
-                "startOffsetInCell": cell.offset_of(at.line, at.character),
-                "endOffsetInCell": cell.offset_of(end.line, end.character),
+                "startCharacterOffsetInCell": cell.offset_of(at.line, at.character),
+                "endCharacterOffsetInCell": cell.offset_of(end.line, end.character),
+                "wordsInTheCell": cell.source[
+                    cell.offset_of(at.line, at.character) : cell.offset_of(
+                        end.line, end.character
+                    )
+                ],
+                "isVisible": True,
                 "ruleThatFoundTheError": finding.rule,
                 "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
                 "reasonForError": finding.detail,

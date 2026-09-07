@@ -7,12 +7,10 @@ import {
     type ModelServerJob,
 } from "../server/jobs";
 import { authorFileEditorSession } from "../author_file_editor_session";
+import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 import type { AuthorDocument } from "../storydoc/model";
 
-export interface ProseCheckError {
-    cellId: string;
-    startOffsetInCell: number;
-    endOffsetInCell: number;
+export interface ProseCheckError extends SynchronizedRepresentation {
     ruleThatFoundTheError: string;
     isAnErrorOf: "style" | "grammar";
     reasonForError: string;
