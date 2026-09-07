@@ -60,3 +60,34 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
         expect(shownMessages[0]).toContain("Name the documents");
     });
 });
+
+describe("WriteStorySoFarCommand — while the author keeps working", () => {
+    it("writes it into the cell even when the document was read again while the job ran", async () => {
+        const document = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
+        let statusAskedFor = 0;
+        vi.stubGlobal("fetch", (url: string) => {
+            const stillRunning = url.includes("status") && statusAskedFor++ < 1;
+            if (stillRunning) {
+                document.fromText(document.text);
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () =>
+                    Promise.resolve(
+                        url.includes("status")
+                            ? {
+                                  running: stillRunning,
+                                  error: null,
+                                  text: "She had lost her name.",
+                                  progress: { written: 1, chapters: 2 },
+                              }
+                            : { id: "job-1" },
+                    ),
+            });
+        });
+
+        await new WriteStorySoFarCommand().invoke(document, { cellIndex: 0 });
+
+        expect(document.cells[0].source).toBe("She had lost her name.");
+    });
+});

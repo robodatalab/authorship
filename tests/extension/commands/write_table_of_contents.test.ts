@@ -43,4 +43,10 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
 
         expect(document.cells[0].source).toBe("");
     });
+
+    it("writes nothing when there is no cell at that index", () => {
+        const document = openStory(A_STORY_WITH_A_CONTENTS_CELL);
+        new WriteTableOfContentsCommand().invoke(document, { cellIndex: 9 });
+        expect(document.cells[0].source).toBe("");
+    });
 });

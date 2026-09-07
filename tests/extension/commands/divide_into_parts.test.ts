@@ -35,4 +35,14 @@ He heard the bell.
         expect(files.get(FIRST_PART)).toContain("She saw the door.");
         expect(files.get(SECOND_PART)).toContain("He heard the bell.");
     });
+
+    it("writes no files when the author marked no parts", async () => {
+        const document = openStory(
+            '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n',
+        );
+
+        await new DivideIntoPartsCommand().invoke(document);
+
+        expect([...files.keys()]).toEqual([]);
+    });
 });

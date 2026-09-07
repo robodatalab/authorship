@@ -13,4 +13,14 @@ describe("MoveCellUpCommand — moves a cell up", () => {
             "c2",
         ]);
     });
+
+    it("leaves the first cell where it is, since nothing stands above it", () => {
+        const document = storyOfThreeCells();
+        new MoveCellUpCommand().invoke(document, { cellIndex: 0 });
+        expect(document.cells.map((cell) => cell.uniqueId)).toEqual([
+            "c1",
+            "c2",
+            "c3",
+        ]);
+    });
 });

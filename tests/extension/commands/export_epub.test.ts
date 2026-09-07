@@ -29,4 +29,18 @@ describe("ExportEpubCommand — exports the document as an EPUB", () => {
         expect(asked[0].body).toEqual({ path: STORY_FILE, force: false });
         expect(shownMessages).toContain("Exported story.epub");
     });
+
+    it("tells the author when the server refuses the export", async () => {
+        vi.stubGlobal("fetch", () =>
+            Promise.resolve({
+                ok: false,
+                status: 500,
+                json: () => Promise.resolve({ detail: "no model is serving" }),
+            }),
+        );
+
+        await new ExportEpubCommand().invoke(storyOfThreeCells());
+
+        expect(shownMessages[0]).toContain("no model is serving");
+    });
 });

@@ -14,4 +14,14 @@ describe("ReplaceAttributeCommand — replaces a cell's attribute", () => {
         expect(document.cells[0].attrs.title).toBe("The Door");
         expect(document.text).toContain('title="The Door"');
     });
+
+    it("writes nothing when there is no cell at that index", () => {
+        const document = storyOfThreeCells();
+        new ReplaceAttributeCommand().invoke(document, {
+            cellIndex: 9,
+            attributeName: "title",
+            attributeValue: "Nowhere",
+        });
+        expect(document.text).not.toContain("Nowhere");
+    });
 });

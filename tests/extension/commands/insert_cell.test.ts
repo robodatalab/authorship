@@ -18,4 +18,13 @@ describe("InsertCellCommand — inserts a cell", () => {
         ]);
         expect(document.cells[1].source).toBe("remember this");
     });
+
+    it("puts a cell at the end when the index is the length of the document", () => {
+        const document = storyOfThreeCells();
+        new InsertCellCommand().invoke(document, {
+            cellIndex: 3,
+            newCell: { kind: "note", source: "last", attrs: {} },
+        });
+        expect(document.cells[3].source).toBe("last");
+    });
 });

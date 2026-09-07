@@ -16,4 +16,12 @@ describe("FoldCellCommand — folds a cell", () => {
         });
         expect(document.cells[1].isFolded()).toBe(false);
     });
+
+    it("leaves the document alone when there is no cell at that index", () => {
+        const document = storyOfThreeCells();
+        new FoldCellCommand("foldCell", "", "", true).invoke(document, {
+            cellIndex: 9,
+        });
+        expect(document.text).not.toContain("folded");
+    });
 });

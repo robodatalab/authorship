@@ -13,4 +13,13 @@ describe("ReplaceMarkdownCommand — replaces a cell's markdown", () => {
         expect(document.cells[1].source).toBe("She saw the door was open.");
         expect(document.cells[2].source).toBe("He heard the bell.");
     });
+
+    it("writes nothing when there is no cell at that index", () => {
+        const document = storyOfThreeCells();
+        new ReplaceMarkdownCommand().invoke(document, {
+            cellIndex: 9,
+            markdown: "nowhere",
+        });
+        expect(document.text).not.toContain("nowhere");
+    });
 });

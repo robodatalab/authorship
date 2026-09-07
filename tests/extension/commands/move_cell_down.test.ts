@@ -13,4 +13,14 @@ describe("MoveCellDownCommand — moves a cell down", () => {
             "c3",
         ]);
     });
+
+    it("leaves the last cell where it is, since nothing stands under it", () => {
+        const document = storyOfThreeCells();
+        new MoveCellDownCommand().invoke(document, { cellIndex: 2 });
+        expect(document.cells.map((cell) => cell.uniqueId)).toEqual([
+            "c1",
+            "c2",
+            "c3",
+        ]);
+    });
 });

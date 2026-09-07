@@ -73,3 +73,47 @@ describe("WriteBlurbCommand — writes the blurb", () => {
         });
     });
 });
+
+describe("WriteBlurbCommand — while the author keeps working", () => {
+    it("writes the blurb into the cell even when the document was read again while the job ran", async () => {
+        const document = openStory(A_STORY_WITH_A_BLURB_CELL);
+        let statusAskedFor = 0;
+        vi.stubGlobal("fetch", (url: string) => {
+            const stillRunning = url.includes("status") && statusAskedFor++ < 1;
+            if (stillRunning) {
+                document.fromText(document.text);
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () =>
+                    Promise.resolve(
+                        url.includes("status")
+                            ? {
+                                  running: stillRunning,
+                                  error: null,
+                                  text: "A woman loses her name.",
+                                  progress: { written: 1, chapters: 2 },
+                              }
+                            : { id: "job-1" },
+                    ),
+            });
+        });
+
+        await new WriteBlurbCommand().invoke(document, { cellIndex: 0 });
+
+        expect(document.cells[0].source).toBe("A woman loses her name.");
+    });
+
+    it("leaves the document alone when the cell it was asked for is not there", async () => {
+        const asked: string[] = [];
+        vi.stubGlobal("fetch", (url: string) => {
+            asked.push(url);
+            return Promise.resolve({ ok: true, json: () => ({}) });
+        });
+        const document = openStory(A_STORY_WITH_A_BLURB_CELL);
+
+        await new WriteBlurbCommand().invoke(document, { cellIndex: 9 });
+
+        expect(asked).toEqual([]);
+    });
+});
