@@ -8,15 +8,11 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    replaceCellAttribute,
-    writeTableOfContents,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { CONTENTS } from "../../vscode_runtime/storydoc/model";
 
 interface ContentsCellProps {
@@ -38,7 +34,11 @@ export function ContentsCell({
                     isRunning={howFarTheCellHasBeenWritten !== undefined}
                     howFarAlong={howFarTheCellHasBeenWritten ?? 0}
                     onRun={() =>
-                        writeTableOfContents(sendMessagesToVscode, cellIndex)
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "writeTableOfContents",
+                            { cellIndex },
+                        )
                     }
                 />
             }
@@ -50,10 +50,10 @@ export function ContentsCell({
                 <MarkdownEditor
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(
+                        invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
-                            cellIndex,
-                            markdown,
+                            "replaceMarkdown",
+                            { cellIndex, markdown: markdown },
                         )
                     }
                 />

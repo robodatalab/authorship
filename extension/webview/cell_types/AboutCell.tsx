@@ -10,15 +10,11 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    fixProseError,
-    replaceCellAttribute,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { ABOUT } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
@@ -60,11 +56,10 @@ export function AboutCell({
                         fields={FIELDS}
                         cellAttributes={cell.attrs}
                         onAttributeChanged={(attributeName, attributeValue) =>
-                            replaceCellAttribute(
+                            invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                cellIndex,
-                                attributeName,
-                                attributeValue,
+                                "replaceAttribute",
+                                { cellIndex, attributeName, attributeValue },
                             )
                         }
                     />
@@ -74,13 +69,19 @@ export function AboutCell({
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
-                            fixProseError(sendMessagesToVscode, proseError)
+                            invokeAuthorDocumentCommand(
+                                sendMessagesToVscode,
+                                "fixProse",
+                                {
+                                    ...proseError,
+                                },
+                            )
                         }
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(
+                            invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                cellIndex,
-                                markdown,
+                                "replaceMarkdown",
+                                { cellIndex, markdown: markdown },
                             )
                         }
                     />

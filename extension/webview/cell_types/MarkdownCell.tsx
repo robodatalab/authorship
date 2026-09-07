@@ -8,15 +8,11 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    fixProseError,
-    replaceCellAttribute,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { MARKDOWN } from "../../vscode_runtime/storydoc/model";
 
 interface MarkdownCellProps {
@@ -40,13 +36,19 @@ export function MarkdownCell({
                     markdown={cell.source}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
-                        fixProseError(sendMessagesToVscode, proseError)
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "fixProse",
+                            {
+                                ...proseError,
+                            },
+                        )
                     }
                     onMarkdownCommitted={(markdown) =>
-                        replaceCellMarkdown(
+                        invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
-                            cellIndex,
-                            markdown,
+                            "replaceMarkdown",
+                            { cellIndex, markdown: markdown },
                         )
                     }
                 />

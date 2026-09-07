@@ -7,14 +7,11 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    replaceCellAttribute,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { CHAPTER } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
@@ -40,11 +37,10 @@ export function ChapterCell({
                     fields={FIELDS}
                     cellAttributes={cell.attrs}
                     onAttributeChanged={(attributeName, attributeValue) =>
-                        replaceCellAttribute(
+                        invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
-                            cellIndex,
-                            attributeName,
-                            attributeValue,
+                            "replaceAttribute",
+                            { cellIndex, attributeName, attributeValue },
                         )
                     }
                 />

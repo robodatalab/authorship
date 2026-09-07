@@ -13,16 +13,11 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    fixProseError,
-    writeStorySoFar,
-    replaceCellAttribute,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { RECAP } from "../../vscode_runtime/storydoc/model";
 
 const FIELDS: AuthorFileEditorCellField[] = [
@@ -55,7 +50,11 @@ export function RecapCell({
                         isRunning={howFarTheCellHasBeenWritten !== undefined}
                         howFarAlong={howFarTheCellHasBeenWritten ?? 0}
                         onRun={() =>
-                            writeStorySoFar(sendMessagesToVscode, cellIndex)
+                            invokeAuthorDocumentCommand(
+                                sendMessagesToVscode,
+                                "writeStorySoFar",
+                                { cellIndex },
+                            )
                         }
                     />
                     <AuthorFileEditorCellWarning />
@@ -71,11 +70,10 @@ export function RecapCell({
                         fields={FIELDS}
                         cellAttributes={cell.attrs}
                         onAttributeChanged={(attributeName, attributeValue) =>
-                            replaceCellAttribute(
+                            invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                cellIndex,
-                                attributeName,
-                                attributeValue,
+                                "replaceAttribute",
+                                { cellIndex, attributeName, attributeValue },
                             )
                         }
                     />
@@ -85,13 +83,19 @@ export function RecapCell({
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
-                            fixProseError(sendMessagesToVscode, proseError)
+                            invokeAuthorDocumentCommand(
+                                sendMessagesToVscode,
+                                "fixProse",
+                                {
+                                    ...proseError,
+                                },
+                            )
                         }
                         onMarkdownCommitted={(markdown) =>
-                            replaceCellMarkdown(
+                            invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                cellIndex,
-                                markdown,
+                                "replaceMarkdown",
+                                { cellIndex, markdown: markdown },
                             )
                         }
                     />

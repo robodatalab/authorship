@@ -6,14 +6,11 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type {
-    SendMessagesToVscode,
-    WebviewCell,
-} from "../author_editor/AuthorFileEditorCanvas";
 import {
-    replaceCellAttribute,
-    replaceCellMarkdown,
-} from "../../vscode_runtime/commands/author_document_edits";
+    invokeAuthorDocumentCommand,
+    type SendMessagesToVscode,
+    type WebviewCell,
+} from "../author_editor/AuthorFileEditorCanvas";
 import { NOTE } from "../../vscode_runtime/storydoc/model";
 import "./NotesCell.css";
 
@@ -35,10 +32,10 @@ export function NotesCell({
                 <MarkdownEditor
                     markdown={noteWithinComment(cell.source)}
                     onMarkdownCommitted={(note) =>
-                        replaceCellMarkdown(
+                        invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
-                            cellIndex,
-                            `<!--\n${note}\n-->`,
+                            "replaceMarkdown",
+                            { cellIndex, markdown: `<!--\n${note}\n-->` },
                         )
                     }
                 >
