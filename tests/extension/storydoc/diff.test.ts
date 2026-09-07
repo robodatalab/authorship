@@ -34,17 +34,17 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c2",
-                cellIsInRhs: true,
-                atCellIndexInRhs: 1,
-                editedFromOffsetInCell: 0,
-                charactersRemoved: 0,
-                insertedText: "He heard the bell.",
+                startCharacterIndexInRhsCell: 0,
+                endCharacterIndexInRhsCell: 18,
+                startCharacterIndexInLhsCell: 0,
+                endCharacterIndexInLhsCell: 0,
+                textInLhs: "",
                 attributesChanged: { id: "c2" },
             },
         ]);
     });
 
-    it("gives a cell the first has and the second has not, standing nowhere", () => {
+    it("gives a cell the first has and the second has not, with all of its text", () => {
         expect(
             diff(
                 AuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
@@ -53,17 +53,17 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c1",
-                cellIsInRhs: false,
-                atCellIndexInRhs: -1,
-                editedFromOffsetInCell: 0,
-                charactersRemoved: 0,
-                insertedText: "",
+                startCharacterIndexInRhsCell: 0,
+                endCharacterIndexInRhsCell: 0,
+                startCharacterIndexInLhsCell: 0,
+                endCharacterIndexInLhsCell: 17,
+                textInLhs: "She saw the door.",
                 attributesChanged: {},
             },
         ]);
     });
 
-    it("says where a cell's markdown differs, what goes and what comes", () => {
+    it("says where a cell's markdown differs, in both of them", () => {
         expect(
             diff(
                 AuthorDocument.fromText(SHE_SAW),
@@ -74,11 +74,11 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c1",
-                cellIsInRhs: true,
-                atCellIndexInRhs: 0,
-                editedFromOffsetInCell: 4,
-                charactersRemoved: 3,
-                insertedText: "opened",
+                startCharacterIndexInRhsCell: 4,
+                endCharacterIndexInRhsCell: 10,
+                startCharacterIndexInLhsCell: 4,
+                endCharacterIndexInLhsCell: 7,
+                textInLhs: "saw",
                 attributesChanged: {},
             },
         ]);
@@ -95,11 +95,11 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c1",
-                cellIsInRhs: true,
-                atCellIndexInRhs: 0,
-                editedFromOffsetInCell: 1,
-                charactersRemoved: 0,
-                insertedText: "lowly, S",
+                startCharacterIndexInRhsCell: 1,
+                endCharacterIndexInRhsCell: 9,
+                startCharacterIndexInLhsCell: 1,
+                endCharacterIndexInLhsCell: 1,
+                textInLhs: "",
                 attributesChanged: {},
             },
         ]);
@@ -118,11 +118,11 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c1",
-                cellIsInRhs: true,
-                atCellIndexInRhs: 0,
-                editedFromOffsetInCell: 0,
-                charactersRemoved: 0,
-                insertedText: "",
+                startCharacterIndexInRhsCell: 0,
+                endCharacterIndexInRhsCell: 0,
+                startCharacterIndexInLhsCell: 0,
+                endCharacterIndexInLhsCell: 0,
+                textInLhs: "",
                 attributesChanged: {
                     title: "Two",
                     folded: undefined,
@@ -143,20 +143,20 @@ describe("diff — what would have to change to turn one document into the other
         ).toEqual([
             {
                 cellId: "c1",
-                cellIsInRhs: false,
-                atCellIndexInRhs: -1,
-                editedFromOffsetInCell: 0,
-                charactersRemoved: 0,
-                insertedText: "",
+                startCharacterIndexInRhsCell: 0,
+                endCharacterIndexInRhsCell: 0,
+                startCharacterIndexInLhsCell: 0,
+                endCharacterIndexInLhsCell: 17,
+                textInLhs: "She saw the door.",
                 attributesChanged: {},
             },
             {
                 cellId: "c2",
-                cellIsInRhs: true,
-                atCellIndexInRhs: 0,
-                editedFromOffsetInCell: 9,
-                charactersRemoved: 3,
-                insertedText: "a",
+                startCharacterIndexInRhsCell: 9,
+                endCharacterIndexInRhsCell: 10,
+                startCharacterIndexInLhsCell: 9,
+                endCharacterIndexInLhsCell: 12,
+                textInLhs: "the",
                 attributesChanged: { title: "Bells" },
             },
         ]);

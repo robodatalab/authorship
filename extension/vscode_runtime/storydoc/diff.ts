@@ -2,78 +2,35 @@ import { AuthorDocument, Cell } from "./model";
 
 export interface AuthorDocCellDiff {
     cellId: string;
-    cellIsInRhs: boolean;
-    atCellIndexInRhs: number;
-    editedFromOffsetInCell: number;
-    charactersRemoved: number;
-    insertedText: string;
+    startCharacterIndexInRhsCell: number;
+    endCharacterIndexInRhsCell: number;
+    startCharacterIndexInLhsCell: number;
+    endCharacterIndexInLhsCell: number;
+    textInLhs: string; // we assume the change always erases the text in Rhs and inserts text in Lhs
     attributesChanged: Record<string, string | undefined>;
 }
 
 function cellOnlyInLhs(cellInLhs: Cell): AuthorDocCellDiff {
     return {
         cellId: cellInLhs.uniqueId,
-        cellIsInRhs: false,
-        atCellIndexInRhs: -1,
-        editedFromOffsetInCell: 0,
-        charactersRemoved: 0,
-        insertedText: "",
+        startCharacterIndexInRhsCell: 0,
+        endCharacterIndexInRhsCell: 0,
+        startCharacterIndexInLhsCell: 0,
+        endCharacterIndexInLhsCell: cellInLhs.source.length,
+        textInLhs: cellInLhs.source,
         attributesChanged: {},
     };
 }
 
-function cellOnlyInRhs(
-    cellInRhs: Cell,
-    atCellIndexInRhs: number,
-): AuthorDocCellDiff {
+function cellOnlyInRhs(cellInRhs: Cell): AuthorDocCellDiff {
     return {
         cellId: cellInRhs.uniqueId,
-        cellIsInRhs: true,
-        atCellIndexInRhs,
-        editedFromOffsetInCell: 0,
-        charactersRemoved: 0,
-        insertedText: cellInRhs.source,
+        startCharacterIndexInRhsCell: 0,
+        endCharacterIndexInRhsCell: cellInRhs.source.length,
+        startCharacterIndexInLhsCell: 0,
+        endCharacterIndexInLhsCell: 0,
+        textInLhs: "",
         attributesChanged: { ...cellInRhs.attrs },
-    };
-}
-
-function markdownEditBetween(
-    markdownInLhs: string,
-    markdownInRhs: string,
-): Pick<
-    AuthorDocCellDiff,
-    "editedFromOffsetInCell" | "charactersRemoved" | "insertedText"
-> {
-    let charactersSameAtTheStart = 0;
-    while (
-        charactersSameAtTheStart < markdownInLhs.length &&
-        charactersSameAtTheStart < markdownInRhs.length &&
-        markdownInLhs[charactersSameAtTheStart] ===
-            markdownInRhs[charactersSameAtTheStart]
-    ) {
-        charactersSameAtTheStart += 1;
-    }
-    let charactersSameAtTheEnd = 0;
-    while (
-        charactersSameAtTheEnd <
-            markdownInLhs.length - charactersSameAtTheStart &&
-        charactersSameAtTheEnd <
-            markdownInRhs.length - charactersSameAtTheStart &&
-        markdownInLhs[markdownInLhs.length - 1 - charactersSameAtTheEnd] ===
-            markdownInRhs[markdownInRhs.length - 1 - charactersSameAtTheEnd]
-    ) {
-        charactersSameAtTheEnd += 1;
-    }
-    return {
-        editedFromOffsetInCell: charactersSameAtTheStart,
-        charactersRemoved:
-            markdownInLhs.length -
-            charactersSameAtTheStart -
-            charactersSameAtTheEnd,
-        insertedText: markdownInRhs.slice(
-            charactersSameAtTheStart,
-            markdownInRhs.length - charactersSameAtTheEnd,
-        ),
     };
 }
 
@@ -97,7 +54,6 @@ function attributesChangedBetween(
 function cellInBoth(
     cellInLhs: Cell,
     cellInRhs: Cell,
-    atCellIndexInRhs: number,
 ): AuthorDocCellDiff | undefined {
     const attributesChanged = attributesChangedBetween(cellInLhs, cellInRhs);
     if (
@@ -106,11 +62,42 @@ function cellInBoth(
     ) {
         return undefined;
     }
+    const markdownInLhs = cellInLhs.source;
+    const markdownInRhs = cellInRhs.source;
+
+    let charactersSameAtTheStart = 0;
+    while (
+        charactersSameAtTheStart < markdownInLhs.length &&
+        charactersSameAtTheStart < markdownInRhs.length &&
+        markdownInLhs[charactersSameAtTheStart] ===
+            markdownInRhs[charactersSameAtTheStart]
+    ) {
+        charactersSameAtTheStart += 1;
+    }
+    let charactersSameAtTheEnd = 0;
+    while (
+        charactersSameAtTheEnd <
+            markdownInLhs.length - charactersSameAtTheStart &&
+        charactersSameAtTheEnd <
+            markdownInRhs.length - charactersSameAtTheStart &&
+        markdownInLhs[markdownInLhs.length - 1 - charactersSameAtTheEnd] ===
+            markdownInRhs[markdownInRhs.length - 1 - charactersSameAtTheEnd]
+    ) {
+        charactersSameAtTheEnd += 1;
+    }
+
     return {
         cellId: cellInRhs.uniqueId,
-        cellIsInRhs: true,
-        atCellIndexInRhs,
-        ...markdownEditBetween(cellInLhs.source, cellInRhs.source),
+        startCharacterIndexInRhsCell: charactersSameAtTheStart,
+        endCharacterIndexInRhsCell:
+            markdownInRhs.length - charactersSameAtTheEnd,
+        startCharacterIndexInLhsCell: charactersSameAtTheStart,
+        endCharacterIndexInLhsCell:
+            markdownInLhs.length - charactersSameAtTheEnd,
+        textInLhs: markdownInLhs.slice(
+            charactersSameAtTheStart,
+            markdownInLhs.length - charactersSameAtTheEnd,
+        ),
         attributesChanged,
     };
 }
@@ -133,16 +120,16 @@ export function diff(
             differences.push(cellOnlyInLhs(cellInLhs));
         }
     }
-    rhs.cells.forEach((cellInRhs, atCellIndexInRhs) => {
+    for (const cellInRhs of rhs.cells) {
         const cellInLhs = lhs.cellWithId(cellInRhs.uniqueId);
         if (!cellInLhs) {
-            differences.push(cellOnlyInRhs(cellInRhs, atCellIndexInRhs));
-            return;
+            differences.push(cellOnlyInRhs(cellInRhs));
+            continue;
         }
-        const difference = cellInBoth(cellInLhs, cellInRhs, atCellIndexInRhs);
+        const difference = cellInBoth(cellInLhs, cellInRhs);
         if (difference) {
             differences.push(difference);
         }
-    });
+    }
     return differences;
 }
