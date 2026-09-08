@@ -4,7 +4,7 @@ import {
     BLURB,
     CHAPTER,
     CONTENTS,
-    COVER,
+    IMAGE,
     Cell,
     DISCLAIMER,
     MARKDOWN,
@@ -90,12 +90,11 @@ const CELL_KINDS: CellKind[] = [
             ),
     },
     {
-        cellKind: COVER,
-        label: "Cover",
+        cellKind: IMAGE,
+        label: "Image",
         fields: [],
         isFrontOrBackMatter: true,
-        blank: () =>
-            new Cell(COVER, "![Cover](cover.jpg)", { src: "cover.jpg" }),
+        blank: () => new Cell(IMAGE, "", { src: "" }),
     },
     {
         cellKind: CONTENTS,
