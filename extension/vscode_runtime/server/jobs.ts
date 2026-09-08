@@ -1,8 +1,6 @@
 import { fetchFromServer } from "./fetch";
 
 const MILLISECONDS_BETWEEN_POLLS = 400;
-const MILLISECONDS_BEFORE_GIVING_UP = 180_000;
-const UNANSWERED_POLLS_BEFORE_GIVING_UP = 5;
 
 export interface ServerJob {
     running: boolean;
@@ -22,9 +20,7 @@ export async function awaitServerJob<Job extends ServerJob>(
     jobId: string,
     whileTheJobRuns: (job: Job) => void = () => undefined,
 ): Promise<Job> {
-    const givingUpAt = Date.now() + MILLISECONDS_BEFORE_GIVING_UP;
-    let pollsUnanswered = 0;
-    while (Date.now() < givingUpAt) {
+    for (;;) {
         await new Promise((wake) =>
             setTimeout(wake, MILLISECONDS_BETWEEN_POLLS),
         );
@@ -33,13 +29,9 @@ export async function awaitServerJob<Job extends ServerJob>(
             job = await fetchFromServer<Job>(
                 `${route}?id=${encodeURIComponent(jobId)}`,
             );
-        } catch (unanswered: unknown) {
-            if ((pollsUnanswered += 1) > UNANSWERED_POLLS_BEFORE_GIVING_UP) {
-                throw unanswered;
-            }
+        } catch {
             continue;
         }
-        pollsUnanswered = 0;
         if (job.error) {
             throw new Error(job.error);
         }
@@ -48,5 +40,4 @@ export async function awaitServerJob<Job extends ServerJob>(
         }
         whileTheJobRuns(job);
     }
-    throw new Error("the job is taking longer than expected");
 }
