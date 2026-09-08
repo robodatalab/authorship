@@ -248,10 +248,6 @@ export class PublishView implements vscode.WebviewViewProvider {
     }
 
     private html(webview: vscode.Webview): string {
-        const mediaFolder = vscode.Uri.joinPath(
-            this.context.extensionUri,
-            "media",
-        );
         const distFolder = vscode.Uri.joinPath(
             this.context.extensionUri,
             "dist",
@@ -260,7 +256,7 @@ export class PublishView implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(distFolder, "publish_view.js"),
         );
         const style = webview.asWebviewUri(
-            vscode.Uri.joinPath(mediaFolder, "publish.css"),
+            vscode.Uri.joinPath(distFolder, "publish_view.css"),
         );
         const nonce = scriptNonce();
 
@@ -275,30 +271,7 @@ export class PublishView implements vscode.WebviewViewProvider {
 	<title>Authorship</title>
 </head>
 <body>
-	<details class="drawer" id="account-drawer" open>
-		<summary>Account</summary>
-		<div class="body">
-			<div id="account" class="account"></div>
-		</div>
-	</details>
-	<details class="drawer" id="serving-status-drawer" open>
-		<summary>Serving Status</summary>
-		<div class="body">
-			<div id="model-status" class="models"></div>
-		</div>
-	</details>
-	<details class="drawer" id="memory-drawer" open>
-		<summary>Memory</summary>
-		<div class="body">
-			<div id="memory" class="memory"></div>
-		</div>
-	</details>
-	<details class="drawer" id="jobs-status-drawer" open>
-		<summary>Jobs Status</summary>
-		<div class="body">
-			<div id="jobs-status" class="jobs"></div>
-		</div>
-	</details>
+	<div id="authorship-panel-root"></div>
 	<script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;

@@ -55,7 +55,7 @@ const extensionConfig = {
 const publishViewConfig = {
   target: 'web',
   mode: 'development',
-  entry: './extension/webview/publish_sidebar_webview.ts',
+  entry: './extension/webview/publish_sidebar_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'publish_view.js'
