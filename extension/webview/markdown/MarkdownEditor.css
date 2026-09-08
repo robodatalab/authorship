@@ -1,0 +1,61 @@
+.markdown-editor-mark {
+    text-decoration-skip-ink: none;
+    text-underline-offset: 2px;
+}
+
+.markdown-editor-mark-grammar {
+    text-decoration: underline wavy
+        var(--vscode-editorError-foreground, #f14c4c);
+}
+
+.markdown-editor-mark-spelling {
+    text-decoration: underline wavy
+        var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.markdown-editor-mark-style {
+    background-image: linear-gradient(
+        to right,
+        var(--vscode-editorInfo-foreground, #3794ff) 0 100%
+    );
+    background-repeat: repeat-x;
+    background-size: 100% 2px;
+    background-position: 0 100%;
+}
+
+.markdown-editor-mark-usage {
+    background-image: linear-gradient(
+        to right,
+        var(--vscode-charts-purple, #b180d7) 0 100%
+    );
+    background-repeat: repeat-x;
+    background-size: 100% 1px;
+    background-position: 0 100%;
+}
+
+.markdown-editor-mark-said {
+    position: fixed;
+    z-index: 20;
+}
+
+.markdown-editor {
+    width: 100%;
+    min-height: 1.4em;
+}
+
+.markdown-rendered {
+    flex: 1 1 auto;
+    min-height: 1.4em;
+}
+
+.markdown-rendered > :first-child {
+    margin-top: 0;
+}
+
+.markdown-rendered > :last-child {
+    margin-bottom: 0;
+}
+
+.markdown-rendered img {
+    max-width: 100%;
+}

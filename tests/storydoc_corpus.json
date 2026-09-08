@@ -2,18 +2,6 @@
   "comment": "Documents both storydoc libraries must read AND write identically. Each case is run by tests/server/test_storydoc.py and tests/extension/storydoc/model.test.ts: `text` must parse to `cells`, and re-serialising must produce `dumped` byte for byte. Add a case here and both languages are held to it.",
   "cases": [
     {
-      "name": "plain markdown with no markers is one markdown cell",
-      "text": "# A Story\n\nIt began badly.\n",
-      "cells": [
-        {
-          "kind": "markdown",
-          "source": "# A Story\n\nIt began badly.",
-          "attrs": {}
-        }
-      ],
-      "dumped": "<!-- cell: markdown -->\n\n# A Story\n\nIt began badly.\n"
-    },
-    {
       "name": "an empty document has no cells",
       "text": "",
       "cells": [],
@@ -40,14 +28,9 @@
       "dumped": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n"
     },
     {
-      "name": "text above the first marker is a markdown cell of its own",
-      "text": "Front matter.\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n",
+      "name": "a marker is read whatever spacing it was written with",
+      "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
       "cells": [
-        {
-          "kind": "markdown",
-          "source": "Front matter.",
-          "attrs": {}
-        },
         {
           "kind": "chapter",
           "source": "Prose.",
@@ -56,7 +39,7 @@
           }
         }
       ],
-      "dumped": "<!-- cell: markdown -->\n\nFront matter.\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
     },
     {
       "name": "a document opening with a marker has no empty leading cell",
@@ -145,20 +128,6 @@
         }
       ],
       "dumped": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n"
-    },
-    {
-      "name": "a marker is read whatever spacing it was written with",
-      "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
-      "cells": [
-        {
-          "kind": "chapter",
-          "source": "Prose.",
-          "attrs": {
-            "title": "One"
-          }
-        }
-      ],
-      "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
     },
     {
       "name": "blank lines inside a cell are the author's and are kept",

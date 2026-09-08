@@ -1,0 +1,151 @@
+/* The editor's own widget belongs to the text editor and never reaches a
+   webview, so this is that widget, drawn again. It hangs off the toolbar rather
+   than the window, so it stays put while the manuscript scrolls under it. */
+
+.author-file-editor-find {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 4px 4px 4px 2px;
+    color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+    background: var(
+        --vscode-editorWidget-background,
+        var(--vscode-editor-background)
+    );
+    border: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.author-file-editor-find-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.author-file-editor-find-row {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+
+/* The buttons that turn the search into a different search sit inside the box
+   they belong to, as they do everywhere else in the editor. */
+.author-file-editor-find-box {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 0 2px 0 5px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, transparent);
+    border-radius: 2px;
+}
+
+.author-file-editor-find-box:focus-within {
+    border-color: var(--vscode-focusBorder);
+}
+
+.author-file-editor-find-box-invalid {
+    border-color: var(
+        --vscode-inputValidation-errorBorder,
+        var(--vscode-errorForeground)
+    );
+}
+
+.author-file-editor-find-input {
+    width: 190px;
+    padding: 3px 0;
+    font-family: inherit;
+    font-size: 0.9em;
+    color: var(--vscode-input-foreground);
+    background: none;
+    border: none;
+    outline: none;
+}
+
+.author-file-editor-find-input::placeholder {
+    color: var(
+        --vscode-input-placeholderForeground,
+        var(--vscode-descriptionForeground)
+    );
+}
+
+.author-file-editor-find-option,
+.author-file-editor-find-action,
+.author-file-editor-find-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    color: inherit;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.author-file-editor-find-option:hover,
+.author-file-editor-find-action:hover:not([disabled]),
+.author-file-editor-find-toggle:hover {
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
+}
+
+.author-file-editor-find-option-on {
+    color: var(--vscode-inputOption-activeForeground, inherit);
+    background: var(--vscode-inputOption-activeBackground);
+    outline: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+}
+
+.author-file-editor-find-action[disabled] {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Wide enough for "999 of 999", so the buttons beside it do not shuffle along
+   as the author types. */
+.author-file-editor-find-count {
+    min-width: 72px;
+    padding: 0 4px;
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+/* The chevron is as tall as both rows, the way the editor draws it. */
+.author-file-editor-find-toggle {
+    align-self: stretch;
+}
+
+.author-file-editor-find-match {
+    color: inherit;
+    background: var(
+        --vscode-editor-findMatchHighlightBackground,
+        rgba(234, 92, 0, 0.33)
+    );
+    border-radius: 2px;
+}
+
+.author-file-editor-find-match-current {
+    background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+    outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
+}
+
+/* A title is a box, and a box cannot hold a mark around part of what it says. */
+.author-file-editor-find-field {
+    background: var(
+        --vscode-editor-findMatchHighlightBackground,
+        rgba(234, 92, 0, 0.33)
+    );
+}
+
+.author-file-editor-find-field-current {
+    background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
+}

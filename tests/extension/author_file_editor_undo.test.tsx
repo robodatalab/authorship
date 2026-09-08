@@ -1,0 +1,162 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+
+import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
+import { Uri, executedCommands, files } from "./vscode";
+
+(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+
+const DOCUMENT_PATH = "/stories/expat_pet.author";
+
+const listeningForThePage: [string, EventListenerOrEventListenerObject][] = [];
+
+interface OpenEditor {
+    fileDocument: { text: string };
+    edits: { undo(): void; redo(): void }[];
+}
+
+async function openEditor(text: string): Promise<OpenEditor> {
+    files.clear();
+    files.set(DOCUMENT_PATH, text);
+
+    const provider = new AuthorFileEditorProvider({
+        extensionUri: Uri.file("/extension"),
+    } as never);
+    const edits: { undo(): void; redo(): void }[] = [];
+    provider.onDidChangeCustomDocument((edit) =>
+        edits.push(edit as unknown as { undo(): void; redo(): void }),
+    );
+
+    const fileDocument = await provider.openCustomDocument(
+        Uri.file(DOCUMENT_PATH) as never,
+        {} as never,
+    );
+
+    let receiveFromThePage: (message: unknown) => void = () => undefined;
+    const panel = {
+        webview: {
+            options: {},
+            html: "",
+            cspSource: "vscode-resource:",
+            asWebviewUri: (uri: unknown) => uri,
+            postMessage: (message: unknown) => {
+                window.dispatchEvent(
+                    new MessageEvent("message", { data: message }),
+                );
+                return Promise.resolve(true);
+            },
+            onDidReceiveMessage: (listener: (message: unknown) => void) => {
+                receiveFromThePage = listener;
+                return { dispose: () => undefined };
+            },
+        },
+        onDidDispose: () => ({ dispose: () => undefined }),
+    };
+    provider.resolveCustomEditor(fileDocument, panel as never);
+
+    document.body.innerHTML = '<div id="author-file-editor-root"></div>';
+    (globalThis as Record<string, unknown>).acquireVsCodeApi = () => ({
+        postMessage: (message: unknown) => receiveFromThePage(message),
+    });
+    vi.resetModules();
+    for (const [type, listener] of listeningForThePage) {
+        window.removeEventListener(type, listener);
+    }
+    listeningForThePage.length = 0;
+    const addEventListenerItself = window.addEventListener.bind(window);
+    window.addEventListener = ((
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+    ) => {
+        listeningForThePage.push([type, listener]);
+        addEventListenerItself(type, listener, options);
+    }) as typeof window.addEventListener;
+    await act(async () => {
+        await import("../../extension/webview/cell_types/MarkdownCell");
+        await import("../../extension/webview/message_queue_between_vscode_and_webview");
+    });
+    window.addEventListener = addEventListenerItself;
+
+    return {
+        fileDocument: fileDocument as unknown as { text: string },
+        edits,
+    };
+}
+
+async function addMarkdownCellAtTheTop(): Promise<void> {
+    const menu = document.querySelector(
+        ".author-file-editor-insert-cell-menu",
+    )!;
+    await act(async () => {
+        menu.querySelector("button")!.dispatchEvent(
+            new MouseEvent("click", { bubbles: true }),
+        );
+    });
+}
+
+async function pressCtrlZ(): Promise<void> {
+    await act(async () => {
+        window.dispatchEvent(
+            new KeyboardEvent("keydown", {
+                key: "z",
+                ctrlKey: true,
+                bubbles: true,
+            }),
+        );
+    });
+}
+
+async function undo(editor: OpenEditor): Promise<void> {
+    await act(async () => {
+        editor.edits[editor.edits.length - 1].undo();
+    });
+}
+
+function cellsInTheFile(editor: OpenEditor): number {
+    return editor.fileDocument.text.split("<!-- cell:").length - 1;
+}
+
+function cellsOnThePage(): number {
+    return document.querySelectorAll(".author-file-editor-cell").length;
+}
+
+let editor: OpenEditor;
+
+beforeEach(async () => {
+    executedCommands.length = 0;
+    editor = await openEditor("<!-- cell: markdown -->\n\none\n");
+});
+
+describe("undoing after two cells were added", () => {
+    it("takes one of the two out of the file", async () => {
+        await addMarkdownCellAtTheTop();
+        await addMarkdownCellAtTheTop();
+        expect(cellsInTheFile(editor)).toBe(3);
+
+        await undo(editor);
+
+        expect(cellsInTheFile(editor)).toBe(2);
+    });
+
+    it("takes one of the two off the page", async () => {
+        await addMarkdownCellAtTheTop();
+        await addMarkdownCellAtTheTop();
+        expect(cellsOnThePage()).toBe(3);
+
+        await undo(editor);
+
+        expect(cellsOnThePage()).toBe(2);
+    });
+});
+
+describe("what one Ctrl+Z asks the host for", () => {
+    it("asks for nothing, since VS Code runs undo from the keystroke itself", async () => {
+        await addMarkdownCellAtTheTop();
+        await addMarkdownCellAtTheTop();
+
+        await pressCtrlZ();
+
+        expect(executedCommands).toEqual([]);
+    });
+});

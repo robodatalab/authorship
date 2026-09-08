@@ -1,0 +1,156 @@
+.author-file-editor-cell {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    background: var(--vscode-editor-background);
+    overflow: hidden;
+}
+
+.author-file-editor-cell-sidebar {
+    display: flex;
+    flex: 0 0 28px;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding-top: 4px;
+    background: var(--vscode-editor-background);
+    border-right: 1px solid var(--vscode-panel-border);
+}
+
+.author-file-editor-cell-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.author-file-editor-cell-warning {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.author-file-editor-cell-run {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    color: var(--vscode-foreground);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.author-file-editor-cell-run-progress {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+}
+
+.author-file-editor-cell-run-progress svg {
+    transform: rotate(-90deg);
+}
+
+.author-file-editor-cell-run-progress-track {
+    fill: none;
+    stroke: var(--vscode-panel-border);
+    stroke-width: 2;
+}
+
+.author-file-editor-cell-run-progress-written {
+    fill: none;
+    stroke: var(--vscode-progressBar-background, #0078d4);
+    stroke-width: 2;
+    transition: stroke-dashoffset 0.2s linear;
+}
+
+.author-file-editor-cell-actions {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    z-index: 1;
+    display: flex;
+    gap: 1px;
+    visibility: hidden;
+}
+
+.author-file-editor-cell:hover .author-file-editor-cell-actions {
+    visibility: visible;
+}
+
+.author-file-editor-cell-actions-button {
+    display: flex;
+    align-items: center;
+    padding: 3px 5px;
+    color: var(--vscode-foreground);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-cell-actions-button:hover {
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
+}
+
+.author-file-editor-cell-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 1.25em;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    background: var(--vscode-editorWidget-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.author-file-editor-cell-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 48px;
+    padding: 10px;
+}
+
+.author-file-editor-cell-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.author-file-editor-cell-card:last-child {
+    flex: 1 1 auto;
+}
+
+.author-file-editor-cell-card + .author-file-editor-cell-card {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
+.author-file-editor-cell-folded .author-file-editor-cell-body,
+.author-file-editor-cell-folded .author-file-editor-cell-footer {
+    display: none;
+}
+
+.author-file-editor-cell-words {
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-cell-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+    padding: 3px 10px;
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-editorWidget-background);
+    border-top: 1px solid var(--vscode-panel-border);
+}

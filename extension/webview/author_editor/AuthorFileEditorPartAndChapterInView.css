@@ -1,0 +1,9 @@
+.author-file-editor-part-and-chapter-in-view {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
+    padding: 4px 4px 4px 12px;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}

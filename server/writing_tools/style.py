@@ -123,14 +123,14 @@ class Editor(Protocol):
 
 @dataclass(frozen=True)
 class Section:
-    """One markdown section of a chapter, and where it sits in the document.
+    """One markdown section of a chapter, and which cell of the document it is.
 
-    `index` is the cell's place in the document, which is what the editor needs
-    to put the corrected text back — a line span would name a section that has
-    moved by the time the next chapter is done.
+    `cell_id` is what the editor needs to put the corrected text back — a line
+    span would name a section that has moved by the time the next chapter is
+    done, and a place in the document is no steadier.
     """
 
-    index: int
+    cell_id: str
     source: str
 
 
@@ -167,11 +167,11 @@ def chapters_of(document: Document) -> list[Chapter]:
     It belongs to no chapter and is not corrected.
     """
     found: list[Chapter] = []
-    for index, cell in enumerate(document.cells):
+    for cell in document.cells:
         if cell.kind == storydoc.CHAPTER:
             found.append(Chapter(cell.title or f"Chapter {len(found) + 1}"))
         elif found and cell.kind == storydoc.MARKDOWN and cell.source.strip():
-            found[-1].sections.append(Section(index, cell.source))
+            found[-1].sections.append(Section(cell.unique_id, cell.source))
     return [chapter for chapter in found if chapter.sections]
 
 
@@ -180,7 +180,7 @@ def fix_style(
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, chapters: None,
-    revised: Callable[[int, str], None] = lambda index, source: None,
+    revised: Callable[[str, str], None] = lambda cell_id, source: None,
     left_alone: Callable[[str, str], None] = lambda title, why: None,
 ) -> None:
     """Correct the style and grammar of every chapter, in the order they are read.
@@ -222,7 +222,7 @@ def fix_style(
         if sections is not None:
             for section, source in zip(chapter.sections, sections):
                 if source != section.source:
-                    revised(section.index, source)
+                    revised(section.cell_id, source)
         progress(fixed, len(chapters))
 
 

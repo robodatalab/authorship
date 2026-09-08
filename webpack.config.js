@@ -3,6 +3,7 @@
 'use strict';
 
 const path = require('path');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -12,7 +13,7 @@ const extensionConfig = {
   target: 'node', // VS Code extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
 	mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
 
-  entry: './extension/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
+  entry: './extension/vscode_runtime/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
   output: {
     // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
     path: path.resolve(__dirname, 'dist'),
@@ -53,46 +54,56 @@ const extensionConfig = {
  */
 const publishViewConfig = {
   target: 'web',
-  mode: 'none',
-  entry: './extension/publish/view.ts',
+  mode: 'development',
+  entry: './extension/webview/publish_sidebar_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'publish_view.js'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.tsx', '.js']
   },
   module: {
     rules: [
       {
-        test: /\.ts$/,
+        test: /\.tsx?$/,
         exclude: /node_modules/,
         use: [
           {
             loader: 'ts-loader'
           }
         ]
+      },
+      {
+        test: /\.css$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader']
+      },
+      {
+        test: /\.(ttf|woff2?)$/,
+        type: 'asset/resource'
       }
     ]
   },
+  plugins: [
+    new MiniCssExtractPlugin({ filename: 'publish_view.css' })
+  ],
   devtool: 'nosources-source-map',
   infrastructureLogging: {
     level: "log",
   },
 };
 
-/**
- * The .author editor's cell surface, in its own webview and so its own bundle.
- *
- * @type WebpackConfig
- */
-const authorViewConfig = {
+/** @type WebpackConfig */
+const authorFileEditorViewConfig = {
   ...publishViewConfig,
-  entry: './extension/author_editor/view.ts',
+  entry: './extension/webview/message_queue_between_vscode_and_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'author_view.js'
+    filename: 'author_file_editor_view.js'
   },
+  plugins: [
+    new MiniCssExtractPlugin({ filename: 'author_file_editor_view.css' })
+  ],
 };
 
-module.exports = [ extensionConfig, publishViewConfig, authorViewConfig ];
+module.exports = [ extensionConfig, publishViewConfig, authorFileEditorViewConfig ];

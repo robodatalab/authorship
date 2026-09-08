@@ -1,0 +1,49 @@
+/* The Publish view dresses in VS Code's own theme variables, like the graph
+   view, so it follows whatever theme the editor is wearing without a light/dark
+   branch of its own. */
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--vscode-sideBar-background);
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+}
+
+/* A drawer: one titled, collapsible section. They stack, each delineated by its
+   own header and rule. */
+.authorship-panel-drawer {
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.authorship-panel-drawer > summary {
+    cursor: pointer;
+    padding: 8px 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.authorship-panel-drawer > summary:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.authorship-panel-drawer-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 10px 12px;
+}
+
+.authorship-panel-offline {
+    color: var(--vscode-errorForeground);
+}
+
+.authorship-panel-idle {
+    color: var(--vscode-descriptionForeground);
+}

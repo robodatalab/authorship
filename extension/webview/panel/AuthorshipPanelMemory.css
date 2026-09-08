@@ -1,0 +1,92 @@
+/* The Memory drawer: a bar per figure against its own ceiling, and the two
+   read together over time. */
+.authorship-panel-memory {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.authorship-panel-gauge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.authorship-panel-gauge-name {
+    width: 4.5em;
+    color: var(--vscode-descriptionForeground);
+    font-size: calc(var(--vscode-font-size) - 1px);
+}
+
+.authorship-panel-gauge-track {
+    flex: 1;
+    min-width: 0;
+    height: 6px;
+    border-radius: 3px;
+    background: var(
+        --vscode-progressBar-background,
+        var(--vscode-panel-border)
+    );
+    opacity: 0.9;
+    overflow: hidden;
+}
+
+.authorship-panel-gauge-fill {
+    display: block;
+    height: 100%;
+    background: var(--vscode-charts-blue, #4daafc);
+}
+
+/* Past the ceiling the driver enforces — where a load starts being refused. */
+.authorship-panel-gauge-over {
+    background: var(--vscode-errorForeground);
+}
+
+.authorship-panel-gauge-figure {
+    font-size: calc(var(--vscode-font-size) - 1px);
+    color: var(--vscode-descriptionForeground);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The models loaded over the stretch of plot below, on the same scale. */
+.authorship-panel-bands {
+    position: relative;
+    height: 14px;
+    margin-top: 4px;
+}
+
+.authorship-panel-band {
+    position: absolute;
+    top: 0;
+    height: 14px;
+    min-width: 2px;
+    box-sizing: border-box;
+    padding: 0 3px;
+    border-radius: 2px;
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    font-size: calc(var(--vscode-font-size) - 3px);
+    line-height: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.authorship-panel-plot {
+    width: 100%;
+    height: 48px;
+}
+
+.authorship-panel-plot polyline {
+    fill: none;
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.authorship-panel-plot-gpu {
+    stroke: var(--vscode-charts-blue, #4daafc);
+}
+
+.authorship-panel-plot-process {
+    stroke: var(--vscode-charts-purple, #b180d7);
+}
