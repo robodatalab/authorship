@@ -14,6 +14,7 @@ const MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT = 10_000;
 export class PublishView implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private statusPollTimer?: ReturnType<typeof setInterval>;
+    private readonly whenEachJobFirstAppeared = new Map<string, number>();
 
     private watchingTheAccount?: vscode.Disposable;
     private watchingTheSettings?: vscode.Disposable;
@@ -181,6 +182,21 @@ export class PublishView implements vscode.WebviewViewProvider {
         }
     }
 
+    private secondsSinceTheJobFirstAppeared(documentPath: string): number {
+        const firstAppearedAt =
+            this.whenEachJobFirstAppeared.get(documentPath) ?? Date.now();
+        this.whenEachJobFirstAppeared.set(documentPath, firstAppearedAt);
+        return Math.round((Date.now() - firstAppearedAt) / 1000);
+    }
+
+    private forgetJobsThatAreOver(documentPathsStillQueued: string[]): void {
+        for (const documentPath of this.whenEachJobFirstAppeared.keys()) {
+            if (!documentPathsStillQueued.includes(documentPath)) {
+                this.whenEachJobFirstAppeared.delete(documentPath);
+            }
+        }
+    }
+
     private async showRunningJobs(): Promise<void> {
         if (!this.view) {
             return;
@@ -206,7 +222,9 @@ export class PublishView implements vscode.WebviewViewProvider {
                 ),
                 status: job.status,
                 cancelled: job.cancelled,
+                secondsRunning: this.secondsSinceTheJobFirstAppeared(job.path),
             }));
+            this.forgetJobsThatAreOver(answered.jobs.map((job) => job.path));
             void this.view.webview.postMessage({ type: "jobs", jobs });
         } catch (unanswered) {
             if (!isTimeout(unanswered)) {
