@@ -99,6 +99,8 @@ interface AuthorFileEditorCanvasProps {
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
+    wordsInEverySection?: Readonly<Record<string, number>>;
+    wordsInTheDocument?: number;
 }
 
 export function AuthorFileEditorCanvas({
@@ -109,6 +111,8 @@ export function AuthorFileEditorCanvas({
     cellRenderers,
     proseErrors = [],
     cellsBeingWritten = {},
+    wordsInEverySection = {},
+    wordsInTheDocument = 0,
 }: AuthorFileEditorCanvasProps) {
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
@@ -214,6 +218,9 @@ export function AuthorFileEditorCanvas({
                                 howFarTheCellHasBeenWritten={
                                     cellsBeingWritten[cell.attrs.id]
                                 }
+                                wordsInTheSection={
+                                    wordsInEverySection[cell.attrs.id]
+                                }
                                 sendMessagesToVscode={sendMessagesToVscode}
                             >
                                 {renderCell(
@@ -254,6 +261,7 @@ export function AuthorFileEditorCanvas({
                 <AuthorFileEditorPartAndChapterInView
                     cells={cells}
                     cellIdInView={cellIdInView}
+                    wordsInTheDocument={wordsInTheDocument}
                 />
             </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator>

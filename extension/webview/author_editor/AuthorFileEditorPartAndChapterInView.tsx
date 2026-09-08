@@ -5,6 +5,7 @@ import "./AuthorFileEditorPartAndChapterInView.css";
 interface AuthorFileEditorPartAndChapterInViewProps {
     cells: WebviewCell[];
     cellIdInView?: string;
+    wordsInTheDocument?: number;
 }
 
 const UNTITLED = "Untitled";
@@ -38,17 +39,21 @@ function partAndChapterAt(
 export function AuthorFileEditorPartAndChapterInView({
     cells,
     cellIdInView,
+    wordsInTheDocument = 0,
 }: AuthorFileEditorPartAndChapterInViewProps) {
     const { partTitle, chapterTitle } = partAndChapterAt(cells, cellIdInView);
     const said = [partTitle, chapterTitle].filter(Boolean);
 
-    if (said.length === 0) {
-        return null;
-    }
-
     return (
         <div className="author-file-editor-part-and-chapter-in-view">
-            {said.join(" / ")}
+            {said.length > 0 && (
+                <span className="author-file-editor-part-and-chapter-said">
+                    {said.join(" / ")}
+                </span>
+            )}
+            <span className="author-file-editor-words-in-the-document">
+                {wordsInTheDocument.toLocaleString()} words
+            </span>
         </div>
     );
 }

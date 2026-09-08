@@ -39,6 +39,7 @@ interface AuthorFileEditorCellStateProps {
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
     howFarTheCellHasBeenWritten?: number;
+    wordsInTheSection?: number;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
 }
@@ -52,6 +53,7 @@ const AuthorFileEditorCellStateContext = createContext<
     cellAttributes: {},
     proseErrors: [],
     howFarTheCellHasBeenWritten: undefined,
+    wordsInTheSection: undefined,
     sendMessagesToVscode: () => undefined,
 });
 
@@ -62,6 +64,7 @@ export function AuthorFileEditorCellState({
     cellAttributes,
     proseErrors = [],
     howFarTheCellHasBeenWritten,
+    wordsInTheSection,
     sendMessagesToVscode,
     children,
 }: AuthorFileEditorCellStateProps) {
@@ -74,6 +77,7 @@ export function AuthorFileEditorCellState({
                 cellAttributes,
                 proseErrors,
                 howFarTheCellHasBeenWritten,
+                wordsInTheSection,
                 sendMessagesToVscode,
             }}
         >
@@ -161,6 +165,20 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function AuthorFileEditorCellWords() {
+    const { wordsInTheSection } = useContext(AuthorFileEditorCellStateContext);
+
+    if (wordsInTheSection === undefined) {
+        return null;
+    }
+
+    return (
+        <span className="author-file-editor-cell-words">
+            {wordsInTheSection.toLocaleString()} words
+        </span>
+    );
 }
 
 export function AuthorFileEditorCellWarning() {

@@ -33,6 +33,8 @@ interface WhatTheWebviewDraws {
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
     cellsBeingWritten: Record<string, number>;
+    wordsInEverySection: Record<string, number>;
+    wordsInTheDocument: number;
 }
 
 function processMessageFromVscode(
@@ -51,6 +53,12 @@ function processMessageFromVscode(
             string,
             number
         >;
+    } else if (message.data?.type === "wordCounts") {
+        drawn.wordsInEverySection = message.data.wordsInEverySection as Record<
+            string,
+            number
+        >;
+        drawn.wordsInTheDocument = message.data.wordsInTheDocument as number;
     } else {
         return false;
     }
@@ -68,6 +76,8 @@ function openTheAuthorFileEditor(): void {
         commands: [],
         proseErrors: [],
         cellsBeingWritten: {},
+        wordsInEverySection: {},
+        wordsInTheDocument: 0,
     };
 
     function drawTheCanvas(): void {
@@ -80,6 +90,8 @@ function openTheAuthorFileEditor(): void {
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
                 cellsBeingWritten={drawn.cellsBeingWritten}
+                wordsInEverySection={drawn.wordsInEverySection}
+                wordsInTheDocument={drawn.wordsInTheDocument}
             />,
         );
     }

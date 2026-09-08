@@ -3,6 +3,7 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    AuthorFileEditorCellWords,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -45,7 +46,9 @@ export function PartCell({
                     }
                 />
             </AuthorFileEditorCellBody>
-            <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
+            <AuthorFileEditorCellFooter>
+                <AuthorFileEditorCellWords />
+            </AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>
     );
 }

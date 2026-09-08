@@ -9,6 +9,7 @@ import {
     AuthorFileEditorCellRun,
     AuthorFileEditorCellState,
     AuthorFileEditorCellWarning,
+    AuthorFileEditorCellWords,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -154,6 +155,37 @@ describe("what the prose checker found", () => {
         await hover(warning(), "mouseover");
 
         expect(document.querySelector(".linter-tooltip")).toBeNull();
+    });
+});
+
+describe("the words of the section a cell opens", () => {
+    async function mountWords(wordsInTheSection?: number): Promise<void> {
+        await mount(
+            <AuthorFileEditorCellState
+                cellCommands={[]}
+                cellId="c1"
+                cellAttributes={{}}
+                wordsInTheSection={wordsInTheSection}
+                sendMessagesToVscode={() => undefined}
+            >
+                <AuthorFileEditorCellWords />
+            </AuthorFileEditorCellState>,
+        );
+    }
+
+    it("says how many the section holds", async () => {
+        await mountWords(1234);
+        expect(
+            document.querySelector(".author-file-editor-cell-words")
+                ?.textContent,
+        ).toBe("1,234 words");
+    });
+
+    it("says nothing on a cell that opens no section", async () => {
+        await mountWords(undefined);
+        expect(
+            document.querySelector(".author-file-editor-cell-words"),
+        ).toBeNull();
     });
 });
 

@@ -3,6 +3,7 @@ import type * as vscode from "vscode";
 import type { ProseCheckError } from "./commands/check_prose";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocument } from "./storydoc/model";
+import { WordCounter } from "./storydoc/word_counter";
 
 const openSessions = new Map<string, AuthorFileEditorSession>();
 
@@ -10,6 +11,7 @@ export class AuthorFileEditorSession {
     private readonly proseErrors: ProseCheckError[] = [];
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly synchronizer: AuthorDocSynchronizer<ProseCheckError>;
+    private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: AuthorDocument;
 
     constructor(
@@ -20,6 +22,7 @@ export class AuthorFileEditorSession {
         this.documentAsTheLastSynchronizationLeftIt = AuthorDocument.fromText(
             document.text,
         );
+        this.wordCounter.synchronize(document);
     }
 
     showProseErrors(proseErrors: ProseCheckError[]): void {
@@ -49,6 +52,14 @@ export class AuthorFileEditorSession {
         });
     }
 
+    sendWordCounts(): void {
+        void this.panel.webview.postMessage({
+            type: "wordCounts",
+            wordsInEverySection: this.wordCounter.wordsInEverySection,
+            wordsInTheDocument: this.wordCounter.wordsInTheDocument,
+        });
+    }
+
     sendProseErrors(): void {
         void this.panel.webview.postMessage({
             type: "proseErrors",
@@ -64,6 +75,7 @@ export class AuthorFileEditorSession {
         this.documentAsTheLastSynchronizationLeftIt = AuthorDocument.fromText(
             this.document.text,
         );
+        this.wordCounter.synchronize(this.document);
         void this.panel.webview.postMessage({
             type: "document",
             cells: this.document.cells.map((cell) => ({
@@ -73,6 +85,7 @@ export class AuthorFileEditorSession {
             })),
         });
         this.sendProseErrors();
+        this.sendWordCounts();
     }
 }
 

@@ -23,10 +23,11 @@ const A_STORY_IN_TWO_PARTS: WebviewCell[] = [
     cell("markdown", "m3"),
 ];
 
-async function saidAbout(
+async function draw(
     cellIdInView: string | undefined,
     cells: WebviewCell[] = A_STORY_IN_TWO_PARTS,
-): Promise<string> {
+    wordsInTheDocument = 0,
+): Promise<void> {
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
@@ -35,11 +36,19 @@ async function saidAbout(
             <AuthorFileEditorPartAndChapterInView
                 cells={cells}
                 cellIdInView={cellIdInView}
+                wordsInTheDocument={wordsInTheDocument}
             />,
         );
     });
+}
+
+async function saidAbout(
+    cellIdInView: string | undefined,
+    cells: WebviewCell[] = A_STORY_IN_TWO_PARTS,
+): Promise<string> {
+    await draw(cellIdInView, cells);
     return (
-        document.querySelector(".author-file-editor-part-and-chapter-in-view")
+        document.querySelector(".author-file-editor-part-and-chapter-said")
             ?.textContent ?? ""
     );
 }
@@ -85,5 +94,26 @@ describe("the part and chapter the author is looking at", () => {
 
     it("says nothing about a cell the document has not got", async () => {
         expect(await saidAbout("nowhere")).toBe("");
+    });
+});
+
+describe("the words of the whole document", () => {
+    it("are said beside the part and the chapter", async () => {
+        await draw("m3", A_STORY_IN_TWO_PARTS, 12043);
+        expect(
+            document.querySelector(".author-file-editor-words-in-the-document")
+                ?.textContent,
+        ).toBe("12,043 words");
+    });
+
+    it("are said even where no part or chapter stands above", async () => {
+        await draw("title", A_STORY_IN_TWO_PARTS, 7);
+        expect(
+            document.querySelector(".author-file-editor-part-and-chapter-said"),
+        ).toBeNull();
+        expect(
+            document.querySelector(".author-file-editor-words-in-the-document")
+                ?.textContent,
+        ).toBe("7 words");
     });
 });
