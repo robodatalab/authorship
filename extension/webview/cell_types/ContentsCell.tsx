@@ -17,13 +17,13 @@ import { CONTENTS } from "../../vscode_runtime/storydoc/model";
 
 interface ContentsCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function ContentsCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: ContentsCellProps) {
     const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
@@ -37,7 +37,7 @@ export function ContentsCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "writeTableOfContents",
-                            { cellIndex },
+                            { cellId },
                         )
                     }
                 />
@@ -53,7 +53,7 @@ export function ContentsCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceMarkdown",
-                            { cellIndex, markdown: markdown },
+                            { cellId, markdown: markdown },
                         )
                     }
                 />
@@ -67,10 +67,10 @@ registerAuthorDocumentCellType({
     cellKind: CONTENTS,
     menuLabel: "Table of Contents",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <ContentsCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

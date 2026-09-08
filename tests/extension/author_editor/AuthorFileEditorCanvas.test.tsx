@@ -21,8 +21,8 @@ interface Invocation {
 
 let posted: Invocation[] = [];
 
-function markdownCell(source: string): WebviewCell {
-    return { kind: "markdown", source, attrs: {} };
+function markdownCell(source: string, id = source): WebviewCell {
+    return { kind: "markdown", source, attrs: { id } };
 }
 
 const CELL_RENDERERS: AuthorDocumentCellRenderers = {
@@ -169,14 +169,14 @@ describe("adding a cell", () => {
                 type: "invoke",
                 commandName: "insertCell",
                 commandArguments: {
-                    cellIndex: 0,
+                    afterCellId: null,
                     newCell: { kind: "chapter", source: "", attrs: {} },
                 },
             },
         ]);
     });
 
-    it("asks each menu for the place it inserts at", async () => {
+    it("asks each menu for the cell it inserts after", async () => {
         await mountCanvas({
             cells: [markdownCell("one"), markdownCell("two")],
         });
@@ -186,8 +186,8 @@ describe("adding a cell", () => {
         }
 
         expect(
-            posted.map((invocation) => invocation.commandArguments.cellIndex),
-        ).toEqual([0, 1, 2]);
+            posted.map((invocation) => invocation.commandArguments.afterCellId),
+        ).toEqual([null, "one", "two"]);
     });
 
     it("holds a kind that is not primary behind the ellipsis", async () => {
@@ -323,7 +323,7 @@ describe("the commands on a cell", () => {
             {
                 type: "invoke",
                 commandName: "deleteCell",
-                commandArguments: { cellIndex: 0 },
+                commandArguments: { cellId: "one" },
             },
         ]);
     });
@@ -342,8 +342,8 @@ describe("the commands on a cell", () => {
         }
 
         expect(
-            posted.map((invocation) => invocation.commandArguments.cellIndex),
-        ).toEqual([0, 1]);
+            posted.map((invocation) => invocation.commandArguments.cellId),
+        ).toEqual(["one", "two"]);
     });
 });
 
@@ -403,7 +403,11 @@ describe("two commands drawn as one button", () => {
     it("asks for the command that was drawn, not the one that was not", async () => {
         await mountCanvas({
             cells: [
-                { kind: "markdown", source: "one", attrs: { folded: "true" } },
+                {
+                    kind: "markdown",
+                    source: "one",
+                    attrs: { id: "one", folded: "true" },
+                },
             ],
             cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
             commands: FOLD_COMMANDS,
@@ -417,7 +421,7 @@ describe("two commands drawn as one button", () => {
             {
                 type: "invoke",
                 commandName: "unfoldCell",
-                commandArguments: { cellIndex: 0 },
+                commandArguments: { cellId: "one" },
             },
         ]);
     });

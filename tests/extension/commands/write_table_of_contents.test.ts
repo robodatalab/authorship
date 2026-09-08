@@ -21,7 +21,7 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("lists the chapters, in the order they stand in", () => {
         const document = openStory(A_STORY_WITH_A_CONTENTS_CELL);
 
-        new WriteTableOfContentsCommand().invoke(document, { cellIndex: 0 });
+        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
 
         expect(document.cells[0].source).toBe("1. The Door\n1. The Bell");
     });
@@ -31,7 +31,7 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
             '<!-- cell: contents id="toc" -->\n\n<!-- cell: chapter id="c1" -->\n',
         );
 
-        new WriteTableOfContentsCommand().invoke(document, { cellIndex: 0 });
+        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
 
         expect(document.cells[0].source).toBe("1. Untitled");
     });
@@ -39,14 +39,16 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("writes nothing into a story with no chapters", () => {
         const document = openStory('<!-- cell: contents id="toc" -->\n');
 
-        new WriteTableOfContentsCommand().invoke(document, { cellIndex: 0 });
+        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
 
         expect(document.cells[0].source).toBe("");
     });
 
     it("writes nothing when there is no cell at that index", () => {
         const document = openStory(A_STORY_WITH_A_CONTENTS_CELL);
-        new WriteTableOfContentsCommand().invoke(document, { cellIndex: 9 });
+        new WriteTableOfContentsCommand().invoke(document, {
+            cellId: "nowhere",
+        });
         expect(document.cells[0].source).toBe("");
     });
 });

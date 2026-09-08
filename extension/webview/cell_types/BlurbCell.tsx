@@ -19,13 +19,13 @@ import { BLURB } from "../../vscode_runtime/storydoc/model";
 
 interface BlurbCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function BlurbCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: BlurbCellProps) {
     const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
@@ -42,7 +42,7 @@ export function BlurbCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "writeBlurb",
-                                { cellIndex },
+                                { cellId },
                             )
                         }
                     />
@@ -68,7 +68,7 @@ export function BlurbCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceMarkdown",
-                            { cellIndex, markdown: markdown },
+                            { cellId, markdown: markdown },
                         )
                     }
                 />
@@ -82,10 +82,10 @@ registerAuthorDocumentCellType({
     cellKind: BLURB,
     menuLabel: "Blurb",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <BlurbCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

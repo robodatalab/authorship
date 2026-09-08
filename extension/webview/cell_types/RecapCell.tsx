@@ -30,13 +30,13 @@ const FIELDS: AuthorFileEditorCellField[] = [
 
 interface RecapCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function RecapCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: RecapCellProps) {
     const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
@@ -53,7 +53,7 @@ export function RecapCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "writeStorySoFar",
-                                { cellIndex },
+                                { cellId },
                             )
                         }
                     />
@@ -73,7 +73,7 @@ export function RecapCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "replaceAttribute",
-                                { cellIndex, attributeName, attributeValue },
+                                { cellId, attributeName, attributeValue },
                             )
                         }
                     />
@@ -95,7 +95,7 @@ export function RecapCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "replaceMarkdown",
-                                { cellIndex, markdown: markdown },
+                                { cellId, markdown: markdown },
                             )
                         }
                     />
@@ -110,10 +110,10 @@ registerAuthorDocumentCellType({
     cellKind: RECAP,
     menuLabel: "The Story So Far",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <RecapCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

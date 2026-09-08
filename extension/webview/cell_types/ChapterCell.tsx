@@ -20,13 +20,13 @@ const FIELDS: AuthorFileEditorCellField[] = [
 
 interface ChapterCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function ChapterCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: ChapterCellProps) {
     return (
@@ -40,7 +40,7 @@ export function ChapterCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceAttribute",
-                            { cellIndex, attributeName, attributeValue },
+                            { cellId, attributeName, attributeValue },
                         )
                     }
                 />
@@ -54,10 +54,10 @@ registerAuthorDocumentCellType({
     cellKind: CHAPTER,
     menuLabel: "Chapter",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <ChapterCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

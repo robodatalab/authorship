@@ -30,13 +30,13 @@ const FIELDS: AuthorFileEditorCellField[] = [
 
 interface TitlePageCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function TitlePageCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: TitlePageCellProps) {
     return (
@@ -50,7 +50,7 @@ export function TitlePageCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceAttribute",
-                            { cellIndex, attributeName, attributeValue },
+                            { cellId, attributeName, attributeValue },
                         )
                     }
                 />
@@ -64,10 +64,10 @@ registerAuthorDocumentCellType({
     cellKind: TITLE_PAGE,
     menuLabel: "Title Page",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <TitlePageCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

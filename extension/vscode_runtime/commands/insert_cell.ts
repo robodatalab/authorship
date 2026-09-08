@@ -16,8 +16,8 @@ export class InsertCellCommand implements AuthorDocumentCommand {
             source: string;
             attrs: Record<string, string>;
         };
-        document.insertAt(
-            commandArguments.cellIndex as number,
+        document.insertAfter(
+            (commandArguments.afterCellId as string | null) ?? null,
             new Cell(newCell.kind, newCell.source, newCell.attrs),
         );
     }

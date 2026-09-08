@@ -24,6 +24,8 @@ export class FoldCellCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.cells[commandArguments.cellIndex as number]?.fold(this.folded);
+        document
+            .cellWithId(commandArguments.cellId as string)
+            ?.fold(this.folded);
     }
 }

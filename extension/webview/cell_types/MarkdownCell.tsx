@@ -17,13 +17,13 @@ import { MARKDOWN } from "../../vscode_runtime/storydoc/model";
 
 interface MarkdownCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function MarkdownCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: MarkdownCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
@@ -48,7 +48,7 @@ export function MarkdownCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceMarkdown",
-                            { cellIndex, markdown: markdown },
+                            { cellId, markdown: markdown },
                         )
                     }
                 />
@@ -62,10 +62,10 @@ registerAuthorDocumentCellType({
     cellKind: MARKDOWN,
     menuLabel: "Markdown",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <MarkdownCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

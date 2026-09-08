@@ -16,13 +16,13 @@ import "./NotesCell.css";
 
 interface NotesCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function NotesCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: NotesCellProps) {
     return (
@@ -35,7 +35,7 @@ export function NotesCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceMarkdown",
-                            { cellIndex, markdown: `<!--\n${note}\n-->` },
+                            { cellId, markdown: `<!--\n${note}\n-->` },
                         )
                     }
                 >
@@ -66,10 +66,10 @@ registerAuthorDocumentCellType({
     cellKind: NOTE,
     menuLabel: "Note",
     insertMenuGroup: "primary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <NotesCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

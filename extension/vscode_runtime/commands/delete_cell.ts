@@ -11,6 +11,6 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.removeAt(commandArguments.cellIndex as number);
+        document.removeCell(commandArguments.cellId as string);
     }
 }

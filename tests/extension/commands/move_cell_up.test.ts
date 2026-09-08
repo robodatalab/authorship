@@ -6,7 +6,7 @@ import { storyOfThreeCells } from "./open_story";
 describe("MoveCellUpCommand — moves a cell up", () => {
     it("puts the cell above the one it stood under", () => {
         const document = storyOfThreeCells();
-        new MoveCellUpCommand().invoke(document, { cellIndex: 2 });
+        new MoveCellUpCommand().invoke(document, { cellId: "c3" });
         expect(document.cells.map((cell) => cell.uniqueId)).toEqual([
             "c1",
             "c3",
@@ -16,7 +16,7 @@ describe("MoveCellUpCommand — moves a cell up", () => {
 
     it("leaves the first cell where it is, since nothing stands above it", () => {
         const document = storyOfThreeCells();
-        new MoveCellUpCommand().invoke(document, { cellIndex: 0 });
+        new MoveCellUpCommand().invoke(document, { cellId: "c1" });
         expect(document.cells.map((cell) => cell.uniqueId)).toEqual([
             "c1",
             "c2",

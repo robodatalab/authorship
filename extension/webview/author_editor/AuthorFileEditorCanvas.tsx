@@ -40,7 +40,7 @@ export type AuthorDocumentCellRenderers = Record<
     string,
     (
         cell: WebviewCell,
-        cellIndex: number,
+        cellId: string,
         sendMessagesToVscode: SendMessagesToVscode,
     ) => ReactNode
 >;
@@ -88,7 +88,7 @@ export function AuthorFileEditorCanvas({
                         <AuthorFileEditorInsertCellMenu
                             insertCommand={insertCommand}
                             cellTypes={cellTypes}
-                            insertAtCellIndex={0}
+                            insertAfterCellId={null}
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
                     </li>
@@ -108,7 +108,7 @@ export function AuthorFileEditorCanvas({
                             >
                                 <AuthorFileEditorCellState
                                     cellCommands={cellCommands}
-                                    cellIndex={cellIndex}
+                                    cellId={cell.attrs.id}
                                     cellAttributes={cell.attrs}
                                     proseErrors={proseErrors.filter(
                                         (proseError) =>
@@ -123,14 +123,14 @@ export function AuthorFileEditorCanvas({
                                 >
                                     {renderCell(
                                         cell,
-                                        cellIndex,
+                                        cell.attrs.id,
                                         sendMessagesToVscode,
                                     )}
                                 </AuthorFileEditorCellState>
                                 <AuthorFileEditorInsertCellMenu
                                     insertCommand={insertCommand}
                                     cellTypes={cellTypes}
-                                    insertAtCellIndex={cellIndex + 1}
+                                    insertAfterCellId={cell.attrs.id}
                                     sendMessagesToVscode={sendMessagesToVscode}
                                 />
                             </li>
@@ -145,14 +145,14 @@ export function AuthorFileEditorCanvas({
 interface AuthorFileEditorInsertCellMenuProps {
     insertCommand?: WebviewAuthorDocumentCommandCard;
     cellTypes: AuthorDocumentCellType[];
-    insertAtCellIndex: number;
+    insertAfterCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenu({
     insertCommand,
     cellTypes,
-    insertAtCellIndex,
+    insertAfterCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuProps) {
     const [everyKindIsShown, showEveryKind] = useState(false);
@@ -175,7 +175,7 @@ function AuthorFileEditorInsertCellMenu({
                     key={cellType.cellKind}
                     insertCommand={insertCommand}
                     cellType={cellType}
-                    insertAtCellIndex={insertAtCellIndex}
+                    insertAfterCellId={insertAfterCellId}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             ))}
@@ -198,7 +198,7 @@ function AuthorFileEditorInsertCellMenu({
                                     key={cellType.cellKind}
                                     insertCommand={insertCommand}
                                     cellType={cellType}
-                                    insertAtCellIndex={insertAtCellIndex}
+                                    insertAfterCellId={insertAfterCellId}
                                     sendMessagesToVscode={sendMessagesToVscode}
                                 />
                             ))}
@@ -213,14 +213,14 @@ function AuthorFileEditorInsertCellMenu({
 interface AuthorFileEditorInsertCellMenuButtonProps {
     insertCommand: WebviewAuthorDocumentCommandCard;
     cellType: AuthorDocumentCellType;
-    insertAtCellIndex: number;
+    insertAfterCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenuButton({
     insertCommand,
     cellType,
-    insertAtCellIndex,
+    insertAfterCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
     return (
@@ -233,7 +233,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     sendMessagesToVscode,
                     insertCommand.commandName,
                     {
-                        cellIndex: insertAtCellIndex,
+                        afterCellId: insertAfterCellId,
                         newCell: cellType.newCell(),
                     },
                 )

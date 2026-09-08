@@ -19,8 +19,9 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        const cell = document.cells[commandArguments.cellIndex as number];
-        cell?.replaceMarkdown(contentsOf(document));
+        document
+            .cellWithId(commandArguments.cellId as string)
+            ?.replaceMarkdown(contentsOf(document));
         authorFileEditorSession(document)?.sendDocument();
     }
 }

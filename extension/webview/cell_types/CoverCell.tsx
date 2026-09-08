@@ -15,13 +15,13 @@ import { COVER } from "../../vscode_runtime/storydoc/model";
 
 interface CoverCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function CoverCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: CoverCellProps) {
     return (
@@ -34,7 +34,7 @@ export function CoverCell({
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "replaceMarkdown",
-                            { cellIndex, markdown: markdown },
+                            { cellId, markdown: markdown },
                         )
                     }
                 />
@@ -48,10 +48,10 @@ registerAuthorDocumentCellType({
     cellKind: COVER,
     menuLabel: "Cover",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <CoverCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

@@ -111,7 +111,7 @@ describe("what the prose checker found", () => {
         await mount(
             <AuthorFileEditorCellState
                 cellCommands={[]}
-                cellIndex={0}
+                cellId="c1"
                 cellAttributes={{}}
                 proseErrors={proseErrors}
                 sendMessagesToVscode={(message) => posted.push(message)}

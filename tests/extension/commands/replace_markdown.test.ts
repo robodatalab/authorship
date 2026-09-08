@@ -7,7 +7,7 @@ describe("ReplaceMarkdownCommand — replaces a cell's markdown", () => {
     it("writes the new markdown into that cell and no other", () => {
         const document = storyOfThreeCells();
         new ReplaceMarkdownCommand().invoke(document, {
-            cellIndex: 1,
+            cellId: "c2",
             markdown: "She saw the door was open.",
         });
         expect(document.cells[1].source).toBe("She saw the door was open.");
@@ -17,7 +17,7 @@ describe("ReplaceMarkdownCommand — replaces a cell's markdown", () => {
     it("writes nothing when there is no cell at that index", () => {
         const document = storyOfThreeCells();
         new ReplaceMarkdownCommand().invoke(document, {
-            cellIndex: 9,
+            cellId: "nowhere",
             markdown: "nowhere",
         });
         expect(document.text).not.toContain("nowhere");

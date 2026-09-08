@@ -147,6 +147,36 @@ export class AuthorDocument implements vscode.CustomDocument {
     numCharactersInCell(cellId: string): number {
         return this.cellWithId(cellId)?.source.length ?? 0;
     }
+    insertAfter(cellId: string | null, cell: Cell): void {
+        const standsAfter =
+            cellId === null
+                ? -1
+                : this.documentCells.findIndex(
+                      (inTheDocument) => inTheDocument.uniqueId === cellId,
+                  );
+        this.insertAt(standsAfter + 1, cell);
+    }
+
+    removeCell(cellId: string): void {
+        this.removeAt(
+            this.documentCells.findIndex((cell) => cell.uniqueId === cellId),
+        );
+    }
+
+    moveCellUp(cellId: string): void {
+        const cellIndex = this.documentCells.findIndex(
+            (cell) => cell.uniqueId === cellId,
+        );
+        this.moveAt(cellIndex, cellIndex - 1);
+    }
+
+    moveCellDown(cellId: string): void {
+        const cellIndex = this.documentCells.findIndex(
+            (cell) => cell.uniqueId === cellId,
+        );
+        this.moveAt(cellIndex, cellIndex + 1);
+    }
+
     insertAt(cellIndex: number, cell: Cell): void {
         this.documentCells.splice(
             cellIndex,

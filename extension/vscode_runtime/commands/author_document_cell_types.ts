@@ -12,7 +12,7 @@ export interface AuthorDocumentCellType {
     insertMenuGroup: string;
     render(
         cell: WebviewCell,
-        cellIndex: number,
+        cellId: string,
         sendMessagesToVscode: SendMessagesToVscode,
     ): ReactNode;
     newCell(): WebviewCell;

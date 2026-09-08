@@ -11,8 +11,8 @@ export class ReplaceMarkdownCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.cells[commandArguments.cellIndex as number]?.replaceMarkdown(
-            commandArguments.markdown as string,
-        );
+        document
+            .cellWithId(commandArguments.cellId as string)
+            ?.replaceMarkdown(commandArguments.markdown as string);
     }
 }

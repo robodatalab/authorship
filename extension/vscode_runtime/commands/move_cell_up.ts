@@ -11,7 +11,6 @@ export class MoveCellUpCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        const cellIndex = commandArguments.cellIndex as number;
-        document.moveAt(cellIndex, cellIndex - 1);
+        document.moveCellUp(commandArguments.cellId as string);
     }
 }

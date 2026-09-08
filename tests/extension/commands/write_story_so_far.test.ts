@@ -35,7 +35,7 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
 
         const document = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
 
-        await new WriteStorySoFarCommand().invoke(document, { cellIndex: 0 });
+        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
 
         expect(asked[0].url).toContain("/generate/recap");
         expect(asked[0].body).toEqual({
@@ -54,7 +54,7 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
 
         const document = openStory(A_STORY_SO_FAR_THAT_NAMES_NONE);
 
-        await new WriteStorySoFarCommand().invoke(document, { cellIndex: 0 });
+        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
 
         expect(asked).toEqual([]);
         expect(shownMessages[0]).toContain("Name the documents");
@@ -86,7 +86,7 @@ describe("WriteStorySoFarCommand — while the author keeps working", () => {
             });
         });
 
-        await new WriteStorySoFarCommand().invoke(document, { cellIndex: 0 });
+        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
 
         expect(document.cells[0].source).toBe("She had lost her name.");
     });

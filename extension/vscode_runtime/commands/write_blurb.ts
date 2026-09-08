@@ -26,7 +26,8 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): Promise<void> {
-        const cell = document.cells[commandArguments.cellIndex as number];
+        const cellId = commandArguments.cellId as string;
+        const cell = document.cellWithId(cellId);
         if (!cell) {
             return;
         }
@@ -36,23 +37,22 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
                 document.uri,
                 new TextEncoder().encode(document.text),
             );
-            session?.writingCell(cell.uniqueId, 0);
+            session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/blurb", {
                 path: document.uri.fsPath,
             });
             const blurb = await awaitServerJob<WrittenSection>(
                 "/generate/status",
                 jobId,
-                (written) =>
-                    session?.writingCell(cell.uniqueId, howFarAlong(written)),
+                (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
-            cell.replaceMarkdown(blurb.text);
+            document.cellWithId(cellId)?.replaceMarkdown(blurb.text);
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot write the blurb — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
             );
         } finally {
-            session?.stopWritingCell(cell.uniqueId);
+            session?.stopWritingCell(cellId);
         }
     }
 }

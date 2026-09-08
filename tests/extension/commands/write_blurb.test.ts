@@ -51,7 +51,7 @@ describe("WriteBlurbCommand — writes the blurb", () => {
             },
         } as never);
 
-        await new WriteBlurbCommand().invoke(document, { cellIndex: 0 });
+        await new WriteBlurbCommand().invoke(document, { cellId: "b1" });
         closeAuthorFileEditorSession(document);
 
         expect(files.get(STORY_FILE)).toContain("She saw the door.");
@@ -99,7 +99,7 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
             });
         });
 
-        await new WriteBlurbCommand().invoke(document, { cellIndex: 0 });
+        await new WriteBlurbCommand().invoke(document, { cellId: "b1" });
 
         expect(document.cells[0].source).toBe("A woman loses her name.");
     });
@@ -112,7 +112,7 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
         });
         const document = openStory(A_STORY_WITH_A_BLURB_CELL);
 
-        await new WriteBlurbCommand().invoke(document, { cellIndex: 9 });
+        await new WriteBlurbCommand().invoke(document, { cellId: "nowhere" });
 
         expect(asked).toEqual([]);
     });

@@ -7,7 +7,7 @@ describe("ReplaceAttributeCommand — replaces a cell's attribute", () => {
     it("writes the new value into that cell's marker", () => {
         const document = storyOfThreeCells();
         new ReplaceAttributeCommand().invoke(document, {
-            cellIndex: 0,
+            cellId: "c1",
             attributeName: "title",
             attributeValue: "The Door",
         });
@@ -18,7 +18,7 @@ describe("ReplaceAttributeCommand — replaces a cell's attribute", () => {
     it("writes nothing when there is no cell at that index", () => {
         const document = storyOfThreeCells();
         new ReplaceAttributeCommand().invoke(document, {
-            cellIndex: 9,
+            cellId: "nowhere",
             attributeName: "title",
             attributeValue: "Nowhere",
         });

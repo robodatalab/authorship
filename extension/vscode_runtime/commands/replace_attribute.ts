@@ -11,9 +11,11 @@ export class ReplaceAttributeCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.cells[commandArguments.cellIndex as number]?.replaceAttribute(
-            commandArguments.attributeName as string,
-            commandArguments.attributeValue as string,
-        );
+        document
+            .cellWithId(commandArguments.cellId as string)
+            ?.replaceAttribute(
+                commandArguments.attributeName as string,
+                commandArguments.attributeValue as string,
+            );
     }
 }

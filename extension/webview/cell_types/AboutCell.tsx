@@ -34,13 +34,13 @@ const FIELDS: AuthorFileEditorCellField[] = [
 
 interface AboutCellProps {
     cell: WebviewCell;
-    cellIndex: number;
+    cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AboutCell({
     cell,
-    cellIndex,
+    cellId,
     sendMessagesToVscode,
 }: AboutCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
@@ -59,7 +59,7 @@ export function AboutCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "replaceAttribute",
-                                { cellIndex, attributeName, attributeValue },
+                                { cellId, attributeName, attributeValue },
                             )
                         }
                     />
@@ -81,7 +81,7 @@ export function AboutCell({
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
                                 "replaceMarkdown",
-                                { cellIndex, markdown: markdown },
+                                { cellId, markdown: markdown },
                             )
                         }
                     />
@@ -96,10 +96,10 @@ registerAuthorDocumentCellType({
     cellKind: ABOUT,
     menuLabel: "About the Author",
     insertMenuGroup: "secondary",
-    render: (cell, cellIndex, sendMessagesToVscode) => (
+    render: (cell, cellId, sendMessagesToVscode) => (
         <AboutCell
             cell={cell}
-            cellIndex={cellIndex}
+            cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),

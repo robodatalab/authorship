@@ -40,7 +40,7 @@ interface AuthorFileEditorCellCardProps {
 
 interface AuthorFileEditorCellStateProps {
     cellCommands: WebviewAuthorDocumentCommandCard[];
-    cellIndex: number;
+    cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
     howFarTheCellHasBeenWritten?: number;
@@ -52,7 +52,7 @@ const AuthorFileEditorCellStateContext = createContext<
     Omit<AuthorFileEditorCellStateProps, "children">
 >({
     cellCommands: [],
-    cellIndex: 0,
+    cellId: "",
     cellAttributes: {},
     proseErrors: [],
     howFarTheCellHasBeenWritten: undefined,
@@ -61,7 +61,7 @@ const AuthorFileEditorCellStateContext = createContext<
 
 export function AuthorFileEditorCellState({
     cellCommands,
-    cellIndex,
+    cellId,
     cellAttributes,
     proseErrors = [],
     howFarTheCellHasBeenWritten,
@@ -72,7 +72,7 @@ export function AuthorFileEditorCellState({
         <AuthorFileEditorCellStateContext.Provider
             value={{
                 cellCommands,
-                cellIndex,
+                cellId,
                 cellAttributes,
                 proseErrors,
                 howFarTheCellHasBeenWritten,
@@ -99,7 +99,7 @@ export function AuthorFileEditorCell({
     sidebar,
     children,
 }: AuthorFileEditorCellProps) {
-    const { cellCommands, cellIndex, cellAttributes, sendMessagesToVscode } =
+    const { cellCommands, cellId, cellAttributes, sendMessagesToVscode } =
         useContext(AuthorFileEditorCellStateContext);
     return (
         <section className="author-file-editor-cell">
@@ -117,7 +117,7 @@ export function AuthorFileEditorCell({
                                 invokeAuthorDocumentCommand(
                                     sendMessagesToVscode,
                                     command.commandName,
-                                    { cellIndex },
+                                    { cellId },
                                 )
                             }
                         >
