@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
+import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorCellState } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
@@ -71,6 +72,43 @@ export function AuthorFileEditorCanvas({
     const insertCommand = commands.find(
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
+    const cellsOnThePage = useRef<HTMLUListElement>(null);
+    const [cellIdInView, setCellIdInView] = useState<string>();
+
+    useEffect(() => {
+        const scrolled = cellsOnThePage.current;
+        if (!scrolled) {
+            return;
+        }
+        const cellIdsInView = new Set<string>();
+        const watching = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    const cellId = (entry.target as HTMLElement).dataset.cellId;
+                    if (!cellId) {
+                        continue;
+                    }
+                    if (entry.isIntersecting) {
+                        cellIdsInView.add(cellId);
+                    } else {
+                        cellIdsInView.delete(cellId);
+                    }
+                }
+                const first = cells.find((cell) =>
+                    cellIdsInView.has(cell.attrs.id),
+                );
+                if (first) {
+                    setCellIdInView(first.attrs.id);
+                }
+            },
+            { root: scrolled },
+        );
+        for (const drawn of scrolled.querySelectorAll("li[data-cell-id]")) {
+            watching.observe(drawn);
+        }
+        return () => watching.disconnect();
+    }, [cells]);
+
     const mainMenuCommands = commands.filter(
         (command) =>
             command.buttonGroup !== CELL_BUTTON_GROUP &&
@@ -83,9 +121,14 @@ export function AuthorFileEditorCanvas({
             <AuthorFileEditorMainMenu
                 commands={mainMenuCommands}
                 sendMessagesToVscode={sendMessagesToVscode}
-            />
+            >
+                <AuthorFileEditorPartAndChapterInView
+                    cells={cells}
+                    cellIdInView={cellIdInView}
+                />
+            </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator>
-                <ul>
+                <ul ref={cellsOnThePage}>
                     <li>
                         <AuthorFileEditorInsertCellMenu
                             insertCommand={insertCommand}
@@ -102,6 +145,7 @@ export function AuthorFileEditorCanvas({
                         return (
                             <li
                                 key={cellIndex}
+                                data-cell-id={cell.attrs.id}
                                 className={
                                     cell.attrs.folded === "true"
                                         ? "author-file-editor-cell-folded"

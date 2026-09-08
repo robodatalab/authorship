@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import type { ReactNode } from "react";
 import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
@@ -9,11 +10,13 @@ import "./AuthorFileEditorMainMenu.css";
 interface AuthorFileEditorMainMenuProps {
     commands: WebviewAuthorDocumentCommandCard[];
     sendMessagesToVscode: SendMessagesToVscode;
+    children?: ReactNode;
 }
 
 export function AuthorFileEditorMainMenu({
     commands,
     sendMessagesToVscode,
+    children,
 }: AuthorFileEditorMainMenuProps) {
     const buttonGroups = [
         ...new Set(commands.map((command) => command.buttonGroup)),
@@ -50,6 +53,7 @@ export function AuthorFileEditorMainMenu({
                         ))}
                 </Fragment>
             ))}
+            {children}
         </nav>
     );
 }
