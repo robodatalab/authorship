@@ -65,10 +65,10 @@ class Inline(unittest.TestCase):
 
 
 class Blocks(unittest.TestCase):
-    def test_a_blank_line_ends_a_paragraph(self) -> None:
+    def test_every_line_is_its_own_paragraph(self) -> None:
         self.assertEqual(
-            blocks_to_xhtml(["one", "still one", "", "two"]),
-            "<p>one still one</p>\n<p>two</p>",
+            blocks_to_xhtml(["one", "two", "", "three"]),
+            "<p>one</p>\n<p>two</p>\n<p>three</p>",
         )
 
     def test_headings(self) -> None:
@@ -127,7 +127,7 @@ class Chapters(unittest.TestCase):
                 storydoc.markdown("second"),
             )
         )
-        self.assertEqual(chapters[0].body_lines, ["first", "", "second"])
+        self.assertEqual(chapters[0].body_lines, ["first", "second"])
 
     def test_chapters_are_numbered_in_order(self) -> None:
         chapters = chapters_of(

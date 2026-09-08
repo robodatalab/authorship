@@ -76,33 +76,20 @@ def _inline(text: str) -> str:
 
 def blocks_to_xhtml(lines: list[str]) -> str:
     out: list[str] = []
-    para: list[str] = []
-
-    def flush() -> None:
-        if para:
-            out.append(f"<p>{_inline(' '.join(para))}</p>")
-            para.clear()
-
     for raw in lines:
-        line = raw.rstrip()
-        stripped = line.strip()
-        if not stripped:  # blank line -> paragraph break
-            flush()
-        elif re.fullmatch(r"(-{3,}|\*{3,}|_{3,})", stripped):
-            flush()
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if re.fullmatch(r"(-{3,}|\*{3,}|_{3,})", stripped):
             out.append('<hr class="scene-break"/>')
         elif stripped.startswith("### "):
-            flush()
             out.append(f"<h3>{_inline(stripped[4:].strip())}</h3>")
         elif stripped.startswith("## "):
-            flush()
             out.append(f"<h2>{_inline(stripped[3:].strip())}</h2>")
         elif stripped.startswith("# "):
-            flush()
             out.append(f"<h1>{_inline(stripped[2:].strip())}</h1>")
         else:
-            para.append(stripped)
-    flush()
+            out.append(f"<p>{_inline(stripped)}</p>")
     return "\n".join(out)
 
 
@@ -460,10 +447,7 @@ def chapters_of(document: Document) -> list[Chapter]:
 
 def _add_prose(documents: list[Chapter | Page], cell: Cell) -> None:
     if documents and isinstance(documents[-1], Chapter):
-        body = documents[-1].body_lines
-        if body:
-            body.append("")
-        body.extend(cell.source.splitlines())
+        documents[-1].body_lines.extend(cell.source.splitlines())
         return
     loose = sum(1 for item in documents if item.id.startswith(LOOSE))
     written = blocks_to_xhtml(cell.source.splitlines())
@@ -520,9 +504,7 @@ html, body { margin: 0; padding: 0; }
 body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
        text-align: justify; hyphens: auto; }
 /* The page's own margin, set on the content and not on the body so that the
-   cover can still fill the page edge to edge. Without it the first-line indent
-   is the only white space on the page and reads as a stray offset rather than
-   as the paragraph opening it is. */
+   cover can still fill the page edge to edge. */
 .chapter, .title-page, .contents, .disclaimer, .about, .part-page { padding: 0 6%; }
 /* No page-break-before here: every chapter is its own spine document, so the
    reader already opens a page for it. Breaking again leaves a blank one. */
@@ -531,8 +513,7 @@ h1, h2, h3 { font-family: Georgia, serif; text-align: center; font-weight: norma
 h1 { font-size: 1.9em; margin: 2.5em 0 0.6em; }
 h2 { font-size: 1.5em; margin: 2.2em 0 1em; }
 h3 { font-size: 1.2em; margin: 1.6em 0 0.8em; font-style: italic; }
-p { margin: 0; text-indent: 1.4em; }
-p:first-of-type, h1 + p, h2 + p, h3 + p, hr + p { text-indent: 0; }
+p { margin: 0 0 0.8em; }
 hr.scene-break { border: 0; text-align: center; margin: 1.4em 0; }
 hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 /* A part is one line on an otherwise empty page, set in the middle of it both
@@ -545,7 +526,6 @@ hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 .cover img { max-width: 100%; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
 .title-page h1.book-title { font-size: 2.4em; margin: 0 0 0.4em; }
-.title-page p { text-indent: 0; }
 .title-page p.subtitle { font-size: 1.3em; font-style: italic; margin: 0 0 2.5em; }
 .title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
 .title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
@@ -555,11 +535,9 @@ hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 .contents li { margin: 0 0 0.8em; }
 .contents a { text-decoration: none; }
 .disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }
-.disclaimer p { text-indent: 0; margin: 0 0 0.8em; }
 /* The blurb is prose and is set like prose; only the list of places to go is
    centred, because that is a list and not something anyone reads across. */
 .about { margin-top: 12%; }
-.about p { text-indent: 0; margin: 0 0 0.8em; }
 .about .links { margin-top: 2.5em; text-align: center; }
 .about .links p { margin: 0 0 0.9em; }
 """
