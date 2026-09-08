@@ -3,7 +3,7 @@ import type { AuthorDocument } from "../storydoc/model";
 
 export class RunAllCommand implements AuthorDocumentCommand {
     readonly commandName = "runAll";
-    readonly buttonGroup = "run";
+    readonly buttonGroup = "all_cells";
     readonly iconClassName = "codicon codicon-run-all";
     readonly tooltip = "Run All — write every section that writes itself";
 

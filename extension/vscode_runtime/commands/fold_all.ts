@@ -5,7 +5,7 @@ import type {
 } from "./author_document_command";
 
 export class FoldAllCommand implements AuthorDocumentCommand {
-    readonly buttonGroup = "fold";
+    readonly buttonGroup = "all_cells";
     readonly drawnWhenCellAttributeIs: CellAttributeCondition;
 
     constructor(
