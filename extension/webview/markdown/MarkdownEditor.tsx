@@ -145,6 +145,7 @@ export function MarkdownEditor({
         <MonacoMarkdownEditor
             markdown={draftMarkdown}
             errors={errors}
+            highlights={highlights}
             onFixAsked={onFixAsked}
             onMarkdownChanged={setDraftMarkdown}
             onSettled={onMarkdownCommitted}
@@ -159,6 +160,7 @@ export function MarkdownEditor({
 interface MonacoMarkdownEditorProps {
     markdown: string;
     errors: ProseCheckError[];
+    highlights: AuthorFileEditorFindHighlight[];
     onFixAsked: (error: ProseCheckError) => void;
     onMarkdownChanged: (markdown: string) => void;
     onSettled: (markdown: string) => void;
@@ -174,6 +176,7 @@ interface MarkdownEditorErrorUnderPointer {
 function MonacoMarkdownEditor({
     markdown,
     errors,
+    highlights,
     onFixAsked,
     onMarkdownChanged,
     onSettled,
@@ -184,6 +187,8 @@ function MonacoMarkdownEditor({
         null,
     );
     const drawnMarks =
+        useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const drawnHighlights =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const errorsNow = useRef(errors);
     errorsNow.current = errors;
@@ -255,6 +260,7 @@ function MonacoMarkdownEditor({
         };
 
         drawnMarks.current = editor.createDecorationsCollection([]);
+        drawnHighlights.current = editor.createDecorationsCollection([]);
 
         const errorUnderPointer = (
             event: monaco.editor.IEditorMouseEvent,
@@ -361,6 +367,30 @@ function MonacoMarkdownEditor({
             })),
         );
     }, [errors, markdown]);
+
+    // A cell open for typing shows no HTML, so its matches are marked by the
+    // text editor instead — in the same colours the rest of the page marks them,
+    // so that stepping from one to the next does not change what a match looks
+    // like halfway through the document.
+    useEffect(() => {
+        const model = monacoEditor.current?.getModel();
+        if (!model) {
+            return;
+        }
+        drawnHighlights.current?.set(
+            highlights.map((highlight) => ({
+                range: monaco.Range.fromPositions(
+                    model.getPositionAt(highlight.at),
+                    model.getPositionAt(highlight.end),
+                ),
+                options: {
+                    inlineClassName: highlight.isCurrent
+                        ? "author-file-editor-find-match author-file-editor-find-match-current"
+                        : "author-file-editor-find-match",
+                },
+            })),
+        );
+    }, [highlights, markdown]);
 
     return (
         <>

@@ -62,6 +62,7 @@ export interface WhatTheAuthorFileEditorIsFinding {
 export function useAuthorFileEditorFind(
     cells: WebviewCell[],
     sendMessagesToVscode: SendMessagesToVscode,
+    cellsOnThePage: RefObject<HTMLElement | null>,
 ): WhatTheAuthorFileEditorIsFinding {
     const [query, askFor] = useState(NOTHING_LOOKED_FOR);
     const [isSearching, search] = useState(false);
@@ -151,16 +152,43 @@ export function useAuthorFileEditorFind(
         return () => document.removeEventListener("keydown", pressed);
     });
 
+    const cellStoodOn = current ? cells[current.cell]?.attrs.id : undefined;
+
     // Bringing the current match on screen without taking the focus off the box:
     // the author is still typing what they are looking for, and a match that took
     // the caret with it would put the next keystroke in the manuscript.
+    //
+    // A frame later than the page, because a cell open for typing has the text
+    // editor draw its marks and that happens a frame after the page is drawn.
+    // The cell itself is what is scrolled to when there is no mark to scroll to,
+    // so that a match in a cell that draws none is still arrived at.
+    //
+    // The page's own list is what scrolls, rather than the browser being asked to
+    // bring the mark into view: a mark in a cell open for typing lies inside the
+    // text editor's scrolling box, and asking the browser scrolls that box, which
+    // the editor then puts back where it wants it.
     useEffect(() => {
-        document
-            .querySelector(
-                ".author-file-editor-find-match-current, .author-file-editor-find-field-current",
-            )
-            ?.scrollIntoView({ block: "center" });
-    }, [current?.cell, current?.attributeName, current?.at]);
+        const drawn = requestAnimationFrame(() => {
+            const scrolled = cellsOnThePage.current;
+            const shown =
+                document.querySelector(
+                    ".author-file-editor-find-match-current, .author-file-editor-find-field-current",
+                ) ??
+                (cellStoodOn
+                    ? scrolled?.querySelector(
+                          `li[data-cell-id="${cellStoodOn}"]`,
+                      )
+                    : null);
+            if (!scrolled || !shown) {
+                return;
+            }
+            scrolled.scrollTop +=
+                shown.getBoundingClientRect().top -
+                scrolled.getBoundingClientRect().top -
+                scrolled.clientHeight / 2;
+        });
+        return () => cancelAnimationFrame(drawn);
+    }, [cellStoodOn, current?.attributeName, current?.at]);
 
     return {
         query,

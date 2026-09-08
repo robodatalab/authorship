@@ -130,7 +130,11 @@ export function AuthorFileEditorCanvas({
     );
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
-    const find = useAuthorFileEditorFind(cells, sendMessagesToVscode);
+    const find = useAuthorFileEditorFind(
+        cells,
+        sendMessagesToVscode,
+        cellsOnThePage,
+    );
 
     const findMatchesByCellId = useMemo(() => {
         const byCellId = new Map<string, AuthorFileEditorFindMatch[]>();

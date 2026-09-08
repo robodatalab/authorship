@@ -46,10 +46,10 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                 let changed = (): void => {};
                 let pointed: (event: unknown) => void = () => {};
                 let pointedAway = (): void => {};
-                let marks: {
+                const collections: {
                     range: unknown;
                     options: { inlineClassName: string };
-                }[] = [];
+                }[][] = [];
                 const editor = {
                     getValue: () => value,
                     setValue: (next: string) => {
@@ -73,16 +73,20 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                         pointedAway = listener;
                         return disposable;
                     },
-                    createDecorationsCollection: () => ({
-                        set: (
-                            next: {
-                                range: unknown;
-                                options: { inlineClassName: string };
-                            }[],
-                        ) => {
-                            marks = next;
-                        },
-                    }),
+                    createDecorationsCollection: () => {
+                        const drawn = collections.length;
+                        collections.push([]);
+                        return {
+                            set: (
+                                next: {
+                                    range: unknown;
+                                    options: { inlineClassName: string };
+                                }[],
+                            ) => {
+                                collections[drawn] = next;
+                            },
+                        };
+                    },
                     getModel: () => ({
                         getOffsetAt: (position: { column: number }) =>
                             position.column - 1,
@@ -96,7 +100,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                         left: 20,
                         height: 18,
                     }),
-                    marks: () => marks,
+                    marks: () => collections.flat(),
                     point: (offset: number | null) =>
                         pointed({
                             target: {
@@ -553,3 +557,4 @@ describe("what the checks found in the prose being written", () => {
         expect(onFixAsked).toHaveBeenCalledWith(REPEATED);
     });
 });
+
