@@ -338,9 +338,9 @@ class GenerateBlurb(unittest.TestCase):
             [
                 storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
                 storydoc.chapter("One"),
-                storydoc.markdown("The lantern had gone out."),
+                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
                 storydoc.chapter("Two"),
-                storydoc.markdown("The door stood open."),
+                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
                 storydoc.Cell(storydoc.BLURB, "", {}),
             ]
         )
@@ -742,9 +742,9 @@ class FixStyle(unittest.TestCase):
             [
                 storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
                 storydoc.chapter("One"),
-                storydoc.markdown("The lantern had gone out."),
+                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
                 storydoc.chapter("Two"),
-                storydoc.markdown("The door stood open."),
+                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
             ]
         )
         self.document.write_text(self.written, encoding="utf-8")
@@ -781,8 +781,8 @@ class FixStyle(unittest.TestCase):
         self.assertEqual(
             status["sections"],
             [
-                {"index": 2, "source": CORRECTED},
-                {"index": 4, "source": CORRECTED},
+                {"cellId": "lantern", "source": CORRECTED},
+                {"cellId": "door", "source": CORRECTED},
             ],
         )
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
@@ -823,7 +823,7 @@ class FixStyle(unittest.TestCase):
             CORRECTED,
         ]
         status = self.start()
-        self.assertEqual(status["sections"], [{"index": 4, "source": CORRECTED}])
+        self.assertEqual(status["sections"], [{"cellId": "door", "source": CORRECTED}])
         self.assertEqual(len(status["leftAlone"]), 1)
         self.assertEqual(status["leftAlone"][0]["chapter"], "One")
         self.assertIn("mid-sentence", status["leftAlone"][0]["why"])

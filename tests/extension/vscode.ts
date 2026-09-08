@@ -36,6 +36,24 @@ function uriOf(path: string): StubUri {
 
 export const shownMessages: string[] = [];
 
+export const settings = new Map<string, unknown>();
+
+export const geminiKeyInTheKeychain: { key: string | undefined } = {
+    key: undefined,
+};
+
+export const authentication = {
+    registerAuthenticationProvider: (): { dispose(): void } => ({
+        dispose: () => undefined,
+    }),
+    getSession: (): Promise<{ accessToken: string } | undefined> =>
+        Promise.resolve(
+            geminiKeyInTheKeychain.key
+                ? { accessToken: geminiKeyInTheKeychain.key }
+                : undefined,
+        ),
+};
+
 export const dialogs: {
     filesTheAuthorChose: StubUri[];
     answerToTheWarning: string | undefined;
@@ -79,10 +97,17 @@ export const workspace = {
         createDirectory: (): Promise<void> => Promise.resolve(),
         readDirectory: (): Promise<[string, number][]> => Promise.resolve([]),
     },
-    getConfiguration: (): {
-        get<Setting>(named: string): Setting | undefined;
+    getConfiguration: (
+        section: string,
+    ): {
+        get<Setting>(named: string, fallback?: Setting): Setting | undefined;
     } => ({
-        get: () => undefined,
+        get: <Setting,>(named: string, fallback?: Setting) =>
+            (settings.get(`${section}.${named}`) as Setting | undefined) ??
+            fallback,
+    }),
+    onDidChangeConfiguration: (): { dispose(): void } => ({
+        dispose: () => undefined,
     }),
     getWorkspaceFolder: (): undefined => undefined,
     asRelativePath: (uri: StubUri): string => uri.toString(),

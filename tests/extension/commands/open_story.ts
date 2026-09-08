@@ -1,6 +1,13 @@
 import * as vscode from "vscode";
 
-import { dialogs, files, executedCommands, shownMessages } from "../vscode";
+import {
+    dialogs,
+    files,
+    executedCommands,
+    geminiKeyInTheKeychain,
+    settings,
+    shownMessages,
+} from "../vscode";
 import { AuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
 
 export const STORY_FILE = "/stories/story.author";
@@ -32,4 +39,6 @@ export function forgetWhatTheEditorDid(): void {
     shownMessages.length = 0;
     dialogs.filesTheAuthorChose = [];
     dialogs.answerToTheWarning = undefined;
+    settings.clear();
+    geminiKeyInTheKeychain.key = undefined;
 }

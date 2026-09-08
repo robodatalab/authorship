@@ -6,6 +6,7 @@ import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
 import { FixProseCommand } from "./fix_prose";
+import { FixStyleCommand } from "./fix_style";
 import { FoldAllCommand } from "./fold_all";
 import { FoldCellCommand } from "./fold_cell";
 import { ImportMarkdownCommand } from "./import_markdown";
@@ -60,6 +61,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DivideIntoPartsCommand(),
     new CheckProseCommand(),
     new FixProseCommand(),
+    new FixStyleCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),
     new WriteStorySoFarCommand(),

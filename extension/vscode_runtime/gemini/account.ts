@@ -19,14 +19,24 @@ export function styleFixEnabled(): boolean {
         .get<boolean>("experimental.useGeminiForStyleCorrection", false);
 }
 
-export const STYLE_FIX_SETTING =
-    "authorship.experimental.useGeminiForStyleCorrection";
-
 export function configuredModel(): string | undefined {
     const modelInSettings = vscode.workspace
         .getConfiguration("authorship")
         .get<string>("gemini.model");
     return modelInSettings?.trim() || undefined;
+}
+
+let signedInAccount: GeminiAccount | undefined;
+
+export function openGeminiAccount(
+    context: vscode.ExtensionContext,
+): GeminiAccount {
+    signedInAccount = new GeminiAccount(context);
+    return signedInAccount;
+}
+
+export function geminiAccount(): GeminiAccount | undefined {
+    return signedInAccount;
 }
 
 export class GeminiAccount
@@ -282,6 +292,9 @@ export class GeminiAccount
     }
 
     dispose(): void {
+        if (signedInAccount === this) {
+            signedInAccount = undefined;
+        }
         this.providerRegistration.dispose();
         this.sessionsChanged.dispose();
     }

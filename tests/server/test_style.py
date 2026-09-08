@@ -48,25 +48,34 @@ def one_fixed(first: str = FIRST_FIXED, second: str = SECOND_FIXED) -> str:
 ONE_FIXED = one_fixed()
 
 
+FIRST_CELL_ID = "lantern"
+SECOND_CELL_ID = "unlit"
+THIRD_CELL_ID = "door"
+
+
+def markdown(source: str, cell_id: str) -> storydoc.Cell:
+    return storydoc.Cell(storydoc.MARKDOWN, source, {"id": cell_id})
+
+
 STORY = storydoc.dumps(
     [
         storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-        storydoc.markdown("Front matter, about the book and not in it."),
+        markdown("Front matter, about the book and not in it.", "front"),
         storydoc.chapter("The First Night"),
-        storydoc.markdown("The lantern had gone out again."),
-        storydoc.markdown("She did not light it."),
+        markdown("The lantern had gone out again.", FIRST_CELL_ID),
+        markdown("She did not light it.", SECOND_CELL_ID),
         storydoc.Cell(storydoc.NOTE, "Ask Mara whether this is the third time.", {}),
         storydoc.Cell(storydoc.CONTENTS, "1. The First Night", {}),
         storydoc.chapter("The Second"),
-        storydoc.markdown("The door stood open."),
+        markdown("The door stood open.", THIRD_CELL_ID),
     ]
 )
 
 
-def collect(document: Document, model: mock.MagicMock) -> dict[int, str]:
+def collect(document: Document, model: mock.MagicMock) -> dict[str, str]:
     """Every section the pass handed back, by the cell it belongs to."""
-    revised: dict[int, str] = {}
-    fix_style(model, document, revised=lambda index, source: revised.update({index: source}))
+    revised: dict[str, str] = {}
+    fix_style(model, document, revised=lambda cell_id, source: revised.update({cell_id: source}))
     return revised
 
 
@@ -94,11 +103,10 @@ class ChaptersOf(unittest.TestCase):
         self.assertNotIn("1. The First Night", sources)
 
     def test_a_section_points_at_the_cell_it_came_from(self) -> None:
-        chapters = chapters_of(Document(STORY))
-        cells = Document(STORY).cells
-        for chapter in chapters:
+        by_id = {cell.unique_id: cell for cell in Document(STORY).cells}
+        for chapter in chapters_of(Document(STORY)):
             for section in chapter.sections:
-                self.assertEqual(cells[section.index].source, section.source)
+                self.assertEqual(by_id[section.cell_id].source, section.source)
 
     def test_a_chapter_with_nothing_written_under_it_is_not_one(self) -> None:
         empty = storydoc.dumps([storydoc.chapter("Unwritten")])
@@ -153,19 +161,19 @@ class FixStyle(unittest.TestCase):
     def test_hands_back_each_corrected_section_against_its_own_cell(self) -> None:
         document = Document(STORY)
         model = build_model(one_fixed(), THIRD_FIXED)
-        self.assertEqual(collect(document, model), {3: FIRST_FIXED, 4: SECOND_FIXED, 8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {FIRST_CELL_ID: FIRST_FIXED, SECOND_CELL_ID: SECOND_FIXED, THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_section_that_came_back_unchanged_is_not_handed_back(self) -> None:
         document = Document(STORY)
         model = build_model(
             one_fixed("The lantern had gone out again."), THIRD_FIXED
         )
-        self.assertEqual(collect(document, model), {4: SECOND_FIXED, 8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {SECOND_CELL_ID: SECOND_FIXED, THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_chapter_whose_seams_did_not_come_back_is_left_alone(self) -> None:
         document = Document(STORY)
         model = build_model("The lantern had gone out; she did not light it.", THIRD_FIXED)
-        self.assertEqual(collect(document, model), {8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_chapter_left_alone_is_carried_on_as_the_author_wrote_it(self) -> None:
         model = build_model("The lantern had gone out; she did not light it.", THIRD_FIXED)
@@ -177,12 +185,12 @@ class FixStyle(unittest.TestCase):
     def test_takes_the_answer_out_of_a_code_fence(self) -> None:
         document = Document(STORY)
         model = build_model(f"```markdown\n{one_fixed()}\n```", THIRD_FIXED)
-        self.assertEqual(collect(document, model), {3: FIRST_FIXED, 4: SECOND_FIXED, 8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {FIRST_CELL_ID: FIRST_FIXED, SECOND_CELL_ID: SECOND_FIXED, THIRD_CELL_ID: THIRD_FIXED})
 
     def test_takes_off_a_heading_that_only_says_what_the_chapter_is_called(self) -> None:
         document = Document(STORY)
         model = build_model(f"# The First Night\n\n{one_fixed()}", THIRD_FIXED)
-        self.assertEqual(collect(document, model), {3: FIRST_FIXED, 4: SECOND_FIXED, 8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {FIRST_CELL_ID: FIRST_FIXED, SECOND_CELL_ID: SECOND_FIXED, THIRD_CELL_ID: THIRD_FIXED})
 
     def test_leaves_a_heading_the_author_would_have_written(self) -> None:
         document = Document(STORY)
@@ -190,9 +198,9 @@ class FixStyle(unittest.TestCase):
         self.assertEqual(
             collect(document, model),
             {
-                3: f"# Somewhere else\n\n{FIRST_FIXED}",
-                4: SECOND_FIXED,
-                8: THIRD_FIXED,
+                FIRST_CELL_ID: f"# Somewhere else\n\n{FIRST_FIXED}",
+                SECOND_CELL_ID: SECOND_FIXED,
+                THIRD_CELL_ID: THIRD_FIXED,
             },
         )
 
@@ -217,20 +225,20 @@ class FixStyle(unittest.TestCase):
             one_fixed(second='She reached for the matches and said, "Come closer'),
             THIRD_FIXED,
         )
-        self.assertEqual(collect(document, model), {8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_chapter_that_came_back_far_shorter_is_refused(self) -> None:
         # Copy-editing is not summarising, so a chapter at a third of its length
         # is not a tightened chapter — it is a piece of one.
         document = Document(STORY)
         model = build_model(one_fixed("Dark.", "Still."), THIRD_FIXED)
-        self.assertEqual(collect(document, model), {8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_chapter_that_came_back_far_longer_is_refused(self) -> None:
         # The other way a model stops copy-editing and starts writing.
         document = Document(STORY)
         model = build_model(one_fixed(FIRST_FIXED, "She did not relight it. " * 12), THIRD_FIXED)
-        self.assertEqual(collect(document, model), {8: THIRD_FIXED})
+        self.assertEqual(collect(document, model), {THIRD_CELL_ID: THIRD_FIXED})
 
     def test_a_chapter_ending_on_a_closing_quote_is_finished(self) -> None:
         # Dialogue ends on the quote mark rather than the full stop inside it,
@@ -239,7 +247,7 @@ class FixStyle(unittest.TestCase):
         ended = 'She did not light it. "Not tonight."'
         model = build_model(one_fixed(FIRST_FIXED, ended), THIRD_FIXED)
         self.assertEqual(
-            collect(document, model), {3: FIRST_FIXED, 4: ended, 8: THIRD_FIXED}
+            collect(document, model), {FIRST_CELL_ID: FIRST_FIXED, SECOND_CELL_ID: ended, THIRD_CELL_ID: THIRD_FIXED}
         )
 
     def test_a_real_correction_of_about_the_same_length_is_let_through(self) -> None:
@@ -247,7 +255,7 @@ class FixStyle(unittest.TestCase):
         document = Document(STORY)
         self.assertEqual(
             collect(document, build_model(one_fixed(), THIRD_FIXED)),
-            {3: FIRST_FIXED, 4: SECOND_FIXED, 8: THIRD_FIXED},
+            {FIRST_CELL_ID: FIRST_FIXED, SECOND_CELL_ID: SECOND_FIXED, THIRD_CELL_ID: THIRD_FIXED},
         )
 
     def test_says_how_far_it_has_read_before_it_starts_and_after_each_chapter(self) -> None:
@@ -259,13 +267,13 @@ class FixStyle(unittest.TestCase):
     def test_a_job_told_to_stop_reads_no_further(self) -> None:
         model = build_model(one_fixed(), THIRD_FIXED)
         stop = [False]
-        revised: dict[int, str] = {}
+        revised: dict[str, str] = {}
         fix_style(
             model,
             Document(STORY),
             cancelled=lambda: stop[0],
             progress=lambda *_: stop.__setitem__(0, True),
-            revised=lambda index, source: revised.update({index: source}),
+            revised=lambda cell_id, source: revised.update({cell_id: source}),
         )
         # Stopped before it read anything: the first `progress` call is the total.
         self.assertEqual(model.complete.call_count, 0)
@@ -281,15 +289,15 @@ class FixStyle(unittest.TestCase):
 
         model = build_model()
         model.complete.side_effect = [Truncated("ran out of room"), THIRD_FIXED]
-        revised: dict[int, str] = {}
+        revised: dict[str, str] = {}
         told: list[tuple[str, str]] = []
         fix_style(
             model,
             Document(STORY),
-            revised=lambda index, source: revised.update({index: source}),
+            revised=lambda cell_id, source: revised.update({cell_id: source}),
             left_alone=lambda title, why: told.append((title, why)),
         )
-        self.assertEqual(revised, {8: THIRD_FIXED})
+        self.assertEqual(revised, {THIRD_CELL_ID: THIRD_FIXED})
         self.assertEqual(told, [("The First Night", "ran out of room")])
 
     def test_a_chapter_the_model_would_not_read_costs_one_chapter_too(self) -> None:

@@ -611,8 +611,8 @@ class StyleFixJob(Job):
     def _waiting(self, note: str | None) -> None:
         self.note = note
 
-    def _revised(self, index: int, source: str) -> None:
-        self.sections.append({"index": index, "source": source})
+    def _revised(self, cell_id: str, source: str) -> None:
+        self.sections.append({"cellId": cell_id, "source": source})
 
     def _left_alone(self, title: str, why: str) -> None:
         self.left_alone.append({"chapter": title, "why": why})

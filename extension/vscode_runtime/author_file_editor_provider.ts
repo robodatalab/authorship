@@ -45,6 +45,13 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         panel.webview.html = this.html(panel.webview, document.uri);
         const session = openAuthorFileEditorSession(document, panel);
 
+        const sendCommandCards = (): void => {
+            void panel.webview.postMessage({
+                type: "commands",
+                commands: authorDocumentCommandCards(),
+            });
+        };
+
         const pageSpoke = panel.webview.onDidReceiveMessage(
             (message: {
                 type?: string;
@@ -52,10 +59,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 commandArguments?: Record<string, unknown>;
             }) => {
                 if (message?.type === "ready") {
-                    void panel.webview.postMessage({
-                        type: "commands",
-                        commands: authorDocumentCommandCards(),
-                    });
+                    sendCommandCards();
                     session.sendDocument();
                 } else if (message?.type === "invoke" && message.commandName) {
                     void this.runCommand(
@@ -63,6 +67,14 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                         message.commandName,
                         message.commandArguments ?? {},
                     );
+                }
+            },
+        );
+
+        const settingsChanged = vscode.workspace.onDidChangeConfiguration(
+            (changed) => {
+                if (changed.affectsConfiguration("authorship")) {
+                    sendCommandCards();
                 }
             },
         );
@@ -84,6 +96,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         });
 
         panel.onDidDispose(() => {
+            settingsChanged.dispose();
             savedElsewhere.dispose();
             fileWatcher.dispose();
             pageSpoke.dispose();

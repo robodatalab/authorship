@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AuthorFileEditorProvider } from "./author_file_editor_provider";
-import { GeminiAccount } from "./gemini/account";
+import { openGeminiAccount } from "./gemini/account";
 import { PublishView } from "./publish/panel";
 import { ServerStatusBarItem } from "./llm/status_bar";
 import { ModelServer } from "./server/process";
@@ -12,7 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(new ModelServer(context, serverPort(), log));
 
-    const geminiAccount = new GeminiAccount(context);
+    const geminiAccount = openGeminiAccount(context);
     context.subscriptions.push(geminiAccount);
     for (const [commandName, runTheCommand] of Object.entries(
         geminiAccount.commands,
