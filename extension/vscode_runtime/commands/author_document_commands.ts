@@ -6,6 +6,7 @@ import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
 import { FixProseCommand } from "./fix_prose";
+import { FoldAllCommand } from "./fold_all";
 import { FoldCellCommand } from "./fold_cell";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
@@ -21,15 +22,27 @@ import { WriteTableOfContentsCommand } from "./write_table_of_contents";
 
 const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new RunAllCommand(authorDocumentCommandThatRunsCellsOfKind),
+    new FoldAllCommand(
+        "foldAll",
+        "codicon codicon-collapse-all",
+        "Fold every section away",
+        true,
+    ),
+    new FoldAllCommand(
+        "unfoldAll",
+        "codicon codicon-expand-all",
+        "Unfold every section",
+        false,
+    ),
     new FoldCellCommand(
         "foldCell",
-        "codicon codicon-fold-up",
+        "codicon codicon-collapse-all",
         "Fold this section away",
         true,
     ),
     new FoldCellCommand(
         "unfoldCell",
-        "codicon codicon-fold-down",
+        "codicon codicon-expand-all",
         "Unfold this section",
         false,
     ),

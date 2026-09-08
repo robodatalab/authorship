@@ -285,6 +285,117 @@ describe("invoking a main menu command", () => {
         ).toHaveLength(1);
     });
 
+    it("draws the one of a pair that the folding of the document calls for", async () => {
+        const foldAll = {
+            ...command("foldAll", "fold"),
+            drawnWhenCellAttributeIs: {
+                attributeName: "folded",
+                attributeValue: "",
+            },
+        };
+        const unfoldAll = {
+            ...command("unfoldAll", "fold"),
+            drawnWhenCellAttributeIs: {
+                attributeName: "folded",
+                attributeValue: "true",
+            },
+        };
+
+        await mountCanvas({
+            cells: [markdownCell("one"), markdownCell("two")],
+            commands: [foldAll, unfoldAll],
+        });
+        expect(
+            document
+                .querySelector(".author-file-editor-main-menu-tool")
+                ?.getAttribute("title"),
+        ).toBe("foldAll");
+
+        await mountCanvas({
+            cells: [
+                {
+                    kind: "markdown",
+                    source: "one",
+                    attrs: { id: "one", folded: "true" },
+                },
+                {
+                    kind: "markdown",
+                    source: "two",
+                    attrs: { id: "two", folded: "true" },
+                },
+            ],
+            commands: [foldAll, unfoldAll],
+        });
+        expect(
+            document
+                .querySelector(".author-file-editor-main-menu-tool")
+                ?.getAttribute("title"),
+        ).toBe("unfoldAll");
+    });
+
+    it("draws the first of the pair while the cells disagree", async () => {
+        await mountCanvas({
+            cells: [
+                {
+                    kind: "markdown",
+                    source: "one",
+                    attrs: { id: "one", folded: "true" },
+                },
+                markdownCell("two"),
+            ],
+            commands: [
+                {
+                    ...command("foldAll", "fold"),
+                    drawnWhenCellAttributeIs: {
+                        attributeName: "folded",
+                        attributeValue: "",
+                    },
+                },
+                {
+                    ...command("unfoldAll", "fold"),
+                    drawnWhenCellAttributeIs: {
+                        attributeName: "folded",
+                        attributeValue: "true",
+                    },
+                },
+            ],
+        });
+        expect(
+            [
+                ...document.querySelectorAll(
+                    ".author-file-editor-main-menu-tool",
+                ),
+            ].map((tool) => tool.getAttribute("title")),
+        ).toEqual(["foldAll"]);
+    });
+
+    it("draws the first of the pair for a document with no cells in it", async () => {
+        await mountCanvas({
+            cells: [],
+            commands: [
+                {
+                    ...command("foldAll", "fold"),
+                    drawnWhenCellAttributeIs: {
+                        attributeName: "folded",
+                        attributeValue: "",
+                    },
+                },
+                {
+                    ...command("unfoldAll", "fold"),
+                    drawnWhenCellAttributeIs: {
+                        attributeName: "folded",
+                        attributeValue: "true",
+                    },
+                },
+            ],
+        });
+        expect(
+            document
+                .querySelector(".author-file-editor-main-menu-tool")
+                ?.getAttribute("title"),
+        ).toBe("foldAll");
+    });
+
     it("separates the categories with one divider between each", async () => {
         await mountCanvas({
             commands: [

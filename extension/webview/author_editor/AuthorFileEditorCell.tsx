@@ -86,7 +86,7 @@ export function AuthorFileEditorCellState({
     );
 }
 
-function isDrawnOnCell(
+export function isDrawnOnCell(
     command: WebviewAuthorDocumentCommandCard,
     cellAttributes: Readonly<Record<string, string>>,
 ): boolean {

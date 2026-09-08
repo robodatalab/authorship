@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
-import { AuthorFileEditorCellState } from "./AuthorFileEditorCell";
+import {
+    AuthorFileEditorCellState,
+    isDrawnOnCell,
+} from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
@@ -157,11 +160,36 @@ export function AuthorFileEditorCanvas({
         return () => watching.disconnect();
     }, [cells]);
 
+    function everyCellIsDrawnOn(
+        command: WebviewAuthorDocumentCommandCard,
+    ): boolean {
+        return (
+            cells.length > 0 &&
+            cells.every((cell) => isDrawnOnCell(command, cell.attrs))
+        );
+    }
+
+    function theOneOfItsGroupTheDocumentCallsFor(
+        command: WebviewAuthorDocumentCommandCard,
+    ): boolean {
+        const asksAboutTheCells = commands.filter(
+            (other) =>
+                other.buttonGroup === command.buttonGroup &&
+                other.drawnWhenCellAttributeIs,
+        );
+        return (
+            (asksAboutTheCells.find(everyCellIsDrawnOn) ??
+                asksAboutTheCells[0]) === command
+        );
+    }
+
     const mainMenuCommands = commands.filter(
         (command) =>
             command.buttonGroup !== CELL_BUTTON_GROUP &&
             command.buttonGroup !== INSERT_BUTTON_GROUP &&
-            command.runsCellsOfKind === undefined,
+            command.runsCellsOfKind === undefined &&
+            (command.drawnWhenCellAttributeIs === undefined ||
+                theOneOfItsGroupTheDocumentCallsFor(command)),
     );
 
     function insertCellMenu(insertAfterCellId: string | null): ReactNode {

@@ -135,11 +135,7 @@
 }
 
 .author-file-editor-cell-folded .author-file-editor-cell-body,
-.author-file-editor-cell-folded .author-file-editor-cell-words {
-    color: var(--vscode-descriptionForeground);
-}
-
-.author-file-editor-cell-footer {
+.author-file-editor-cell-folded .author-file-editor-cell-footer {
     display: none;
 }
 
