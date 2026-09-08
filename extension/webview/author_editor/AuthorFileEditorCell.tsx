@@ -13,12 +13,6 @@ interface AuthorFileEditorCellProps {
     children?: ReactNode;
 }
 
-interface AuthorFileEditorCellRunProps {
-    isRunning: boolean;
-    howFarAlong: number;
-    onRun: () => void;
-}
-
 const RUN_RING_RADIUS = 7;
 const RUN_RING_CIRCUMFERENCE = 2 * Math.PI * RUN_RING_RADIUS;
 
@@ -40,6 +34,7 @@ interface AuthorFileEditorCellCardProps {
 
 interface AuthorFileEditorCellStateProps {
     cellCommands: WebviewAuthorDocumentCommandCard[];
+    runCommand?: WebviewAuthorDocumentCommandCard;
     cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
@@ -52,6 +47,7 @@ const AuthorFileEditorCellStateContext = createContext<
     Omit<AuthorFileEditorCellStateProps, "children">
 >({
     cellCommands: [],
+    runCommand: undefined,
     cellId: "",
     cellAttributes: {},
     proseErrors: [],
@@ -61,6 +57,7 @@ const AuthorFileEditorCellStateContext = createContext<
 
 export function AuthorFileEditorCellState({
     cellCommands,
+    runCommand,
     cellId,
     cellAttributes,
     proseErrors = [],
@@ -72,6 +69,7 @@ export function AuthorFileEditorCellState({
         <AuthorFileEditorCellStateContext.Provider
             value={{
                 cellCommands,
+                runCommand,
                 cellId,
                 cellAttributes,
                 proseErrors,
@@ -165,11 +163,6 @@ export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
 }
 
-export function useAuthorFileEditorCellIsBeingWritten(): number | undefined {
-    return useContext(AuthorFileEditorCellStateContext)
-        .howFarTheCellHasBeenWritten;
-}
-
 export function AuthorFileEditorCellWarning() {
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
@@ -187,12 +180,20 @@ export function AuthorFileEditorCellWarning() {
     );
 }
 
-export function AuthorFileEditorCellRun({
-    isRunning,
-    howFarAlong,
-    onRun,
-}: AuthorFileEditorCellRunProps) {
-    if (isRunning) {
+export function AuthorFileEditorCellRun() {
+    const {
+        runCommand,
+        cellId,
+        howFarTheCellHasBeenWritten,
+        sendMessagesToVscode,
+    } = useContext(AuthorFileEditorCellStateContext);
+
+    if (!runCommand) {
+        return null;
+    }
+
+    if (howFarTheCellHasBeenWritten !== undefined) {
+        const howFarAlong = howFarTheCellHasBeenWritten;
         return (
             <div
                 className="author-file-editor-cell-run-progress"
@@ -228,7 +229,13 @@ export function AuthorFileEditorCellRun({
             className="author-file-editor-cell-run"
             title="Write this section"
             aria-label="Write this section"
-            onClick={onRun}
+            onClick={() =>
+                invokeAuthorDocumentCommand(
+                    sendMessagesToVscode,
+                    runCommand.commandName,
+                    { cellId },
+                )
+            }
         >
             <i className="codicon codicon-play" />
         </button>

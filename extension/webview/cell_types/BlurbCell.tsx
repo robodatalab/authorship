@@ -6,7 +6,6 @@ import {
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
-    useAuthorFileEditorCellIsBeingWritten,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -28,24 +27,13 @@ export function BlurbCell({
     cellId,
     sendMessagesToVscode,
 }: BlurbCellProps) {
-    const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
     return (
         <AuthorFileEditorCell
             sidebar={
                 <>
-                    <AuthorFileEditorCellRun
-                        isRunning={howFarTheCellHasBeenWritten !== undefined}
-                        howFarAlong={howFarTheCellHasBeenWritten ?? 0}
-                        onRun={() =>
-                            invokeAuthorDocumentCommand(
-                                sendMessagesToVscode,
-                                "writeBlurb",
-                                { cellId },
-                            )
-                        }
-                    />
+                    <AuthorFileEditorCellRun />
                     <AuthorFileEditorCellWarning />
                 </>
             }

@@ -11,6 +11,7 @@ export interface AuthorDocumentCommand {
     readonly iconClassName: string;
     readonly tooltip: string;
     readonly drawnWhenCellAttributeIs?: CellAttributeCondition;
+    readonly runsCellsOfKind?: string;
     invoke(
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,

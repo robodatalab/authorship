@@ -3,7 +3,10 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
-import { AuthorFileEditorCell } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
+import {
+    AuthorFileEditorCell,
+    AuthorFileEditorCellRun,
+} from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,
@@ -270,6 +273,18 @@ describe("invoking a main menu command", () => {
         ).toHaveLength(3);
     });
 
+    it("leaves out the ones that run a kind of cell, since a cell draws those", async () => {
+        await mountCanvas({
+            commands: [
+                command("compile", "manuscript"),
+                { ...command("writeBlurb", "run"), runsCellsOfKind: "blurb" },
+            ],
+        });
+        expect(
+            document.querySelectorAll(".author-file-editor-main-menu-tool"),
+        ).toHaveLength(1);
+    });
+
     it("separates the categories with one divider between each", async () => {
         await mountCanvas({
             commands: [
@@ -344,6 +359,47 @@ describe("the commands on a cell", () => {
         expect(
             posted.map((invocation) => invocation.commandArguments.cellId),
         ).toEqual(["one", "two"]);
+    });
+});
+
+describe("the command that runs a cell", () => {
+    it("goes to the cell of the kind it runs, and to no other", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("one"),
+                { kind: "blurb", source: "", attrs: { id: "b1" } },
+            ],
+            cellRenderers: {
+                markdown: () => (
+                    <AuthorFileEditorCell
+                        sidebar={<AuthorFileEditorCellRun />}
+                    />
+                ),
+                blurb: () => (
+                    <AuthorFileEditorCell
+                        sidebar={<AuthorFileEditorCellRun />}
+                    />
+                ),
+            },
+            commands: [
+                { ...command("writeBlurb", "run"), runsCellsOfKind: "blurb" },
+            ],
+        });
+
+        const runButtons = document.querySelectorAll(
+            ".author-file-editor-cell-run",
+        );
+        expect(runButtons).toHaveLength(1);
+
+        await click(runButtons[0]);
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "writeBlurb",
+                commandArguments: { cellId: "b1" },
+            },
+        ]);
     });
 });
 

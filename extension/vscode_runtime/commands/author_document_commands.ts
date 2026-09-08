@@ -14,11 +14,13 @@ import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceMarkdownCommand } from "./replace_markdown";
+import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
 
 const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
+    new RunAllCommand(authorDocumentCommandThatRunsCellsOfKind),
     new FoldCellCommand(
         "foldCell",
         "codicon codicon-fold-up",
@@ -51,14 +53,25 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
 
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {
     return AUTHOR_DOCUMENT_COMMANDS.filter(
-        (command) => command.iconClassName !== "",
+        (command) =>
+            command.iconClassName !== "" ||
+            command.runsCellsOfKind !== undefined,
     ).map((command) => ({
         commandName: command.commandName,
         buttonGroup: command.buttonGroup,
         iconClassName: command.iconClassName,
         tooltip: command.tooltip,
         drawnWhenCellAttributeIs: command.drawnWhenCellAttributeIs,
+        runsCellsOfKind: command.runsCellsOfKind,
     }));
+}
+
+export function authorDocumentCommandThatRunsCellsOfKind(
+    cellKind: string,
+): AuthorDocumentCommand | undefined {
+    return AUTHOR_DOCUMENT_COMMANDS.find(
+        (command) => command.runsCellsOfKind === cellKind,
+    );
 }
 
 export function authorDocumentCommand(

@@ -7,7 +7,6 @@ import {
     AuthorFileEditorCellCard,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
-    useAuthorFileEditorCellIsBeingWritten,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -39,24 +38,13 @@ export function RecapCell({
     cellId,
     sendMessagesToVscode,
 }: RecapCellProps) {
-    const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
     const proseErrors = useAuthorFileEditorCellProseErrors();
 
     return (
         <AuthorFileEditorCell
             sidebar={
                 <>
-                    <AuthorFileEditorCellRun
-                        isRunning={howFarTheCellHasBeenWritten !== undefined}
-                        howFarAlong={howFarTheCellHasBeenWritten ?? 0}
-                        onRun={() =>
-                            invokeAuthorDocumentCommand(
-                                sendMessagesToVscode,
-                                "writeStorySoFar",
-                                { cellId },
-                            )
-                        }
-                    />
+                    <AuthorFileEditorCellRun />
                     <AuthorFileEditorCellWarning />
                 </>
             }

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { authorFileEditorSession } from "../author_file_editor_session";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import type { AuthorDocument } from "../storydoc/model";
+import { RECAP, type AuthorDocument } from "../storydoc/model";
 
 const DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES = "documents";
 
@@ -23,6 +23,7 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "run";
     readonly iconClassName = "";
     readonly tooltip = "";
+    readonly runsCellsOfKind = RECAP;
 
     async invoke(
         document: AuthorDocument,

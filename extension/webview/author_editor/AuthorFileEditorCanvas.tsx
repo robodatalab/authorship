@@ -24,6 +24,7 @@ export interface WebviewAuthorDocumentCommandCard {
     readonly iconClassName: string;
     readonly tooltip: string;
     readonly drawnWhenCellAttributeIs?: CellAttributeCondition;
+    readonly runsCellsOfKind?: string;
 }
 
 export type SendMessagesToVscode = (message: unknown) => void;
@@ -73,7 +74,8 @@ export function AuthorFileEditorCanvas({
     const mainMenuCommands = commands.filter(
         (command) =>
             command.buttonGroup !== CELL_BUTTON_GROUP &&
-            command.buttonGroup !== INSERT_BUTTON_GROUP,
+            command.buttonGroup !== INSERT_BUTTON_GROUP &&
+            command.runsCellsOfKind === undefined,
     );
 
     return (
@@ -108,6 +110,11 @@ export function AuthorFileEditorCanvas({
                             >
                                 <AuthorFileEditorCellState
                                     cellCommands={cellCommands}
+                                    runCommand={commands.find(
+                                        (command) =>
+                                            command.runsCellsOfKind ===
+                                            cell.kind,
+                                    )}
                                     cellId={cell.attrs.id}
                                     cellAttributes={cell.attrs}
                                     proseErrors={proseErrors.filter(

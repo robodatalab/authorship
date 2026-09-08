@@ -1,6 +1,6 @@
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { authorFileEditorSession } from "../author_file_editor_session";
-import { CHAPTER, type AuthorDocument } from "../storydoc/model";
+import { CHAPTER, CONTENTS, type AuthorDocument } from "../storydoc/model";
 
 function contentsOf(document: AuthorDocument): string {
     return document.cells
@@ -14,6 +14,7 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "run";
     readonly iconClassName = "";
     readonly tooltip = "";
+    readonly runsCellsOfKind = CONTENTS;
 
     invoke(
         document: AuthorDocument,

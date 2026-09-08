@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { authorFileEditorSession } from "../author_file_editor_session";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import type { AuthorDocument } from "../storydoc/model";
+import { BLURB, type AuthorDocument } from "../storydoc/model";
 
 interface WrittenSection extends ServerJob {
     text: string;
@@ -21,6 +21,7 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "run";
     readonly iconClassName = "";
     readonly tooltip = "";
+    readonly runsCellsOfKind = BLURB;
 
     async invoke(
         document: AuthorDocument,

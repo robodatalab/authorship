@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { act } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,8 +11,17 @@ import {
     AuthorFileEditorCellWarning,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
+import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+
+const RUN_COMMAND: WebviewAuthorDocumentCommandCard = {
+    commandName: "writeBlurb",
+    buttonGroup: "run",
+    iconClassName: "",
+    tooltip: "",
+    runsCellsOfKind: "blurb",
+};
 
 async function mount(cell: ReactNode): Promise<void> {
     document.body.innerHTML = "";
@@ -48,19 +57,19 @@ describe("the sidebar every cell has", () => {
 
     it("holds what the cell renders into it", async () => {
         await mount(
-            <AuthorFileEditorCell
-                sidebar={
-                    <AuthorFileEditorCellRun
-                        isRunning={false}
-                        howFarAlong={0}
-                        onRun={() => undefined}
-                    />
-                }
+            <AuthorFileEditorCellState
+                cellCommands={[]}
+                runCommand={RUN_COMMAND}
+                cellId="c1"
+                cellAttributes={{}}
+                sendMessagesToVscode={() => undefined}
             >
-                <AuthorFileEditorCellHeader>
-                    Contents
-                </AuthorFileEditorCellHeader>
-            </AuthorFileEditorCell>,
+                <AuthorFileEditorCell sidebar={<AuthorFileEditorCellRun />}>
+                    <AuthorFileEditorCellHeader>
+                        Contents
+                    </AuthorFileEditorCellHeader>
+                </AuthorFileEditorCell>
+            </AuthorFileEditorCellState>,
         );
         expect(
             sidebar().querySelector(".author-file-editor-cell-run"),
@@ -159,15 +168,31 @@ describe("running a cell that writes itself", () => {
         )!;
     }
 
-    it("offers to run it", async () => {
-        const run = vi.fn();
+    const posted: unknown[] = [];
+
+    async function mountRun(options: {
+        runCommand?: WebviewAuthorDocumentCommandCard;
+        howFarTheCellHasBeenWritten?: number;
+    }): Promise<void> {
+        posted.length = 0;
         await mount(
-            <AuthorFileEditorCellRun
-                isRunning={false}
-                howFarAlong={0}
-                onRun={run}
-            />,
+            <AuthorFileEditorCellState
+                cellCommands={[]}
+                runCommand={options.runCommand}
+                cellId="c1"
+                cellAttributes={{}}
+                howFarTheCellHasBeenWritten={
+                    options.howFarTheCellHasBeenWritten
+                }
+                sendMessagesToVscode={(message) => posted.push(message)}
+            >
+                <AuthorFileEditorCellRun />
+            </AuthorFileEditorCellState>,
         );
+    }
+
+    it("asks for the command that runs cells of this kind", async () => {
+        await mountRun({ runCommand: RUN_COMMAND });
         const button = document.querySelector(".author-file-editor-cell-run")!;
         expect(button.querySelector("i")?.className).toBe(
             "codicon codicon-play",
@@ -177,17 +202,29 @@ describe("running a cell that writes itself", () => {
             button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
         });
 
-        expect(run).toHaveBeenCalledTimes(1);
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "writeBlurb",
+                commandArguments: { cellId: "c1" },
+            },
+        ]);
+    });
+
+    it("offers nothing when no command runs cells of this kind", async () => {
+        await mountRun({});
+
+        expect(
+            document.querySelector(".author-file-editor-cell-run"),
+        ).toBeNull();
+        expect(ring()).toBeNull();
     });
 
     it("becomes a ring while it runs, and offers nothing to press", async () => {
-        await mount(
-            <AuthorFileEditorCellRun
-                isRunning={true}
-                howFarAlong={0}
-                onRun={vi.fn()}
-            />,
-        );
+        await mountRun({
+            runCommand: RUN_COMMAND,
+            howFarTheCellHasBeenWritten: 0,
+        });
 
         expect(
             document.querySelector(".author-file-editor-cell-run"),
@@ -196,13 +233,10 @@ describe("running a cell that writes itself", () => {
     });
 
     it("fills the ring as far as the writing has got", async () => {
-        await mount(
-            <AuthorFileEditorCellRun
-                isRunning={true}
-                howFarAlong={0.25}
-                onRun={vi.fn()}
-            />,
-        );
+        await mountRun({
+            runCommand: RUN_COMMAND,
+            howFarTheCellHasBeenWritten: 0.25,
+        });
 
         const circumference = 2 * Math.PI * 7;
         expect(written().getAttribute("stroke-dasharray")).toBe(
@@ -215,13 +249,10 @@ describe("running a cell that writes itself", () => {
     });
 
     it("closes the ring when the writing is done", async () => {
-        await mount(
-            <AuthorFileEditorCellRun
-                isRunning={true}
-                howFarAlong={1}
-                onRun={vi.fn()}
-            />,
-        );
+        await mountRun({
+            runCommand: RUN_COMMAND,
+            howFarTheCellHasBeenWritten: 1,
+        });
 
         expect(written().getAttribute("stroke-dashoffset")).toBe("0");
     });

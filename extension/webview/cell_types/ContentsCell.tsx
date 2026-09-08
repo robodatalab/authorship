@@ -4,7 +4,6 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
-    useAuthorFileEditorCellIsBeingWritten,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -26,23 +25,8 @@ export function ContentsCell({
     cellId,
     sendMessagesToVscode,
 }: ContentsCellProps) {
-    const howFarTheCellHasBeenWritten = useAuthorFileEditorCellIsBeingWritten();
     return (
-        <AuthorFileEditorCell
-            sidebar={
-                <AuthorFileEditorCellRun
-                    isRunning={howFarTheCellHasBeenWritten !== undefined}
-                    howFarAlong={howFarTheCellHasBeenWritten ?? 0}
-                    onRun={() =>
-                        invokeAuthorDocumentCommand(
-                            sendMessagesToVscode,
-                            "writeTableOfContents",
-                            { cellId },
-                        )
-                    }
-                />
-            }
-        >
+        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellRun />}>
             <AuthorFileEditorCellHeader>
                 Table of Contents
             </AuthorFileEditorCellHeader>
