@@ -6,6 +6,7 @@ import { AuthorFileEditorCellState } from "./AuthorFileEditorCell";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import { CHAPTER, FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -29,6 +30,49 @@ export interface WebviewAuthorDocumentCommandCard {
 }
 
 export type SendMessagesToVscode = (message: unknown) => void;
+
+function isFolded(cell: WebviewCell): boolean {
+    return cell.attrs[FOLDED] === "true";
+}
+
+function opensASection(cell: WebviewCell): boolean {
+    return cell.kind === PART || cell.kind === CHAPTER;
+}
+
+function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
+    const scope =
+        cell.kind === PART
+            ? "author-file-editor-part-scope"
+            : "author-file-editor-chapter-scope";
+    return nothingOfItsKindFollows
+        ? `${scope} author-file-editor-scope-ends`
+        : scope;
+}
+
+export interface CellsInASection {
+    cell: WebviewCell;
+    within: CellsInASection[];
+}
+
+export function cellsBySection(cells: WebviewCell[]): CellsInASection[] {
+    const wholeDocument: CellsInASection[] = [];
+    let part: CellsInASection | undefined;
+    let chapter: CellsInASection | undefined;
+    for (const cell of cells) {
+        const section: CellsInASection = { cell, within: [] };
+        if (cell.kind === PART) {
+            wholeDocument.push(section);
+            part = section;
+            chapter = undefined;
+        } else if (cell.kind === CHAPTER) {
+            (part?.within ?? wholeDocument).push(section);
+            chapter = section;
+        } else {
+            (chapter?.within ?? part?.within ?? wholeDocument).push(section);
+        }
+    }
+    return wholeDocument;
+}
 
 export function invokeAuthorDocumentCommand(
     sendMessagesToVscode: SendMessagesToVscode,
@@ -116,6 +160,91 @@ export function AuthorFileEditorCanvas({
             command.runsCellsOfKind === undefined,
     );
 
+    function insertCellMenu(insertAfterCellId: string | null): ReactNode {
+        return (
+            <AuthorFileEditorInsertCellMenu
+                insertCommand={insertCommand}
+                cellTypes={cellTypes}
+                insertAfterCellId={insertAfterCellId}
+                sendMessagesToVscode={sendMessagesToVscode}
+            />
+        );
+    }
+
+    function cellsInScope(
+        sections: CellsInASection[],
+        insertAfterCellId: string | null,
+        scopeClassName?: string,
+    ): ReactNode {
+        return (
+            <ul
+                className={scopeClassName}
+                ref={scopeClassName ? undefined : cellsOnThePage}
+            >
+                <li>{insertCellMenu(insertAfterCellId)}</li>
+                {sections.map((section, sectionIndex) => {
+                    const cell = section.cell;
+                    const renderCell = cellRenderers[cell.kind];
+                    if (!renderCell) {
+                        return null;
+                    }
+                    return (
+                        <li
+                            key={cell.attrs.id}
+                            data-cell-id={cell.attrs.id}
+                            className={
+                                isFolded(cell)
+                                    ? "author-file-editor-cell-folded"
+                                    : undefined
+                            }
+                        >
+                            <AuthorFileEditorCellState
+                                cellCommands={cellCommands}
+                                runCommand={commands.find(
+                                    (command) =>
+                                        command.runsCellsOfKind === cell.kind,
+                                )}
+                                cellId={cell.attrs.id}
+                                cellAttributes={cell.attrs}
+                                proseErrors={proseErrors.filter(
+                                    (proseError) =>
+                                        proseError.cellId === cell.attrs.id &&
+                                        proseError.isVisible,
+                                )}
+                                howFarTheCellHasBeenWritten={
+                                    cellsBeingWritten[cell.attrs.id]
+                                }
+                                sendMessagesToVscode={sendMessagesToVscode}
+                            >
+                                {renderCell(
+                                    cell,
+                                    cell.attrs.id,
+                                    sendMessagesToVscode,
+                                )}
+                            </AuthorFileEditorCellState>
+                            {opensASection(cell) && !isFolded(cell)
+                                ? cellsInScope(
+                                      section.within,
+                                      cell.attrs.id,
+                                      scopeOf(
+                                          cell,
+                                          !sections
+                                              .slice(sectionIndex + 1)
+                                              .some(
+                                                  (following) =>
+                                                      following.cell.kind ===
+                                                      cell.kind,
+                                              ),
+                                      ),
+                                  )
+                                : insertCellMenu(cell.attrs.id)}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    }
+
     return (
         <div className="author-file-editor-canvas">
             <AuthorFileEditorMainMenu
@@ -128,66 +257,7 @@ export function AuthorFileEditorCanvas({
                 />
             </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator>
-                <ul ref={cellsOnThePage}>
-                    <li>
-                        <AuthorFileEditorInsertCellMenu
-                            insertCommand={insertCommand}
-                            cellTypes={cellTypes}
-                            insertAfterCellId={null}
-                            sendMessagesToVscode={sendMessagesToVscode}
-                        />
-                    </li>
-                    {cells.map((cell, cellIndex) => {
-                        const renderCell = cellRenderers[cell.kind];
-                        if (!renderCell) {
-                            return null;
-                        }
-                        return (
-                            <li
-                                key={cellIndex}
-                                data-cell-id={cell.attrs.id}
-                                className={
-                                    cell.attrs.folded === "true"
-                                        ? "author-file-editor-cell-folded"
-                                        : undefined
-                                }
-                            >
-                                <AuthorFileEditorCellState
-                                    cellCommands={cellCommands}
-                                    runCommand={commands.find(
-                                        (command) =>
-                                            command.runsCellsOfKind ===
-                                            cell.kind,
-                                    )}
-                                    cellId={cell.attrs.id}
-                                    cellAttributes={cell.attrs}
-                                    proseErrors={proseErrors.filter(
-                                        (proseError) =>
-                                            proseError.cellId ===
-                                                cell.attrs.id &&
-                                            proseError.isVisible,
-                                    )}
-                                    howFarTheCellHasBeenWritten={
-                                        cellsBeingWritten[cell.attrs.id]
-                                    }
-                                    sendMessagesToVscode={sendMessagesToVscode}
-                                >
-                                    {renderCell(
-                                        cell,
-                                        cell.attrs.id,
-                                        sendMessagesToVscode,
-                                    )}
-                                </AuthorFileEditorCellState>
-                                <AuthorFileEditorInsertCellMenu
-                                    insertCommand={insertCommand}
-                                    cellTypes={cellTypes}
-                                    insertAfterCellId={cell.attrs.id}
-                                    sendMessagesToVscode={sendMessagesToVscode}
-                                />
-                            </li>
-                        );
-                    })}
-                </ul>
+                {cellsInScope(cellsBySection(cells), null)}
             </MarkdownEditorMediator>
         </div>
     );

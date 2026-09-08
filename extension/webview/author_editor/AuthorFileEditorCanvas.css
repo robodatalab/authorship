@@ -14,12 +14,55 @@ body {
     overflow: hidden;
 }
 
+.author-file-editor-canvas ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
 .author-file-editor-canvas > ul {
     flex: 1 1 auto;
     overflow-y: auto;
-    margin: 0;
     padding: 6px 12px 40vh;
-    list-style: none;
+}
+
+.author-file-editor-canvas ul.author-file-editor-part-scope,
+.author-file-editor-canvas ul.author-file-editor-chapter-scope {
+    margin-left: 7px;
+    padding-left: 12px;
+    border-left: 1px solid;
+}
+
+.author-file-editor-canvas ul.author-file-editor-part-scope {
+    border-left-color: var(--vscode-panel-border);
+}
+
+.author-file-editor-canvas ul.author-file-editor-chapter-scope {
+    border-left-color: color-mix(
+        in srgb,
+        var(--vscode-panel-border) 55%,
+        transparent
+    );
+}
+
+.author-file-editor-canvas ul.author-file-editor-scope-ends {
+    position: relative;
+}
+
+.author-file-editor-canvas ul.author-file-editor-scope-ends::after {
+    content: "";
+    position: absolute;
+    left: -4px;
+    bottom: -3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--vscode-panel-border);
+}
+
+.author-file-editor-canvas
+    ul.author-file-editor-chapter-scope.author-file-editor-scope-ends::after {
+    background: color-mix(in srgb, var(--vscode-panel-border) 55%, transparent);
 }
 
 .author-file-editor-insert-cell-menu {

@@ -483,6 +483,203 @@ describe("two commands drawn as one button", () => {
     });
 });
 
+describe("folding a part or a chapter", () => {
+    function story(folded: Record<string, boolean>): WebviewCell[] {
+        return [
+            { kind: "part", source: "", attrs: foldedAttributes("p1", folded) },
+            {
+                kind: "chapter",
+                source: "",
+                attrs: foldedAttributes("c1", folded),
+            },
+            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            {
+                kind: "chapter",
+                source: "",
+                attrs: foldedAttributes("c2", folded),
+            },
+            { kind: "markdown", source: "two", attrs: { id: "m2" } },
+            { kind: "part", source: "", attrs: foldedAttributes("p2", folded) },
+            { kind: "markdown", source: "three", attrs: { id: "m3" } },
+        ];
+    }
+
+    function foldedAttributes(
+        id: string,
+        folded: Record<string, boolean>,
+    ): Record<string, string> {
+        return folded[id] ? { id, folded: "true" } : { id };
+    }
+
+    const CELL_KINDS: AuthorDocumentCellRenderers = {
+        part: (cell) => <div className="test-cell">{cell.source}</div>,
+        chapter: (cell) => <div className="test-cell">{cell.source}</div>,
+        markdown: (cell) => <div className="test-cell">{cell.source}</div>,
+    };
+
+    async function cellsDrawn(
+        folded: Record<string, boolean>,
+    ): Promise<(string | null)[]> {
+        await mountCanvas({
+            cells: story(folded),
+            cellRenderers: CELL_KINDS,
+        });
+        return [...document.querySelectorAll("li[data-cell-id]")].map((drawn) =>
+            drawn.getAttribute("data-cell-id"),
+        );
+    }
+
+    it("draws every cell while nothing is folded", async () => {
+        expect(await cellsDrawn({})).toEqual([
+            "p1",
+            "c1",
+            "m1",
+            "c2",
+            "m2",
+            "p2",
+            "m3",
+        ]);
+    });
+
+    it("folds every chapter of a part away, up to the next part", async () => {
+        expect(await cellsDrawn({ p1: true })).toEqual(["p1", "p2", "m3"]);
+    });
+
+    it("folds the prose under a chapter away, up to the next chapter", async () => {
+        expect(await cellsDrawn({ c1: true })).toEqual([
+            "p1",
+            "c1",
+            "c2",
+            "m2",
+            "p2",
+            "m3",
+        ]);
+    });
+
+    it("folds the prose under the last part away, to the end", async () => {
+        expect(await cellsDrawn({ p2: true })).toEqual([
+            "p1",
+            "c1",
+            "m1",
+            "c2",
+            "m2",
+            "p2",
+        ]);
+    });
+
+    it("keeps a chapter of a folded part folded away, whatever the chapter says", async () => {
+        expect(await cellsDrawn({ p1: true, c1: false })).toEqual([
+            "p1",
+            "p2",
+            "m3",
+        ]);
+    });
+});
+
+describe("the scope of a part and of a chapter", () => {
+    const CELL_KINDS: AuthorDocumentCellRenderers = {
+        part: () => <div className="test-cell" />,
+        chapter: () => <div className="test-cell" />,
+        markdown: () => <div className="test-cell" />,
+    };
+
+    async function mountStory(cells: WebviewCell[]): Promise<void> {
+        await mountCanvas({ cells, cellRenderers: CELL_KINDS });
+    }
+
+    function cellsWithin(scope: string): string[] {
+        return [
+            ...document.querySelectorAll(`.${scope} > li[data-cell-id]`),
+        ].map((drawn) => drawn.getAttribute("data-cell-id") ?? "");
+    }
+
+    it("draws a chapter inside the scope of its part, and the prose inside the chapter's", async () => {
+        await mountStory([
+            { kind: "part", source: "", attrs: { id: "p1" } },
+            { kind: "chapter", source: "", attrs: { id: "c1" } },
+            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+        ]);
+
+        expect(cellsWithin("author-file-editor-part-scope")).toEqual(["c1"]);
+        expect(cellsWithin("author-file-editor-chapter-scope")).toEqual(["m1"]);
+    });
+
+    it("holds every kind of section inside the chapter it stands in", async () => {
+        await mountStory([
+            { kind: "chapter", source: "", attrs: { id: "c1" } },
+            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            { kind: "part", source: "", attrs: { id: "p1" } },
+        ]);
+
+        expect(cellsWithin("author-file-editor-chapter-scope")).toEqual(["m1"]);
+        expect(
+            listItems().map((item) => item.getAttribute("data-cell-id")),
+        ).toEqual([null, "c1", "p1"]);
+    });
+
+    it("leaves what stands before any part or chapter at the top", async () => {
+        await mountStory([
+            { kind: "markdown", source: "front", attrs: { id: "m0" } },
+            { kind: "part", source: "", attrs: { id: "p1" } },
+            { kind: "markdown", source: "under", attrs: { id: "m1" } },
+        ]);
+
+        expect(
+            listItems().map((item) => item.getAttribute("data-cell-id")),
+        ).toEqual([null, "m0", "p1"]);
+        expect(cellsWithin("author-file-editor-part-scope")).toEqual(["m1"]);
+    });
+
+    it("marks the end of the line of a section nothing of its kind follows", async () => {
+        await mountStory([
+            { kind: "part", source: "", attrs: { id: "p1" } },
+            { kind: "chapter", source: "", attrs: { id: "c1" } },
+            { kind: "chapter", source: "", attrs: { id: "c2" } },
+        ]);
+
+        const scopes = [
+            ...document.querySelectorAll("ul[class*='-scope']"),
+        ].map((scope) =>
+            scope.classList.contains("author-file-editor-scope-ends"),
+        );
+        expect(scopes).toEqual([true, false, true]);
+    });
+
+    it("keeps the menu of a folded section, where its scope would have been", async () => {
+        await mountStory([
+            {
+                kind: "chapter",
+                source: "",
+                attrs: { id: "c1", folded: "true" },
+            },
+            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            { kind: "chapter", source: "", attrs: { id: "c2" } },
+        ]);
+
+        const menu = document.querySelector(
+            "li[data-cell-id='c1'] > .author-file-editor-insert-cell-menu",
+        )!;
+        expect(menu).not.toBeNull();
+        await click(menu.querySelector("button")!);
+
+        expect(posted[0].commandArguments.afterCellId).toBe("c1");
+    });
+
+    it("opens the scope with the menu that inserts after the section's own cell", async () => {
+        await mountStory([
+            { kind: "part", source: "", attrs: { id: "p1" } },
+            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+        ]);
+
+        const menu = document.querySelector(
+            ".author-file-editor-part-scope > li > .author-file-editor-insert-cell-menu",
+        )!;
+        await click(menu.querySelector("button")!);
+
+        expect(posted[0].commandArguments.afterCellId).toBe("p1");
+    });
+});
+
 describe("a folded cell", () => {
     it("is marked as folded on the page", async () => {
         await mountCanvas({
