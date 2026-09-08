@@ -6,6 +6,7 @@ import {
     AuthorFileEditorCellCard,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
+    useAuthorFileEditorCellFindHighlights,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -44,6 +45,7 @@ export function AboutCell({
     sendMessagesToVscode,
 }: AboutCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
+    const findHighlights = useAuthorFileEditorCellFindHighlights();
 
     return (
         <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
@@ -66,6 +68,7 @@ export function AboutCell({
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
+                        highlights={findHighlights}
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>

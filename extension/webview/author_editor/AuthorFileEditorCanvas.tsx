@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
@@ -6,6 +6,11 @@ import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
 } from "./AuthorFileEditorCell";
+import {
+    AuthorFileEditorFindBar,
+    useAuthorFileEditorFind,
+} from "./AuthorFileEditorFindBar";
+import type { AuthorFileEditorFindMatch } from "./AuthorFileEditorFind";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
@@ -125,6 +130,18 @@ export function AuthorFileEditorCanvas({
     );
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
+    const find = useAuthorFileEditorFind(cells, sendMessagesToVscode);
+
+    const findMatchesByCellId = useMemo(() => {
+        const byCellId = new Map<string, AuthorFileEditorFindMatch[]>();
+        for (const match of find.found) {
+            const cellId = cells[match.cell]?.attrs.id;
+            if (cellId) {
+                byCellId.set(cellId, [...(byCellId.get(cellId) ?? []), match]);
+            }
+        }
+        return byCellId;
+    }, [find.found, cells]);
 
     useEffect(() => {
         const scrolled = cellsOnThePage.current;
@@ -243,6 +260,16 @@ export function AuthorFileEditorCanvas({
                                         proseError.cellId === cell.attrs.id &&
                                         proseError.isVisible,
                                 )}
+                                findMatches={findMatchesByCellId.get(
+                                    cell.attrs.id,
+                                )}
+                                currentFindMatch={
+                                    find.current &&
+                                    cells[find.current.cell]?.attrs.id ===
+                                        cell.attrs.id
+                                        ? find.current
+                                        : null
+                                }
                                 howFarTheCellHasBeenWritten={
                                     cellsBeingWritten[cell.attrs.id]
                                 }
@@ -291,6 +318,7 @@ export function AuthorFileEditorCanvas({
                     cellIdInView={cellIdInView}
                     wordsInTheDocument={wordsInTheDocument}
                 />
+                <AuthorFileEditorFindBar find={find} />
             </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator>
                 {cellsInScope(cellsBySection(cells), null)}

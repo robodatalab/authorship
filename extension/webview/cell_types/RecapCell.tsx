@@ -7,6 +7,7 @@ import {
     AuthorFileEditorCellCard,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
+    useAuthorFileEditorCellFindHighlights,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
@@ -39,6 +40,7 @@ export function RecapCell({
     sendMessagesToVscode,
 }: RecapCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
+    const findHighlights = useAuthorFileEditorCellFindHighlights();
 
     return (
         <AuthorFileEditorCell
@@ -68,6 +70,7 @@ export function RecapCell({
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
+                        highlights={findHighlights}
                         markdown={cell.source}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>

@@ -4,6 +4,7 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    useAuthorFileEditorCellFindHighlights,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -25,6 +26,8 @@ export function ContentsCell({
     cellId,
     sendMessagesToVscode,
 }: ContentsCellProps) {
+    const findHighlights = useAuthorFileEditorCellFindHighlights();
+
     return (
         <AuthorFileEditorCell sidebar={<AuthorFileEditorCellRun />}>
             <AuthorFileEditorCellHeader>
@@ -32,6 +35,7 @@ export function ContentsCell({
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    highlights={findHighlights}
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
                         invokeAuthorDocumentCommand(

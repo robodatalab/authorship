@@ -6,6 +6,10 @@ import {
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type {
+    AuthorFileEditorFindHighlight,
+    AuthorFileEditorFindMatch,
+} from "./AuthorFileEditorFind";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -38,6 +42,8 @@ interface AuthorFileEditorCellStateProps {
     cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
+    findMatches?: AuthorFileEditorFindMatch[];
+    currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
     wordsInTheSection?: number;
     sendMessagesToVscode: SendMessagesToVscode;
@@ -52,6 +58,8 @@ const AuthorFileEditorCellStateContext = createContext<
     cellId: "",
     cellAttributes: {},
     proseErrors: [],
+    findMatches: [],
+    currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
     wordsInTheSection: undefined,
     sendMessagesToVscode: () => undefined,
@@ -63,6 +71,8 @@ export function AuthorFileEditorCellState({
     cellId,
     cellAttributes,
     proseErrors = [],
+    findMatches = [],
+    currentFindMatch = null,
     howFarTheCellHasBeenWritten,
     wordsInTheSection,
     sendMessagesToVscode,
@@ -76,6 +86,8 @@ export function AuthorFileEditorCellState({
                 cellId,
                 cellAttributes,
                 proseErrors,
+                findMatches,
+                currentFindMatch,
                 howFarTheCellHasBeenWritten,
                 wordsInTheSection,
                 sendMessagesToVscode,
@@ -165,6 +177,28 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function useAuthorFileEditorCellFind(): {
+    matches: AuthorFileEditorFindMatch[];
+    current: AuthorFileEditorFindMatch | null;
+} {
+    const { findMatches, currentFindMatch } = useContext(
+        AuthorFileEditorCellStateContext,
+    );
+    return { matches: findMatches ?? [], current: currentFindMatch ?? null };
+}
+
+/** Where the cell's prose is to be marked, as the markdown editor takes it. */
+export function useAuthorFileEditorCellFindHighlights(): AuthorFileEditorFindHighlight[] {
+    const { matches, current } = useAuthorFileEditorCellFind();
+    return matches
+        .filter((match) => match.attributeName === null)
+        .map((match) => ({
+            at: match.at,
+            end: match.end,
+            isCurrent: match === current,
+        }));
 }
 
 export function AuthorFileEditorCellWords() {

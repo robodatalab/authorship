@@ -3,6 +3,7 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    useAuthorFileEditorCellFindHighlights,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -24,11 +25,14 @@ export function CoverCell({
     cellId,
     sendMessagesToVscode,
 }: CoverCellProps) {
+    const findHighlights = useAuthorFileEditorCellFindHighlights();
+
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Cover</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    highlights={findHighlights}
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>
                         invokeAuthorDocumentCommand(

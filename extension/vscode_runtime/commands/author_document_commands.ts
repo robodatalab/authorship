@@ -15,6 +15,7 @@ import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceMarkdownCommand } from "./replace_markdown";
+import { ReplaceTextsCommand } from "./replace_texts";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
@@ -52,6 +53,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new InsertCellCommand(),
     new ReplaceMarkdownCommand(),
     new ReplaceAttributeCommand(),
+    new ReplaceTextsCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

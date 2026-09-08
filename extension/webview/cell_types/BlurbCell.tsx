@@ -6,6 +6,7 @@ import {
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
+    useAuthorFileEditorCellFindHighlights,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -28,6 +29,7 @@ export function BlurbCell({
     sendMessagesToVscode,
 }: BlurbCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
+    const findHighlights = useAuthorFileEditorCellFindHighlights();
 
     return (
         <AuthorFileEditorCell
@@ -41,6 +43,7 @@ export function BlurbCell({
             <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    highlights={findHighlights}
                     markdown={cell.source}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>

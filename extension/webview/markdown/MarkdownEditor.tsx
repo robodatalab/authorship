@@ -15,6 +15,8 @@ import {
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
 import { marked } from "marked";
+import { fenced, markedUp } from "../author_editor/AuthorFileEditorFind";
+import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileEditorFind";
 import { LinterTooltip } from "../linter/LinterTooltip";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import "./MarkdownEditor.css";
@@ -31,6 +33,15 @@ monaco.editor.addKeybindingRules([
         command: null,
     },
     { keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY, command: null },
+    { keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, command: null },
+    { keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, command: null },
+    {
+        keybinding:
+            monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+        command: null,
+    },
+    { keybinding: monaco.KeyCode.F3, command: null },
+    { keybinding: monaco.KeyMod.Shift | monaco.KeyCode.F3, command: null },
 ]);
 
 const SETTLE_AFTER_TYPING_MS = 400;
@@ -76,6 +87,7 @@ interface MarkdownEditorProps {
     markdown: string;
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
+    highlights?: AuthorFileEditorFindHighlight[];
     onFixAsked?: (error: ProseCheckError) => void;
     children?: (markdown: string) => ReactNode;
 }
@@ -84,6 +96,7 @@ export function MarkdownEditor({
     markdown,
     onMarkdownCommitted,
     errors = [],
+    highlights = [],
     onFixAsked = () => undefined,
     children,
 }: MarkdownEditorProps) {
@@ -106,7 +119,7 @@ export function MarkdownEditor({
                 className="markdown-rendered"
                 onDoubleClick={openOnDoubleClick}
             >
-                {children(markdown)}
+                {children(fenced(markdown, highlights))}
             </div>
         );
     }
@@ -117,7 +130,12 @@ export function MarkdownEditor({
                 className="markdown-rendered"
                 onDoubleClick={openOnDoubleClick}
                 dangerouslySetInnerHTML={{
-                    __html: marked.parse(markdown, { async: false, gfm: true }),
+                    __html: markedUp(
+                        marked.parse(fenced(markdown, highlights), {
+                            async: false,
+                            gfm: true,
+                        }),
+                    ),
                 }}
             />
         );
