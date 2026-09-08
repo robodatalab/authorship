@@ -1,41 +1,39 @@
-/* The Jobs Status drawer: one row per unfinished job, keyed by the file it
-   works on. */
+/* The Jobs Status drawer: one line per unfinished job, in three columns — what
+   it is, how long it has run, and the button that stops it — so the times and
+   the buttons line up down the drawer however long the names beside them are. */
 .authorship-panel-jobs {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: baseline;
+    column-gap: 8px;
+    row-gap: 6px;
 }
 
-.authorship-panel-job-head {
+/* The kind is short and fixed; the file it works on gives up its width first. */
+.authorship-panel-job-what {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .authorship-panel-job-kind {
-    flex: 1;
+    flex: 0 0 auto;
+}
+
+.authorship-panel-job-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.authorship-panel-job-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: calc(var(--vscode-font-size) - 1px);
-    color: var(--vscode-descriptionForeground);
-}
-
-.authorship-panel-job-elapsed,
-.authorship-panel-job-phase {
     font-size: calc(var(--vscode-font-size) - 1px);
     color: var(--vscode-descriptionForeground);
 }
 
 .authorship-panel-job-elapsed {
+    font-size: calc(var(--vscode-font-size) - 1px);
     font-variant-numeric: tabular-nums;
+    color: var(--vscode-descriptionForeground);
 }
 
 .authorship-panel-job-running {
@@ -75,4 +73,8 @@
     height: 8px;
     border-radius: 1px;
     background: currentColor;
+}
+
+.authorship-panel-job-stop-taken {
+    width: 16px;
 }
