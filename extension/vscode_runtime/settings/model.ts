@@ -4,13 +4,19 @@ export const SETTINGS_FILE = "settings.json";
 
 export interface Templates {
     disclaimer: { title: string; text: string };
-    about: { text: string; kdp: string; website: string; substack: string };
+    about: {
+        text: string;
+        kdp: string;
+        website: string;
+        substack: string;
+        portrait: string;
+    };
     "title-page": { author: string; publisher: string };
 }
 
 export const EMPTY_TEMPLATES: Templates = {
     disclaimer: { title: "", text: "" },
-    about: { text: "", kdp: "", website: "", substack: "" },
+    about: { text: "", kdp: "", website: "", substack: "", portrait: "" },
     "title-page": { author: "", publisher: "" },
 };
 
@@ -24,7 +30,8 @@ export const BLANK_SETTINGS = `{
       "file": "about.md",
       "kdp": "",
       "website": "",
-      "substack": ""
+      "substack": "",
+      "portrait": ""
     },
     "title-page": {
       "author": "",
@@ -64,6 +71,7 @@ export async function readSettings(
             kdp: textOf(about, "kdp"),
             website: textOf(about, "website"),
             substack: textOf(about, "substack"),
+            portrait: textOf(about, "portrait"),
         },
         "title-page": {
             author: textOf(titlePage, "author"),

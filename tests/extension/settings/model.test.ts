@@ -28,7 +28,13 @@ describe("what Authorship starts a workspace with", () => {
     it("has no words of its own for any of these pages", () => {
         expect(EMPTY_TEMPLATES).toEqual({
             disclaimer: { title: "", text: "" },
-            about: { text: "", kdp: "", website: "", substack: "" },
+            about: {
+                text: "",
+                kdp: "",
+                website: "",
+                substack: "",
+                portrait: "",
+            },
             "title-page": { author: "", publisher: "" },
         });
     });
@@ -56,6 +62,7 @@ describe("readSettings — reading what the author wrote", () => {
                         kdp: "https://amazon.com/author/x",
                         website: "https://example.com",
                         substack: "https://x.substack.com",
+                        portrait: "author.jpg",
                     },
                     "title-page": { author: "A. Writer", publisher: "Nobody" },
                 },
@@ -70,6 +77,7 @@ describe("readSettings — reading what the author wrote", () => {
             text: "All of it invented.",
         });
         expect(written.about.text).toBe("Writes at night.");
+        expect(written.about.portrait).toBe("author.jpg");
         expect(written["title-page"].author).toBe("A. Writer");
     });
 
@@ -130,6 +138,10 @@ describe("BLANK_SETTINGS — what a workspace is started with", () => {
         expect(await readSettings(BLANK_SETTINGS, folder())).toEqual(
             EMPTY_TEMPLATES,
         );
+    });
+
+    it("names the portrait an author page carries", () => {
+        expect(BLANK_SETTINGS).toContain('"portrait": ""');
     });
 
     it("names the markdown files those pages are written in", () => {

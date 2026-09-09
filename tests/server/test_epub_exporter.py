@@ -735,7 +735,9 @@ class BuildEpub(unittest.TestCase):
         who = page[page.index('<div class="who">') :]
         self.assertIn('<div class="links">', who)
         self.assertIn('href="art_000.jpg"', opf)
-        self.assertIn("max-height: 22vh", css)
+        # Given a width rather than a ceiling, so art of any size comes down to
+        # the same share of the page and the links have somewhere to stand.
+        self.assertIn(".about .who .portrait { width: 34%", css)
 
     def test_a_portrait_nobody_has_drawn_yet_leaves_the_page_standing(
         self,

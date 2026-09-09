@@ -135,6 +135,7 @@ const CELL_KINDS: CellKind[] = [
                     kdp: templates().about.kdp,
                     website: templates().about.website,
                     substack: templates().about.substack,
+                    portrait: templates().about.portrait,
                 }),
             ),
     },

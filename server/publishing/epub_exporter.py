@@ -583,8 +583,8 @@ p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 .about .who { text-align: center; margin-bottom: 2.5em; }
 .about .who .portrait, .about .who .links { display: inline-block;
                                             vertical-align: middle; }
-.about .who .portrait { max-width: 38%; max-height: 22vh; width: auto;
-                        height: auto; margin: 0 1.2em; }
+.about .who .portrait { width: 34%; height: auto; margin-right: 4%; }
+.about .who .links { width: 46%; }
 .about .links p { margin: 0 0 0.9em; }
 """
 
