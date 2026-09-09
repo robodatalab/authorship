@@ -55,16 +55,20 @@ TEXT = "text"
 
 DEFAULT_LANGUAGE = "en"
 
+_BOLD_ITALIC = re.compile(r"\*\*\*(.+?)\*\*\*")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
-_ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
-_ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)")
+_BOLD_UND = re.compile(r"(?<!\w)__(?!_)(.+?)(?<!_)__(?!\w)")
+_ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(\S(?:[^*]*?\S)?)(?<!\*)\*(?!\*)")
+_ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(\S(?:[^_]*?\S)?)(?<!_)_(?!\w)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)")
 
 
 def _inline(text: str) -> str:
     text = html.escape(text, quote=False)
+    text = _BOLD_ITALIC.sub(r"<strong><em>\1</em></strong>", text)
     text = _BOLD.sub(r"<strong>\1</strong>", text)
+    text = _BOLD_UND.sub(r"<strong>\1</strong>", text)
     text = _ITALIC_STAR.sub(r"<em>\1</em>", text)
     text = _ITALIC_UND.sub(r"<em>\1</em>", text)
     text = _LINK.sub(

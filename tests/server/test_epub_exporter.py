@@ -62,6 +62,24 @@ class Inline(unittest.TestCase):
     def test_a_double_star_is_not_read_as_italic(self) -> None:
         self.assertNotIn("<em>", _inline("**bold**"))
 
+    def test_bold_and_italic_at_once(self) -> None:
+        self.assertEqual(_inline("***both***"), "<strong><em>both</em></strong>")
+
+    def test_bold_written_with_underscores(self) -> None:
+        self.assertEqual(_inline("__bold__"), "<strong>bold</strong>")
+
+    def test_italic_inside_bold(self) -> None:
+        self.assertEqual(
+            _inline("**a *word* of it**"),
+            "<strong>a <em>word</em> of it</strong>",
+        )
+
+    def test_a_star_standing_on_its_own_is_not_italic(self) -> None:
+        self.assertEqual(_inline("3 * 4 * 5"), "3 * 4 * 5")
+
+    def test_an_underscore_inside_a_word_is_left_alone(self) -> None:
+        self.assertEqual(_inline("snake_case_words"), "snake_case_words")
+
 
 class Blocks(unittest.TestCase):
     def test_every_line_is_its_own_paragraph(self) -> None:
@@ -74,6 +92,12 @@ class Blocks(unittest.TestCase):
         self.assertEqual(blocks_to_xhtml(["# Title"]), "<h1>Title</h1>")
         self.assertEqual(blocks_to_xhtml(["## Two"]), "<h2>Two</h2>")
         self.assertEqual(blocks_to_xhtml(["### Three"]), "<h3>Three</h3>")
+
+    def test_a_heading_carries_the_formatting_written_into_it(self) -> None:
+        self.assertEqual(
+            blocks_to_xhtml(["## The *Queendom* at war"]),
+            "<h2>The <em>Queendom</em> at war</h2>",
+        )
 
     def test_a_rule_of_three_or_more_is_a_scene_break(self) -> None:
         for rule in ["---", "***", "___", "----"]:
