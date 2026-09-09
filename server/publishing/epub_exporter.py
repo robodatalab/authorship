@@ -60,6 +60,11 @@ DEFAULT_LANGUAGE = "en"
 # section is set louder than the section is.
 SECTION_TITLE = 2
 
+# A name with nothing under it: a part divider, or a chapter whose prose has not
+# been written yet. The reader turns to a page holding one line, and it is set in
+# the middle of that page rather than at the top of it.
+ALONE_ON_THE_PAGE = "alone-on-the-page"
+
 _BOLD_ITALIC = re.compile(r"\*\*\*(.+?)\*\*\*")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _BOLD_UND = re.compile(r"(?<!\w)__(?!_)(.+?)(?<!_)__(?!\w)")
@@ -163,11 +168,11 @@ class Chapter:
     def body_xhtml(self) -> str:
         # A chapter cell carries the name and no prose of its own, so the heading
         # is put back onto the page here.
-        return (
-            f'<div class="chapter">\n'
-            f"<h{SECTION_TITLE}>{_inline(self.name)}</h{SECTION_TITLE}>\n"
-            f"{blocks_to_xhtml(self.body_lines)}\n</div>"
-        )
+        name = f"<h{SECTION_TITLE}>{_inline(self.name)}</h{SECTION_TITLE}>"
+        written = blocks_to_xhtml(self.body_lines)
+        if not written:
+            return f'<div class="{ALONE_ON_THE_PAGE}">\n{name}\n</div>'
+        return f'<div class="chapter">\n{name}\n{written}\n</div>'
 
 
 class Page:
@@ -270,7 +275,7 @@ def read_book(document: Document) -> Book:
             documents.append(build_title_page(imprint))
             documents.append(build_copyright_page(imprint))
         elif cell.kind == IMAGE:
-            source = _art_of(cell, root)
+            source = _art_file(root, cell.attrs.get("src", ""))
             if source is None:
                 continue
             picture = Art(f"art_{len(art):03d}", source)
@@ -293,8 +298,18 @@ def read_book(document: Document) -> Book:
             if page:
                 documents.append(page)
         elif cell.kind == ABOUT:
-            page = build_about_page(cell)
+            portrait = _art_file(root, cell.attrs.get("portrait", ""))
+            drawn = (
+                Art(f"art_{len(art):03d}", portrait)
+                if portrait is not None
+                else None
+            )
+            page = build_about_page(
+                cell, drawn.href if drawn else "", imprint.author
+            )
             if page:
+                if drawn:
+                    art.append(drawn)
                 documents.append(page)
         elif cell.source and cell.kind not in UNPRINTED:
             _add_lines(documents, cell.source.splitlines())
@@ -486,13 +501,12 @@ def _add_lines(documents: list[Chapter | Page], lines: list[str]) -> None:
     )
 
 
-def _art_of(cell: Cell, root: Path) -> Path | None:
-    """The image the cell points at, if it is really there.
+def _art_file(root: Path, src: str) -> Path | None:
+    """The image a cell points at, if it is really there.
 
     A cell naming art nobody has drawn yet is not printed, and that is the one
     case where a book goes out short of a picture rather than not at all.
     """
-    src = cell.attrs.get("src", "")
     return root / src if src and (root / src).is_file() else None
 
 
@@ -521,8 +535,8 @@ body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
        text-align: justify; hyphens: auto; }
 /* The page's own margin, set on the content and not on the body so that the
    cover can still fill the page edge to edge. */
-.chapter, .title-page, .contents, .disclaimer, .about, .part-page,
-.copyright { padding: 0 6%; }
+.chapter, .title-page, .contents, .disclaimer, .about, .copyright,
+.alone-on-the-page { padding: 0 6%; }
 /* No page-break-before here: every chapter is its own spine document, so the
    reader already opens a page for it. Breaking again leaves a blank one. */
 h1, h2, h3, h4, h5 { font-family: Georgia, serif; text-align: center;
@@ -538,13 +552,16 @@ hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 /* A part is one line on an otherwise empty page, set in the middle of it both
    ways. The height is the reader's page rather than the text's, which is what
    lets the line be centred against something. */
-.part-page { display: flex; flex-direction: column; justify-content: center;
-             align-items: center; height: 100vh; text-align: center; }
-.part-page h1 { margin: 0; }
+.alone-on-the-page { display: flex; flex-direction: column;
+                     justify-content: center; align-items: center;
+                     height: 100vh; text-align: center; }
+.alone-on-the-page h1, .alone-on-the-page h2 { margin: 0; }
 .cover, .image-page { text-align: center; margin: 0; padding: 0; }
 .cover img, .image-page img { max-width: 100%; height: auto; }
+/* A picture standing in the prose is one thing on the page among others, so it
+   is held to a share of the page's height and the words go on around it. */
 p.image { text-align: center; margin: 1.2em 0; }
-p.image img { max-width: 100%; height: auto; }
+p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
 .title-page h1.book-title { font-size: 2.4em; margin: 0 0 0.4em; }
 .title-page p.subtitle { font-size: 1.3em; font-style: italic; margin: 0 0 2.5em; }
@@ -560,7 +577,14 @@ p.image img { max-width: 100%; height: auto; }
 /* The blurb is prose and is set like prose; only the list of places to go is
    centred, because that is a list and not something anyone reads across. */
 .about { margin-top: 12%; }
-.about .links { margin-bottom: 2.5em; text-align: center; }
+/* The portrait and the links stand side by side, and are set inline rather than
+   in a flex row so that a reader without either falls back to one above the
+   other instead of to a heap. */
+.about .who { text-align: center; margin-bottom: 2.5em; }
+.about .who .portrait, .about .who .links { display: inline-block;
+                                            vertical-align: middle; }
+.about .who .portrait { max-width: 38%; max-height: 22vh; width: auto;
+                        height: auto; margin: 0 1.2em; }
 .about .links p { margin: 0 0 0.9em; }
 """
 
@@ -689,7 +713,7 @@ def build_part_page(idx: int, cell: Cell) -> Page:
     return Page(
         "part",
         name,
-        f'<div class="part-page">\n<h1>{_inline(name)}</h1>\n</div>',
+        f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{_inline(name)}</h1>\n</div>',
         in_toc=True,
     )
 
@@ -731,12 +755,13 @@ AUTHOR_LINKS = [
 ABOUT_TITLE = "About the Author"
 
 
-def build_about_page(cell: Cell) -> Page | None:
+def build_about_page(cell: Cell, portrait: str = "", named: str = "") -> Page | None:
     """The author, in their own words, and where to find them.
 
     Every part of it is optional, and a page with nothing written and nowhere to
     send anyone is not printed — an empty "About the Author" is worse than no
-    page at all.
+    page at all. A portrait is not one of the parts that make the page worth
+    printing: it stands beside the links on a page that was already going out.
     """
     sent = [
         (label, cell.attrs[name]) for name, label in AUTHOR_LINKS if cell.attrs.get(name)
@@ -746,14 +771,22 @@ def build_about_page(cell: Cell) -> Page | None:
         return None
 
     said = [f"  <h{SECTION_TITLE}>{ABOUT_TITLE}</h{SECTION_TITLE}>"]
-    if sent:
-        # Kept apart from the blurb and one to a line: this is a list of places to
-        # go, and a reader runs their eye down it rather than reading it.
-        said.append('  <div class="links">')
-        said += [
-            f'    <p><a href="{html.escape(url, quote=True)}">{_inline(label)}</a></p>'
-            for label, url in sent
-        ]
+    if sent or portrait:
+        # The face and the list of places to go, side by side under the heading:
+        # a reader looks at both at once rather than reading down them.
+        said.append('  <div class="who">')
+        if portrait:
+            said.append(
+                f'    <img class="portrait" src="{portrait}"'
+                f' alt="{html.escape(named, quote=True)}"/>'
+            )
+        if sent:
+            said.append('    <div class="links">')
+            said += [
+                f'      <p><a href="{html.escape(url, quote=True)}">{_inline(label)}</a></p>'
+                for label, url in sent
+            ]
+            said.append("    </div>")
         said.append("  </div>")
     if blurb:
         said.append(blocks_to_xhtml(blurb.splitlines()))

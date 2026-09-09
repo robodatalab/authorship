@@ -31,6 +31,7 @@ const FIELDS: AuthorFileEditorCellField[] = [
         label: "Substack",
         placeholder: "https://….substack.com",
     },
+    { attributeName: "portrait", label: "Portrait", placeholder: "author.jpg" },
 ];
 
 interface AboutCellProps {

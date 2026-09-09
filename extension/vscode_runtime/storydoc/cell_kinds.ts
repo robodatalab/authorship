@@ -124,6 +124,7 @@ const CELL_KINDS: CellKind[] = [
             { attributeName: "kdp", label: "KDP" },
             { attributeName: "website", label: "Website" },
             { attributeName: "substack", label: "Substack" },
+            { attributeName: "portrait", label: "Portrait" },
         ],
         isFrontOrBackMatter: true,
         blank: () =>

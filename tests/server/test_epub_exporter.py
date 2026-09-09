@@ -502,13 +502,46 @@ class BuildEpub(unittest.TestCase):
             css = z.read("OEBPS/style.css").decode("utf-8")
 
         self.assertIn("<h1>Book One</h1>", page)
-        self.assertIn('class="part-page"', page)
+        self.assertIn('class="alone-on-the-page"', page)
         self.assertNotIn("prose", page)
         # Centred both ways against the reader's page, which is the whole of what
         # a part divider looks like.
-        self.assertIn(".part-page", css)
+        self.assertIn(".alone-on-the-page", css)
         self.assertIn("height: 100vh", css)
         self.assertIn("text-align: center", css)
+
+    def test_a_chapter_nobody_has_written_yet_is_its_name_in_the_middle(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.chapter("One"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            alone = z.read("OEBPS/chap_000.xhtml").decode("utf-8")
+            written_in = z.read("OEBPS/chap_001.xhtml").decode("utf-8")
+
+        self.assertIn('class="alone-on-the-page"', alone)
+        self.assertIn('class="chapter"', written_in)
+        self.assertNotIn("alone-on-the-page", written_in)
+
+    def test_a_picture_in_the_prose_leaves_room_for_the_words(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        out = written(
+            self.root,
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.image("art.png", full_page=False),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn("max-height: 45vh", css)
 
     def test_a_part_opens_a_page_the_chapters_under_it_do_not_share(self) -> None:
         out = written(
@@ -671,6 +704,59 @@ class BuildEpub(unittest.TestCase):
         opened = page.index('<div class="links">')
         links = page[opened : page.index("</div>", opened)]
         self.assertEqual(links.count("<p>"), 2)
+
+    def test_the_portrait_stands_beside_the_links_and_is_bound_in(self) -> None:
+        (self.root / "author.jpg").write_bytes(b"jpg")
+        out = written(
+            self.root,
+            title_page(title="Book", author="A. Writer"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(
+                storydoc.ABOUT,
+                "A. Writer lives by the sea.",
+                {
+                    "kdp": "https://amazon.example/author/1",
+                    "portrait": "author.jpg",
+                },
+            ),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            names = z.namelist()
+            page = z.read("OEBPS/about.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn("OEBPS/art_000.jpg", names)
+        self.assertIn('<img class="portrait" src="art_000.jpg"', page)
+        self.assertIn('alt="A. Writer"', page)
+        # One block, so the face and the list are read as one thing.
+        who = page[page.index('<div class="who">') :]
+        self.assertIn('<div class="links">', who)
+        self.assertIn('href="art_000.jpg"', opf)
+        self.assertIn("max-height: 22vh", css)
+
+    def test_a_portrait_nobody_has_drawn_yet_leaves_the_page_standing(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(
+                storydoc.ABOUT,
+                "A. Writer lives by the sea.",
+                {"portrait": "nobody.jpg"},
+            ),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/about.xhtml").decode("utf-8")
+            self.assertNotIn("art_000", z.read("OEBPS/content.opf").decode("utf-8"))
+
+        self.assertIn("A. Writer lives by the sea.", page)
+        self.assertNotIn("<img", page)
 
     def test_an_author_page_with_nothing_on_it_is_not_printed(self) -> None:
         out = written(
