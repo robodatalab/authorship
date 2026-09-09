@@ -252,15 +252,23 @@ describe("deleting a cell", () => {
     it("takes it out of the document", () => {
         const document = twoCells();
 
-        document.removeAt(0);
+        document.removeCellsAt(0, 1);
 
         expect(document.cells.map((cell) => cell.kind)).toEqual([NOTE]);
+    });
+
+    it("takes out as many as it is asked for", () => {
+        const document = twoCells();
+
+        document.removeCellsAt(0, 2);
+
+        expect(document.cells).toHaveLength(0);
     });
 
     it("does nothing when there is no cell there", () => {
         const document = twoCells();
 
-        document.removeAt(2);
+        document.removeCellsAt(2, 1);
 
         expect(document.cells).toHaveLength(2);
     });

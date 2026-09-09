@@ -155,3 +155,17 @@ export function moveTheSectionDown(
         moveSection(document, section, pastTheCellThatEndsTheScope);
     }
 }
+
+export function removeTheSection(
+    document: AuthorDocument,
+    cellId: string,
+): void {
+    const standing = whereACellStands(cellsBySection(document.cells), cellId);
+    if (!standing) {
+        return;
+    }
+    document.removeCellsAt(
+        document.cells.indexOf(standing.section.cell),
+        cellsWithinASection(standing.section).length,
+    );
+}

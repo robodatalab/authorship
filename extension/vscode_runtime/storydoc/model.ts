@@ -158,8 +158,9 @@ export class AuthorDocument implements vscode.CustomDocument {
     }
 
     removeCell(cellId: string): void {
-        this.removeAt(
+        this.removeCellsAt(
             this.documentCells.findIndex((cell) => cell.uniqueId === cellId),
+            1,
         );
     }
 
@@ -180,11 +181,11 @@ export class AuthorDocument implements vscode.CustomDocument {
         );
     }
 
-    removeAt(cellIndex: number): void {
+    removeCellsAt(cellIndex: number, howMany: number): void {
         if (cellIndex < 0 || cellIndex >= this.documentCells.length) {
             return;
         }
-        this.documentCells.splice(cellIndex, 1);
+        this.documentCells.splice(cellIndex, howMany);
     }
 }
 
