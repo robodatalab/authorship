@@ -75,6 +75,7 @@ const CELL_KINDS: CellKind[] = [
             { attributeName: "date", label: "Date" },
             { attributeName: "version", label: "Version" },
             { attributeName: "isbn", label: "ISBN" },
+            { attributeName: "cover-designer", label: "Cover Designer" },
         ],
         isFrontOrBackMatter: true,
         blank: () =>

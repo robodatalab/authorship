@@ -88,15 +88,17 @@ class Blocks(unittest.TestCase):
             "<p>one</p>\n<p>two</p>\n<p>three</p>",
         )
 
-    def test_headings(self) -> None:
-        self.assertEqual(blocks_to_xhtml(["# Title"]), "<h1>Title</h1>")
-        self.assertEqual(blocks_to_xhtml(["## Two"]), "<h2>Two</h2>")
-        self.assertEqual(blocks_to_xhtml(["### Three"]), "<h3>Three</h3>")
+    def test_a_heading_written_in_the_prose_stands_under_the_section_title(
+        self,
+    ) -> None:
+        self.assertEqual(blocks_to_xhtml(["# Title"]), "<h3>Title</h3>")
+        self.assertEqual(blocks_to_xhtml(["## Two"]), "<h4>Two</h4>")
+        self.assertEqual(blocks_to_xhtml(["### Three"]), "<h5>Three</h5>")
 
     def test_a_heading_carries_the_formatting_written_into_it(self) -> None:
         self.assertEqual(
             blocks_to_xhtml(["## The *Queendom* at war"]),
-            "<h2>The <em>Queendom</em> at war</h2>",
+            "<h4>The <em>Queendom</em> at war</h4>",
         )
 
     def test_a_rule_of_three_or_more_is_a_scene_break(self) -> None:
@@ -376,7 +378,7 @@ class BuildEpub(unittest.TestCase):
         )
 
         with zipfile.ZipFile(out) as z:
-            page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
             opf = z.read("OEBPS/content.opf").decode("utf-8")
 
         self.assertIn("2026-08-17", page)
@@ -384,6 +386,56 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("ISBN 978-0-000-00000-0", page)
         self.assertIn("<dc:date>2026-08-17</dc:date>", opf)
         self.assertIn('urn:isbn:978-0-000-00000-0</dc:identifier>', opf)
+
+    def test_the_title_page_is_followed_by_a_copyright_page(self) -> None:
+        out = written(
+            self.root,
+            title_page(
+                title="Book",
+                author="Pierre Dupied",
+                publisher="Cuir Et Soie",
+                date="2026-08-17",
+            ),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+
+        self.assertIn(
+            "Copyright © 2026 Pierre Dupied and Cuir Et Soie. "
+            "All rights reserved.",
+            page,
+        )
+        self.assertIn("No part of this publication may be reproduced", page)
+        self.assertIn(
+            "The right of Pierre Dupied and Cuir Et Soie to be identified as "
+            "the author of this work has been asserted in accordance with the "
+            "Copyright, Designs and Patents Act 1988.",
+            page,
+        )
+        self.assertIn("Published by Cuir Et Soie", page)
+        self.assertLess(
+            opf.index('idref="titlepage"'), opf.index('idref="copyright"')
+        )
+        # A page the reader turns past, not one they look up.
+        self.assertNotIn("copyright.xhtml", nav)
+
+    def test_the_cover_designer_is_credited_where_they_are_named(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book", **{"cover-designer": "A. Painter"}),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
+
+        self.assertIn("Cover design by A. Painter", page)
 
     def test_a_book_with_no_title_page_still_binds(self) -> None:
         out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
@@ -479,7 +531,8 @@ class BuildEpub(unittest.TestCase):
             if "itemref" in line
         ]
         self.assertEqual(
-            order, ["titlepage", "part", "chap_000", "part_2", "chap_001"]
+            order,
+            ["titlepage", "copyright", "part", "chap_000", "part_2", "chap_001"],
         )
 
     def test_a_part_with_no_name_is_numbered_by_where_it_stands(self) -> None:
@@ -589,6 +642,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("https://amazon.example/author/1", page)
         self.assertIn("https://writer.example", page)
         self.assertIn("https://writer.substack.example", page)
+        # Where to find the author stands under the heading, above what they
+        # wrote about themselves.
+        self.assertLess(
+            page.index('<div class="links">'),
+            page.index("A. Writer lives by the sea."),
+        )
         # The back matter comes after the story, not before it.
         self.assertLess(opf.index('idref="chap_000"'), opf.index('idref="about"'))
 
@@ -609,7 +668,8 @@ class BuildEpub(unittest.TestCase):
 
         # A list of places to go, not a line of prose running on from the blurb.
         self.assertIn('<div class="links">', page)
-        links = page[page.index('<div class="links">') :]
+        opened = page.index('<div class="links">')
+        links = page[opened : page.index("</div>", opened)]
         self.assertEqual(links.count("<p>"), 2)
 
     def test_an_author_page_with_nothing_on_it_is_not_printed(self) -> None:
@@ -646,7 +706,15 @@ class BuildEpub(unittest.TestCase):
         ]
         self.assertEqual(
             order,
-            ["cover", "titlepage", "contents", "disclaimer", "chap_000", "about"],
+            [
+                "cover",
+                "titlepage",
+                "copyright",
+                "contents",
+                "disclaimer",
+                "chap_000",
+                "about",
+            ],
         )
 
     def test_prose_standing_outside_every_chapter_is_still_printed(self) -> None:

@@ -55,12 +55,18 @@ TEXT = "text"
 
 DEFAULT_LANGUAGE = "en"
 
+# The heading a page carries its own name in. A heading the author wrote into the
+# prose stands under it, however few hashes they gave it, so nothing inside a
+# section is set louder than the section is.
+SECTION_TITLE = 2
+
 _BOLD_ITALIC = re.compile(r"\*\*\*(.+?)\*\*\*")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _BOLD_UND = re.compile(r"(?<!\w)__(?!_)(.+?)(?<!_)__(?!\w)")
 _ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(\S(?:[^*]*?\S)?)(?<!\*)\*(?!\*)")
 _ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(\S(?:[^_]*?\S)?)(?<!_)_(?!\w)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+_HEADING = re.compile(r"(#{1,3})\s+(.*)")
 _IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)")
 
 
@@ -92,12 +98,10 @@ def blocks_to_xhtml(lines: list[str]) -> str:
                 f'<p class="image"><img src="{html.escape(src, quote=True)}"'
                 f' alt="{html.escape(alt, quote=True)}"/></p>'
             )
-        elif stripped.startswith("### "):
-            out.append(f"<h3>{_inline(stripped[4:].strip())}</h3>")
-        elif stripped.startswith("## "):
-            out.append(f"<h2>{_inline(stripped[3:].strip())}</h2>")
-        elif stripped.startswith("# "):
-            out.append(f"<h1>{_inline(stripped[2:].strip())}</h1>")
+        elif heading := _HEADING.fullmatch(stripped):
+            hashes, said = heading.groups()
+            level = SECTION_TITLE + len(hashes)
+            out.append(f"<h{level}>{_inline(said.strip())}</h{level}>")
         else:
             out.append(f"<p>{_inline(stripped)}</p>")
     return "\n".join(out)
@@ -118,6 +122,7 @@ class Imprint:
     date: str = ""
     version: str = ""
     isbn: str = ""
+    cover_designer: str = ""
     language: str = DEFAULT_LANGUAGE
 
 
@@ -133,6 +138,7 @@ def imprint_of(document: Document) -> Imprint:
         date=said.get("date", ""),
         version=said.get("version", ""),
         isbn=said.get("isbn", ""),
+        cover_designer=said.get("cover-designer", ""),
         language=said.get("language") or DEFAULT_LANGUAGE,
     )
 
@@ -158,7 +164,8 @@ class Chapter:
         # A chapter cell carries the name and no prose of its own, so the heading
         # is put back onto the page here.
         return (
-            f'<div class="chapter">\n<h2>{_inline(self.name)}</h2>\n'
+            f'<div class="chapter">\n'
+            f"<h{SECTION_TITLE}>{_inline(self.name)}</h{SECTION_TITLE}>\n"
             f"{blocks_to_xhtml(self.body_lines)}\n</div>"
         )
 
@@ -261,6 +268,7 @@ def read_book(document: Document) -> Book:
                 parts += 1
         elif cell.kind == TITLE_PAGE:
             documents.append(build_title_page(imprint))
+            documents.append(build_copyright_page(imprint))
         elif cell.kind == IMAGE:
             source = _art_of(cell, root)
             if source is None:
@@ -513,14 +521,17 @@ body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
        text-align: justify; hyphens: auto; }
 /* The page's own margin, set on the content and not on the body so that the
    cover can still fill the page edge to edge. */
-.chapter, .title-page, .contents, .disclaimer, .about, .part-page { padding: 0 6%; }
+.chapter, .title-page, .contents, .disclaimer, .about, .part-page,
+.copyright { padding: 0 6%; }
 /* No page-break-before here: every chapter is its own spine document, so the
    reader already opens a page for it. Breaking again leaves a blank one. */
-h1, h2, h3 { font-family: Georgia, serif; text-align: center; font-weight: normal;
-             line-height: 1.25; }
+h1, h2, h3, h4, h5 { font-family: Georgia, serif; text-align: center;
+                     font-weight: normal; line-height: 1.25; }
 h1 { font-size: 1.9em; margin: 2.5em 0 0.6em; }
 h2 { font-size: 1.5em; margin: 2.2em 0 1em; }
 h3 { font-size: 1.2em; margin: 1.6em 0 0.8em; font-style: italic; }
+h4 { font-size: 1.05em; margin: 1.4em 0 0.7em; }
+h5 { font-size: 1em; margin: 1.2em 0 0.6em; font-style: italic; }
 p { margin: 0 0 0.8em; }
 hr.scene-break { border: 0; text-align: center; margin: 1.4em 0; }
 hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
@@ -540,15 +551,16 @@ p.image img { max-width: 100%; height: auto; }
 .title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
 .title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
                           text-transform: uppercase; }
-.title-page p.imprint { font-size: 0.8em; margin: 3em 0 0; }
 .contents ol { list-style: none; padding: 0; text-align: center; }
 .contents li { margin: 0 0 0.8em; }
 .contents a { text-decoration: none; }
 .disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }
+.copyright { text-align: left; font-size: 0.8em; margin-top: 20%; }
+.copyright p { margin: 0 0 1.2em; }
 /* The blurb is prose and is set like prose; only the list of places to go is
    centred, because that is a list and not something anyone reads across. */
 .about { margin-top: 12%; }
-.about .links { margin-top: 2.5em; text-align: center; }
+.about .links { margin-bottom: 2.5em; text-align: center; }
 .about .links p { margin: 0 0 0.9em; }
 """
 
@@ -580,22 +592,73 @@ def build_title_page(imprint: Imprint) -> Page:
     if imprint.publisher:
         said.append(f'  <p class="publisher">{_inline(imprint.publisher)}</p>')
 
-    # What a copyright page would carry, printed at the foot of the title page:
-    # this edition, when it was made, and the number it is sold under.
-    printed = []
-    if imprint.date:
-        printed.append(imprint.date)
-    if imprint.version:
-        printed.append(f"Version {imprint.version}")
-    if imprint.isbn:
-        printed.append(f"ISBN {imprint.isbn}")
-    if printed:
-        said.append(f'  <p class="imprint">{_inline(" · ".join(printed))}</p>')
-
     return Page(
         "titlepage",
         imprint.title,
         '<div class="title-page">\n' + "\n".join(said) + "\n</div>",
+    )
+
+
+# What the page says whatever book it stands in, and what it says about this one.
+RIGHTS = (
+    "No part of this publication may be reproduced, distributed, or transmitted "
+    "in any form without the prior written permission of the publisher, except "
+    "for brief quotations in reviews."
+)
+MORAL_RIGHTS = (
+    "The right of {named} to be identified as the author of this work has been "
+    "asserted in accordance with the Copyright, Designs and Patents Act 1988."
+)
+COPYRIGHT_TITLE = "Copyright"
+
+_YEAR = re.compile(r"\d{4}")
+
+
+def copyright_year(date: str) -> str:
+    """The year the edition is dated, or the year it is being bound in.
+
+    The date is the author's own line rather than a form to fill in, so the year
+    is read out of whatever they wrote and only falls back to today when they
+    wrote nothing a year can be read from.
+    """
+    found = _YEAR.search(date)
+    return found.group() if found else str(datetime.now(timezone.utc).year)
+
+
+def build_copyright_page(imprint: Imprint) -> Page:
+    """Who owns the book, what may be done with it, and which edition it is.
+
+    Built from the title page rather than written by the author: every fact on it
+    is one the title page already carries, and a copyright page that disagreed
+    with the title page would be the one thing worse than not having one.
+    """
+    year = copyright_year(imprint.date)
+    named = " and ".join(
+        who for who in (imprint.author, imprint.publisher) if who
+    )
+    held = f"Copyright © {year} {named}".strip()
+    said = [f"  <p>{_inline(held)}. All rights reserved.</p>", f"  <p>{RIGHTS}</p>"]
+    if imprint.author:
+        said.append(f"  <p>{_inline(MORAL_RIGHTS.format(named=named))}</p>")
+    if imprint.cover_designer:
+        said.append(f"  <p>Cover design by {_inline(imprint.cover_designer)}</p>")
+    if imprint.publisher:
+        said.append(f"  <p>Published by {_inline(imprint.publisher)}</p>")
+
+    edition = []
+    if imprint.version:
+        edition.append(f"Version {imprint.version}")
+    if imprint.date:
+        edition.append(imprint.date)
+    if edition:
+        said.append(f'  <p>{_inline(" · ".join(edition))}</p>')
+    if imprint.isbn:
+        said.append(f"  <p>ISBN {_inline(imprint.isbn)}</p>")
+
+    return Page(
+        "copyright",
+        COPYRIGHT_TITLE,
+        '<div class="copyright">\n' + "\n".join(said) + "\n</div>",
     )
 
 
@@ -651,7 +714,8 @@ def build_disclaimer_page(cell: Cell) -> Page | None:
     return Page(
         "disclaimer",
         name,
-        f'<div class="disclaimer">\n<h2>{_inline(name)}</h2>\n{body}\n</div>',
+        f'<div class="disclaimer">\n'
+        f"<h{SECTION_TITLE}>{_inline(name)}</h{SECTION_TITLE}>\n{body}\n</div>",
         in_toc=True,
     )
 
@@ -681,9 +745,7 @@ def build_about_page(cell: Cell) -> Page | None:
     if not sent and not blurb:
         return None
 
-    said = [f"  <h2>{ABOUT_TITLE}</h2>"]
-    if blurb:
-        said.append(blocks_to_xhtml(blurb.splitlines()))
+    said = [f"  <h{SECTION_TITLE}>{ABOUT_TITLE}</h{SECTION_TITLE}>"]
     if sent:
         # Kept apart from the blurb and one to a line: this is a list of places to
         # go, and a reader runs their eye down it rather than reading it.
@@ -693,6 +755,8 @@ def build_about_page(cell: Cell) -> Page | None:
             for label, url in sent
         ]
         said.append("  </div>")
+    if blurb:
+        said.append(blocks_to_xhtml(blurb.splitlines()))
     return Page(
         "about",
         ABOUT_TITLE,

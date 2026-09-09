@@ -52,9 +52,6 @@ function titlePageMarkdown(cell: Cell): string[] {
 
 function aboutTheAuthorMarkdown(cell: Cell): string[] {
     const lines: string[] = [];
-    if (cell.source) {
-        lines.push(cell.source);
-    }
     const links = AUTHOR_LINK_ATTRIBUTES.filter(
         ([attributeName]) => cell.attrs[attributeName],
     ).map(
@@ -62,6 +59,9 @@ function aboutTheAuthorMarkdown(cell: Cell): string[] {
     );
     if (links.length > 0) {
         lines.push(links.join(" · "));
+    }
+    if (cell.source) {
+        lines.push(cell.source);
     }
 
     return lines.length > 0

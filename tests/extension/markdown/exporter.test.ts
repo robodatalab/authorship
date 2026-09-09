@@ -65,13 +65,13 @@ describe("what a document exports as", () => {
         ).toBe("");
     });
 
-    it("writes the author's links after what they wrote about themselves", () => {
+    it("writes the author's links under the heading, above what they wrote", () => {
         expect(
             markdownOf(
                 '<!-- cell: about kdp="https://amazon.com/author/p" -->\n\nI write.\n',
             ),
         ).toBe(
-            "### About the Author\n\nI write.\n\n[Books on Amazon](https://amazon.com/author/p)\n",
+            "### About the Author\n\n[Books on Amazon](https://amazon.com/author/p)\n\nI write.\n",
         );
     });
 
