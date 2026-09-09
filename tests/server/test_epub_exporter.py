@@ -643,6 +643,98 @@ class BuildEpub(unittest.TestCase):
 
         self.assertIn("Book One", nav)
 
+    def test_the_contents_page_lists_the_chapters_under_their_part(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.contents(),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+            storydoc.part("Book Two"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("b"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/contents.xhtml").decode("utf-8")
+
+        self.assertIn(
+            '<li><a href="part.xhtml">Book One</a>\n'
+            "      <ol>\n"
+            '        <li><a href="chap_000.xhtml">One</a></li>\n'
+            "      </ol>",
+            page,
+        )
+        self.assertIn('<li><a href="part_2.xhtml">Book Two</a>', page)
+        self.assertIn('<li><a href="chap_001.xhtml">Two</a></li>', page)
+
+    def test_the_chapters_of_a_part_the_book_does_not_print_stand_alone(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.contents(),
+            storydoc.part("Break", printed=False),
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/contents.xhtml").decode("utf-8")
+
+        self.assertNotIn("Break", page)
+        self.assertIn('    <li><a href="chap_000.xhtml">One</a></li>', page)
+
+    def test_the_navigation_holds_the_chapters_under_their_part(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+            ncx = z.read("OEBPS/toc.ncx").decode("utf-8")
+
+        self.assertIn(
+            '<li><a href="part.xhtml">Book One</a>\n'
+            "        <ol>\n"
+            '          <li><a href="chap_000.xhtml">One</a></li>\n'
+            "        </ol>",
+            nav,
+        )
+        self.assertIn('<meta name="dtb:depth" content="2"/>', ncx)
+        self.assertIn(
+            '      <navPoint id="np2" playOrder="2">\n'
+            "        <navLabel><text>One</text></navLabel>\n"
+            '        <content src="chap_000.xhtml"/>\n'
+            "      </navPoint>",
+            ncx,
+        )
+
+    def test_a_page_that_is_not_of_the_story_closes_the_part_before_it(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.part("Book One"),
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+            Cell(storydoc.ABOUT, "", {"website": "https://writer.example"}),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+
+        self.assertIn(
+            '      <li><a href="about.xhtml">About the Author</a></li>', nav
+        )
+
     def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
         out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
 
