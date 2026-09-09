@@ -741,6 +741,27 @@ describe("the scope of a part and of a chapter", () => {
         expect(cellsWithin("author-file-editor-part-scope")).toEqual(["m1"]);
     });
 
+    it("ends the part and the chapter where a page outside the story stands", async () => {
+        await mountCanvas({
+            cells: [
+                { kind: "part", source: "", attrs: { id: "p1" } },
+                { kind: "chapter", source: "", attrs: { id: "c1" } },
+                { kind: "markdown", source: "one", attrs: { id: "m1" } },
+                { kind: "about", source: "", attrs: { id: "a1" } },
+                { kind: "markdown", source: "beside", attrs: { id: "m2" } },
+            ],
+            cellRenderers: {
+                ...CELL_KINDS,
+                about: () => <div className="test-cell" />,
+            },
+        });
+
+        expect(
+            listItems().map((item) => item.getAttribute("data-cell-id")),
+        ).toEqual([null, "p1", "a1", "m2"]);
+        expect(cellsWithin("author-file-editor-chapter-scope")).toEqual(["m1"]);
+    });
+
     it("marks the end of the line of a section nothing of its kind follows", async () => {
         await mountStory([
             { kind: "part", source: "", attrs: { id: "p1" } },

@@ -179,3 +179,10 @@ export function isKeptOutOfTheBook(kind: string): boolean {
 export function isAnAsideToTheProseAroundIt(kind: string): boolean {
     return cellKind(kind)?.isAnAsideToTheProseAroundIt ?? false;
 }
+
+export function standsOutsideTheStory(kind: string): boolean {
+    return (
+        isFrontOrBackMatter(kind) ||
+        (isKeptOutOfTheBook(kind) && !isAnAsideToTheProseAroundIt(kind))
+    );
+}

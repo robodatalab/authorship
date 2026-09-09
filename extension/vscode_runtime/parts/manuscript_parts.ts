@@ -18,9 +18,8 @@
 // turns the parts into files.
 
 import {
-    isAnAsideToTheProseAroundIt,
     isFrontOrBackMatter,
-    isKeptOutOfTheBook,
+    standsOutsideTheStory,
 } from "../storydoc/cell_kinds";
 import {
     AUTHOR_FILE_EXTENSION,
@@ -113,11 +112,7 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
             opening = null;
             continue;
         }
-        if (
-            isFrontOrBackMatter(cell.kind) ||
-            (isKeptOutOfTheBook(cell.kind) &&
-                !isAnAsideToTheProseAroundIt(cell.kind))
-        ) {
+        if (standsOutsideTheStory(cell.kind)) {
             continue;
         }
         const holding = opening ?? sections[sections.length - 1];
