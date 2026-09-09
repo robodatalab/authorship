@@ -171,14 +171,14 @@ describe("adding a cell", () => {
                 type: "invoke",
                 commandName: "insertCell",
                 commandArguments: {
-                    afterCellId: null,
+                    beforeCellId: "one",
                     cellKind: "chapter",
                 },
             },
         ]);
     });
 
-    it("asks each menu for the cell it inserts after", async () => {
+    it("asks each menu for the cell it inserts before", async () => {
         await mountCanvas({
             cells: [markdownCell("one"), markdownCell("two")],
         });
@@ -188,8 +188,10 @@ describe("adding a cell", () => {
         }
 
         expect(
-            posted.map((invocation) => invocation.commandArguments.afterCellId),
-        ).toEqual([null, "one", "two"]);
+            posted.map(
+                (invocation) => invocation.commandArguments.beforeCellId,
+            ),
+        ).toEqual(["one", "two", null]);
     });
 
     it("holds a kind that is not primary behind the ellipsis", async () => {
@@ -772,7 +774,7 @@ describe("the scope of a part and of a chapter", () => {
         expect(scopes).toEqual([true, false, true]);
     });
 
-    it("keeps the menu of a folded section, where its scope would have been", async () => {
+    it("inserts past the contents a folded section holds, not in front of them", async () => {
         await mountStory([
             {
                 kind: "chapter",
@@ -789,10 +791,10 @@ describe("the scope of a part and of a chapter", () => {
         expect(menu).not.toBeNull();
         await click(menu.querySelector("button")!);
 
-        expect(posted[0].commandArguments.afterCellId).toBe("c1");
+        expect(posted[0].commandArguments.beforeCellId).toBe("c2");
     });
 
-    it("opens the scope with the menu that inserts after the section's own cell", async () => {
+    it("opens the scope with the menu that inserts before the section's first cell", async () => {
         await mountStory([
             { kind: "part", source: "", attrs: { id: "p1" } },
             { kind: "markdown", source: "one", attrs: { id: "m1" } },
@@ -803,7 +805,7 @@ describe("the scope of a part and of a chapter", () => {
         )!;
         await click(menu.querySelector("button")!);
 
-        expect(posted[0].commandArguments.afterCellId).toBe("p1");
+        expect(posted[0].commandArguments.beforeCellId).toBe("m1");
     });
 });
 

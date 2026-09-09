@@ -218,12 +218,12 @@ export function AuthorFileEditorCanvas({
                 theOneOfItsGroupTheDocumentCallsFor(command)),
     );
 
-    function insertCellMenu(insertAfterCellId: string | null): ReactNode {
+    function insertCellMenu(insertBeforeCellId: string | null): ReactNode {
         return (
             <AuthorFileEditorInsertCellMenu
                 insertCommand={insertCommand}
                 cellTypes={cellTypes}
-                insertAfterCellId={insertAfterCellId}
+                insertBeforeCellId={insertBeforeCellId}
                 sendMessagesToVscode={sendMessagesToVscode}
             />
         );
@@ -231,7 +231,7 @@ export function AuthorFileEditorCanvas({
 
     function cellsInScope(
         sections: CellsInASection[],
-        insertAfterCellId: string | null,
+        whatFollowsTheScope: string | null,
         scopeClassName?: string,
     ): ReactNode {
         return (
@@ -239,9 +239,16 @@ export function AuthorFileEditorCanvas({
                 className={scopeClassName}
                 ref={scopeClassName ? undefined : cellsOnThePage}
             >
-                <li>{insertCellMenu(insertAfterCellId)}</li>
+                <li>
+                    {insertCellMenu(
+                        sections[0]?.cell.attrs.id ?? whatFollowsTheScope,
+                    )}
+                </li>
                 {sections.map((section, sectionIndex) => {
                     const cell = section.cell;
+                    const whatFollowsTheSection =
+                        sections[sectionIndex + 1]?.cell.attrs.id ??
+                        whatFollowsTheScope;
                     const renderCell = cellRenderers[cell.kind];
                     if (!renderCell) {
                         return null;
@@ -296,7 +303,7 @@ export function AuthorFileEditorCanvas({
                             {opensASection(cell) && !isFolded(cell)
                                 ? cellsInScope(
                                       section.within,
-                                      cell.attrs.id,
+                                      whatFollowsTheSection,
                                       scopeOf(
                                           cell,
                                           !sections
@@ -308,7 +315,7 @@ export function AuthorFileEditorCanvas({
                                               ),
                                       ),
                                   )
-                                : insertCellMenu(cell.attrs.id)}
+                                : insertCellMenu(whatFollowsTheSection)}
                         </li>
                     );
                 })}
@@ -339,14 +346,14 @@ export function AuthorFileEditorCanvas({
 interface AuthorFileEditorInsertCellMenuProps {
     insertCommand?: WebviewAuthorDocumentCommandCard;
     cellTypes: AuthorDocumentCellType[];
-    insertAfterCellId: string | null;
+    insertBeforeCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenu({
     insertCommand,
     cellTypes,
-    insertAfterCellId,
+    insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuProps) {
     const [everyKindIsShown, showEveryKind] = useState(false);
@@ -369,7 +376,7 @@ function AuthorFileEditorInsertCellMenu({
                     key={cellType.cellKind}
                     insertCommand={insertCommand}
                     cellType={cellType}
-                    insertAfterCellId={insertAfterCellId}
+                    insertBeforeCellId={insertBeforeCellId}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             ))}
@@ -392,7 +399,7 @@ function AuthorFileEditorInsertCellMenu({
                                     key={cellType.cellKind}
                                     insertCommand={insertCommand}
                                     cellType={cellType}
-                                    insertAfterCellId={insertAfterCellId}
+                                    insertBeforeCellId={insertBeforeCellId}
                                     sendMessagesToVscode={sendMessagesToVscode}
                                 />
                             ))}
@@ -407,14 +414,14 @@ function AuthorFileEditorInsertCellMenu({
 interface AuthorFileEditorInsertCellMenuButtonProps {
     insertCommand: WebviewAuthorDocumentCommandCard;
     cellType: AuthorDocumentCellType;
-    insertAfterCellId: string | null;
+    insertBeforeCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorFileEditorInsertCellMenuButton({
     insertCommand,
     cellType,
-    insertAfterCellId,
+    insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
     return (
@@ -427,7 +434,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     sendMessagesToVscode,
                     insertCommand.commandName,
                     {
-                        afterCellId: insertAfterCellId,
+                        beforeCellId: insertBeforeCellId,
                         cellKind: cellType.cellKind,
                     },
                 )

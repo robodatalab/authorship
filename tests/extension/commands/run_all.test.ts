@@ -97,7 +97,7 @@ describe("RunAllCommand — while it runs", () => {
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
         const asked = serverThatWritesEveryBlurb(() =>
-            document.insertAfter("b2", new Cell(BLURB, "", { id: "b3" })),
+            document.insertBefore("toc", new Cell(BLURB, "", { id: "b3" })),
         );
 
         await new RunAllCommand(

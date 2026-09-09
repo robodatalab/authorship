@@ -12,8 +12,8 @@ export class InsertCellCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.insertAfter(
-            (commandArguments.afterCellId as string | null) ?? null,
+        document.insertBefore(
+            (commandArguments.beforeCellId as string | null) ?? null,
             blankCellOfKind(commandArguments.cellKind as string),
         );
     }
