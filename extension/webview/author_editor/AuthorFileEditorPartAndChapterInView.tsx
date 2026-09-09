@@ -1,5 +1,9 @@
 import type { WebviewCell } from "./AuthorFileEditorCanvas";
 import { CHAPTER, PART } from "../../vscode_runtime/storydoc/model";
+import {
+    cellsBySection,
+    whereACellStands,
+} from "../../vscode_runtime/storydoc/sections";
 import "./AuthorFileEditorPartAndChapterInView.css";
 
 interface AuthorFileEditorPartAndChapterInViewProps {
@@ -19,21 +23,25 @@ function partAndChapterAt(
     cells: WebviewCell[],
     cellIdInView: string | undefined,
 ): PartAndChapter {
-    let partTitle = "";
-    let chapterTitle = "";
-    for (const cell of cells) {
-        if (cell.kind === PART) {
-            partTitle = cell.attrs.title || UNTITLED;
-            chapterTitle = "";
-        }
-        if (cell.kind === CHAPTER) {
-            chapterTitle = cell.attrs.title || UNTITLED;
-        }
-        if (cell.attrs.id === cellIdInView) {
-            return { partTitle, chapterTitle };
-        }
+    const standing = cellIdInView
+        ? whereACellStands(cellsBySection(cells), cellIdInView)
+        : undefined;
+    if (!standing) {
+        return { partTitle: "", chapterTitle: "" };
     }
-    return { partTitle: "", chapterTitle: "" };
+    const sectionsItStandsIn = [...standing.under, standing.section];
+    return {
+        partTitle: titleOfTheSectionOfKind(sectionsItStandsIn, PART),
+        chapterTitle: titleOfTheSectionOfKind(sectionsItStandsIn, CHAPTER),
+    };
+}
+
+function titleOfTheSectionOfKind(
+    sectionsItStandsIn: { cell: WebviewCell }[],
+    kind: string,
+): string {
+    const section = sectionsItStandsIn.find(({ cell }) => cell.kind === kind);
+    return section ? section.cell.attrs.title || UNTITLED : "";
 }
 
 export function AuthorFileEditorPartAndChapterInView({

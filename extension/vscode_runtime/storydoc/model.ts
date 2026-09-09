@@ -163,20 +163,6 @@ export class AuthorDocument implements vscode.CustomDocument {
         );
     }
 
-    moveCellUp(cellId: string): void {
-        const cellIndex = this.documentCells.findIndex(
-            (cell) => cell.uniqueId === cellId,
-        );
-        this.moveAt(cellIndex, cellIndex - 1);
-    }
-
-    moveCellDown(cellId: string): void {
-        const cellIndex = this.documentCells.findIndex(
-            (cell) => cell.uniqueId === cellId,
-        );
-        this.moveAt(cellIndex, cellIndex + 1);
-    }
-
     insertAt(cellIndex: number, cell: Cell): void {
         this.documentCells.splice(
             cellIndex,
@@ -185,16 +171,13 @@ export class AuthorDocument implements vscode.CustomDocument {
         );
     }
 
-    moveAt(cellIndex: number, toCellIndex: number): void {
-        if (
-            toCellIndex === cellIndex ||
-            toCellIndex < 0 ||
-            toCellIndex >= this.documentCells.length
-        ) {
-            return;
-        }
-        const [moved] = this.documentCells.splice(cellIndex, 1);
-        this.documentCells.splice(toCellIndex, 0, moved);
+    moveCellsAt(cellIndex: number, howMany: number, toCellIndex: number): void {
+        const moved = this.documentCells.splice(cellIndex, howMany);
+        this.documentCells.splice(
+            toCellIndex > cellIndex ? toCellIndex - howMany : toCellIndex,
+            0,
+            ...moved,
+        );
     }
 
     removeAt(cellIndex: number): void {

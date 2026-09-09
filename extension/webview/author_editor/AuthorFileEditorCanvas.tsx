@@ -14,8 +14,12 @@ import type { AuthorFileEditorFindMatch } from "./AuthorFileEditorFind";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
-import { standsOutsideTheStory } from "../../vscode_runtime/storydoc/cell_kinds";
-import { CHAPTER, FOLDED, PART } from "../../vscode_runtime/storydoc/model";
+import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
+import {
+    cellsBySection,
+    opensASection,
+    type CellsInASection,
+} from "../../vscode_runtime/storydoc/sections";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -44,10 +48,6 @@ function isFolded(cell: WebviewCell): boolean {
     return cell.attrs[FOLDED] === "true";
 }
 
-function opensASection(cell: WebviewCell): boolean {
-    return cell.kind === PART || cell.kind === CHAPTER;
-}
-
 function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
     const scope =
         cell.kind === PART
@@ -56,35 +56,6 @@ function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
     return nothingOfItsKindFollows
         ? `${scope} author-file-editor-scope-ends`
         : scope;
-}
-
-export interface CellsInASection {
-    cell: WebviewCell;
-    within: CellsInASection[];
-}
-
-export function cellsBySection(cells: WebviewCell[]): CellsInASection[] {
-    const wholeDocument: CellsInASection[] = [];
-    let part: CellsInASection | undefined;
-    let chapter: CellsInASection | undefined;
-    for (const cell of cells) {
-        const section: CellsInASection = { cell, within: [] };
-        if (cell.kind === PART) {
-            wholeDocument.push(section);
-            part = section;
-            chapter = undefined;
-        } else if (cell.kind === CHAPTER) {
-            (part?.within ?? wholeDocument).push(section);
-            chapter = section;
-        } else if (standsOutsideTheStory(cell.kind)) {
-            wholeDocument.push(section);
-            part = undefined;
-            chapter = undefined;
-        } else {
-            (chapter?.within ?? part?.within ?? wholeDocument).push(section);
-        }
-    }
-    return wholeDocument;
 }
 
 export function invokeAuthorDocumentCommand(
@@ -230,7 +201,7 @@ export function AuthorFileEditorCanvas({
     }
 
     function cellsInScope(
-        sections: CellsInASection[],
+        sections: CellsInASection<WebviewCell>[],
         whatFollowsTheScope: string | null,
         scopeClassName?: string,
     ): ReactNode {
@@ -300,7 +271,7 @@ export function AuthorFileEditorCanvas({
                                     sendMessagesToVscode,
                                 )}
                             </AuthorFileEditorCellState>
-                            {opensASection(cell) && !isFolded(cell)
+                            {opensASection(cell.kind) && !isFolded(cell)
                                 ? cellsInScope(
                                       section.within,
                                       whatFollowsTheSection,

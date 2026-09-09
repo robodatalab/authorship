@@ -69,13 +69,13 @@ describe("WordCounter — the words of a story", () => {
 
 Remember the door and the bell.
 
-<!-- cell: blurb id="b1" -->
-
-A woman loses her name.
-
 <!-- cell: markdown id="m1" -->
 
 She saw the door.
+
+<!-- cell: blurb id="b1" -->
+
+A woman loses her name.
 `);
         expect(counter.wordsInTheDocument).toBe(4);
         expect(counter.wordsInTheSection("c1")).toBe(4);
