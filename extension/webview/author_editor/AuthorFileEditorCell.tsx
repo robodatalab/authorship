@@ -24,6 +24,10 @@ interface AuthorFileEditorCellHeaderProps {
     children?: ReactNode;
 }
 
+interface AuthorFileEditorCellHeaderTitleProps {
+    title?: string;
+}
+
 interface AuthorFileEditorCellBodyProps {
     children?: ReactNode;
 }
@@ -150,6 +154,18 @@ export function AuthorFileEditorCellHeader({
 }: AuthorFileEditorCellHeaderProps) {
     return (
         <section className="author-file-editor-cell-header">{children}</section>
+    );
+}
+
+export function AuthorFileEditorCellHeaderTitle({
+    title,
+}: AuthorFileEditorCellHeaderTitleProps) {
+    if (!title) {
+        return null;
+    }
+
+    return (
+        <span className="author-file-editor-cell-header-title">{title}</span>
     );
 }
 

@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
+    AuthorFileEditorCellHeaderTitle,
     AuthorFileEditorCellRun,
     AuthorFileEditorCellState,
     AuthorFileEditorCellWarning,
@@ -93,6 +94,34 @@ describe("the sidebar every cell has", () => {
                 ".author-file-editor-cell-main .author-file-editor-cell-header",
             ),
         ).not.toBeNull();
+    });
+});
+
+describe("the title in the header of a section a cell opens", () => {
+    function header(): Element {
+        return document.querySelector(".author-file-editor-cell-header")!;
+    }
+
+    it("names the section, so a folded one can be told from another", async () => {
+        await mount(
+            <AuthorFileEditorCellHeader>
+                Chapter
+                <AuthorFileEditorCellHeaderTitle title="The Door" />
+            </AuthorFileEditorCellHeader>,
+        );
+        expect(header().textContent).toBe("ChapterThe Door");
+    });
+
+    it("says nothing where the section has no title of its own", async () => {
+        await mount(
+            <AuthorFileEditorCellHeader>
+                Chapter
+                <AuthorFileEditorCellHeaderTitle title="" />
+            </AuthorFileEditorCellHeader>,
+        );
+        expect(
+            header().querySelector(".author-file-editor-cell-header-title"),
+        ).toBeNull();
     });
 });
 

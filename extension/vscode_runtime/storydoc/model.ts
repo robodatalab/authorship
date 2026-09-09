@@ -147,14 +147,14 @@ export class AuthorDocument implements vscode.CustomDocument {
     numCharactersInCell(cellId: string): number {
         return this.cellWithId(cellId)?.source.length ?? 0;
     }
-    insertAfter(cellId: string | null, cell: Cell): void {
-        const standsAfter =
-            cellId === null
-                ? -1
-                : this.documentCells.findIndex(
-                      (inTheDocument) => inTheDocument.uniqueId === cellId,
-                  );
-        this.insertAt(standsAfter + 1, cell);
+    insertBefore(cellId: string | null, cell: Cell): void {
+        const standsBefore = this.documentCells.findIndex(
+            (inTheDocument) => inTheDocument.uniqueId === cellId,
+        );
+        this.insertAt(
+            standsBefore < 0 ? this.documentCells.length : standsBefore,
+            cell,
+        );
     }
 
     removeCell(cellId: string): void {
