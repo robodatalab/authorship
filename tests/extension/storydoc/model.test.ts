@@ -243,61 +243,6 @@ describe("what a document reads as", () => {
     });
 });
 
-describe("moving a cell", () => {
-    const threeCells = () =>
-        AuthorDocument.fromText(
-            "<!-- cell: markdown -->\n\none\n\n<!-- cell: markdown -->\n\ntwo\n\n<!-- cell: markdown -->\n\nthree\n",
-        );
-
-    it("swaps it with the one above", () => {
-        const document = threeCells();
-
-        document.moveAt(1, 0);
-
-        expect(document.cells.map((cell) => cell.source)).toEqual([
-            "two",
-            "one",
-            "three",
-        ]);
-    });
-
-    it("swaps it with the one below", () => {
-        const document = threeCells();
-
-        document.moveAt(1, 2);
-
-        expect(document.cells.map((cell) => cell.source)).toEqual([
-            "one",
-            "three",
-            "two",
-        ]);
-    });
-
-    it("leaves the first cell where it is", () => {
-        const document = threeCells();
-
-        document.moveAt(0, -1);
-
-        expect(document.cells.map((cell) => cell.source)).toEqual([
-            "one",
-            "two",
-            "three",
-        ]);
-    });
-
-    it("leaves the last cell where it is", () => {
-        const document = threeCells();
-
-        document.moveAt(2, 3);
-
-        expect(document.cells.map((cell) => cell.source)).toEqual([
-            "one",
-            "two",
-            "three",
-        ]);
-    });
-});
-
 describe("deleting a cell", () => {
     const twoCells = () =>
         AuthorDocument.fromText(
@@ -307,15 +252,23 @@ describe("deleting a cell", () => {
     it("takes it out of the document", () => {
         const document = twoCells();
 
-        document.removeAt(0);
+        document.removeCellsAt(0, 1);
 
         expect(document.cells.map((cell) => cell.kind)).toEqual([NOTE]);
+    });
+
+    it("takes out as many as it is asked for", () => {
+        const document = twoCells();
+
+        document.removeCellsAt(0, 2);
+
+        expect(document.cells).toHaveLength(0);
     });
 
     it("does nothing when there is no cell there", () => {
         const document = twoCells();
 
-        document.removeAt(2);
+        document.removeCellsAt(2, 1);
 
         expect(document.cells).toHaveLength(2);
     });

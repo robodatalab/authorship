@@ -78,9 +78,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
             return;
         }
         const laidOut = cellsLaidOutByPlan(document.cells, report.plan);
-        while (document.cells.length > 0) {
-            document.removeAt(0);
-        }
+        document.removeCellsAt(0, document.cells.length);
         laidOut.forEach((cell, cellIndex) =>
             document.insertAt(
                 cellIndex,

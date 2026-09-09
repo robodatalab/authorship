@@ -1,4 +1,5 @@
 import type { AuthorDocument } from "../storydoc/model";
+import { moveTheSectionDown } from "../storydoc/sections";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class MoveCellDownCommand implements AuthorDocumentCommand {
@@ -11,6 +12,6 @@ export class MoveCellDownCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.moveCellDown(commandArguments.cellId as string);
+        moveTheSectionDown(document, commandArguments.cellId as string);
     }
 }

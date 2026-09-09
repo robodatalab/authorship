@@ -1,7 +1,19 @@
-import { CHAPTER, MARKDOWN, PART, type AuthorDocument } from "./model";
+import { MARKDOWN, type AuthorDocument, type Cell } from "./model";
+import {
+    cellsBySection,
+    cellsWithinASection,
+    opensASection,
+    type CellsInASection,
+} from "./sections";
 
 export function numberOfWords(markdown: string): number {
     return markdown.split(/\s+/).filter((word) => /\w/.test(word)).length;
+}
+
+function wordsInTheCells(cells: readonly Cell[]): number {
+    return cells
+        .filter((cell) => cell.kind === MARKDOWN)
+        .reduce((words, cell) => words + numberOfWords(cell.source), 0);
 }
 
 export class WordCounter {
@@ -9,40 +21,21 @@ export class WordCounter {
     private wordsInTheWholeDocument = 0;
 
     synchronize(document: AuthorDocument): void {
-        const wordsInEachSection = new Map<string, number>();
-        let wordsInTheWholeDocument = 0;
-        let part: string | undefined;
-        let chapter: string | undefined;
+        this.wordsInEachSection = new Map<string, number>();
+        this.countSections(cellsBySection(document.cells));
+        this.wordsInTheWholeDocument = wordsInTheCells(document.cells);
+    }
 
-        for (const cell of document.cells) {
-            if (cell.kind === PART) {
-                part = cell.uniqueId;
-                chapter = undefined;
-                wordsInEachSection.set(part, 0);
-                continue;
+    private countSections(sections: CellsInASection<Cell>[]): void {
+        for (const section of sections) {
+            if (opensASection(section.cell.kind)) {
+                this.wordsInEachSection.set(
+                    section.cell.uniqueId,
+                    wordsInTheCells(cellsWithinASection(section)),
+                );
             }
-            if (cell.kind === CHAPTER) {
-                chapter = cell.uniqueId;
-                wordsInEachSection.set(chapter, 0);
-                continue;
-            }
-            if (cell.kind !== MARKDOWN) {
-                continue;
-            }
-            const words = numberOfWords(cell.source);
-            wordsInTheWholeDocument += words;
-            for (const section of [part, chapter]) {
-                if (section !== undefined) {
-                    wordsInEachSection.set(
-                        section,
-                        (wordsInEachSection.get(section) ?? 0) + words,
-                    );
-                }
-            }
+            this.countSections(section.within);
         }
-
-        this.wordsInEachSection = wordsInEachSection;
-        this.wordsInTheWholeDocument = wordsInTheWholeDocument;
     }
 
     wordsInTheSection(cellId: string): number | undefined {

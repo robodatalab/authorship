@@ -36,6 +36,40 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
         expect(document.cells[0].source).toBe("1. Untitled");
     });
 
+    it("lists a part above the chapters written under it", () => {
+        const document = openStory(`
+<!-- cell: contents id="toc" -->
+
+<!-- cell: part title="Book One" id="p1" -->
+
+<!-- cell: chapter title="The Door" id="c1" -->
+
+<!-- cell: part title="Book Two" id="p2" -->
+
+<!-- cell: chapter title="The Bell" id="c2" -->
+`);
+
+        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+
+        expect(document.cells[0].source).toBe(
+            "1. Book One\n    1. The Door\n1. Book Two\n    1. The Bell",
+        );
+    });
+
+    it("leaves out a part the book does not print, and the chapters under it stand alone", () => {
+        const document = openStory(`
+<!-- cell: contents id="toc" -->
+
+<!-- cell: part title="Break" print="no" id="p1" -->
+
+<!-- cell: chapter title="The Door" id="c1" -->
+`);
+
+        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+
+        expect(document.cells[0].source).toBe("1. The Door");
+    });
+
     it("writes nothing into a story with no chapters", () => {
         const document = openStory('<!-- cell: contents id="toc" -->\n');
 

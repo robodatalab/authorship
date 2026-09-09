@@ -7,6 +7,7 @@ import mimetypes
 import re
 import uuid
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -191,6 +192,17 @@ class Page:
         self.filename = f"{id}.xhtml"
 
 
+class Part(Page):
+    def __init__(self, name: str, body_xhtml: str):
+        super().__init__("part", name, body_xhtml, in_toc=True)
+
+
+@dataclass
+class Listing:
+    item: Chapter | Page
+    within: list["Listing"]
+
+
 class Art:
     def __init__(self, id: str, source: Path):
         self.id = id
@@ -232,9 +244,9 @@ class Book:
         return [item for item in self.documents if isinstance(item, Chapter)]
 
     @property
-    def listed(self) -> list[Chapter | Page]:
-        """What the table of contents points at."""
-        return [item for item in self.documents if item.in_toc]
+    def listing(self) -> list["Listing"]:
+        """What the table of contents points at, chapters under their part."""
+        return listing_of(self.documents)
 
 
 # Prose the author left standing outside every chapter — a dedication, an
@@ -314,10 +326,10 @@ def read_book(document: Document) -> Book:
         elif cell.source and cell.kind not in UNPRINTED:
             _add_lines(documents, cell.source.splitlines())
 
-    built = contents_xhtml([item for item in documents if isinstance(item, Chapter)])
-    for listing in listings:
-        listing.body_xhtml = built
     _name_apart(documents)
+    built = contents_xhtml(listing_of(documents))
+    for page in listings:
+        page.body_xhtml = built
     return Book(imprint, documents, art, cover, _wanting(document.cells, imprint))
 
 
@@ -568,7 +580,8 @@ p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 .title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
 .title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
                           text-transform: uppercase; }
-.contents ol { list-style: none; padding: 0; text-align: center; }
+.contents ol { text-align: left; padding-left: 2em; margin: 0; }
+.contents ol ol { margin: 0.6em 0 0; }
 .contents li { margin: 0 0 0.8em; }
 .contents a { text-decoration: none; }
 .disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }
@@ -703,30 +716,68 @@ def build_image_page(art: Art) -> Page:
     )
 
 
-def build_part_page(idx: int, cell: Cell) -> Page:
+def build_part_page(idx: int, cell: Cell) -> Part:
     """The divider a reader turns to before the chapters under it.
 
     A page of its own carrying one line: every document in the spine opens a
     page, so the name stands alone with nothing above or below it.
     """
     name = cell.title or f"Part {idx + 1}"
-    return Page(
-        "part",
+    return Part(
         name,
         f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{_inline(name)}</h1>\n</div>',
-        in_toc=True,
     )
 
 
-def contents_xhtml(chapters: list[Chapter]) -> str:
-    items = "\n".join(
-        f'    <li><a href="{ch.filename}">{_inline(ch.name)}</a></li>'
-        for ch in chapters
-    )
+def listing_of(documents: list[Chapter | Page]) -> list[Listing]:
+    listing: list[Listing] = []
+    under: Listing | None = None
+    for item in documents:
+        if not item.in_toc:
+            continue
+        entry = Listing(item, [])
+        if isinstance(item, Chapter) and under is not None:
+            under.within.append(entry)
+            continue
+        listing.append(entry)
+        under = entry if isinstance(item, Part) else None
+    return listing
+
+
+def links_in_the_listing(
+    listing: list[Listing], indent: str, named: Callable[[str], str]
+) -> str:
+    lines = []
+    for entry in listing:
+        link = (
+            f'{indent}<li><a href="{entry.item.filename}">'
+            f"{named(entry.item.name)}</a>"
+        )
+        if not entry.within:
+            lines.append(f"{link}</li>")
+            continue
+        lines.append(
+            f"{link}\n{indent}  <ol>\n"
+            f"{links_in_the_listing(entry.within, indent + '    ', named)}\n"
+            f"{indent}  </ol>\n{indent}</li>"
+        )
+    return "\n".join(lines)
+
+
+def contents_xhtml(listing: list["Listing"]) -> str:
+    items = links_in_the_listing(_of_the_story(listing), "    ", _inline)
     return (
         '<div class="contents">\n  <h1>Contents</h1>\n  <ol>\n'
         f"{items}\n  </ol>\n</div>"
     )
+
+
+def _of_the_story(listing: list["Listing"]) -> list["Listing"]:
+    return [
+        Listing(entry.item, _of_the_story(entry.within))
+        for entry in listing
+        if isinstance(entry.item, (Chapter, Part))
+    ]
 
 
 def build_disclaimer_page(cell: Cell) -> Page | None:
@@ -857,11 +908,8 @@ def build_content_opf(book_id: uuid.UUID, book: Book, modified: str) -> str:
 """
 
 
-def build_nav(lang: str, title: str, listed: list[Chapter | Page]) -> str:
-    items = "\n".join(
-        f'      <li><a href="{item.filename}">{html.escape(item.name)}</a></li>'
-        for item in listed
-    )
+def build_nav(lang: str, title: str, listing: list[Listing]) -> str:
+    items = links_in_the_listing(listing, "      ", html.escape)
     body = f"""<nav epub:type="toc" id="toc">
     <h1>Contents</h1>
     <ol>
@@ -880,20 +928,41 @@ def build_nav(lang: str, title: str, listed: list[Chapter | Page]) -> str:
 """
 
 
-def build_ncx(book_id: uuid.UUID, title: str, listed: list[Chapter | Page]) -> str:
-    points = []
-    for i, item in enumerate(listed, start=1):
+def nav_points(
+    listing: list[Listing], indent: str, played: int
+) -> tuple[list[str], int]:
+    points: list[str] = []
+    for entry in listing:
+        played += 1
+        at = played
+        held: list[str] = []
+        if entry.within:
+            held, played = nav_points(entry.within, indent + "  ", played)
         points.append(
-            f'    <navPoint id="np{i}" playOrder="{i}">\n'
-            f"      <navLabel><text>{html.escape(item.name)}</text></navLabel>\n"
-            f'      <content src="{item.filename}"/>\n'
-            f"    </navPoint>"
+            f'{indent}<navPoint id="np{at}" playOrder="{at}">\n'
+            f"{indent}  <navLabel><text>{html.escape(entry.item.name)}</text>"
+            f"</navLabel>\n"
+            f'{indent}  <content src="{entry.item.filename}"/>\n'
+            + ("\n".join(held) + "\n" if held else "")
+            + f"{indent}</navPoint>"
         )
+    return points, played
+
+
+def how_deep_the_listing_goes(listing: list[Listing]) -> int:
+    return max(
+        (1 + how_deep_the_listing_goes(entry.within) for entry in listing),
+        default=0,
+    )
+
+
+def build_ncx(book_id: uuid.UUID, title: str, listing: list[Listing]) -> str:
+    points, _ = nav_points(listing, "    ", 0)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <head>
     <meta name="dtb:uid" content="urn:uuid:{book_id}"/>
-    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:depth" content="{max(1, how_deep_the_listing_goes(listing))}"/>
     <meta name="dtb:totalPageCount" content="0"/>
     <meta name="dtb:maxPageNumber" content="0"/>
   </head>
@@ -919,8 +988,8 @@ def build_epub(document: Document, out_path: Path) -> None:
         z.writestr("META-INF/container.xml", CONTAINER_XML)
         z.writestr("OEBPS/style.css", CSS)
         z.writestr("OEBPS/content.opf", build_content_opf(book_id, book, modified))
-        z.writestr("OEBPS/nav.xhtml", build_nav(lang, title, book.listed))
-        z.writestr("OEBPS/toc.ncx", build_ncx(book_id, title, book.listed))
+        z.writestr("OEBPS/nav.xhtml", build_nav(lang, title, book.listing))
+        z.writestr("OEBPS/toc.ncx", build_ncx(book_id, title, book.listing))
 
         for picture in book.art:
             z.writestr(f"OEBPS/{picture.href}", picture.source.read_bytes())
