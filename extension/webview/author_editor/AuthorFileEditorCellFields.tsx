@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuthorFileEditorCellFind } from "./AuthorFileEditorCell";
 import "./AuthorFileEditorCellFields.css";
 
@@ -61,21 +62,48 @@ export function AuthorFileEditorCellFields({
                             }
                         />
                     ) : (
-                        <input
-                            type="text"
+                        <AuthorFileEditorCellFieldBox
                             className={inputClassName(field.attributeName)}
-                            value={cellAttributes[field.attributeName] ?? ""}
+                            said={cellAttributes[field.attributeName] ?? ""}
                             placeholder={field.placeholder ?? ""}
-                            onChange={(event) =>
-                                onAttributeChanged(
-                                    field.attributeName,
-                                    event.currentTarget.value,
-                                )
+                            onSaid={(said) =>
+                                onAttributeChanged(field.attributeName, said)
                             }
                         />
                     )}
                 </label>
             ))}
         </div>
+    );
+}
+
+interface AuthorFileEditorCellFieldBoxProps {
+    className: string;
+    said: string;
+    placeholder: string;
+    onSaid: (said: string) => void;
+}
+
+function AuthorFileEditorCellFieldBox({
+    className,
+    said,
+    placeholder,
+    onSaid,
+}: AuthorFileEditorCellFieldBoxProps) {
+    const [beingTyped, setBeingTyped] = useState<string | null>(null);
+
+    return (
+        <input
+            type="text"
+            className={className}
+            value={beingTyped ?? said}
+            placeholder={placeholder}
+            onFocus={() => setBeingTyped(said)}
+            onBlur={() => setBeingTyped(null)}
+            onChange={(event) => {
+                setBeingTyped(event.currentTarget.value);
+                onSaid(event.currentTarget.value);
+            }}
+        />
     );
 }
