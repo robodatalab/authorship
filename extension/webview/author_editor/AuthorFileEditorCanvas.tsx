@@ -48,6 +48,22 @@ function isFolded(cell: WebviewCell): boolean {
     return cell.attrs[FOLDED] === "true";
 }
 
+function theInnermostCellInView(
+    sections: CellsInASection<WebviewCell>[],
+    cellIdsInView: Set<string>,
+): string | undefined {
+    const first = sections.find((section) =>
+        cellIdsInView.has(section.cell.attrs.id),
+    );
+    if (!first) {
+        return undefined;
+    }
+    return (
+        theInnermostCellInView(first.within, cellIdsInView) ??
+        first.cell.attrs.id
+    );
+}
+
 function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
     const scope =
         cell.kind === PART
@@ -104,6 +120,7 @@ export function AuthorFileEditorCanvas({
     const insertCommand = commands.find(
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
+    const sections = useMemo(() => cellsBySection(cells), [cells]);
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
     const find = useAuthorFileEditorFind(
@@ -142,11 +159,12 @@ export function AuthorFileEditorCanvas({
                         cellIdsInView.delete(cellId);
                     }
                 }
-                const first = cells.find((cell) =>
-                    cellIdsInView.has(cell.attrs.id),
+                const inView = theInnermostCellInView(
+                    sections,
+                    cellIdsInView,
                 );
-                if (first) {
-                    setCellIdInView(first.attrs.id);
+                if (inView) {
+                    setCellIdInView(inView);
                 }
             },
             { root: scrolled },
@@ -155,7 +173,7 @@ export function AuthorFileEditorCanvas({
             watching.observe(drawn);
         }
         return () => watching.disconnect();
-    }, [cells]);
+    }, [sections]);
 
     function everyCellIsDrawnOn(
         command: WebviewAuthorDocumentCommandCard,
@@ -308,7 +326,7 @@ export function AuthorFileEditorCanvas({
                 <AuthorFileEditorFindBar find={find} />
             </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator>
-                {cellsInScope(cellsBySection(cells), null)}
+                {cellsInScope(sections, null)}
             </MarkdownEditorMediator>
         </div>
     );

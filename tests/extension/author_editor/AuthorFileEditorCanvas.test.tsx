@@ -684,6 +684,81 @@ describe("folding a part or a chapter", () => {
     });
 });
 
+describe("the part and the chapter the author is looking at", () => {
+    const CELL_KINDS: AuthorDocumentCellRenderers = {
+        part: () => <div className="test-cell" />,
+        chapter: () => <div className="test-cell" />,
+        markdown: () => <div className="test-cell" />,
+    };
+
+    let tellWhatIsInView: (entries: IntersectionObserverEntry[]) => void;
+
+    class ObserverTheTestDrives {
+        constructor(watch: IntersectionObserverCallback) {
+            tellWhatIsInView = (entries) =>
+                watch(entries, this as unknown as IntersectionObserver);
+        }
+        observe(): void {}
+        disconnect(): void {}
+    }
+
+    async function scrolledTo(...cellIdsInView: string[]): Promise<void> {
+        await act(async () => {
+            tellWhatIsInView(
+                cellIdsInView.map(
+                    (cellId) =>
+                        ({
+                            target: document.querySelector(
+                                `li[data-cell-id='${cellId}']`,
+                            ),
+                            isIntersecting: true,
+                        }) as unknown as IntersectionObserverEntry,
+                ),
+            );
+        });
+    }
+
+    function said(): string {
+        return (
+            document.querySelector(".author-file-editor-part-and-chapter-said")
+                ?.textContent ?? ""
+        );
+    }
+
+    async function mountTheStory(): Promise<void> {
+        (globalThis as Record<string, unknown>).IntersectionObserver =
+            ObserverTheTestDrives;
+        await mountCanvas({
+            cells: [
+                { kind: "part", source: "", attrs: { id: "p1", title: "Book One" } },
+                {
+                    kind: "chapter",
+                    source: "",
+                    attrs: { id: "c1", title: "The Door" },
+                },
+                { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            ],
+            cellRenderers: CELL_KINDS,
+        });
+    }
+
+    it("names the chapter the prose in view stands in, not the part alone", async () => {
+        await mountTheStory();
+
+        await scrolledTo("p1", "c1", "m1");
+
+        expect(said()).toBe("Book One / The Door");
+    });
+
+    it("names the part alone above the first chapter of it", async () => {
+        await mountTheStory();
+
+        await scrolledTo("p1");
+
+        expect(said()).toBe("Book One");
+    });
+});
+
 describe("the scope of a part and of a chapter", () => {
     const CELL_KINDS: AuthorDocumentCellRenderers = {
         part: () => <div className="test-cell" />,
