@@ -55,7 +55,6 @@ function cellType(
         menuLabel: cellKind,
         insertMenuGroup,
         render: () => null,
-        newCell: () => ({ kind: cellKind, source: "", attrs: {} }),
     };
 }
 
@@ -173,7 +172,7 @@ describe("adding a cell", () => {
                 commandName: "insertCell",
                 commandArguments: {
                     afterCellId: null,
-                    newCell: { kind: "chapter", source: "", attrs: {} },
+                    cellKind: "chapter",
                 },
             },
         ]);
@@ -215,11 +214,7 @@ describe("adding a cell", () => {
         )!;
         expect(dropdown).not.toBeNull();
         await click(dropdown.querySelector("button")!);
-        expect(posted[0].commandArguments.newCell).toEqual({
-            kind: "cover",
-            source: "",
-            attrs: {},
-        });
+        expect(posted[0].commandArguments.cellKind).toBe("cover");
     });
 
     it("draws no ellipsis when every kind is primary", async () => {

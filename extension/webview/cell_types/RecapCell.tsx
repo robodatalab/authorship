@@ -108,5 +108,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: RECAP, source: "", attrs: {} }),
 });

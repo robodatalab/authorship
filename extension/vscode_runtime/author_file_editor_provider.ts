@@ -9,6 +9,8 @@ import {
     closeAuthorFileEditorSession,
     openAuthorFileEditorSession,
 } from "./author_file_editor_session";
+import { loadTemplates, watchSettings } from "./settings/file";
+import { useTemplates } from "./settings/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorDocument> {
     public static readonly viewType = "authorship.authorEditor";
@@ -44,6 +46,12 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         };
         panel.webview.html = this.html(panel.webview, document.uri);
         const session = openAuthorFileEditorSession(document, panel);
+
+        const readTemplates = (): void => {
+            void loadTemplates(document.uri).then(useTemplates);
+        };
+        readTemplates();
+        const templatesWatcher = watchSettings(document.uri, readTemplates);
 
         const sendCommandCards = (): void => {
             void panel.webview.postMessage({
@@ -96,6 +104,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         });
 
         panel.onDidDispose(() => {
+            templatesWatcher.dispose();
             settingsChanged.dispose();
             savedElsewhere.dispose();
             fileWatcher.dispose();

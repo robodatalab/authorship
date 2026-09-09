@@ -66,6 +66,20 @@ export const Uri = {
         uriOf([base.toString(), ...parts].join("/")),
 };
 
+export class Disposable {
+    static from(...disposables: { dispose(): void }[]): Disposable {
+        return new Disposable(() =>
+            disposables.forEach((disposable) => disposable.dispose()),
+        );
+    }
+
+    constructor(private readonly disposing: () => void) {}
+
+    dispose(): void {
+        this.disposing();
+    }
+}
+
 export class RelativePattern {
     constructor(
         readonly base: StubUri,

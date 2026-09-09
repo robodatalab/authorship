@@ -71,9 +71,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({
-        kind: TITLE_PAGE,
-        source: "",
-        attrs: { title: "Untitled" },
-    }),
 });

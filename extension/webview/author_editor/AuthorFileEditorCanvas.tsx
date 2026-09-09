@@ -428,7 +428,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     insertCommand.commandName,
                     {
                         afterCellId: insertAfterCellId,
-                        newCell: cellType.newCell(),
+                        cellKind: cellType.cellKind,
                     },
                 )
             }

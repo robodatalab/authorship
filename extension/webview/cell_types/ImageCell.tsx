@@ -79,5 +79,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: IMAGE, source: "", attrs: { src: "" } }),
 });

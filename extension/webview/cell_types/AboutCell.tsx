@@ -106,5 +106,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: ABOUT, source: "", attrs: {} }),
 });

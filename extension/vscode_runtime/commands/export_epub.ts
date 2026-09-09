@@ -7,8 +7,6 @@ import {
     saidAfterLayingOut,
     type BookLayoutReport,
 } from "../publish/book_layout_report";
-import { loadTemplates } from "../settings/file";
-import { useTemplates } from "../settings/model";
 import { fetchFromServer } from "../server/fetch";
 import { AuthorDocument, Cell } from "../storydoc/model";
 
@@ -79,7 +77,6 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         if (answer !== "Fix") {
             return;
         }
-        useTemplates(await loadTemplates(document.uri));
         const laidOut = cellsLaidOutByPlan(document.cells, report.plan);
         while (document.cells.length > 0) {
             document.removeAt(0);
