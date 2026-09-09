@@ -17,13 +17,14 @@ from server.storydoc import (
     BUILT_KINDS,
     CHAPTER,
     CONTENTS,
-    COVER,
     DISCLAIMER,
+    IMAGE,
     PART,
     PRIVATE_KINDS,
     TITLE_PAGE,
     Cell,
     Document,
+    is_full_page,
     prints_page,
 )
 
@@ -33,9 +34,9 @@ UNPRINTED = BUILT_KINDS | PRIVATE_KINDS
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is
-# never touched — but a reader does not choose where they meet the art, the
-# title, the list of chapters or the author's own page, so these do not float.
-OPENING = (COVER, TITLE_PAGE, CONTENTS, BLURB)
+# never touched — but a reader does not choose where they meet the title, the
+# list of chapters or the author's own page, so these do not float.
+OPENING = (TITLE_PAGE, CONTENTS, BLURB)
 CLOSING = (ABOUT,)
 REQUIRED = OPENING + CLOSING
 
@@ -50,7 +51,6 @@ TITLE_PAGE_FIELDS = ("title", "subtitle", "author", "publisher", "date")
 UNNAMED = ("Untitled", "Anonymous")
 
 # Why a section is wanting when what it lacks is not one of its fields.
-ART = "art"
 TEXT = "text"
 
 DEFAULT_LANGUAGE = "en"
@@ -59,7 +59,7 @@ _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-_IMAGE = re.compile(r"!\[[^\]]*\]\(\s*([^)\s]+)")
+_IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)")
 
 
 def _inline(text: str) -> str:
@@ -82,6 +82,12 @@ def blocks_to_xhtml(lines: list[str]) -> str:
             continue
         if re.fullmatch(r"(-{3,}|\*{3,}|_{3,})", stripped):
             out.append('<hr class="scene-break"/>')
+        elif picture := _IMAGE.fullmatch(stripped):
+            alt, src = picture.groups()
+            out.append(
+                f'<p class="image"><img src="{html.escape(src, quote=True)}"'
+                f' alt="{html.escape(alt, quote=True)}"/></p>'
+            )
         elif stripped.startswith("### "):
             out.append(f"<h3>{_inline(stripped[4:].strip())}</h3>")
         elif stripped.startswith("## "):
@@ -169,19 +175,12 @@ class Page:
         self.filename = f"{id}.xhtml"
 
 
-class Cover:
-    """The art the book opens with, and the page that shows it."""
-
-    def __init__(self, art: Path, title: str):
-        self.art = art
-        self.href = f"cover{art.suffix.lower() or '.jpg'}"
-        self.media = mimetypes.guess_type(art.name)[0] or "image/jpeg"
-        self.page = Page(
-            "cover",
-            title,
-            f'<div class="cover"><img src="{self.href}"'
-            f' alt="{html.escape(title, quote=True)}"/></div>',
-        )
+class Art:
+    def __init__(self, id: str, source: Path):
+        self.id = id
+        self.source = source
+        self.href = f"{id}{source.suffix.lower() or '.jpg'}"
+        self.media = mimetypes.guess_type(source.name)[0] or "image/jpeg"
 
 
 @dataclass(frozen=True)
@@ -204,11 +203,12 @@ class Book:
 
     imprint: Imprint
     documents: list[Chapter | Page]
-    cover: Cover | None
+    art: list[Art]
+    cover: Art | None
     # What was asked for and could not be printed. Every one of these is a
-    # judgement the binding already made — a cover whose art is not on the disk,
-    # an about page with nothing on it — and which used to be thrown away the
-    # moment it was made, so a book went out short of a section and said nothing.
+    # judgement the binding already made — an about page with nothing on it —
+    # and which used to be thrown away the moment it was made, so a book went
+    # out short of a section and said nothing.
     wanting: tuple[Wanting, ...] = ()
 
     @property
@@ -238,7 +238,8 @@ def read_book(document: Document) -> Book:
     root = document.path.parent if document.path else Path()
     documents: list[Chapter | Page] = []
     listings: list[Page] = []
-    cover: Cover | None = None
+    art: list[Art] = []
+    cover: Art | None = None
     chapters = 0
     parts = 0
 
@@ -256,11 +257,19 @@ def read_book(document: Document) -> Book:
                 parts += 1
         elif cell.kind == TITLE_PAGE:
             documents.append(build_title_page(imprint))
-        elif cell.kind == COVER:
-            art = _art_of(cell, root)
-            if art and cover is None:
-                cover = Cover(art, imprint.title)
-                documents.append(cover.page)
+        elif cell.kind == IMAGE:
+            source = _art_of(cell, root)
+            if source is None:
+                continue
+            picture = Art(f"art_{len(art):03d}", source)
+            art.append(picture)
+            if not is_full_page(cell):
+                _add_lines(documents, [f"![]({picture.href})"])
+            elif cover is None and chapters == 0:
+                cover = picture
+                documents.append(build_cover_page(picture, imprint.title))
+            else:
+                documents.append(build_image_page(picture))
         elif cell.kind == CONTENTS:
             # Built here rather than taken from the cell: on the page a table of
             # contents is a list of names, in a book it is a list of links.
@@ -276,13 +285,13 @@ def read_book(document: Document) -> Book:
             if page:
                 documents.append(page)
         elif cell.source and cell.kind not in UNPRINTED:
-            _add_prose(documents, cell)
+            _add_lines(documents, cell.source.splitlines())
 
     built = contents_xhtml([item for item in documents if isinstance(item, Chapter)])
     for listing in listings:
         listing.body_xhtml = built
     _name_apart(documents)
-    return Book(imprint, documents, cover, _wanting(document.cells, imprint, root))
+    return Book(imprint, documents, art, cover, _wanting(document.cells, imprint))
 
 
 def _first_of(cells: list[Cell]) -> dict[str, int]:
@@ -299,27 +308,25 @@ def _first_of(cells: list[Cell]) -> dict[str, int]:
     return found
 
 
-def _wanting(cells: list[Cell], imprint: Imprint, root: Path) -> tuple[Wanting, ...]:
-    """Which of the five have nothing in them yet.
+def _wanting(cells: list[Cell], imprint: Imprint) -> tuple[Wanting, ...]:
+    """Which of the four have nothing in them yet.
 
-    Asked of the same functions that do the binding — `_art_of` for the cover,
-    `build_about_page` for the author's page — so what stops an export is exactly
-    what the book would have gone out without, rather than a second opinion about
-    it that can drift from the first.
+    Asked of the same function that does the binding — `build_about_page` for the
+    author's page — so what stops an export is exactly what the book would have
+    gone out without, rather than a second opinion about it that can drift from
+    the first.
     """
     found = _first_of(cells)
     said = [
         Wanting(kind, needs)
         for kind in REQUIRED
-        for needs in [_wants(kind, cells[found[kind]] if kind in found else None, imprint, root)]
+        for needs in [_wants(kind, cells[found[kind]] if kind in found else None, imprint)]
         if needs
     ]
     return tuple(said)
 
 
-def _wants(
-    kind: str, cell: Cell | None, imprint: Imprint, root: Path
-) -> tuple[str, ...]:
+def _wants(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
     """What this section still needs before it can be printed.
 
     `cell` is None for a section that is not in the document at all, which wants
@@ -331,10 +338,6 @@ def _wants(
         return ()
     if kind == TITLE_PAGE:
         return _imprint_wants(imprint if cell else Imprint())
-    if kind == COVER:
-        # Only the file settles this: a cover pointing at art nobody has drawn
-        # binds a book with no cover and says nothing, which is the whole fault.
-        return () if cell and _art_of(cell, root) else (ART,)
     if kind == BLURB:
         return () if cell and cell.source.strip() else (TEXT,)
     if kind == ABOUT:
@@ -407,9 +410,15 @@ def report_of(document: Document) -> Report:
     cells = document.cells
     found = _first_of(cells)
     claimed = set(found.values())
+    art = _opening_art(cells)
     plan = (
-        [Slot(kind, found.get(kind)) for kind in OPENING]
-        + [Slot(cell.kind, at) for at, cell in enumerate(cells) if at not in claimed]
+        [Slot(IMAGE, at) for at in sorted(art)]
+        + [Slot(kind, found.get(kind)) for kind in OPENING]
+        + [
+            Slot(cell.kind, at)
+            for at, cell in enumerate(cells)
+            if at not in claimed and at not in art
+        ]
         + [Slot(kind, found.get(kind)) for kind in CLOSING]
     )
     return Report(
@@ -418,6 +427,15 @@ def report_of(document: Document) -> Report:
         moved=_moved(plan, found),
         wanting=read_book(document).wanting,
     )
+
+
+def _opening_art(cells: list[Cell]) -> set[int]:
+    art: set[int] = set()
+    for at, cell in enumerate(cells):
+        if cell.kind != IMAGE:
+            break
+        art.add(at)
+    return art
 
 
 def _moved(plan: list[Slot], found: dict[str, int]) -> tuple[str, ...]:
@@ -445,39 +463,25 @@ def chapters_of(document: Document) -> list[Chapter]:
     return read_book(document).chapters
 
 
-def _add_prose(documents: list[Chapter | Page], cell: Cell) -> None:
+def _add_lines(documents: list[Chapter | Page], lines: list[str]) -> None:
     if documents and isinstance(documents[-1], Chapter):
-        documents[-1].body_lines.extend(cell.source.splitlines())
+        documents[-1].body_lines.extend(lines)
         return
     loose = sum(1 for item in documents if item.id.startswith(LOOSE))
-    written = blocks_to_xhtml(cell.source.splitlines())
+    written = blocks_to_xhtml(lines)
     documents.append(
         Page(f"{LOOSE}{loose:03d}", "", f'<div class="chapter">\n{written}\n</div>')
     )
 
 
 def _art_of(cell: Cell, root: Path) -> Path | None:
-    """The image the cover cell points at, if it is really there.
+    """The image the cell points at, if it is really there.
 
-    A cover says where its art is twice — in the marker, and in the markdown that
-    a reader of the plain file sees — and the two come apart. The author repoints
-    the image and the attribute keeps the name the section was started with, so
-    the editor draws one file and the binding looked for the other, found nothing
-    where it looked, and put out a book with no cover without a word said.
-
-    So both are tried and the first that is really on the disk wins. A cell whose
-    every candidate is missing names art nobody has drawn yet, and that is the
-    one case where a book goes out coverless rather than not at all.
+    A cell naming art nobody has drawn yet is not printed, and that is the one
+    case where a book goes out short of a picture rather than not at all.
     """
-    for src in (cell.attrs.get("src"), _first_image(cell.source)):
-        if src and (root / src).is_file():
-            return root / src
-    return None
-
-
-def _first_image(source: str) -> str:
-    found = _IMAGE.search(source)
-    return found.group(1) if found else ""
+    src = cell.attrs.get("src", "")
+    return root / src if src and (root / src).is_file() else None
 
 
 def _name_apart(documents: list[Chapter | Page]) -> None:
@@ -522,8 +526,10 @@ hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 .part-page { display: flex; flex-direction: column; justify-content: center;
              align-items: center; height: 100vh; text-align: center; }
 .part-page h1 { margin: 0; }
-.cover { text-align: center; margin: 0; padding: 0; }
-.cover img { max-width: 100%; height: auto; }
+.cover, .image-page { text-align: center; margin: 0; padding: 0; }
+.cover img, .image-page img { max-width: 100%; height: auto; }
+p.image { text-align: center; margin: 1.2em 0; }
+p.image img { max-width: 100%; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
 .title-page h1.book-title { font-size: 2.4em; margin: 0 0 0.4em; }
 .title-page p.subtitle { font-size: 1.3em; font-style: italic; margin: 0 0 2.5em; }
@@ -586,6 +592,23 @@ def build_title_page(imprint: Imprint) -> Page:
         "titlepage",
         imprint.title,
         '<div class="title-page">\n' + "\n".join(said) + "\n</div>",
+    )
+
+
+def build_cover_page(art: Art, title: str) -> Page:
+    return Page(
+        "cover",
+        title,
+        f'<div class="cover"><img src="{art.href}"'
+        f' alt="{html.escape(title, quote=True)}"/></div>',
+    )
+
+
+def build_image_page(art: Art) -> Page:
+    return Page(
+        f"{art.id}_page",
+        "",
+        f'<div class="image-page"><img src="{art.href}" alt=""/></div>',
     )
 
 
@@ -698,12 +721,18 @@ def build_content_opf(book_id: uuid.UUID, book: Book, modified: str) -> str:
         )
     said.append(f'<meta property="dcterms:modified">{modified}</meta>')
 
-    if book.cover:
+    for picture in book.art:
+        if picture is book.cover:
+            manifest.append(
+                f'<item id="cover-image" href="{picture.href}"'
+                f' media-type="{picture.media}" properties="cover-image"/>'
+            )
+            said.append('<meta name="cover" content="cover-image"/>')
+            continue
         manifest.append(
-            f'<item id="cover-image" href="{book.cover.href}"'
-            f' media-type="{book.cover.media}" properties="cover-image"/>'
+            f'<item id="{picture.id}" href="{picture.href}"'
+            f' media-type="{picture.media}"/>'
         )
-        said.append('<meta name="cover" content="cover-image"/>')
 
     spine = []
     for item in book.documents:
@@ -792,8 +821,8 @@ def build_epub(document: Document, out_path: Path) -> None:
         z.writestr("OEBPS/nav.xhtml", build_nav(lang, title, book.listed))
         z.writestr("OEBPS/toc.ncx", build_ncx(book_id, title, book.listed))
 
-        if book.cover:
-            z.writestr(f"OEBPS/{book.cover.href}", book.cover.art.read_bytes())
+        for picture in book.art:
+            z.writestr(f"OEBPS/{picture.href}", picture.source.read_bytes())
 
         for item in book.documents:
             z.writestr(

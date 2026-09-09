@@ -4,6 +4,7 @@ import {
     BLURB,
     CHAPTER,
     Cell,
+    IMAGE,
     MARKDOWN,
     NOTE,
     PART,
@@ -131,6 +132,12 @@ export function toMarkdown(cells: Cell[]): string {
         }
         if (cell.kind === ABOUT) {
             manuscript.push(...aboutTheAuthorMarkdown(cell));
+            continue;
+        }
+        if (cell.kind === IMAGE) {
+            if (cell.attrs.src) {
+                manuscript.push(`![](${cell.attrs.src})`);
+            }
             continue;
         }
 

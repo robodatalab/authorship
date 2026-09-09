@@ -93,7 +93,6 @@ const CELL_KINDS: CellKind[] = [
         cellKind: IMAGE,
         label: "Image",
         fields: [],
-        isFrontOrBackMatter: true,
         blank: () => new Cell(IMAGE, "", { src: "" }),
     },
     {

@@ -14,6 +14,7 @@ import {
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
 import { IMAGE } from "../../vscode_runtime/storydoc/model";
+import "./ImageCell.css";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     { attributeName: "src", label: "Image", placeholder: "cover.jpg" },
@@ -52,6 +53,15 @@ export function ImageCell({
                         }
                     />
                 </AuthorFileEditorCellCard>
+                {cell.attrs.src ? (
+                    <AuthorFileEditorCellCard>
+                        <img
+                            className="image-cell-picture"
+                            src={cell.attrs.src}
+                            alt=""
+                        />
+                    </AuthorFileEditorCellCard>
+                ) : null}
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

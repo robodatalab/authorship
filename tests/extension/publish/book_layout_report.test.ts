@@ -11,8 +11,8 @@ import {
 } from "../../../extension/vscode_runtime/publish/book_layout_report";
 import {
     CHAPTER,
-    COVER,
     Cell,
+    IMAGE,
     MARKDOWN,
 } from "../../../extension/vscode_runtime/storydoc/model";
 
@@ -24,8 +24,8 @@ function markdown(source: string): Cell {
     return new Cell(MARKDOWN, source, {});
 }
 
-function cover(src: string): Cell {
-    return new Cell(COVER, `![Cover](${src})`, { src });
+function image(src: string): Cell {
+    return new Cell(IMAGE, "", { src });
 }
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
@@ -41,10 +41,10 @@ function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
 
 describe("cellsLaidOutByPlan — the document laid out as the server planned it", () => {
     it("carries the author’s own cells across by index", () => {
-        const authorsOwnCover = cover("art/mine.png");
+        const authorsOwnCover = image("art/mine.png");
         const cells = [chapter("One"), authorsOwnCover];
         const laidOut = cellsLaidOutByPlan(cells, [
-            { kind: "cover", at: 1 },
+            { kind: IMAGE, at: 1 },
             { kind: CHAPTER, at: 0 },
         ]);
         expect(laidOut[0]).toBe(authorsOwnCover);
@@ -55,17 +55,17 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
         const laidOut = cellsLaidOutByPlan(
             [chapter("One")],
             [
-                { kind: "cover", at: null },
+                { kind: "contents", at: null },
                 { kind: CHAPTER, at: 0 },
                 { kind: "about", at: null },
             ],
         );
         expect(laidOut.map((cell) => cell.kind)).toEqual([
-            "cover",
+            "contents",
             CHAPTER,
             "about",
         ]);
-        expect(laidOut[0].source).toBe(blankCellOfKind("cover").source);
+        expect(laidOut[0].source).toBe(blankCellOfKind("contents").source);
         expect(laidOut[2].source).toBe(blankCellOfKind("about").source);
     });
 
@@ -100,7 +100,6 @@ describe("wordsForWhatIsMissing — what a section wants, in the author’s word
     });
 
     it("says what is wanted when it is not typed into a box", () => {
-        expect(wordsForWhatIsMissing("cover", ["art"])).toBe("its artwork");
         expect(wordsForWhatIsMissing("blurb", ["text"])).toBe(
             "something written in it",
         );
@@ -118,13 +117,13 @@ describe("askedBeforeBinding — what the author is asked when the book will not
         const { message, detail } = askedBeforeBinding(
             "story.author",
             report({
-                added: ["cover", "blurb"],
+                added: ["contents", "blurb"],
                 moved: ["about"],
                 wanting: [{ kind: "title-page", needs: ["author", "date"] }],
             }),
         );
         expect(message).toBe("story.author is not ready to bind.");
-        expect(detail).toContain("Missing: Cover, Blurb");
+        expect(detail).toContain("Missing: Table of Contents, Blurb");
         expect(detail).toContain("Out of place: About the Author");
         expect(detail).toContain("Title Page needs Author, Date");
     });
@@ -142,7 +141,7 @@ describe("askedBeforeBinding — what the author is asked when the book will not
     it("says that fixing does not export, and exporting does not fix", () => {
         const { detail } = askedBeforeBinding(
             "story.author",
-            report({ added: ["cover"] }),
+            report({ added: ["contents"] }),
         );
         expect(detail).toContain("It does not export.");
         expect(detail).toContain("Export Anyway binds the book as it stands.");
@@ -164,22 +163,23 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
             saidAfterLayingOut(
                 "story.author",
                 report({
-                    added: ["cover", "blurb"],
-                    wanting: [{ kind: "cover", needs: ["art"] }],
+                    added: ["contents", "blurb"],
+                    wanting: [{ kind: "blurb", needs: ["text"] }],
                 }),
             ),
         ).toBe(
-            "Added Cover, Blurb in story.author. The sections still to write are marked.",
+            "Added Table of Contents, Blurb in story.author. " +
+                "The sections still to write are marked.",
         );
     });
 
     it("reports adding and moving together", () => {
         const toldTheAuthor = saidAfterLayingOut(
             "story.author",
-            report({ added: ["cover"], moved: ["about"] }),
+            report({ added: ["contents"], moved: ["about"] }),
         );
         expect(toldTheAuthor).toBe(
-            "Added Cover and moved About the Author into place in story.author.",
+            "Added Table of Contents and moved About the Author into place in story.author.",
         );
     });
 
@@ -198,12 +198,12 @@ describe("kindsStillToWrite — what the page marks", () => {
             kindsStillToWrite(
                 report({
                     wanting: [
-                        { kind: "cover", needs: ["art"] },
+                        { kind: "blurb", needs: ["text"] },
                         { kind: "title-page", needs: ["author"] },
                     ],
                 }),
             ),
-        ).toEqual(["cover", "title-page"]);
+        ).toEqual(["blurb", "title-page"]);
     });
 
     it("is empty for a document with everything written", () => {

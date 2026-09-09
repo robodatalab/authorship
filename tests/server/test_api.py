@@ -636,7 +636,7 @@ class ExportEpub(unittest.TestCase):
         storydoc.save(
             self.document,
             [
-                storydoc.Cell(storydoc.COVER, "", {"src": "art.png"}),
+                storydoc.image("art.png"),
                 storydoc.Cell(
                     storydoc.TITLE_PAGE,
                     "",
@@ -670,7 +670,7 @@ class ExportEpub(unittest.TestCase):
 
     def test_a_document_that_is_not_ready_is_not_bound(self) -> None:
         # The document written in setUp has a title page and nothing else: no
-        # cover, no blurb, no author page, and a title page with one field on it.
+        # blurb, no author page, and a title page with one field on it.
         client = TestClient(app)
         response = client.post("/export/epub", json={"path": str(self.document)})
         self.assertEqual(response.status_code, 200)
@@ -686,7 +686,7 @@ class ExportEpub(unittest.TestCase):
             "/export/epub", json={"path": str(self.document)}
         ).json()
         self.assertEqual(
-            said["added"], [storydoc.COVER, storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+            said["added"], [storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
         )
         wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
         # The title page is there, in place, and still not filled in — which is

@@ -5,7 +5,6 @@ import {
 } from "../storydoc/cell_kinds";
 import type { Cell } from "../storydoc/model";
 
-const NEEDS_ARTWORK = "art";
 const NEEDS_TEXT = "text";
 
 export interface PlannedSection {
@@ -47,9 +46,6 @@ export function wordsForWhatIsMissing(
     const fields = fieldsOfCellKind(cellKind);
     return missing
         .map((name) => {
-            if (name === NEEDS_ARTWORK) {
-                return "its artwork";
-            }
             if (name === NEEDS_TEXT) {
                 return "something written in it";
             }

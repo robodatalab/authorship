@@ -25,8 +25,8 @@ import {
 import {
     AUTHOR_FILE_EXTENSION,
     CHAPTER,
-    COVER,
     Cell,
+    IMAGE,
     PART,
     TITLE_PAGE,
 } from "../storydoc/model";
@@ -96,7 +96,7 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
     let opening: Section | null = null;
     let under = "";
 
-    for (const cell of cells) {
+    for (const cell of cells.slice(picturesTheStoryOpensWith(cells))) {
         if (cell.kind === PART) {
             under = partIsPrintedInTheBook(cell)
                 ? (cell.attrs.title ?? "")
@@ -141,15 +141,24 @@ export function furnitureOf(cells: readonly Cell[]): Furniture {
     const opens = cells.findIndex((cell) => cell.kind === CHAPTER);
     // A story with no chapters has nothing for furniture to stand behind.
     const story = opens < 0 ? cells.length : opens;
+    const opening = picturesTheStoryOpensWith(cells);
     const front: Cell[] = [];
     const back: Cell[] = [];
 
     cells.forEach((cell, at) => {
-        if (isFrontOrBackMatter(cell.kind)) {
+        if (at < opening || isFrontOrBackMatter(cell.kind)) {
             (at < story ? front : back).push(cell);
         }
     });
     return { front, back };
+}
+
+function picturesTheStoryOpensWith(cells: readonly Cell[]): number {
+    let opening = 0;
+    while (cells[opening]?.kind === IMAGE) {
+        opening += 1;
+    }
+    return opening;
 }
 
 /**
@@ -207,19 +216,19 @@ export function partCells(
     part: Part,
 ): Cell[] {
     return [
-        ...furniture.front.map((cell) => carried(cell, number, part.under)),
+        ...furniture.front,
         ...part.sections.flatMap((section) => section.cells),
-        ...furniture.back.map((cell) => carried(cell, number, part.under)),
-    ];
+        ...furniture.back,
+    ].map((cell) => carried(cell, number, part.under));
 }
 
 /**
- * A furniture cell as a part carries it.
+ * A cell as a part carries it.
  *
  * Two things change on the way. The title page is renumbered, because a reader
- * holding part four has to be able to see what it is part four *of*. And a cover
- * names its art relative to the file naming it, so a part — which sits a folder
- * deeper than the story — has to name it from where it now stands.
+ * holding part four has to be able to see what it is part four *of*. And a
+ * picture names its art relative to the file naming it, so a part — which sits a
+ * folder deeper than the story — has to name it from where it now stands.
  */
 function carried(cell: Cell, number: number, under: string): Cell {
     if (cell.kind === TITLE_PAGE) {
@@ -228,44 +237,27 @@ function carried(cell: Cell, number: number, under: string): Cell {
             title: partTitle(cell.attrs.title ?? "", number, under),
         });
     }
-    return cell.kind === COVER ? fromTheFolder(cell) : cell;
-}
-
-/**
- * A markdown image, split at the path so the path alone can be replaced.
- *
- * The same reading `_first_image` does in `server/publishing/epub_exporter.py`,
- * which is what will go looking for the file this points at.
- */
-const IMAGE = /(!\[[^\]]*\]\(\s*)([^)\s]+)/;
-
-function firstImage(source: string): string {
-    return IMAGE.exec(source)?.[2] ?? "";
+    return cell.kind === IMAGE ? fromTheFolder(cell) : cell;
 }
 
 /**
  * `cover.jpg` beside the story is `../cover.jpg` from inside `parts/`.
  *
- * The art does not move when the parts are written, so the path has to. Both
- * places the file is named are moved: the attribute, and the markdown image
- * under it — a cover written by hand may carry only the second, which is what
- * the exporter falls back to reading.
+ * The art does not move when the parts are written, so the path has to.
  *
  * A path that already climbs out of the folder is climbed one further, which is
  * right for the same reason: it was written from where the story stands.
  */
 function fromTheFolder(cell: Cell): Cell {
-    const src = cell.attrs.src || firstImage(cell.source);
+    const src = cell.attrs.src ?? "";
     // An absolute path and a URL both already say where they are from.
     if (src === "" || src.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(src)) {
         return cell;
     }
-    const moved = `../${src}`;
-    return new Cell(
-        cell.kind,
-        cell.source.replace(IMAGE, (_whole, opening) => `${opening}${moved}`),
-        cell.attrs.src ? { ...cell.attrs, src: moved } : cell.attrs,
-    );
+    return new Cell(cell.kind, cell.source, {
+        ...cell.attrs,
+        src: `../${src}`,
+    });
 }
 
 /** What stands between the pieces of a part's name. */

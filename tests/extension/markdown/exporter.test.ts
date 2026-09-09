@@ -87,6 +87,16 @@ describe("what a document exports as", () => {
         ).toBe("### Disclaimer\n\nFiction.\n");
     });
 
+    it("writes an image as the picture it points at", () => {
+        expect(
+            markdownOf('<!-- cell: image src="art/cover.jpg" -->\n'),
+        ).toBe("![](art/cover.jpg)\n");
+    });
+
+    it("writes nothing for an image nobody has pointed anywhere", () => {
+        expect(markdownOf("<!-- cell: image -->\n")).toBe("");
+    });
+
     it("writes nothing at all for a document with no cells", () => {
         expect(markdownOf("")).toBe("");
     });
