@@ -9,7 +9,7 @@ describe("InsertCellCommand — inserts a cell", () => {
 
         new InsertCellCommand().invoke(document, {
             afterCellId: "c1",
-            newCell: { kind: "note", source: "remember this", attrs: {} },
+            cellKind: "note",
         });
 
         expect(document.cells.map((cell) => cell.kind)).toEqual([
@@ -18,7 +18,17 @@ describe("InsertCellCommand — inserts a cell", () => {
             "markdown",
             "markdown",
         ]);
-        expect(document.cells[1].source).toBe("remember this");
+    });
+
+    it("starts it as a blank of its kind", () => {
+        const document = storyOfThreeCells();
+
+        new InsertCellCommand().invoke(document, {
+            afterCellId: "c1",
+            cellKind: "chapter",
+        });
+
+        expect(document.cells[1].attrs.title).toBe("Untitled");
     });
 
     it("puts it at the top when it follows no cell at all", () => {
@@ -26,10 +36,10 @@ describe("InsertCellCommand — inserts a cell", () => {
 
         new InsertCellCommand().invoke(document, {
             afterCellId: null,
-            newCell: { kind: "note", source: "first", attrs: {} },
+            cellKind: "note",
         });
 
-        expect(document.cells[0].source).toBe("first");
+        expect(document.cells[0].kind).toBe("note");
     });
 
     it("puts it at the end when it follows the last cell", () => {
@@ -37,10 +47,10 @@ describe("InsertCellCommand — inserts a cell", () => {
 
         new InsertCellCommand().invoke(document, {
             afterCellId: "c3",
-            newCell: { kind: "note", source: "last", attrs: {} },
+            cellKind: "note",
         });
 
-        expect(document.cells[3].source).toBe("last");
+        expect(document.cells[3].kind).toBe("note");
     });
 
     it("puts it at the top when it follows a cell the document has not got", () => {
@@ -48,9 +58,9 @@ describe("InsertCellCommand — inserts a cell", () => {
 
         new InsertCellCommand().invoke(document, {
             afterCellId: "nowhere",
-            newCell: { kind: "note", source: "lost", attrs: {} },
+            cellKind: "note",
         });
 
-        expect(document.cells[0].source).toBe("lost");
+        expect(document.cells[0].kind).toBe("note");
     });
 });

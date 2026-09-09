@@ -33,8 +33,8 @@ function titlePage(attrs: Record<string, string>): Cell {
     return new Cell("title-page", "", attrs);
 }
 
-function cover(src: string): Cell {
-    return new Cell("cover", `![Cover](${src})`, { src });
+function image(src: string): Cell {
+    return new Cell("image", "", { src });
 }
 
 /** A part that places a cut and prints no page: an author saying "break here"
@@ -241,13 +241,13 @@ describe("sectionsOf — the sections a division cuts along", () => {
 describe("furnitureOf — what stands before the story and after it", () => {
     it("splits at the first chapter", () => {
         const { front, back } = furnitureOf([
-            cover("cover.jpg"),
+            image("cover.jpg"),
             titlePage({ title: "Veriona" }),
             chapter("One"),
             markdown("alpha"),
             new Cell("about", "A. Writer lives by the sea.", {}),
         ]);
-        expect(front.map((cell) => cell.kind)).toEqual(["cover", "title-page"]);
+        expect(front.map((cell) => cell.kind)).toEqual(["image", "title-page"]);
         expect(back.map((cell) => cell.kind)).toEqual(["about"]);
     });
 
@@ -427,7 +427,7 @@ describe("intoParts — one file per Part the author marked", () => {
 describe("partCells — a part as a document of its own", () => {
     it("carries the furniture around its share of the story", () => {
         const cells = [
-            cover("cover.jpg"),
+            image("cover.jpg"),
             titlePage({ title: "Veriona", subtitle: "A Queendom drama" }),
             chapter("One"),
             markdown("alpha"),
@@ -440,7 +440,7 @@ describe("partCells — a part as a document of its own", () => {
         const second = partCells(furnitureOf(cells), 2, parts[1]);
 
         expect(second.map((cell) => cell.kind)).toEqual([
-            "cover",
+            "image",
             "title-page",
             "part",
             "chapter",
@@ -545,7 +545,7 @@ describe("partCells — a part as a document of its own", () => {
     it("points the cover at art that is now a folder away", () => {
         // The parts sit in `parts/`; the art did not move with them.
         const cells = [
-            cover("art/cover.jpg"),
+            image("art/cover.jpg"),
             seam(),
             chapter("One"),
             markdown("alpha"),
@@ -554,40 +554,41 @@ describe("partCells — a part as a document of its own", () => {
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only[0].attrs.src).toBe("../art/cover.jpg");
-        expect(only[0].source).toBe("![Cover](../art/cover.jpg)");
     });
 
-    it("leaves a cover that already says where its art is from", () => {
-        for (const src of ["https://art.example/c.jpg", "/shared/art/c.jpg"]) {
-            const cells = [cover(src), seam(), chapter("One"), markdown("a")];
-            const parts = intoParts(sectionsOf(cells));
-            const only = partCells(furnitureOf(cells), 1, parts[0]);
-
-            expect(only[0].attrs.src, src).toBe(src);
-            expect(only[0].source, src).toBe(`![Cover](${src})`);
-        }
-    });
-
-    it("moves a cover that names its art only in the markdown", () => {
-        // What a cover written by hand looks like, and what the exporter falls back
-        // to reading when there is no attribute to read.
+    it("points a picture standing in the prose at art a folder away too", () => {
         const cells = [
-            new Cell("cover", "![Cover](art/c.jpg)", {}),
             seam(),
             chapter("One"),
             markdown("alpha"),
+            image("art/veriona.jpg"),
         ];
         const parts = intoParts(sectionsOf(cells));
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
-        expect(only[0].source).toBe("![Cover](../art/c.jpg)");
-        expect(only[0].attrs.src).toBeUndefined();
+        expect(only.map((cell) => cell.kind)).toEqual([
+            "part",
+            "chapter",
+            "markdown",
+            "image",
+        ]);
+        expect(only[3].attrs.src).toBe("../art/veriona.jpg");
+    });
+
+    it("leaves a cover that already says where its art is from", () => {
+        for (const src of ["https://art.example/c.jpg", "/shared/art/c.jpg"]) {
+            const cells = [image(src), seam(), chapter("One"), markdown("a")];
+            const parts = intoParts(sectionsOf(cells));
+            const only = partCells(furnitureOf(cells), 1, parts[0]);
+
+            expect(only[0].attrs.src, src).toBe(src);
+        }
     });
 
     it("climbs one further out of a path that already climbs", () => {
         // Written from where the story stands, so a part stands one folder deeper.
         const cells = [
-            cover("../shared/c.jpg"),
+            image("../shared/c.jpg"),
             seam(),
             chapter("One"),
             markdown("a"),
@@ -596,19 +597,6 @@ describe("partCells — a part as a document of its own", () => {
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only[0].attrs.src).toBe("../../shared/c.jpg");
-    });
-
-    it("moves the path and not an alt text that happens to match it", () => {
-        const cells = [
-            new Cell("cover", "![c.jpg](c.jpg)", { src: "c.jpg" }),
-            seam(),
-            chapter("One"),
-            markdown("a"),
-        ];
-        const parts = intoParts(sectionsOf(cells));
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
-
-        expect(only[0].source).toBe("![c.jpg](../c.jpg)");
     });
 
     it("a story with no furniture is a part of nothing but chapters", () => {

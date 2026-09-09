@@ -72,5 +72,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: MARKDOWN, source: "", attrs: {} }),
 });

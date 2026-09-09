@@ -228,6 +228,7 @@ function MonacoMarkdownEditor({
             value: markdown,
             language: "markdown",
             theme: MONACO_THEME_FROM_VSCODE,
+            editContext: false,
             automaticLayout: true,
             wordWrap: "on",
             lineNumbers: "off",

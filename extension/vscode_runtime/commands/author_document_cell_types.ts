@@ -15,7 +15,6 @@ export interface AuthorDocumentCellType {
         cellId: string,
         sendMessagesToVscode: SendMessagesToVscode,
     ): ReactNode;
-    newCell(): WebviewCell;
 }
 
 const registeredCellTypes = new Map<string, AuthorDocumentCellType>();

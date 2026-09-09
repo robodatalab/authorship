@@ -3,9 +3,9 @@ import * as vscode from "vscode";
 import {
     SETTINGS_FILE,
     SETTINGS_FOLDER,
+    BLANK_SETTINGS,
     EMPTY_TEMPLATES,
-    parseSettings,
-    settingsText,
+    readSettings,
     type Templates,
 } from "./model";
 
@@ -38,7 +38,9 @@ export async function loadTemplates(document: vscode.Uri): Promise<Templates> {
         return EMPTY_TEMPLATES;
     }
     try {
-        return parseSettings(settingsJson);
+        return await readSettings(settingsJson, (fileName) =>
+            proseInFile(vscode.Uri.joinPath(settingsFile, "..", fileName)),
+        );
     } catch (unreadable) {
         void vscode.window.showWarningMessage(
             `${SETTINGS_FOLDER}/${SETTINGS_FILE} could not be read (${whatWentWrong(unreadable)}). ` +
@@ -57,10 +59,7 @@ export function watchSettings(
         return new vscode.Disposable(() => undefined);
     }
     const settingsWatcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(
-            workspaceFolder,
-            `${SETTINGS_FOLDER}/${SETTINGS_FILE}`,
-        ),
+        new vscode.RelativePattern(workspaceFolder, `${SETTINGS_FOLDER}/*`),
     );
     return vscode.Disposable.from(
         settingsWatcher.onDidCreate(settingsChanged),
@@ -77,9 +76,19 @@ async function writeEmptySettings(settingsFile: vscode.Uri): Promise<void> {
         );
         await vscode.workspace.fs.writeFile(
             settingsFile,
-            new TextEncoder().encode(settingsText(EMPTY_TEMPLATES)),
+            new TextEncoder().encode(BLANK_SETTINGS),
         );
     } catch {}
+}
+
+async function proseInFile(file: vscode.Uri): Promise<string> {
+    try {
+        return new TextDecoder().decode(
+            await vscode.workspace.fs.readFile(file),
+        );
+    } catch {
+        return "";
+    }
 }
 
 async function fileExists(file: vscode.Uri): Promise<boolean> {

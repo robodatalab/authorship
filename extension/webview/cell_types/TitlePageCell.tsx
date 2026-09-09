@@ -26,6 +26,7 @@ const FIELDS: AuthorFileEditorCellField[] = [
         label: "ISBN",
         placeholder: "e.g. 978-0-000-00000-0",
     },
+    { attributeName: "cover-designer", label: "Cover Designer" },
 ];
 
 interface TitlePageCellProps {
@@ -71,9 +72,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({
-        kind: TITLE_PAGE,
-        source: "",
-        attrs: { title: "Untitled" },
-    }),
 });

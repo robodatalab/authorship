@@ -14,6 +14,7 @@ import type { AuthorFileEditorFindMatch } from "./AuthorFileEditorFind";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import { standsOutsideTheStory } from "../../vscode_runtime/storydoc/cell_kinds";
 import { CHAPTER, FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
@@ -75,6 +76,10 @@ export function cellsBySection(cells: WebviewCell[]): CellsInASection[] {
         } else if (cell.kind === CHAPTER) {
             (part?.within ?? wholeDocument).push(section);
             chapter = section;
+        } else if (standsOutsideTheStory(cell.kind)) {
+            wholeDocument.push(section);
+            part = undefined;
+            chapter = undefined;
         } else {
             (chapter?.within ?? part?.within ?? wholeDocument).push(section);
         }
@@ -423,7 +428,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     insertCommand.commandName,
                     {
                         afterCellId: insertAfterCellId,
-                        newCell: cellType.newCell(),
+                        cellKind: cellType.cellKind,
                     },
                 )
             }

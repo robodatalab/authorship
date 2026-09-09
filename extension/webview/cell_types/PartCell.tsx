@@ -64,5 +64,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: PART, source: "", attrs: { title: "Untitled" } }),
 });

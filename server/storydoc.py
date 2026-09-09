@@ -8,9 +8,7 @@ the cell *is*:
 
     The lantern had gone out again.
 
-    <!-- cell: cover src="art/cover.jpg" -->
-
-    ![Cover](art/cover.jpg)
+    <!-- cell: image src="art/cover.jpg" full-page="yes" -->
 
 The marker is an HTML comment, so every reader that renders markdown renders the
 document and shows none of the scaffolding, and every editor that opens text can
@@ -45,7 +43,7 @@ MARKDOWN = "markdown"
 CHAPTER = "chapter"
 PART = "part"
 TITLE_PAGE = "title-page"
-COVER = "cover"
+IMAGE = "image"
 CONTENTS = "contents"
 DISCLAIMER = "disclaimer"
 ABOUT = "about"
@@ -57,6 +55,8 @@ RECAP = "recap"
 # says it of: whether the book prints a page where the part stands.
 NO = "no"
 PRINT = "print"
+
+FULL_PAGE = "full-page"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
@@ -210,8 +210,12 @@ def prints_page(cell: Cell) -> bool:
     return cell.attrs.get(PRINT, "") != NO
 
 
-def cover(src: str, alt: str = "Cover") -> Cell:
-    return Cell(COVER, f"![{alt}]({src})", {"src": src})
+def image(src: str, full_page: bool = True) -> Cell:
+    return Cell(IMAGE, "", {"src": src} if full_page else {"src": src, FULL_PAGE: NO})
+
+
+def is_full_page(cell: Cell) -> bool:
+    return cell.attrs.get(FULL_PAGE, "") != NO
 
 
 def contents() -> Cell:

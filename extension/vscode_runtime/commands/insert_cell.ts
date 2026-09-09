@@ -1,4 +1,5 @@
-import { Cell, type AuthorDocument } from "../storydoc/model";
+import { blankCellOfKind } from "../storydoc/cell_kinds";
+import type { AuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class InsertCellCommand implements AuthorDocumentCommand {
@@ -11,14 +12,9 @@ export class InsertCellCommand implements AuthorDocumentCommand {
         document: AuthorDocument,
         commandArguments: Record<string, unknown>,
     ): void {
-        const newCell = commandArguments.newCell as {
-            kind: string;
-            source: string;
-            attrs: Record<string, string>;
-        };
         document.insertAfter(
             (commandArguments.afterCellId as string | null) ?? null,
-            new Cell(newCell.kind, newCell.source, newCell.attrs),
+            blankCellOfKind(commandArguments.cellKind as string),
         );
     }
 }

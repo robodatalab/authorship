@@ -17,13 +17,14 @@ from server.storydoc import (
     BUILT_KINDS,
     CHAPTER,
     CONTENTS,
-    COVER,
     DISCLAIMER,
+    IMAGE,
     PART,
     PRIVATE_KINDS,
     TITLE_PAGE,
     Cell,
     Document,
+    is_full_page,
     prints_page,
 )
 
@@ -33,9 +34,9 @@ UNPRINTED = BUILT_KINDS | PRIVATE_KINDS
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is
-# never touched — but a reader does not choose where they meet the art, the
-# title, the list of chapters or the author's own page, so these do not float.
-OPENING = (COVER, TITLE_PAGE, CONTENTS, BLURB)
+# never touched — but a reader does not choose where they meet the title, the
+# list of chapters or the author's own page, so these do not float.
+OPENING = (TITLE_PAGE, CONTENTS, BLURB)
 CLOSING = (ABOUT,)
 REQUIRED = OPENING + CLOSING
 
@@ -50,21 +51,35 @@ TITLE_PAGE_FIELDS = ("title", "subtitle", "author", "publisher", "date")
 UNNAMED = ("Untitled", "Anonymous")
 
 # Why a section is wanting when what it lacks is not one of its fields.
-ART = "art"
 TEXT = "text"
 
 DEFAULT_LANGUAGE = "en"
 
+# The heading a page carries its own name in. A heading the author wrote into the
+# prose stands under it, however few hashes they gave it, so nothing inside a
+# section is set louder than the section is.
+SECTION_TITLE = 2
+
+# A name with nothing under it: a part divider, or a chapter whose prose has not
+# been written yet. The reader turns to a page holding one line, and it is set in
+# the middle of that page rather than at the top of it.
+ALONE_ON_THE_PAGE = "alone-on-the-page"
+
+_BOLD_ITALIC = re.compile(r"\*\*\*(.+?)\*\*\*")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
-_ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
-_ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(.+?)(?<!_)_(?!\w)")
+_BOLD_UND = re.compile(r"(?<!\w)__(?!_)(.+?)(?<!_)__(?!\w)")
+_ITALIC_STAR = re.compile(r"(?<!\*)\*(?!\*)(\S(?:[^*]*?\S)?)(?<!\*)\*(?!\*)")
+_ITALIC_UND = re.compile(r"(?<!\w)_(?!_)(\S(?:[^_]*?\S)?)(?<!_)_(?!\w)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-_IMAGE = re.compile(r"!\[[^\]]*\]\(\s*([^)\s]+)")
+_HEADING = re.compile(r"(#{1,3})\s+(.*)")
+_IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)")
 
 
 def _inline(text: str) -> str:
     text = html.escape(text, quote=False)
+    text = _BOLD_ITALIC.sub(r"<strong><em>\1</em></strong>", text)
     text = _BOLD.sub(r"<strong>\1</strong>", text)
+    text = _BOLD_UND.sub(r"<strong>\1</strong>", text)
     text = _ITALIC_STAR.sub(r"<em>\1</em>", text)
     text = _ITALIC_UND.sub(r"<em>\1</em>", text)
     text = _LINK.sub(
@@ -82,12 +97,16 @@ def blocks_to_xhtml(lines: list[str]) -> str:
             continue
         if re.fullmatch(r"(-{3,}|\*{3,}|_{3,})", stripped):
             out.append('<hr class="scene-break"/>')
-        elif stripped.startswith("### "):
-            out.append(f"<h3>{_inline(stripped[4:].strip())}</h3>")
-        elif stripped.startswith("## "):
-            out.append(f"<h2>{_inline(stripped[3:].strip())}</h2>")
-        elif stripped.startswith("# "):
-            out.append(f"<h1>{_inline(stripped[2:].strip())}</h1>")
+        elif picture := _IMAGE.fullmatch(stripped):
+            alt, src = picture.groups()
+            out.append(
+                f'<p class="image"><img src="{html.escape(src, quote=True)}"'
+                f' alt="{html.escape(alt, quote=True)}"/></p>'
+            )
+        elif heading := _HEADING.fullmatch(stripped):
+            hashes, said = heading.groups()
+            level = SECTION_TITLE + len(hashes)
+            out.append(f"<h{level}>{_inline(said.strip())}</h{level}>")
         else:
             out.append(f"<p>{_inline(stripped)}</p>")
     return "\n".join(out)
@@ -108,6 +127,7 @@ class Imprint:
     date: str = ""
     version: str = ""
     isbn: str = ""
+    cover_designer: str = ""
     language: str = DEFAULT_LANGUAGE
 
 
@@ -123,6 +143,7 @@ def imprint_of(document: Document) -> Imprint:
         date=said.get("date", ""),
         version=said.get("version", ""),
         isbn=said.get("isbn", ""),
+        cover_designer=said.get("cover-designer", ""),
         language=said.get("language") or DEFAULT_LANGUAGE,
     )
 
@@ -147,10 +168,11 @@ class Chapter:
     def body_xhtml(self) -> str:
         # A chapter cell carries the name and no prose of its own, so the heading
         # is put back onto the page here.
-        return (
-            f'<div class="chapter">\n<h2>{_inline(self.name)}</h2>\n'
-            f"{blocks_to_xhtml(self.body_lines)}\n</div>"
-        )
+        name = f"<h{SECTION_TITLE}>{_inline(self.name)}</h{SECTION_TITLE}>"
+        written = blocks_to_xhtml(self.body_lines)
+        if not written:
+            return f'<div class="{ALONE_ON_THE_PAGE}">\n{name}\n</div>'
+        return f'<div class="chapter">\n{name}\n{written}\n</div>'
 
 
 class Page:
@@ -169,19 +191,12 @@ class Page:
         self.filename = f"{id}.xhtml"
 
 
-class Cover:
-    """The art the book opens with, and the page that shows it."""
-
-    def __init__(self, art: Path, title: str):
-        self.art = art
-        self.href = f"cover{art.suffix.lower() or '.jpg'}"
-        self.media = mimetypes.guess_type(art.name)[0] or "image/jpeg"
-        self.page = Page(
-            "cover",
-            title,
-            f'<div class="cover"><img src="{self.href}"'
-            f' alt="{html.escape(title, quote=True)}"/></div>',
-        )
+class Art:
+    def __init__(self, id: str, source: Path):
+        self.id = id
+        self.source = source
+        self.href = f"{id}{source.suffix.lower() or '.jpg'}"
+        self.media = mimetypes.guess_type(source.name)[0] or "image/jpeg"
 
 
 @dataclass(frozen=True)
@@ -204,11 +219,12 @@ class Book:
 
     imprint: Imprint
     documents: list[Chapter | Page]
-    cover: Cover | None
+    art: list[Art]
+    cover: Art | None
     # What was asked for and could not be printed. Every one of these is a
-    # judgement the binding already made — a cover whose art is not on the disk,
-    # an about page with nothing on it — and which used to be thrown away the
-    # moment it was made, so a book went out short of a section and said nothing.
+    # judgement the binding already made — an about page with nothing on it —
+    # and which used to be thrown away the moment it was made, so a book went
+    # out short of a section and said nothing.
     wanting: tuple[Wanting, ...] = ()
 
     @property
@@ -238,7 +254,8 @@ def read_book(document: Document) -> Book:
     root = document.path.parent if document.path else Path()
     documents: list[Chapter | Page] = []
     listings: list[Page] = []
-    cover: Cover | None = None
+    art: list[Art] = []
+    cover: Art | None = None
     chapters = 0
     parts = 0
 
@@ -256,11 +273,20 @@ def read_book(document: Document) -> Book:
                 parts += 1
         elif cell.kind == TITLE_PAGE:
             documents.append(build_title_page(imprint))
-        elif cell.kind == COVER:
-            art = _art_of(cell, root)
-            if art and cover is None:
-                cover = Cover(art, imprint.title)
-                documents.append(cover.page)
+            documents.append(build_copyright_page(imprint))
+        elif cell.kind == IMAGE:
+            source = _art_file(root, cell.attrs.get("src", ""))
+            if source is None:
+                continue
+            picture = Art(f"art_{len(art):03d}", source)
+            art.append(picture)
+            if not is_full_page(cell):
+                _add_lines(documents, [f"![]({picture.href})"])
+            elif cover is None and chapters == 0:
+                cover = picture
+                documents.append(build_cover_page(picture, imprint.title))
+            else:
+                documents.append(build_image_page(picture))
         elif cell.kind == CONTENTS:
             # Built here rather than taken from the cell: on the page a table of
             # contents is a list of names, in a book it is a list of links.
@@ -272,17 +298,27 @@ def read_book(document: Document) -> Book:
             if page:
                 documents.append(page)
         elif cell.kind == ABOUT:
-            page = build_about_page(cell)
+            portrait = _art_file(root, cell.attrs.get("portrait", ""))
+            drawn = (
+                Art(f"art_{len(art):03d}", portrait)
+                if portrait is not None
+                else None
+            )
+            page = build_about_page(
+                cell, drawn.href if drawn else "", imprint.author
+            )
             if page:
+                if drawn:
+                    art.append(drawn)
                 documents.append(page)
         elif cell.source and cell.kind not in UNPRINTED:
-            _add_prose(documents, cell)
+            _add_lines(documents, cell.source.splitlines())
 
     built = contents_xhtml([item for item in documents if isinstance(item, Chapter)])
     for listing in listings:
         listing.body_xhtml = built
     _name_apart(documents)
-    return Book(imprint, documents, cover, _wanting(document.cells, imprint, root))
+    return Book(imprint, documents, art, cover, _wanting(document.cells, imprint))
 
 
 def _first_of(cells: list[Cell]) -> dict[str, int]:
@@ -299,27 +335,25 @@ def _first_of(cells: list[Cell]) -> dict[str, int]:
     return found
 
 
-def _wanting(cells: list[Cell], imprint: Imprint, root: Path) -> tuple[Wanting, ...]:
-    """Which of the five have nothing in them yet.
+def _wanting(cells: list[Cell], imprint: Imprint) -> tuple[Wanting, ...]:
+    """Which of the four have nothing in them yet.
 
-    Asked of the same functions that do the binding — `_art_of` for the cover,
-    `build_about_page` for the author's page — so what stops an export is exactly
-    what the book would have gone out without, rather than a second opinion about
-    it that can drift from the first.
+    Asked of the same function that does the binding — `build_about_page` for the
+    author's page — so what stops an export is exactly what the book would have
+    gone out without, rather than a second opinion about it that can drift from
+    the first.
     """
     found = _first_of(cells)
     said = [
         Wanting(kind, needs)
         for kind in REQUIRED
-        for needs in [_wants(kind, cells[found[kind]] if kind in found else None, imprint, root)]
+        for needs in [_wants(kind, cells[found[kind]] if kind in found else None, imprint)]
         if needs
     ]
     return tuple(said)
 
 
-def _wants(
-    kind: str, cell: Cell | None, imprint: Imprint, root: Path
-) -> tuple[str, ...]:
+def _wants(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
     """What this section still needs before it can be printed.
 
     `cell` is None for a section that is not in the document at all, which wants
@@ -331,10 +365,6 @@ def _wants(
         return ()
     if kind == TITLE_PAGE:
         return _imprint_wants(imprint if cell else Imprint())
-    if kind == COVER:
-        # Only the file settles this: a cover pointing at art nobody has drawn
-        # binds a book with no cover and says nothing, which is the whole fault.
-        return () if cell and _art_of(cell, root) else (ART,)
     if kind == BLURB:
         return () if cell and cell.source.strip() else (TEXT,)
     if kind == ABOUT:
@@ -407,9 +437,15 @@ def report_of(document: Document) -> Report:
     cells = document.cells
     found = _first_of(cells)
     claimed = set(found.values())
+    art = _opening_art(cells)
     plan = (
-        [Slot(kind, found.get(kind)) for kind in OPENING]
-        + [Slot(cell.kind, at) for at, cell in enumerate(cells) if at not in claimed]
+        [Slot(IMAGE, at) for at in sorted(art)]
+        + [Slot(kind, found.get(kind)) for kind in OPENING]
+        + [
+            Slot(cell.kind, at)
+            for at, cell in enumerate(cells)
+            if at not in claimed and at not in art
+        ]
         + [Slot(kind, found.get(kind)) for kind in CLOSING]
     )
     return Report(
@@ -418,6 +454,15 @@ def report_of(document: Document) -> Report:
         moved=_moved(plan, found),
         wanting=read_book(document).wanting,
     )
+
+
+def _opening_art(cells: list[Cell]) -> set[int]:
+    art: set[int] = set()
+    for at, cell in enumerate(cells):
+        if cell.kind != IMAGE:
+            break
+        art.add(at)
+    return art
 
 
 def _moved(plan: list[Slot], found: dict[str, int]) -> tuple[str, ...]:
@@ -445,39 +490,24 @@ def chapters_of(document: Document) -> list[Chapter]:
     return read_book(document).chapters
 
 
-def _add_prose(documents: list[Chapter | Page], cell: Cell) -> None:
+def _add_lines(documents: list[Chapter | Page], lines: list[str]) -> None:
     if documents and isinstance(documents[-1], Chapter):
-        documents[-1].body_lines.extend(cell.source.splitlines())
+        documents[-1].body_lines.extend(lines)
         return
     loose = sum(1 for item in documents if item.id.startswith(LOOSE))
-    written = blocks_to_xhtml(cell.source.splitlines())
+    written = blocks_to_xhtml(lines)
     documents.append(
         Page(f"{LOOSE}{loose:03d}", "", f'<div class="chapter">\n{written}\n</div>')
     )
 
 
-def _art_of(cell: Cell, root: Path) -> Path | None:
-    """The image the cover cell points at, if it is really there.
+def _art_file(root: Path, src: str) -> Path | None:
+    """The image a cell points at, if it is really there.
 
-    A cover says where its art is twice — in the marker, and in the markdown that
-    a reader of the plain file sees — and the two come apart. The author repoints
-    the image and the attribute keeps the name the section was started with, so
-    the editor draws one file and the binding looked for the other, found nothing
-    where it looked, and put out a book with no cover without a word said.
-
-    So both are tried and the first that is really on the disk wins. A cell whose
-    every candidate is missing names art nobody has drawn yet, and that is the
-    one case where a book goes out coverless rather than not at all.
+    A cell naming art nobody has drawn yet is not printed, and that is the one
+    case where a book goes out short of a picture rather than not at all.
     """
-    for src in (cell.attrs.get("src"), _first_image(cell.source)):
-        if src and (root / src).is_file():
-            return root / src
-    return None
-
-
-def _first_image(source: str) -> str:
-    found = _IMAGE.search(source)
-    return found.group(1) if found else ""
+    return root / src if src and (root / src).is_file() else None
 
 
 def _name_apart(documents: list[Chapter | Page]) -> None:
@@ -505,40 +535,56 @@ body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;
        text-align: justify; hyphens: auto; }
 /* The page's own margin, set on the content and not on the body so that the
    cover can still fill the page edge to edge. */
-.chapter, .title-page, .contents, .disclaimer, .about, .part-page { padding: 0 6%; }
+.chapter, .title-page, .contents, .disclaimer, .about, .copyright,
+.alone-on-the-page { padding: 0 6%; }
 /* No page-break-before here: every chapter is its own spine document, so the
    reader already opens a page for it. Breaking again leaves a blank one. */
-h1, h2, h3 { font-family: Georgia, serif; text-align: center; font-weight: normal;
-             line-height: 1.25; }
+h1, h2, h3, h4, h5 { font-family: Georgia, serif; text-align: center;
+                     font-weight: normal; line-height: 1.25; }
 h1 { font-size: 1.9em; margin: 2.5em 0 0.6em; }
 h2 { font-size: 1.5em; margin: 2.2em 0 1em; }
 h3 { font-size: 1.2em; margin: 1.6em 0 0.8em; font-style: italic; }
+h4 { font-size: 1.05em; margin: 1.4em 0 0.7em; }
+h5 { font-size: 1em; margin: 1.2em 0 0.6em; font-style: italic; }
 p { margin: 0 0 0.8em; }
 hr.scene-break { border: 0; text-align: center; margin: 1.4em 0; }
 hr.scene-break::after { content: "\\2042"; font-size: 1.2em; }
 /* A part is one line on an otherwise empty page, set in the middle of it both
    ways. The height is the reader's page rather than the text's, which is what
    lets the line be centred against something. */
-.part-page { display: flex; flex-direction: column; justify-content: center;
-             align-items: center; height: 100vh; text-align: center; }
-.part-page h1 { margin: 0; }
-.cover { text-align: center; margin: 0; padding: 0; }
-.cover img { max-width: 100%; height: auto; }
+.alone-on-the-page { display: flex; flex-direction: column;
+                     justify-content: center; align-items: center;
+                     height: 100vh; text-align: center; }
+.alone-on-the-page h1, .alone-on-the-page h2 { margin: 0; }
+.cover, .image-page { text-align: center; margin: 0; padding: 0; }
+.cover img, .image-page img { max-width: 100%; height: auto; }
+/* A picture standing in the prose is one thing on the page among others, so it
+   is held to a share of the page's height and the words go on around it. */
+p.image { text-align: center; margin: 1.2em 0; }
+p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 .title-page { text-align: center; margin-top: 25%; }
 .title-page h1.book-title { font-size: 2.4em; margin: 0 0 0.4em; }
 .title-page p.subtitle { font-size: 1.3em; font-style: italic; margin: 0 0 2.5em; }
 .title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
 .title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
                           text-transform: uppercase; }
-.title-page p.imprint { font-size: 0.8em; margin: 3em 0 0; }
 .contents ol { list-style: none; padding: 0; text-align: center; }
 .contents li { margin: 0 0 0.8em; }
 .contents a { text-decoration: none; }
 .disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }
+.copyright { text-align: left; font-size: 0.8em; margin-top: 20%; }
+.copyright p { margin: 0 0 1.2em; }
 /* The blurb is prose and is set like prose; only the list of places to go is
    centred, because that is a list and not something anyone reads across. */
 .about { margin-top: 12%; }
-.about .links { margin-top: 2.5em; text-align: center; }
+/* The portrait and the links stand side by side, and are set inline rather than
+   in a flex row so that a reader without either falls back to one above the
+   other instead of to a heap. */
+.about .who { text-align: center; margin-bottom: 2.5em; }
+.about .who .portrait, .about .who .links { display: inline-block;
+                                            vertical-align: middle; }
+.about .who .portrait { width: 34%; height: auto; margin-right: 4%; }
+.about .who .links { width: 46%; }
 .about .links p { margin: 0 0 0.9em; }
 """
 
@@ -570,22 +616,90 @@ def build_title_page(imprint: Imprint) -> Page:
     if imprint.publisher:
         said.append(f'  <p class="publisher">{_inline(imprint.publisher)}</p>')
 
-    # What a copyright page would carry, printed at the foot of the title page:
-    # this edition, when it was made, and the number it is sold under.
-    printed = []
-    if imprint.date:
-        printed.append(imprint.date)
-    if imprint.version:
-        printed.append(f"Version {imprint.version}")
-    if imprint.isbn:
-        printed.append(f"ISBN {imprint.isbn}")
-    if printed:
-        said.append(f'  <p class="imprint">{_inline(" · ".join(printed))}</p>')
-
     return Page(
         "titlepage",
         imprint.title,
         '<div class="title-page">\n' + "\n".join(said) + "\n</div>",
+    )
+
+
+# What the page says whatever book it stands in, and what it says about this one.
+RIGHTS = (
+    "No part of this publication may be reproduced, distributed, or transmitted "
+    "in any form without the prior written permission of the publisher, except "
+    "for brief quotations in reviews."
+)
+MORAL_RIGHTS = (
+    "The right of {named} to be identified as the author of this work has been "
+    "asserted in accordance with the Copyright, Designs and Patents Act 1988."
+)
+COPYRIGHT_TITLE = "Copyright"
+
+_YEAR = re.compile(r"\d{4}")
+
+
+def copyright_year(date: str) -> str:
+    """The year the edition is dated, or the year it is being bound in.
+
+    The date is the author's own line rather than a form to fill in, so the year
+    is read out of whatever they wrote and only falls back to today when they
+    wrote nothing a year can be read from.
+    """
+    found = _YEAR.search(date)
+    return found.group() if found else str(datetime.now(timezone.utc).year)
+
+
+def build_copyright_page(imprint: Imprint) -> Page:
+    """Who owns the book, what may be done with it, and which edition it is.
+
+    Built from the title page rather than written by the author: every fact on it
+    is one the title page already carries, and a copyright page that disagreed
+    with the title page would be the one thing worse than not having one.
+    """
+    year = copyright_year(imprint.date)
+    named = " and ".join(
+        who for who in (imprint.author, imprint.publisher) if who
+    )
+    held = f"Copyright © {year} {named}".strip()
+    said = [f"  <p>{_inline(held)}. All rights reserved.</p>", f"  <p>{RIGHTS}</p>"]
+    if imprint.author:
+        said.append(f"  <p>{_inline(MORAL_RIGHTS.format(named=named))}</p>")
+    if imprint.cover_designer:
+        said.append(f"  <p>Cover design by {_inline(imprint.cover_designer)}</p>")
+    if imprint.publisher:
+        said.append(f"  <p>Published by {_inline(imprint.publisher)}</p>")
+
+    edition = []
+    if imprint.version:
+        edition.append(f"Version {imprint.version}")
+    if imprint.date:
+        edition.append(imprint.date)
+    if edition:
+        said.append(f'  <p>{_inline(" · ".join(edition))}</p>')
+    if imprint.isbn:
+        said.append(f"  <p>ISBN {_inline(imprint.isbn)}</p>")
+
+    return Page(
+        "copyright",
+        COPYRIGHT_TITLE,
+        '<div class="copyright">\n' + "\n".join(said) + "\n</div>",
+    )
+
+
+def build_cover_page(art: Art, title: str) -> Page:
+    return Page(
+        "cover",
+        title,
+        f'<div class="cover"><img src="{art.href}"'
+        f' alt="{html.escape(title, quote=True)}"/></div>',
+    )
+
+
+def build_image_page(art: Art) -> Page:
+    return Page(
+        f"{art.id}_page",
+        "",
+        f'<div class="image-page"><img src="{art.href}" alt=""/></div>',
     )
 
 
@@ -599,7 +713,7 @@ def build_part_page(idx: int, cell: Cell) -> Page:
     return Page(
         "part",
         name,
-        f'<div class="part-page">\n<h1>{_inline(name)}</h1>\n</div>',
+        f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{_inline(name)}</h1>\n</div>',
         in_toc=True,
     )
 
@@ -624,7 +738,8 @@ def build_disclaimer_page(cell: Cell) -> Page | None:
     return Page(
         "disclaimer",
         name,
-        f'<div class="disclaimer">\n<h2>{_inline(name)}</h2>\n{body}\n</div>',
+        f'<div class="disclaimer">\n'
+        f"<h{SECTION_TITLE}>{_inline(name)}</h{SECTION_TITLE}>\n{body}\n</div>",
         in_toc=True,
     )
 
@@ -640,12 +755,13 @@ AUTHOR_LINKS = [
 ABOUT_TITLE = "About the Author"
 
 
-def build_about_page(cell: Cell) -> Page | None:
+def build_about_page(cell: Cell, portrait: str = "", named: str = "") -> Page | None:
     """The author, in their own words, and where to find them.
 
     Every part of it is optional, and a page with nothing written and nowhere to
     send anyone is not printed — an empty "About the Author" is worse than no
-    page at all.
+    page at all. A portrait is not one of the parts that make the page worth
+    printing: it stands beside the links on a page that was already going out.
     """
     sent = [
         (label, cell.attrs[name]) for name, label in AUTHOR_LINKS if cell.attrs.get(name)
@@ -654,18 +770,26 @@ def build_about_page(cell: Cell) -> Page | None:
     if not sent and not blurb:
         return None
 
-    said = [f"  <h2>{ABOUT_TITLE}</h2>"]
+    said = [f"  <h{SECTION_TITLE}>{ABOUT_TITLE}</h{SECTION_TITLE}>"]
+    if sent or portrait:
+        # The face and the list of places to go, side by side under the heading:
+        # a reader looks at both at once rather than reading down them.
+        said.append('  <div class="who">')
+        if portrait:
+            said.append(
+                f'    <img class="portrait" src="{portrait}"'
+                f' alt="{html.escape(named, quote=True)}"/>'
+            )
+        if sent:
+            said.append('    <div class="links">')
+            said += [
+                f'      <p><a href="{html.escape(url, quote=True)}">{_inline(label)}</a></p>'
+                for label, url in sent
+            ]
+            said.append("    </div>")
+        said.append("  </div>")
     if blurb:
         said.append(blocks_to_xhtml(blurb.splitlines()))
-    if sent:
-        # Kept apart from the blurb and one to a line: this is a list of places to
-        # go, and a reader runs their eye down it rather than reading it.
-        said.append('  <div class="links">')
-        said += [
-            f'    <p><a href="{html.escape(url, quote=True)}">{_inline(label)}</a></p>'
-            for label, url in sent
-        ]
-        said.append("  </div>")
     return Page(
         "about",
         ABOUT_TITLE,
@@ -698,12 +822,18 @@ def build_content_opf(book_id: uuid.UUID, book: Book, modified: str) -> str:
         )
     said.append(f'<meta property="dcterms:modified">{modified}</meta>')
 
-    if book.cover:
+    for picture in book.art:
+        if picture is book.cover:
+            manifest.append(
+                f'<item id="cover-image" href="{picture.href}"'
+                f' media-type="{picture.media}" properties="cover-image"/>'
+            )
+            said.append('<meta name="cover" content="cover-image"/>')
+            continue
         manifest.append(
-            f'<item id="cover-image" href="{book.cover.href}"'
-            f' media-type="{book.cover.media}" properties="cover-image"/>'
+            f'<item id="{picture.id}" href="{picture.href}"'
+            f' media-type="{picture.media}"/>'
         )
-        said.append('<meta name="cover" content="cover-image"/>')
 
     spine = []
     for item in book.documents:
@@ -792,8 +922,8 @@ def build_epub(document: Document, out_path: Path) -> None:
         z.writestr("OEBPS/nav.xhtml", build_nav(lang, title, book.listed))
         z.writestr("OEBPS/toc.ncx", build_ncx(book_id, title, book.listed))
 
-        if book.cover:
-            z.writestr(f"OEBPS/{book.cover.href}", book.cover.art.read_bytes())
+        for picture in book.art:
+            z.writestr(f"OEBPS/{picture.href}", picture.source.read_bytes())
 
         for item in book.documents:
             z.writestr(

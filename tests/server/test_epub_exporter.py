@@ -12,7 +12,6 @@ import zipfile
 from pathlib import Path
 
 from server.publishing.epub_exporter import (
-    ART,
     CLOSING,
     OPENING,
     REQUIRED,
@@ -63,6 +62,24 @@ class Inline(unittest.TestCase):
     def test_a_double_star_is_not_read_as_italic(self) -> None:
         self.assertNotIn("<em>", _inline("**bold**"))
 
+    def test_bold_and_italic_at_once(self) -> None:
+        self.assertEqual(_inline("***both***"), "<strong><em>both</em></strong>")
+
+    def test_bold_written_with_underscores(self) -> None:
+        self.assertEqual(_inline("__bold__"), "<strong>bold</strong>")
+
+    def test_italic_inside_bold(self) -> None:
+        self.assertEqual(
+            _inline("**a *word* of it**"),
+            "<strong>a <em>word</em> of it</strong>",
+        )
+
+    def test_a_star_standing_on_its_own_is_not_italic(self) -> None:
+        self.assertEqual(_inline("3 * 4 * 5"), "3 * 4 * 5")
+
+    def test_an_underscore_inside_a_word_is_left_alone(self) -> None:
+        self.assertEqual(_inline("snake_case_words"), "snake_case_words")
+
 
 class Blocks(unittest.TestCase):
     def test_every_line_is_its_own_paragraph(self) -> None:
@@ -71,10 +88,18 @@ class Blocks(unittest.TestCase):
             "<p>one</p>\n<p>two</p>\n<p>three</p>",
         )
 
-    def test_headings(self) -> None:
-        self.assertEqual(blocks_to_xhtml(["# Title"]), "<h1>Title</h1>")
-        self.assertEqual(blocks_to_xhtml(["## Two"]), "<h2>Two</h2>")
-        self.assertEqual(blocks_to_xhtml(["### Three"]), "<h3>Three</h3>")
+    def test_a_heading_written_in_the_prose_stands_under_the_section_title(
+        self,
+    ) -> None:
+        self.assertEqual(blocks_to_xhtml(["# Title"]), "<h3>Title</h3>")
+        self.assertEqual(blocks_to_xhtml(["## Two"]), "<h4>Two</h4>")
+        self.assertEqual(blocks_to_xhtml(["### Three"]), "<h5>Three</h5>")
+
+    def test_a_heading_carries_the_formatting_written_into_it(self) -> None:
+        self.assertEqual(
+            blocks_to_xhtml(["## The *Queendom* at war"]),
+            "<h4>The <em>Queendom</em> at war</h4>",
+        )
 
     def test_a_rule_of_three_or_more_is_a_scene_break(self) -> None:
         for rule in ["---", "***", "___", "----"]:
@@ -228,11 +253,11 @@ class BuildEpub(unittest.TestCase):
         # only white space on the page.
         self.assertIn('<div class="chapter">', page)
 
-    def test_the_cover_cell_embeds_the_art_it_points_at(self) -> None:
+    def test_a_full_page_image_opening_the_document_is_the_cover(self) -> None:
         (self.root / "art.png").write_bytes(b"\x89PNG\r\n\x1a\n not really a png")
         out = written(
             self.root,
-            storydoc.cover("art.png"),
+            storydoc.image("art.png"),
             storydoc.chapter("One"),
             storydoc.markdown("prose"),
         )
@@ -242,22 +267,62 @@ class BuildEpub(unittest.TestCase):
             opf = z.read("OEBPS/content.opf").decode("utf-8")
 
         self.assertIn("OEBPS/cover.xhtml", names)
-        self.assertIn("OEBPS/cover.png", names)
+        self.assertIn("OEBPS/art_000.png", names)
         self.assertIn('properties="cover-image"', opf)
         self.assertIn('<meta name="cover" content="cover-image"/>', opf)
 
-    def test_a_book_with_no_cover_cell_has_no_cover(self) -> None:
+    def test_a_full_page_image_after_the_story_is_a_page_of_its_own(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        (self.root / "veriona.png").write_bytes(b"png")
+        out = written(
+            self.root,
+            storydoc.image("art.png"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.image("veriona.png"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            names = z.namelist()
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+            page = z.read("OEBPS/art_001_page.xhtml").decode("utf-8")
+
+        self.assertIn("OEBPS/art_001.png", names)
+        self.assertIn('<img src="art_001.png"', page)
+        self.assertEqual(opf.count('properties="cover-image"'), 1)
+
+    def test_an_image_in_the_prose_stands_in_the_chapter_it_was_written_in(
+        self,
+    ) -> None:
+        (self.root / "veriona.png").write_bytes(b"png")
+        out = written(
+            self.root,
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.image("veriona.png", full_page=False),
+            storydoc.markdown("Read [Veriona](https://amazon.example/veriona)."),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            names = z.namelist()
+            page = z.read("OEBPS/chap_000.xhtml").decode("utf-8")
+
+        self.assertIn("OEBPS/art_000.png", names)
+        self.assertNotIn("OEBPS/art_000_page.xhtml", names)
+        self.assertIn('<p class="image"><img src="art_000.png"', page)
+        self.assertIn('<a href="https://amazon.example/veriona">Veriona</a>', page)
+
+    def test_a_book_with_no_image_has_no_cover(self) -> None:
         out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
 
         with zipfile.ZipFile(out) as z:
             self.assertNotIn("OEBPS/cover.xhtml", z.namelist())
 
-    def test_a_cover_nobody_has_drawn_yet_does_not_stop_the_export(self) -> None:
-        # The editor hands a new cover cell a placeholder path. A book goes out
-        # without a cover rather than not at all.
+    def test_art_nobody_has_drawn_yet_does_not_stop_the_export(self) -> None:
+        # A book goes out without the picture rather than not at all.
         out = written(
             self.root,
-            storydoc.cover("cover.jpg"),
+            storydoc.image("cover.jpg"),
             storydoc.chapter("One"),
             storydoc.markdown("prose"),
         )
@@ -313,7 +378,7 @@ class BuildEpub(unittest.TestCase):
         )
 
         with zipfile.ZipFile(out) as z:
-            page = z.read("OEBPS/titlepage.xhtml").decode("utf-8")
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
             opf = z.read("OEBPS/content.opf").decode("utf-8")
 
         self.assertIn("2026-08-17", page)
@@ -321,6 +386,56 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("ISBN 978-0-000-00000-0", page)
         self.assertIn("<dc:date>2026-08-17</dc:date>", opf)
         self.assertIn('urn:isbn:978-0-000-00000-0</dc:identifier>', opf)
+
+    def test_the_title_page_is_followed_by_a_copyright_page(self) -> None:
+        out = written(
+            self.root,
+            title_page(
+                title="Book",
+                author="Pierre Dupied",
+                publisher="Cuir Et Soie",
+                date="2026-08-17",
+            ),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+
+        self.assertIn(
+            "Copyright © 2026 Pierre Dupied and Cuir Et Soie. "
+            "All rights reserved.",
+            page,
+        )
+        self.assertIn("No part of this publication may be reproduced", page)
+        self.assertIn(
+            "The right of Pierre Dupied and Cuir Et Soie to be identified as "
+            "the author of this work has been asserted in accordance with the "
+            "Copyright, Designs and Patents Act 1988.",
+            page,
+        )
+        self.assertIn("Published by Cuir Et Soie", page)
+        self.assertLess(
+            opf.index('idref="titlepage"'), opf.index('idref="copyright"')
+        )
+        # A page the reader turns past, not one they look up.
+        self.assertNotIn("copyright.xhtml", nav)
+
+    def test_the_cover_designer_is_credited_where_they_are_named(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book", **{"cover-designer": "A. Painter"}),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/copyright.xhtml").decode("utf-8")
+
+        self.assertIn("Cover design by A. Painter", page)
 
     def test_a_book_with_no_title_page_still_binds(self) -> None:
         out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
@@ -387,13 +502,46 @@ class BuildEpub(unittest.TestCase):
             css = z.read("OEBPS/style.css").decode("utf-8")
 
         self.assertIn("<h1>Book One</h1>", page)
-        self.assertIn('class="part-page"', page)
+        self.assertIn('class="alone-on-the-page"', page)
         self.assertNotIn("prose", page)
         # Centred both ways against the reader's page, which is the whole of what
         # a part divider looks like.
-        self.assertIn(".part-page", css)
+        self.assertIn(".alone-on-the-page", css)
         self.assertIn("height: 100vh", css)
         self.assertIn("text-align: center", css)
+
+    def test_a_chapter_nobody_has_written_yet_is_its_name_in_the_middle(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.chapter("One"),
+            storydoc.chapter("Two"),
+            storydoc.markdown("prose"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            alone = z.read("OEBPS/chap_000.xhtml").decode("utf-8")
+            written_in = z.read("OEBPS/chap_001.xhtml").decode("utf-8")
+
+        self.assertIn('class="alone-on-the-page"', alone)
+        self.assertIn('class="chapter"', written_in)
+        self.assertNotIn("alone-on-the-page", written_in)
+
+    def test_a_picture_in_the_prose_leaves_room_for_the_words(self) -> None:
+        (self.root / "art.png").write_bytes(b"png")
+        out = written(
+            self.root,
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            storydoc.image("art.png", full_page=False),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn("max-height: 45vh", css)
 
     def test_a_part_opens_a_page_the_chapters_under_it_do_not_share(self) -> None:
         out = written(
@@ -416,7 +564,8 @@ class BuildEpub(unittest.TestCase):
             if "itemref" in line
         ]
         self.assertEqual(
-            order, ["titlepage", "part", "chap_000", "part_2", "chap_001"]
+            order,
+            ["titlepage", "copyright", "part", "chap_000", "part_2", "chap_001"],
         )
 
     def test_a_part_with_no_name_is_numbered_by_where_it_stands(self) -> None:
@@ -526,6 +675,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("https://amazon.example/author/1", page)
         self.assertIn("https://writer.example", page)
         self.assertIn("https://writer.substack.example", page)
+        # Where to find the author stands under the heading, above what they
+        # wrote about themselves.
+        self.assertLess(
+            page.index('<div class="links">'),
+            page.index("A. Writer lives by the sea."),
+        )
         # The back matter comes after the story, not before it.
         self.assertLess(opf.index('idref="chap_000"'), opf.index('idref="about"'))
 
@@ -546,8 +701,64 @@ class BuildEpub(unittest.TestCase):
 
         # A list of places to go, not a line of prose running on from the blurb.
         self.assertIn('<div class="links">', page)
-        links = page[page.index('<div class="links">') :]
+        opened = page.index('<div class="links">')
+        links = page[opened : page.index("</div>", opened)]
         self.assertEqual(links.count("<p>"), 2)
+
+    def test_the_portrait_stands_beside_the_links_and_is_bound_in(self) -> None:
+        (self.root / "author.jpg").write_bytes(b"jpg")
+        out = written(
+            self.root,
+            title_page(title="Book", author="A. Writer"),
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(
+                storydoc.ABOUT,
+                "A. Writer lives by the sea.",
+                {
+                    "kdp": "https://amazon.example/author/1",
+                    "portrait": "author.jpg",
+                },
+            ),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            names = z.namelist()
+            page = z.read("OEBPS/about.xhtml").decode("utf-8")
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn("OEBPS/art_000.jpg", names)
+        self.assertIn('<img class="portrait" src="art_000.jpg"', page)
+        self.assertIn('alt="A. Writer"', page)
+        # One block, so the face and the list are read as one thing.
+        who = page[page.index('<div class="who">') :]
+        self.assertIn('<div class="links">', who)
+        self.assertIn('href="art_000.jpg"', opf)
+        # Given a width rather than a ceiling, so art of any size comes down to
+        # the same share of the page and the links have somewhere to stand.
+        self.assertIn(".about .who .portrait { width: 34%", css)
+
+    def test_a_portrait_nobody_has_drawn_yet_leaves_the_page_standing(
+        self,
+    ) -> None:
+        out = written(
+            self.root,
+            storydoc.chapter("One"),
+            storydoc.markdown("prose"),
+            Cell(
+                storydoc.ABOUT,
+                "A. Writer lives by the sea.",
+                {"portrait": "nobody.jpg"},
+            ),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            page = z.read("OEBPS/about.xhtml").decode("utf-8")
+            self.assertNotIn("art_000", z.read("OEBPS/content.opf").decode("utf-8"))
+
+        self.assertIn("A. Writer lives by the sea.", page)
+        self.assertNotIn("<img", page)
 
     def test_an_author_page_with_nothing_on_it_is_not_printed(self) -> None:
         out = written(
@@ -564,7 +775,7 @@ class BuildEpub(unittest.TestCase):
         (self.root / "art.png").write_bytes(b"\x89PNG\r\n\x1a\n not really a png")
         out = written(
             self.root,
-            storydoc.cover("art.png"),
+            storydoc.image("art.png"),
             title_page(title="Book"),
             storydoc.contents(),
             Cell(storydoc.DISCLAIMER, "All fiction.", {"title": "Disclaimer"}),
@@ -583,7 +794,15 @@ class BuildEpub(unittest.TestCase):
         ]
         self.assertEqual(
             order,
-            ["cover", "titlepage", "contents", "disclaimer", "chap_000", "about"],
+            [
+                "cover",
+                "titlepage",
+                "copyright",
+                "contents",
+                "disclaimer",
+                "chap_000",
+                "about",
+            ],
         )
 
     def test_prose_standing_outside_every_chapter_is_still_printed(self) -> None:
@@ -738,16 +957,6 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
         book = read_book(placed(self.root, *cells))
         return {item.kind: item.needs for item in book.wanting}
 
-    def test_a_cover_pointing_at_art_nobody_drew(self) -> None:
-        # `_art_of` already returns None here and the page is silently dropped.
-        said = self.wanting(Cell(storydoc.COVER, "", {"src": "cover.jpg"}))
-        self.assertEqual(said[storydoc.COVER], (ART,))
-
-    def test_a_cover_pointing_at_real_art_is_not_wanting(self) -> None:
-        (self.root / "art.png").write_bytes(b"png")
-        said = self.wanting(Cell(storydoc.COVER, "", {"src": "art.png"}))
-        self.assertNotIn(storydoc.COVER, said)
-
     def test_a_title_page_nobody_filled_in(self) -> None:
         said = self.wanting(title_page(title="Untitled"))
         self.assertEqual(
@@ -758,22 +967,6 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
     def test_it_names_only_the_fields_that_are_empty(self) -> None:
         said = self.wanting(filled_title_page(author="", date="   "))
         self.assertEqual(said[storydoc.TITLE_PAGE], ("author", "date"))
-
-    def test_a_cover_whose_marker_and_markdown_disagree(self) -> None:
-        # The author repointed the image and the attribute kept the name the
-        # section was started with. The editor draws the markdown, so the book
-        # has to find it there too rather than binding coverless in silence.
-        (self.root / "real.png").write_bytes(b"png")
-        said = self.wanting(
-            Cell(storydoc.COVER, "![Cover](real.png)", {"src": "cover.jpg"})
-        )
-        self.assertNotIn(storydoc.COVER, said)
-
-    def test_a_cover_whose_every_name_is_missing(self) -> None:
-        said = self.wanting(
-            Cell(storydoc.COVER, "![Cover](nope.png)", {"src": "cover.jpg"})
-        )
-        self.assertEqual(said[storydoc.COVER], (ART,))
 
     def test_a_version_is_never_wanted(self) -> None:
         # A fact about an edition, like an ISBN, not a thing a book waits for.
@@ -805,7 +998,6 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
 
     def test_a_section_that_is_not_there_wants_everything(self) -> None:
         said = self.wanting(storydoc.chapter("One"))
-        self.assertEqual(said[storydoc.COVER], (ART,))
         self.assertEqual(said[storydoc.BLURB], (TEXT,))
         self.assertEqual(said[storydoc.ABOUT], (TEXT,))
 
@@ -820,7 +1012,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.addCleanup(self._dir.cleanup)
         self.root = Path(self._dir.name)
 
-    def test_a_bare_story_is_missing_all_five(self) -> None:
+    def test_a_bare_story_is_missing_all_four(self) -> None:
         found = report_of(placed(self.root, storydoc.chapter("One")))
         self.assertEqual(found.added, REQUIRED)
         self.assertFalse(found.ready)
@@ -834,13 +1026,9 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
 
     def test_a_section_already_there_is_carried_by_index(self) -> None:
         found = report_of(
-            placed(
-                self.root,
-                storydoc.chapter("One"),
-                Cell(storydoc.COVER, "", {"src": "art.png"}),
-            )
+            placed(self.root, storydoc.chapter("One"), filled_title_page())
         )
-        self.assertNotIn(storydoc.COVER, found.added)
+        self.assertNotIn(storydoc.TITLE_PAGE, found.added)
         self.assertEqual(found.plan[0].at, 1)
 
     def test_the_story_keeps_the_order_it_was_written_in(self) -> None:
@@ -872,7 +1060,6 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.assertEqual(found.moved, ())
 
     def test_a_front_matter_written_back_to_front_has_all_of_it_moved(self) -> None:
-        (self.root / "art.png").write_bytes(b"png")
         found = report_of(
             placed(
                 self.root,
@@ -880,12 +1067,26 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 Cell(storydoc.BLURB, "A lantern, and a stair."),
                 storydoc.contents(),
                 filled_title_page(),
-                Cell(storydoc.COVER, "", {"src": "art.png"}),
                 storydoc.chapter("One"),
             )
         )
         self.assertEqual(found.added, ())
         self.assertEqual(found.moved, REQUIRED)
+
+    def test_a_picture_the_document_opens_with_keeps_its_place(self) -> None:
+        found = report_of(
+            placed(
+                self.root,
+                storydoc.image("art.png"),
+                filled_title_page(),
+                storydoc.contents(),
+                Cell(storydoc.BLURB, "A lantern, and a stair."),
+                storydoc.chapter("One"),
+                Cell(storydoc.ABOUT, "I live by the sea."),
+            )
+        )
+        self.assertEqual(found.moved, ())
+        self.assertEqual(found.plan[0].at, 0)
 
     def test_the_disclaimer_keeps_the_place_the_author_gave_it(self) -> None:
         found = report_of(
@@ -909,15 +1110,13 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 storydoc.contents(),
             )
         )
-        self.assertEqual(found.plan[2].at, 1)
-        self.assertIn(2, [slot.at for slot in found.plan[4:]])
+        self.assertEqual(found.plan[1].at, 1)
+        self.assertIn(2, [slot.at for slot in found.plan[3:]])
 
     def test_everything_present_and_one_of_them_empty_is_not_ready(self) -> None:
-        (self.root / "art.png").write_bytes(b"png")
         found = report_of(
             placed(
                 self.root,
-                Cell(storydoc.COVER, "", {"src": "art.png"}),
                 filled_title_page(),
                 storydoc.contents(),
                 Cell(storydoc.BLURB, ""),  # written in, never filled
@@ -930,11 +1129,9 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.assertFalse(found.ready)
 
     def test_a_document_with_everything_written_is_ready(self) -> None:
-        (self.root / "art.png").write_bytes(b"png")
         found = report_of(
             placed(
                 self.root,
-                Cell(storydoc.COVER, "", {"src": "art.png"}),
                 filled_title_page(),
                 storydoc.contents(),
                 Cell(storydoc.BLURB, "A lantern, and a stair."),

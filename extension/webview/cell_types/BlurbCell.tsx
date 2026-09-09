@@ -80,5 +80,4 @@ registerAuthorDocumentCellType({
             sendMessagesToVscode={sendMessagesToVscode}
         />
     ),
-    newCell: () => ({ kind: BLURB, source: "", attrs: {} }),
 });

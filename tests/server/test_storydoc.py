@@ -85,7 +85,7 @@ class Asking(unittest.TestCase):
     def test_has_finds_a_kind_the_document_carries(self) -> None:
         cells = [storydoc.chapter("One"), storydoc.contents()]
         self.assertTrue(storydoc.has(cells, storydoc.CONTENTS))
-        self.assertFalse(storydoc.has(cells, storydoc.COVER))
+        self.assertFalse(storydoc.has(cells, storydoc.IMAGE))
 
     def test_cells_of_returns_every_cell_of_a_kind_in_order(self) -> None:
         cells = [storydoc.chapter("One"), storydoc.contents(), storydoc.chapter("Two")]
@@ -105,14 +105,14 @@ class Asking(unittest.TestCase):
 class Preparing(unittest.TestCase):
     def test_missing_cells_are_added_in_order(self) -> None:
         prepared = storydoc.add_missing(
-            [storydoc.chapter("One")], [storydoc.contents(), storydoc.cover("c.jpg")]
+            [storydoc.chapter("One")], [storydoc.contents(), storydoc.image("c.jpg")]
         )
         self.assertEqual(
-            [cell.kind for cell in prepared], ["chapter", "contents", "cover"]
+            [cell.kind for cell in prepared], ["chapter", "contents", "image"]
         )
 
     def test_preparing_twice_adds_nothing_the_second_time(self) -> None:
-        wanted = [storydoc.contents(), storydoc.cover("c.jpg")]
+        wanted = [storydoc.contents(), storydoc.image("c.jpg")]
         once = storydoc.add_missing([storydoc.chapter("One")], wanted)
         twice = storydoc.add_missing(once, wanted)
         self.assertEqual(once, twice)
@@ -163,7 +163,7 @@ class Chapters(unittest.TestCase):
 
 class OnDisk(unittest.TestCase):
     def test_a_document_survives_being_saved_and_loaded(self) -> None:
-        cells = [storydoc.cover("c.jpg"), storydoc.chapter("One")]
+        cells = [storydoc.image("c.jpg"), storydoc.chapter("One")]
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / f"story{storydoc.EXTENSION}"
             storydoc.save(path, cells)

@@ -4,7 +4,7 @@ import {
     BLURB,
     CHAPTER,
     CONTENTS,
-    COVER,
+    IMAGE,
     Cell,
     DISCLAIMER,
     MARKDOWN,
@@ -75,6 +75,7 @@ const CELL_KINDS: CellKind[] = [
             { attributeName: "date", label: "Date" },
             { attributeName: "version", label: "Version" },
             { attributeName: "isbn", label: "ISBN" },
+            { attributeName: "cover-designer", label: "Cover Designer" },
         ],
         isFrontOrBackMatter: true,
         blank: () =>
@@ -90,12 +91,10 @@ const CELL_KINDS: CellKind[] = [
             ),
     },
     {
-        cellKind: COVER,
-        label: "Cover",
+        cellKind: IMAGE,
+        label: "Image",
         fields: [],
-        isFrontOrBackMatter: true,
-        blank: () =>
-            new Cell(COVER, "![Cover](cover.jpg)", { src: "cover.jpg" }),
+        blank: () => new Cell(IMAGE, "", { src: "" }),
     },
     {
         cellKind: CONTENTS,
@@ -125,6 +124,7 @@ const CELL_KINDS: CellKind[] = [
             { attributeName: "kdp", label: "KDP" },
             { attributeName: "website", label: "Website" },
             { attributeName: "substack", label: "Substack" },
+            { attributeName: "portrait", label: "Portrait" },
         ],
         isFrontOrBackMatter: true,
         blank: () =>
@@ -135,6 +135,7 @@ const CELL_KINDS: CellKind[] = [
                     kdp: templates().about.kdp,
                     website: templates().about.website,
                     substack: templates().about.substack,
+                    portrait: templates().about.portrait,
                 }),
             ),
     },
@@ -180,4 +181,11 @@ export function isKeptOutOfTheBook(kind: string): boolean {
 
 export function isAnAsideToTheProseAroundIt(kind: string): boolean {
     return cellKind(kind)?.isAnAsideToTheProseAroundIt ?? false;
+}
+
+export function standsOutsideTheStory(kind: string): boolean {
+    return (
+        isFrontOrBackMatter(kind) ||
+        (isKeptOutOfTheBook(kind) && !isAnAsideToTheProseAroundIt(kind))
+    );
 }
