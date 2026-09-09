@@ -580,7 +580,8 @@ p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 .title-page p.author { font-size: 1.2em; margin: 0 0 0.6em; }
 .title-page p.publisher { font-size: 0.9em; letter-spacing: 0.08em;
                           text-transform: uppercase; }
-.contents ol { list-style: none; padding: 0; text-align: center; }
+.contents ol { text-align: left; padding-left: 2em; margin: 0; }
+.contents ol ol { margin: 0.6em 0 0; }
 .contents li { margin: 0 0 0.8em; }
 .contents a { text-decoration: none; }
 .disclaimer { text-align: left; font-size: 0.85em; margin-top: 15%; }

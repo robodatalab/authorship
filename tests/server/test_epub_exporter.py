@@ -669,6 +669,22 @@ class BuildEpub(unittest.TestCase):
         self.assertIn('<li><a href="part_2.xhtml">Book Two</a>', page)
         self.assertIn('<li><a href="chap_001.xhtml">Two</a></li>', page)
 
+    def test_the_contents_page_is_numbered_and_read_down_the_page(self) -> None:
+        out = written(
+            self.root,
+            title_page(title="Book"),
+            storydoc.contents(),
+            storydoc.chapter("One"),
+            storydoc.markdown("a"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            css = z.read("OEBPS/style.css").decode("utf-8")
+
+        self.assertIn(".contents ol { text-align: left;", css)
+        self.assertIn("padding-left: 2em;", css)
+        self.assertNotIn(".contents ol { list-style: none;", css)
+
     def test_the_chapters_of_a_part_the_book_does_not_print_stand_alone(
         self,
     ) -> None:
