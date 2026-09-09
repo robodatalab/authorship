@@ -1,6 +1,7 @@
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellHeader,
+    AuthorFileEditorCellHeaderTitle,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellWords,
@@ -32,7 +33,10 @@ export function PartCell({
 }: PartCellProps) {
     return (
         <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>Part</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>
+                Part
+                <AuthorFileEditorCellHeaderTitle title={cell.attrs.title} />
+            </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellFields
                     fields={FIELDS}

@@ -112,6 +112,14 @@
     border-bottom: 1px solid var(--vscode-panel-border);
 }
 
+.author-file-editor-cell-header-title {
+    overflow: hidden;
+    font-weight: 400;
+    color: var(--vscode-descriptionForeground);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .author-file-editor-cell-body {
     display: flex;
     flex-direction: column;
