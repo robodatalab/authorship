@@ -43,7 +43,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
             defineTheme: () => {},
             create: (node: HTMLElement, options: { value: string }) => {
                 let value = options.value;
-                let changed = (): void => {};
+                let changed = (_changed: { isFlush: boolean }): void => {};
                 let pointed: (event: unknown) => void = () => {};
                 let pointedAway = (): void => {};
                 const collections: {
@@ -54,6 +54,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     getValue: () => value,
                     setValue: (next: string) => {
                         value = next;
+                        changed({ isFlush: true });
                     },
                     getContentHeight: () => 100,
                     layout: () => {},
@@ -61,7 +62,9 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     dispose: () => {},
                     addCommand: () => {},
                     onDidContentSizeChange: () => disposable,
-                    onDidChangeModelContent: (listener: () => void) => {
+                    onDidChangeModelContent: (
+                        listener: (changed: { isFlush: boolean }) => void,
+                    ) => {
                         changed = listener;
                         return disposable;
                     },
@@ -113,7 +116,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     pointAway: () => pointedAway(),
                     type: (markdown: string) => {
                         value = markdown;
-                        changed();
+                        changed({ isFlush: false });
                     },
                 };
                 node.dataset.monaco = "open";
@@ -360,6 +363,31 @@ describe("closing the editor", () => {
     });
 });
 
+describe("the host answering a keystroke later than the author typed it", () => {
+    const whatTheEditorReported: string[] = [];
+    let reporting: ReturnType<typeof committedSpy>;
+
+    beforeEach(async () => {
+        whatTheEditorReported.length = 0;
+        reporting = vi.fn((markdown: string) => {
+            whatTheEditorReported.push(markdown);
+        });
+
+        await mount("", reporting);
+        await doubleClickRendered();
+        await typeIntoEditor("a");
+        await typeIntoEditor("ab");
+    });
+
+    it("answers each message the page sent, and is sent each answer back", async () => {
+        for (let answer = 0; answer < 6; answer++) {
+            await render(whatTheEditorReported[answer], reporting);
+        }
+
+        expect(whatTheEditorReported).toEqual(["a", "ab"]);
+    });
+});
+
 describe("markdown that changes underneath the editor", () => {
     it("follows the new markdown while the editor is open", async () => {
         const committed = committedSpy();
@@ -560,4 +588,3 @@ describe("what the checks found in the prose being written", () => {
         expect(onFixAsked).toHaveBeenCalledWith(REPEATED);
     });
 });
-

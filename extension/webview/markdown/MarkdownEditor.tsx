@@ -295,9 +295,12 @@ function MonacoMarkdownEditor({
         const pointerLeft = editor.onMouseLeave(
             hideTheTooltipUnlessItIsPointedAt,
         );
-        const contentChanged = editor.onDidChangeModelContent(() =>
-            latestCallbacks.current.onMarkdownChanged(editor.getValue()),
-        );
+        const contentChanged = editor.onDidChangeModelContent((changed) => {
+            if (changed.isFlush) {
+                return;
+            }
+            latestCallbacks.current.onMarkdownChanged(editor.getValue());
+        });
         const escapePressed = (event: KeyboardEvent): void => {
             if (event.key === "Escape") {
                 latestCallbacks.current.onFinished();
