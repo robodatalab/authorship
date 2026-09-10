@@ -62,12 +62,10 @@ export class AuthorFileEditorSession
     }
 
     async writeTheDocumentToItsFile(): Promise<void> {
-        const text = this.theDocument.text;
         await vscode.workspace.fs.writeFile(
             this.theDocument.uri,
-            new TextEncoder().encode(text),
+            new TextEncoder().encode(this.theDocument.text),
         );
-        this.theDocument.fromText(text);
     }
 
     async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
