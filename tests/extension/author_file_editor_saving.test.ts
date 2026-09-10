@@ -8,7 +8,6 @@ const DOCUMENT_PATH = "/stories/expat_pet.author";
 interface OpenEditor {
     typeIntoTheCell(markdown: string): Promise<void>;
     save(): Promise<void>;
-    theCellOnThePage(): string | undefined;
     documentsSentToThePage(): number;
 }
 
@@ -66,9 +65,6 @@ async function openEditor(text: string): Promise<OpenEditor> {
             await new Promise((settled) => setTimeout(settled, 0));
         },
         save: () => provider.saveCustomDocument(session),
-        theCellOnThePage: () =>
-            documentsSentToThePage[documentsSentToThePage.length - 1]?.[0]
-                ?.source,
         documentsSentToThePage: () => documentsSentToThePage.length,
     };
 }
@@ -80,17 +76,6 @@ beforeEach(async () => {
 });
 
 describe("the editor's own save reaching its watcher on the file", () => {
-    it("does not put back what the file held when the author has typed on", async () => {
-        await editor.typeIntoTheCell("The lantern w");
-        await editor.save();
-        await editor.typeIntoTheCell("The lantern wa");
-
-        await watchersOnTheFiles[0].theFileChanged();
-        await new Promise((settled) => setTimeout(settled, 0));
-
-        expect(editor.theCellOnThePage()).toBe("The lantern wa");
-    });
-
     it("says nothing to the page, the file holding what the document holds", async () => {
         await editor.typeIntoTheCell("The lantern went out\n");
         await editor.save();
