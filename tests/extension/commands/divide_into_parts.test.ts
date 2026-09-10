@@ -11,7 +11,7 @@ beforeEach(forgetWhatTheEditorDid);
 
 describe("DivideIntoPartsCommand — divides the document into parts", () => {
     it("writes one file per part the author marked", async () => {
-        const document = openStory(`
+        const session = openStory(`
 <!-- cell: part title="Day One" id="p1" -->
 
 <!-- cell: chapter title="One" id="c1" -->
@@ -29,7 +29,7 @@ She saw the door.
 He heard the bell.
 `);
 
-        await new DivideIntoPartsCommand().invoke(document);
+        await new DivideIntoPartsCommand().invoke(session);
 
         expect([...files.keys()].sort()).toEqual([FIRST_PART, SECOND_PART]);
         expect(files.get(FIRST_PART)).toContain("She saw the door.");
@@ -37,11 +37,11 @@ He heard the bell.
     });
 
     it("writes no files when the author marked no parts", async () => {
-        const document = openStory(
+        const session = openStory(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n',
         );
 
-        await new DivideIntoPartsCommand().invoke(document);
+        await new DivideIntoPartsCommand().invoke(session);
 
         expect([...files.keys()]).toEqual([]);
     });

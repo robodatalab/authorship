@@ -34,7 +34,46 @@ function readAttributes(marker: string): Record<string, string> {
     return attributes;
 }
 
-export class Cell {
+export interface ImmutableCell {
+    readonly kind: string;
+    readonly source: string;
+    readonly attrs: Readonly<Record<string, string>>;
+    readonly uniqueId: string;
+    marker(): string;
+    isFolded(): boolean;
+}
+
+export class ImmutableAuthorDocument {
+    readonly cells: readonly ImmutableCell[];
+
+    constructor(
+        readonly uri: vscode.Uri,
+        text: string,
+    ) {
+        this.cells = cellsFromText(text);
+    }
+
+    static fromText(text: string): ImmutableAuthorDocument {
+        return new ImmutableAuthorDocument(
+            undefined as unknown as vscode.Uri,
+            text,
+        );
+    }
+
+    get text(): string {
+        return authorFileText(this.cells);
+    }
+
+    cellWithId(cellId: string): ImmutableCell | undefined {
+        return this.cells.find((cell) => cell.uniqueId === cellId);
+    }
+
+    numCharactersInCell(cellId: string): number {
+        return this.cellWithId(cellId)?.source.length ?? 0;
+    }
+}
+
+export class MutableCell implements ImmutableCell {
     constructor(
         public kind: string,
         public source: string,
@@ -91,8 +130,8 @@ export class Cell {
     }
 }
 
-export class AuthorDocument implements vscode.CustomDocument {
-    private documentCells: Cell[];
+export class MutableAuthorDocument implements vscode.CustomDocument {
+    private documentCells: MutableCell[];
     constructor(
         readonly uri: vscode.Uri,
         text: string,
@@ -101,33 +140,15 @@ export class AuthorDocument implements vscode.CustomDocument {
         this.fromText(text);
     }
 
-    static fromText(text: string): AuthorDocument {
-        return new AuthorDocument(undefined as unknown as vscode.Uri, text);
+    static fromText(text: string): MutableAuthorDocument {
+        return new MutableAuthorDocument(
+            undefined as unknown as vscode.Uri,
+            text,
+        );
     }
 
     fromText(text: string): void {
-        const sections: {
-            markerLine: RegExpExecArray;
-            proseLines: string[];
-        }[] = [];
-
-        for (const line of text.split("\n")) {
-            const markerLine = CELL_MARKER_LINE.exec(line);
-            if (markerLine) {
-                sections.push({ markerLine, proseLines: [] });
-            } else if (sections.length > 0) {
-                sections[sections.length - 1].proseLines.push(line);
-            }
-        }
-
-        this.documentCells = sections.map((section) => {
-            const [, cellKind, markerAttributes] = section.markerLine;
-            return new Cell(
-                cellKind,
-                withoutBlankLinesAtTheEnds(section.proseLines),
-                readAttributes(markerAttributes),
-            );
-        });
+        this.documentCells = cellsFromText(text);
     }
 
     dispose(): void {}
@@ -136,18 +157,18 @@ export class AuthorDocument implements vscode.CustomDocument {
         return authorFileText(this.documentCells);
     }
 
-    get cells(): Cell[] {
+    get cells(): MutableCell[] {
         return this.documentCells;
     }
 
-    cellWithId(cellId: string): Cell | undefined {
+    cellWithId(cellId: string): MutableCell | undefined {
         return this.documentCells.find((cell) => cell.uniqueId === cellId);
     }
 
     numCharactersInCell(cellId: string): number {
         return this.cellWithId(cellId)?.source.length ?? 0;
     }
-    insertBefore(cellId: string | null, cell: Cell): void {
+    insertBefore(cellId: string | null, cell: ImmutableCell): void {
         const standsBefore = this.documentCells.findIndex(
             (inTheDocument) => inTheDocument.uniqueId === cellId,
         );
@@ -164,11 +185,11 @@ export class AuthorDocument implements vscode.CustomDocument {
         );
     }
 
-    insertAt(cellIndex: number, cell: Cell): void {
+    insertAt(cellIndex: number, cell: ImmutableCell): void {
         this.documentCells.splice(
             cellIndex,
             0,
-            new Cell(cell.kind, cell.source, cell.attrs),
+            new MutableCell(cell.kind, cell.source, cell.attrs),
         );
     }
 
@@ -187,9 +208,20 @@ export class AuthorDocument implements vscode.CustomDocument {
         }
         this.documentCells.splice(cellIndex, howMany);
     }
+
+    toImmutable(): ImmutableAuthorDocument {
+        const asItStands = new ImmutableAuthorDocument(this.uri, this.text);
+        for (const cell of asItStands.cells) {
+            Object.freeze(cell.attrs);
+            Object.freeze(cell);
+        }
+        Object.freeze(asItStands.cells);
+        Object.freeze(asItStands);
+        return asItStands;
+    }
 }
 
-export function authorFileText(cells: readonly Cell[]): string {
+export function authorFileText(cells: readonly ImmutableCell[]): string {
     const lines: string[] = [];
     for (const cell of cells) {
         lines.push(cell.marker());
@@ -200,6 +232,31 @@ export function authorFileText(cells: readonly Cell[]): string {
         }
     }
     return lines.join("\n");
+}
+
+function cellsFromText(text: string): MutableCell[] {
+    const sections: {
+        markerLine: RegExpExecArray;
+        proseLines: string[];
+    }[] = [];
+
+    for (const line of text.split("\n")) {
+        const markerLine = CELL_MARKER_LINE.exec(line);
+        if (markerLine) {
+            sections.push({ markerLine, proseLines: [] });
+        } else if (sections.length > 0) {
+            sections[sections.length - 1].proseLines.push(line);
+        }
+    }
+
+    return sections.map((section) => {
+        const [, cellKind, markerAttributes] = section.markerLine;
+        return new MutableCell(
+            cellKind,
+            withoutBlankLinesAtTheEnds(section.proseLines),
+            readAttributes(markerAttributes),
+        );
+    });
 }
 
 function withoutBlankLinesAtTheEnds(proseLines: string[]): string {

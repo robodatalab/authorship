@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import * as vscode from "vscode";
 
 import { ImportMarkdownCommand } from "../../../extension/vscode_runtime/commands/import_markdown";
+import type { AuthorFileEditorSession } from "../../../extension/vscode_runtime/author_file_editor_session";
 import { dialogs, files } from "../vscode";
 import {
     forgetWhatTheEditorDid,
@@ -10,6 +11,10 @@ import {
 } from "./open_story";
 
 beforeEach(forgetWhatTheEditorDid);
+
+function theStoryOpenInTheEditor(): AuthorFileEditorSession {
+    return storyOfThreeCells();
+}
 
 describe("ImportMarkdownCommand — imports markdown into the document", () => {
     it("writes the chosen manuscript over the document, as cells", async () => {
@@ -21,7 +26,7 @@ describe("ImportMarkdownCommand — imports markdown into the document", () => {
         dialogs.filesTheAuthorChose = [manuscript];
         dialogs.answerToTheWarning = "Replace";
 
-        await new ImportMarkdownCommand().invoke(storyOfThreeCells());
+        await new ImportMarkdownCommand().invoke(theStoryOpenInTheEditor());
 
         const written = files.get(STORY_FILE) ?? "";
         expect(written).toContain('<!-- cell: title-page title="Veriona"');
@@ -34,7 +39,7 @@ describe("ImportMarkdownCommand — imports markdown into the document", () => {
         files.set(manuscript.toString(), "# Veriona\n");
         dialogs.filesTheAuthorChose = [manuscript];
 
-        await new ImportMarkdownCommand().invoke(storyOfThreeCells());
+        await new ImportMarkdownCommand().invoke(theStoryOpenInTheEditor());
 
         expect(files.has(STORY_FILE)).toBe(false);
     });

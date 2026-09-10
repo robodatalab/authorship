@@ -43,7 +43,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
             defineTheme: () => {},
             create: (node: HTMLElement, options: { value: string }) => {
                 let value = options.value;
-                let changed = (): void => {};
+                let changed = (_changed: { isFlush: boolean }): void => {};
                 let pointed: (event: unknown) => void = () => {};
                 let pointedAway = (): void => {};
                 const collections: {
@@ -54,6 +54,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     getValue: () => value,
                     setValue: (next: string) => {
                         value = next;
+                        changed({ isFlush: true });
                     },
                     getContentHeight: () => 100,
                     layout: () => {},
@@ -61,7 +62,9 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     dispose: () => {},
                     addCommand: () => {},
                     onDidContentSizeChange: () => disposable,
-                    onDidChangeModelContent: (listener: () => void) => {
+                    onDidChangeModelContent: (
+                        listener: (changed: { isFlush: boolean }) => void,
+                    ) => {
                         changed = listener;
                         return disposable;
                     },
@@ -113,7 +116,7 @@ vi.mock("monaco-editor/editor/editor.api", () => {
                     pointAway: () => pointedAway(),
                     type: (markdown: string) => {
                         value = markdown;
-                        changed();
+                        changed({ isFlush: false });
                     },
                 };
                 node.dataset.monaco = "open";
@@ -128,8 +131,6 @@ const { MarkdownEditor, MarkdownEditorMediator } =
     await import("../../../extension/webview/markdown/MarkdownEditor");
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-
-const SETTLE_AFTER_TYPING_MS = 400;
 
 let root: Root;
 
@@ -252,14 +253,6 @@ async function clickSomethingElse(): Promise<void> {
     });
 }
 
-async function waitForTypingToSettle(): Promise<void> {
-    await act(async () => {
-        await new Promise((settled) =>
-            setTimeout(settled, SETTLE_AFTER_TYPING_MS + 50),
-        );
-    });
-}
-
 beforeEach(() => {
     monacoEditors.length = 0;
 });
@@ -311,15 +304,27 @@ describe("opening the editor", () => {
 });
 
 describe("editing", () => {
-    it("commits a pause in the typing and stays open", async () => {
+    it("commits what was typed and stays open", async () => {
         const committed = await mount("The lantern.");
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
-        await waitForTypingToSettle();
 
         expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).not.toBeNull();
+    });
+
+    it("commits every change, so that none of them waits on the next", async () => {
+        const committed = await mount("The lantern.");
+        await doubleClickRendered();
+
+        await typeIntoEditor("The lantern had");
+        await typeIntoEditor("The lantern had gone out.");
+
+        expect(committed.mock.calls).toEqual([
+            ["The lantern had"],
+            ["The lantern had gone out."],
+        ]);
     });
 
     it("stays open when something else is clicked once", async () => {
@@ -333,7 +338,7 @@ describe("editing", () => {
 });
 
 describe("closing the editor", () => {
-    it("commits the draft and renders it when escape is pressed", async () => {
+    it("renders what was typed when escape is pressed", async () => {
         const committed = await mount("The lantern.");
         await doubleClickRendered();
 
@@ -342,6 +347,7 @@ describe("closing the editor", () => {
 
         expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).toBeNull();
+        expect(rendered()?.textContent).toBe("The lantern had gone out.");
     });
 
     it("closes on escape after the editor has lost focus", async () => {
@@ -354,6 +360,31 @@ describe("closing the editor", () => {
 
         expect(openEditor()).toBeNull();
         expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
+    });
+});
+
+describe("the host answering a keystroke later than the author typed it", () => {
+    const whatTheEditorReported: string[] = [];
+    let reporting: ReturnType<typeof committedSpy>;
+
+    beforeEach(async () => {
+        whatTheEditorReported.length = 0;
+        reporting = vi.fn((markdown: string) => {
+            whatTheEditorReported.push(markdown);
+        });
+
+        await mount("", reporting);
+        await doubleClickRendered();
+        await typeIntoEditor("a");
+        await typeIntoEditor("ab");
+    });
+
+    it("answers each message the page sent, and is sent each answer back", async () => {
+        for (let answer = 0; answer < 6; answer++) {
+            await render(whatTheEditorReported[answer], reporting);
+        }
+
+        expect(whatTheEditorReported).toEqual(["a", "ab"]);
     });
 });
 
@@ -395,7 +426,7 @@ describe("two editors", () => {
         expect(renderedMarkdown()).toEqual(["The lantern."]);
     });
 
-    it("commits nothing on the way out, since the page may have moved on", async () => {
+    it("has nothing left to commit on the way out, every change having been committed as it was typed", async () => {
         const lantern = committedSpy();
         await mountAll([
             { markdown: "The lantern.", committed: lantern },
@@ -406,7 +437,7 @@ describe("two editors", () => {
         await typeIntoEditor("The lantern had gone out.");
         await doubleClickRenderedMarkdown("The night.");
 
-        expect(lantern).not.toHaveBeenCalled();
+        expect(lantern.mock.calls).toEqual([["The lantern had gone out."]]);
     });
 });
 
@@ -557,4 +588,3 @@ describe("what the checks found in the prose being written", () => {
         expect(onFixAsked).toHaveBeenCalledWith(REPEATED);
     });
 });
-

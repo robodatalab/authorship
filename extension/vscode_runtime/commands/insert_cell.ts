@@ -1,5 +1,6 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { blankCellOfKind } from "../storydoc/cell_kinds";
-import type { AuthorDocument } from "../storydoc/model";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class InsertCellCommand implements AuthorDocumentCommand {
@@ -9,12 +10,14 @@ export class InsertCellCommand implements AuthorDocumentCommand {
     readonly tooltip = "Add a section here";
 
     invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        document.insertBefore(
-            (commandArguments.beforeCellId as string | null) ?? null,
-            blankCellOfKind(commandArguments.cellKind as string),
+        session.changeTheDocument((story) =>
+            story.insertBefore(
+                (commandArguments.beforeCellId as string | null) ?? null,
+                blankCellOfKind(commandArguments.cellKind as string),
+            ),
         );
     }
 }

@@ -5,7 +5,7 @@ import {
     CHAPTER,
     CONTENTS,
     IMAGE,
-    Cell,
+    MutableCell,
     DISCLAIMER,
     MARKDOWN,
     NOTE,
@@ -26,7 +26,7 @@ interface CellKind {
     isFrontOrBackMatter?: boolean;
     isKeptOutOfTheBook?: boolean;
     isAnAsideToTheProseAroundIt?: boolean;
-    blank: () => Cell;
+    blank: () => MutableCell;
 }
 
 function withoutTheOnesNothingHasBeenSaidAbout(
@@ -42,13 +42,13 @@ const CELL_KINDS: CellKind[] = [
         cellKind: MARKDOWN,
         label: "Markdown",
         fields: [],
-        blank: () => new Cell(MARKDOWN, "", {}),
+        blank: () => new MutableCell(MARKDOWN, "", {}),
     },
     {
         cellKind: CHAPTER,
         label: "Chapter",
         fields: [{ attributeName: "title", label: "Title" }],
-        blank: () => new Cell(CHAPTER, "", { title: "Untitled" }),
+        blank: () => new MutableCell(CHAPTER, "", { title: "Untitled" }),
     },
     {
         cellKind: NOTE,
@@ -56,13 +56,13 @@ const CELL_KINDS: CellKind[] = [
         fields: [],
         isKeptOutOfTheBook: true,
         isAnAsideToTheProseAroundIt: true,
-        blank: () => new Cell(NOTE, "", {}),
+        blank: () => new MutableCell(NOTE, "", {}),
     },
     {
         cellKind: PART,
         label: "Part",
         fields: [{ attributeName: "title", label: "Title" }],
-        blank: () => new Cell(PART, "", { title: "Untitled" }),
+        blank: () => new MutableCell(PART, "", { title: "Untitled" }),
     },
     {
         cellKind: TITLE_PAGE,
@@ -79,7 +79,7 @@ const CELL_KINDS: CellKind[] = [
         ],
         isFrontOrBackMatter: true,
         blank: () =>
-            new Cell(
+            new MutableCell(
                 TITLE_PAGE,
                 "",
                 withoutTheOnesNothingHasBeenSaidAbout({
@@ -94,14 +94,14 @@ const CELL_KINDS: CellKind[] = [
         cellKind: IMAGE,
         label: "Image",
         fields: [],
-        blank: () => new Cell(IMAGE, "", { src: "" }),
+        blank: () => new MutableCell(IMAGE, "", { src: "" }),
     },
     {
         cellKind: CONTENTS,
         label: "Table of Contents",
         fields: [],
         isFrontOrBackMatter: true,
-        blank: () => new Cell(CONTENTS, "", {}),
+        blank: () => new MutableCell(CONTENTS, "", {}),
     },
     {
         cellKind: DISCLAIMER,
@@ -109,7 +109,7 @@ const CELL_KINDS: CellKind[] = [
         fields: [{ attributeName: "title", label: "Title" }],
         isFrontOrBackMatter: true,
         blank: () =>
-            new Cell(
+            new MutableCell(
                 DISCLAIMER,
                 templates().disclaimer.text,
                 withoutTheOnesNothingHasBeenSaidAbout({
@@ -128,7 +128,7 @@ const CELL_KINDS: CellKind[] = [
         ],
         isFrontOrBackMatter: true,
         blank: () =>
-            new Cell(
+            new MutableCell(
                 ABOUT,
                 templates().about.text,
                 withoutTheOnesNothingHasBeenSaidAbout({
@@ -144,14 +144,14 @@ const CELL_KINDS: CellKind[] = [
         label: "Blurb",
         fields: [],
         isKeptOutOfTheBook: true,
-        blank: () => new Cell(BLURB, "", {}),
+        blank: () => new MutableCell(BLURB, "", {}),
     },
     {
         cellKind: RECAP,
         label: "The Story So Far",
         fields: [{ attributeName: "documents", label: "Documents" }],
         isKeptOutOfTheBook: true,
-        blank: () => new Cell(RECAP, "", {}),
+        blank: () => new MutableCell(RECAP, "", {}),
     },
 ];
 
@@ -167,8 +167,8 @@ export function fieldsOfCellKind(kind: string): CellKindField[] {
     return cellKind(kind)?.fields ?? [];
 }
 
-export function blankCellOfKind(kind: string): Cell {
-    return cellKind(kind)?.blank() ?? new Cell(kind, "", {});
+export function blankCellOfKind(kind: string): MutableCell {
+    return cellKind(kind)?.blank() ?? new MutableCell(kind, "", {});
 }
 
 export function isFrontOrBackMatter(kind: string): boolean {

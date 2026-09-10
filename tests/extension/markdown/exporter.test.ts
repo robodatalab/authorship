@@ -5,12 +5,12 @@ import {
     toMarkdown,
 } from "../../../extension/vscode_runtime/markdown/exporter";
 import {
-    AuthorDocument,
-    Cell,
+    MutableAuthorDocument,
+    MutableCell,
 } from "../../../extension/vscode_runtime/storydoc/model";
 
-function cellsOf(text: string): Cell[] {
-    return AuthorDocument.fromText(text).cells;
+function cellsOf(text: string): MutableCell[] {
+    return MutableAuthorDocument.fromText(text).cells;
 }
 
 function markdownOf(text: string): string {
@@ -88,9 +88,9 @@ describe("what a document exports as", () => {
     });
 
     it("writes an image as the picture it points at", () => {
-        expect(
-            markdownOf('<!-- cell: image src="art/cover.jpg" -->\n'),
-        ).toBe("![](art/cover.jpg)\n");
+        expect(markdownOf('<!-- cell: image src="art/cover.jpg" -->\n')).toBe(
+            "![](art/cover.jpg)\n",
+        );
     });
 
     it("writes nothing for an image nobody has pointed anywhere", () => {

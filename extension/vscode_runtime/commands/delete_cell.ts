@@ -1,7 +1,8 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import { labelOfCellKind } from "../storydoc/cell_kinds";
-import type { AuthorDocument, Cell } from "../storydoc/model";
+import type { ImmutableAuthorDocument, ImmutableCell } from "../storydoc/model";
 import {
     cellsBySection,
     cellsWithinASection,
@@ -14,17 +15,20 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 const EVERYTHING_UNDER_IT = "Delete All";
 const THE_CELL_ALONE = "Only This One";
 
-function nameOf(cell: Cell): string {
+function nameOf(cell: ImmutableCell): string {
     return cell.attrs.title || labelOfCellKind(cell.kind);
 }
 
 async function theAuthorWantsTheWholeSectionGone(
-    section: CellsInASection<Cell>,
+    section: CellsInASection<ImmutableCell>,
 ): Promise<boolean | undefined> {
     const held = cellsWithinASection(section).length - 1;
     const answer = await vscode.window.showWarningMessage(
         `Delete “${nameOf(section.cell)}” and the ${held} ${held === 1 ? "section" : "sections"} under it?`,
-        { modal: true, detail: "Delete it alone and they stay where they are." },
+        {
+            modal: true,
+            detail: "Delete it alone and they stay where they are.",
+        },
         EVERYTHING_UNDER_IT,
         THE_CELL_ALONE,
     );
@@ -38,19 +42,20 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
     readonly tooltip = "Delete this section";
 
     async invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
         const standing = whereACellStands(
-            cellsBySection(document.cells),
+            cellsBySection(session.document.cells),
             cellId,
         );
         if (!standing) {
             return;
         }
+
         if (standing.section.within.length === 0) {
-            document.removeCell(cellId);
+            session?.changeTheDocument((story) => story.removeCell(cellId));
             return;
         }
         const withEverythingUnderIt = await theAuthorWantsTheWholeSectionGone(
@@ -60,9 +65,11 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
             return;
         }
         if (withEverythingUnderIt) {
-            removeTheSection(document, cellId);
+            session?.changeTheDocument((story) =>
+                removeTheSection(story, cellId),
+            );
             return;
         }
-        document.removeCell(cellId);
+        session?.changeTheDocument((story) => story.removeCell(cellId));
     }
 }

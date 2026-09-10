@@ -5,23 +5,23 @@ import { storyOfThreeCells } from "./open_story";
 
 describe("ReplaceAttributeCommand — replaces a cell's attribute", () => {
     it("writes the new value into that cell's marker", () => {
-        const document = storyOfThreeCells();
-        new ReplaceAttributeCommand().invoke(document, {
+        const session = storyOfThreeCells();
+        new ReplaceAttributeCommand().invoke(session, {
             cellId: "c1",
             attributeName: "title",
             attributeValue: "The Door",
         });
-        expect(document.cells[0].attrs.title).toBe("The Door");
-        expect(document.text).toContain('title="The Door"');
+        expect(session.document.cells[0].attrs.title).toBe("The Door");
+        expect(session.document.text).toContain('title="The Door"');
     });
 
     it("writes nothing when there is no cell at that index", () => {
-        const document = storyOfThreeCells();
-        new ReplaceAttributeCommand().invoke(document, {
+        const session = storyOfThreeCells();
+        new ReplaceAttributeCommand().invoke(session, {
             cellId: "nowhere",
             attributeName: "title",
             attributeValue: "Nowhere",
         });
-        expect(document.text).not.toContain("Nowhere");
+        expect(session.document.text).not.toContain("Nowhere");
     });
 });

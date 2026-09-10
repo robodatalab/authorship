@@ -19,25 +19,27 @@ beforeEach(forgetWhatTheEditorDid);
 
 describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("lists the chapters, in the order they stand in", () => {
-        const document = openStory(A_STORY_WITH_A_CONTENTS_CELL);
+        const session = openStory(A_STORY_WITH_A_CONTENTS_CELL);
 
-        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(document.cells[0].source).toBe("1. The Door\n1. The Bell");
+        expect(session.document.cells[0].source).toBe(
+            "1. The Door\n1. The Bell",
+        );
     });
 
     it("writes an untitled chapter as one", () => {
-        const document = openStory(
+        const session = openStory(
             '<!-- cell: contents id="toc" -->\n\n<!-- cell: chapter id="c1" -->\n',
         );
 
-        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(document.cells[0].source).toBe("1. Untitled");
+        expect(session.document.cells[0].source).toBe("1. Untitled");
     });
 
     it("lists a part above the chapters written under it", () => {
-        const document = openStory(`
+        const session = openStory(`
 <!-- cell: contents id="toc" -->
 
 <!-- cell: part title="Book One" id="p1" -->
@@ -49,15 +51,15 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
 <!-- cell: chapter title="The Bell" id="c2" -->
 `);
 
-        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(document.cells[0].source).toBe(
+        expect(session.document.cells[0].source).toBe(
             "1. Book One\n    1. The Door\n1. Book Two\n    1. The Bell",
         );
     });
 
     it("leaves out a part the book does not print, and the chapters under it stand alone", () => {
-        const document = openStory(`
+        const session = openStory(`
 <!-- cell: contents id="toc" -->
 
 <!-- cell: part title="Break" print="no" id="p1" -->
@@ -65,24 +67,24 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
 <!-- cell: chapter title="The Door" id="c1" -->
 `);
 
-        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(document.cells[0].source).toBe("1. The Door");
+        expect(session.document.cells[0].source).toBe("1. The Door");
     });
 
     it("writes nothing into a story with no chapters", () => {
-        const document = openStory('<!-- cell: contents id="toc" -->\n');
+        const session = openStory('<!-- cell: contents id="toc" -->\n');
 
-        new WriteTableOfContentsCommand().invoke(document, { cellId: "toc" });
+        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(document.cells[0].source).toBe("");
+        expect(session.document.cells[0].source).toBe("");
     });
 
     it("writes nothing when there is no cell at that index", () => {
-        const document = openStory(A_STORY_WITH_A_CONTENTS_CELL);
-        new WriteTableOfContentsCommand().invoke(document, {
+        const session = openStory(A_STORY_WITH_A_CONTENTS_CELL);
+        new WriteTableOfContentsCommand().invoke(session, {
             cellId: "nowhere",
         });
-        expect(document.cells[0].source).toBe("");
+        expect(session.document.cells[0].source).toBe("");
     });
 });

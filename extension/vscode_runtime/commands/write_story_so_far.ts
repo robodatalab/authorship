@@ -1,9 +1,9 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { authorFileEditorSession } from "../author_file_editor_session";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { RECAP, type AuthorDocument } from "../storydoc/model";
+import { RECAP, type ImmutableAuthorDocument } from "../storydoc/model";
 
 const DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES = "documents";
 
@@ -26,11 +26,11 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
     readonly runsCellsOfKind = RECAP;
 
     async invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
-        const cell = document.cellWithId(cellId);
+        const cell = session.document.cellWithId(cellId);
         if (!cell) {
             return;
         }
@@ -46,15 +46,15 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
             );
             return;
         }
-        const session = authorFileEditorSession(document);
+
         try {
             await vscode.workspace.fs.writeFile(
-                document.uri,
-                new TextEncoder().encode(document.text),
+                session.document.uri,
+                new TextEncoder().encode(session.document.text),
             );
             session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/recap", {
-                path: document.uri.fsPath,
+                path: session.document.uri.fsPath,
                 documents,
             });
             const storySoFar = await awaitServerJob<WrittenSection>(
@@ -62,7 +62,9 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
-            document.cellWithId(cellId)?.replaceMarkdown(storySoFar.text);
+            session?.changeTheDocument((story) =>
+                story.cellWithId(cellId)?.replaceMarkdown(storySoFar.text),
+            );
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot write the story so far — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,

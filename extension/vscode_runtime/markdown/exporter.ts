@@ -1,9 +1,11 @@
 import {
     ABOUT,
-    AuthorDocument,
+    ImmutableAuthorDocument,
+    MutableAuthorDocument,
+    MutableCell,
     BLURB,
     CHAPTER,
-    Cell,
+    ImmutableCell,
     IMAGE,
     MARKDOWN,
     NOTE,
@@ -34,7 +36,7 @@ function insideAnHtmlComment(prose: string): string {
     return `<!--\n${prose.replace(/-->/g, "--&gt;")}\n-->`;
 }
 
-function titlePageMarkdown(cell: Cell): string[] {
+function titlePageMarkdown(cell: ImmutableCell): string[] {
     const lines = [
         `${headingHashesFor(TITLE_PAGE)} ${cell.attrs.title || "Untitled"}`,
     ];
@@ -50,7 +52,7 @@ function titlePageMarkdown(cell: Cell): string[] {
     return lines;
 }
 
-function aboutTheAuthorMarkdown(cell: Cell): string[] {
+function aboutTheAuthorMarkdown(cell: ImmutableCell): string[] {
     const lines: string[] = [];
     const links = AUTHOR_LINK_ATTRIBUTES.filter(
         ([attributeName]) => cell.attrs[attributeName],
@@ -70,21 +72,21 @@ function aboutTheAuthorMarkdown(cell: Cell): string[] {
 }
 
 export function fromMarkdown(markdown: string): string {
-    const document = AuthorDocument.fromText("");
+    const document = MutableAuthorDocument.fromText("");
     for (const cell of cellsReadFromMarkdown(markdown)) {
         document.insertAt(document.cells.length, cell);
     }
     return document.text;
 }
 
-function cellsReadFromMarkdown(markdown: string): Cell[] {
-    const cells: Cell[] = [];
+function cellsReadFromMarkdown(markdown: string): MutableCell[] {
+    const cells: MutableCell[] = [];
     let proseSinceTheLastHeading: string[] = [];
 
     const closeTheProseCell = (): void => {
         const prose = proseSinceTheLastHeading.join("\n").trim();
         if (prose) {
-            cells.push(new Cell(MARKDOWN, prose, {}));
+            cells.push(new MutableCell(MARKDOWN, prose, {}));
         }
         proseSinceTheLastHeading = [];
     };
@@ -98,7 +100,7 @@ function cellsReadFromMarkdown(markdown: string): Cell[] {
         const [, hashes, headingText] = heading;
         closeTheProseCell();
         cells.push(
-            new Cell(KINDS_WRITTEN_AS_HEADINGS[hashes.length - 1], "", {
+            new MutableCell(KINDS_WRITTEN_AS_HEADINGS[hashes.length - 1], "", {
                 title: headingText.trim(),
             }),
         );
@@ -107,7 +109,7 @@ function cellsReadFromMarkdown(markdown: string): Cell[] {
     return cells;
 }
 
-export function toMarkdown(cells: Cell[]): string {
+export function toMarkdown(cells: readonly ImmutableCell[]): string {
     const manuscript: string[] = [];
     for (const cell of cells) {
         if (KINDS_WRITTEN_AS_COMMENTS.includes(cell.kind)) {

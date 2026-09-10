@@ -1,4 +1,4 @@
-import type { AuthorDocument } from "../storydoc/model";
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 
 export interface CellAttributeCondition {
     readonly attributeName: string;
@@ -13,7 +13,7 @@ export interface AuthorDocumentCommand {
     readonly drawnWhenCellAttributeIs?: CellAttributeCondition;
     readonly runsCellsOfKind?: string;
     invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void | Promise<void>;
 }

@@ -3,7 +3,7 @@ import {
     fieldsOfCellKind,
     labelOfCellKind,
 } from "../storydoc/cell_kinds";
-import type { Cell } from "../storydoc/model";
+import type { ImmutableCell } from "../storydoc/model";
 
 const NEEDS_TEXT = "text";
 
@@ -27,9 +27,9 @@ export interface BookLayoutReport {
 }
 
 export function cellsLaidOutByPlan(
-    cells: Cell[],
+    cells: readonly ImmutableCell[],
     plan: PlannedSection[],
-): Cell[] {
+): ImmutableCell[] {
     return plan.map((section) =>
         section.at === null ? blankCellOfKind(section.kind) : cells[section.at],
     );

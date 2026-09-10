@@ -1,24 +1,24 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { authorFileEditorSession } from "../author_file_editor_session";
 import { partIsPrintedInTheBook } from "../parts/manuscript_parts";
 import {
     CHAPTER,
     CONTENTS,
     PART,
-    type AuthorDocument,
-    type Cell,
+    type ImmutableAuthorDocument,
+    type ImmutableCell,
 } from "../storydoc/model";
 import { cellsBySection, type CellsInASection } from "../storydoc/sections";
 
 const UNTITLED = "Untitled";
 const UNDER_THE_PART = "    ";
 
-function contentsOf(document: AuthorDocument): string {
+function contentsOf(document: ImmutableAuthorDocument): string {
     return linesOfTheContents(cellsBySection(document.cells), "").join("\n");
 }
 
 function linesOfTheContents(
-    sections: CellsInASection<Cell>[],
+    sections: CellsInASection<ImmutableCell>[],
     indent: string,
 ): string[] {
     return sections.flatMap((section) => {
@@ -49,12 +49,13 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
     readonly runsCellsOfKind = CONTENTS;
 
     invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        document
-            .cellWithId(commandArguments.cellId as string)
-            ?.replaceMarkdown(contentsOf(document));
-        authorFileEditorSession(document)?.sendDocument();
+        session.changeTheDocument((story) =>
+            story
+                .cellWithId(commandArguments.cellId as string)
+                ?.replaceMarkdown(contentsOf(session.document)),
+        );
     }
 }

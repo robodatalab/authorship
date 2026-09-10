@@ -1,7 +1,7 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { authorFileEditorSession } from "../author_file_editor_session";
 import {
     configuredModel,
     geminiAccount,
@@ -9,7 +9,7 @@ import {
 } from "../gemini/account";
 import { fetchFromServer } from "../server/fetch";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { MARKDOWN, type AuthorDocument } from "../storydoc/model";
+import { MARKDOWN, type ImmutableAuthorDocument } from "../storydoc/model";
 
 const STYLE_FIX_STATUS = "/fix/style/status";
 
@@ -31,11 +31,11 @@ interface StyleFixJob extends ServerJob {
 }
 
 async function confirmSendingToGemini(
-    document: AuthorDocument,
+    session: AuthorFileEditorSession,
 ): Promise<boolean> {
     const send = "Send to Gemini";
     const answer = await vscode.window.showWarningMessage(
-        `Send the chapters of ${vscode.workspace.asRelativePath(document.uri)} to Google Gemini?`,
+        `Send the chapters of ${vscode.workspace.asRelativePath(session.document.uri)} to Google Gemini?`,
         {
             modal: true,
             detail:
@@ -52,19 +52,21 @@ async function confirmSendingToGemini(
 }
 
 function putCorrectedSectionsIn(
-    document: AuthorDocument,
+    session: AuthorFileEditorSession,
     corrected: CorrectedSection[],
 ): void {
     let anySectionChanged = false;
-    for (const { cellId, source } of corrected) {
-        const cell = document.cellWithId(cellId);
-        if (cell?.kind === MARKDOWN && cell.source !== source) {
-            cell.replaceMarkdown(source);
-            anySectionChanged = true;
+    session.changeTheDocument((story) => {
+        for (const { cellId, source } of corrected) {
+            const cell = story.cellWithId(cellId);
+            if (cell?.kind === MARKDOWN && cell.source !== source) {
+                cell.replaceMarkdown(source);
+                anySectionChanged = true;
+            }
         }
-    }
+    });
     if (anySectionChanged) {
-        authorFileEditorSession(document)?.sendDocument();
+        session.sendDocument();
     }
 }
 
@@ -121,7 +123,9 @@ async function sayWhyThePassStopped(
     } else if (stopped?.unauthorized) {
         await offerToSignInAgain();
     } else {
-        void vscode.window.showErrorMessage(`Cannot fix the style — ${refusal}`);
+        void vscode.window.showErrorMessage(
+            `Cannot fix the style — ${refusal}`,
+        );
     }
 }
 
@@ -135,7 +139,7 @@ export class FixStyleCommand implements AuthorDocumentCommand {
         return styleFixEnabled() ? "codicon codicon-sparkle" : "";
     }
 
-    async invoke(document: AuthorDocument): Promise<void> {
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
         if (!styleFixEnabled()) {
             return;
         }
@@ -143,26 +147,23 @@ export class FixStyleCommand implements AuthorDocumentCommand {
         if (!apiKey) {
             return;
         }
-        if (!(await confirmSendingToGemini(document))) {
+        if (!(await confirmSendingToGemini(session))) {
             return;
         }
-        await vscode.workspace.fs.writeFile(
-            document.uri,
-            new TextEncoder().encode(document.text),
-        );
+        await session.writeTheDocumentToItsFile();
         let jobId: string | undefined;
         try {
             jobId = await startServerJob("/fix/style", {
-                path: document.uri.fsPath,
+                path: session.document.uri.fsPath,
                 key: apiKey,
                 model: configuredModel(),
             });
             const pass = await awaitServerJob<StyleFixJob>(
                 STYLE_FIX_STATUS,
                 jobId,
-                (sofar) => putCorrectedSectionsIn(document, sofar.sections),
+                (sofar) => putCorrectedSectionsIn(session, sofar.sections),
             );
-            putCorrectedSectionsIn(document, pass.sections);
+            putCorrectedSectionsIn(session, pass.sections);
             sayWhichChaptersWereLeftAlone(pass.leftAlone);
         } catch (failure) {
             await sayWhyThePassStopped(jobId, failure);

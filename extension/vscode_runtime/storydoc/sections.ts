@@ -3,8 +3,9 @@ import {
     CHAPTER,
     PART,
     UNIQUE_CELL_ID,
-    type AuthorDocument,
-    type Cell,
+    type ImmutableAuthorDocument,
+    type ImmutableCell,
+    MutableAuthorDocument,
 } from "./model";
 
 export interface CellOfADocument {
@@ -55,7 +56,10 @@ export function cellsBySection<CellInTheDocument extends CellOfADocument>(
         ) {
             openSections.pop();
         }
-        const section: CellsInASection<CellInTheDocument> = { cell, within: [] };
+        const section: CellsInASection<CellInTheDocument> = {
+            cell,
+            within: [],
+        };
         (openSections[openSections.length - 1]?.within ?? wholeDocument).push(
             section,
         );
@@ -94,29 +98,38 @@ export function whereACellStands<CellInTheDocument extends CellOfADocument>(
 }
 
 function endOfSection(
-    document: AuthorDocument,
-    section: CellsInASection<Cell>,
+    document: ImmutableAuthorDocument,
+    section: CellsInASection<ImmutableCell>,
 ): number {
     return (
-        document.cells.indexOf(section.cell) +
+        whereTheCellStands(document, section.cell) +
         cellsWithinASection(section).length
     );
 }
 
+function whereTheCellStands(
+    document: ImmutableAuthorDocument,
+    cell: ImmutableCell,
+): number {
+    return document.cells.findIndex(
+        (inTheDocument) => inTheDocument.uniqueId === cell.uniqueId,
+    );
+}
+
 function moveSection(
-    document: AuthorDocument,
-    section: CellsInASection<Cell>,
+    document: MutableAuthorDocument,
+    section: CellsInASection<ImmutableCell>,
     lands: number,
 ): void {
     document.moveCellsAt(
-        document.cells.indexOf(section.cell),
+        whereTheCellStands(document, section.cell),
         cellsWithinASection(section).length,
         lands,
     );
 }
 
 export function moveTheSectionUp(
-    document: AuthorDocument,
+    document: MutableAuthorDocument,
     cellId: string,
 ): void {
     const standing = whereACellStands(cellsBySection(document.cells), cellId);
@@ -127,12 +140,16 @@ export function moveTheSectionUp(
     const goesBefore =
         among[among.indexOf(section) - 1] ?? under[under.length - 1];
     if (goesBefore) {
-        moveSection(document, section, document.cells.indexOf(goesBefore.cell));
+        moveSection(
+            document,
+            section,
+            whereTheCellStands(document, goesBefore.cell),
+        );
     }
 }
 
 export function moveTheSectionDown(
-    document: AuthorDocument,
+    document: MutableAuthorDocument,
     cellId: string,
 ): void {
     const standing = whereACellStands(cellsBySection(document.cells), cellId);
@@ -157,7 +174,7 @@ export function moveTheSectionDown(
 }
 
 export function removeTheSection(
-    document: AuthorDocument,
+    document: MutableAuthorDocument,
     cellId: string,
 ): void {
     const standing = whereACellStands(cellsBySection(document.cells), cellId);
@@ -165,7 +182,7 @@ export function removeTheSection(
         return;
     }
     document.removeCellsAt(
-        document.cells.indexOf(standing.section.cell),
+        whereTheCellStands(document, standing.section.cell),
         cellsWithinASection(standing.section).length,
     );
 }

@@ -24,19 +24,20 @@ import {
 import {
     AUTHOR_FILE_EXTENSION,
     CHAPTER,
-    Cell,
+    ImmutableCell,
+    MutableCell,
     IMAGE,
     PART,
     TITLE_PAGE,
 } from "../storydoc/model";
 
-export function partIsPrintedInTheBook(cell: Cell): boolean {
+export function partIsPrintedInTheBook(cell: ImmutableCell): boolean {
     return cell.attrs.print !== "no";
 }
 
 /** A chapter and the cells written under it. */
 export interface Section {
-    cells: Cell[];
+    cells: ImmutableCell[];
     /**
      * What the story calls the part this section stands in, or '' where it stands
      * in none.
@@ -63,8 +64,8 @@ export interface Part {
  * after the last chapter is still after the last chapter in every part.
  */
 export interface Furniture {
-    front: Cell[];
-    back: Cell[];
+    front: ImmutableCell[];
+    back: ImmutableCell[];
 }
 
 /**
@@ -87,7 +88,7 @@ export interface Furniture {
  * neither. An aside is the exception: it was written about the passage it stands
  * beside, so it goes wherever that passage goes.
  */
-export function sectionsOf(cells: readonly Cell[]): Section[] {
+export function sectionsOf(cells: readonly ImmutableCell[]): Section[] {
     const sections: Section[] = [];
     // A part waits here for the chapter it names, and so does anything written
     // between the two: they are the head of that section and not the tail of the
@@ -132,13 +133,13 @@ export function sectionsOf(cells: readonly Cell[]): Section[] {
 }
 
 /** What stands before the story and what stands after it. */
-export function furnitureOf(cells: readonly Cell[]): Furniture {
+export function furnitureOf(cells: readonly ImmutableCell[]): Furniture {
     const opens = cells.findIndex((cell) => cell.kind === CHAPTER);
     // A story with no chapters has nothing for furniture to stand behind.
     const story = opens < 0 ? cells.length : opens;
     const opening = picturesTheStoryOpensWith(cells);
-    const front: Cell[] = [];
-    const back: Cell[] = [];
+    const front: ImmutableCell[] = [];
+    const back: ImmutableCell[] = [];
 
     cells.forEach((cell, at) => {
         if (at < opening || isFrontOrBackMatter(cell.kind)) {
@@ -148,7 +149,7 @@ export function furnitureOf(cells: readonly Cell[]): Furniture {
     return { front, back };
 }
 
-function picturesTheStoryOpensWith(cells: readonly Cell[]): number {
+function picturesTheStoryOpensWith(cells: readonly ImmutableCell[]): number {
     let opening = 0;
     while (cells[opening]?.kind === IMAGE) {
         opening += 1;
@@ -209,7 +210,7 @@ export function partCells(
     furniture: Furniture,
     number: number,
     part: Part,
-): Cell[] {
+): ImmutableCell[] {
     return [
         ...furniture.front,
         ...part.sections.flatMap((section) => section.cells),
@@ -225,9 +226,13 @@ export function partCells(
  * picture names its art relative to the file naming it, so a part — which sits a
  * folder deeper than the story — has to name it from where it now stands.
  */
-function carried(cell: Cell, number: number, under: string): Cell {
+function carried(
+    cell: ImmutableCell,
+    number: number,
+    under: string,
+): ImmutableCell {
     if (cell.kind === TITLE_PAGE) {
-        return new Cell(cell.kind, cell.source, {
+        return new MutableCell(cell.kind, cell.source, {
             ...cell.attrs,
             title: partTitle(cell.attrs.title ?? "", number, under),
         });
@@ -243,13 +248,13 @@ function carried(cell: Cell, number: number, under: string): Cell {
  * A path that already climbs out of the folder is climbed one further, which is
  * right for the same reason: it was written from where the story stands.
  */
-function fromTheFolder(cell: Cell): Cell {
+function fromTheFolder(cell: ImmutableCell): ImmutableCell {
     const src = cell.attrs.src ?? "";
     // An absolute path and a URL both already say where they are from.
     if (src === "" || src.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(src)) {
         return cell;
     }
-    return new Cell(cell.kind, cell.source, {
+    return new MutableCell(cell.kind, cell.source, {
         ...cell.attrs,
         src: `../${src}`,
     });
