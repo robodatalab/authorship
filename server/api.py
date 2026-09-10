@@ -205,6 +205,7 @@ class EpubExportRequest(BaseModel):
     # title page, its cover, its disclaimer, where to find the author — is in
     # the document's own cells.
     path: str
+    text: str
     # Bind the book though sections of it are missing or empty. The author has
     # been shown what is wanting and asked for the file anyway, which is theirs
     # to ask for; nothing else may skip the reading.
@@ -250,7 +251,7 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     said. `force` is how the author, having been shown what is missing, says they
     want the file regardless.
     """
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     found = report_of(document)
     if not (found.ready or request.force):
         return _said(found)
@@ -350,6 +351,7 @@ class WritingJob(Job):
 class BlurbRequest(BaseModel):
     # Path of the document to write a blurb for.
     path: str
+    text: str
 
 
 class BlurbJob(WritingJob):
@@ -369,6 +371,7 @@ class BlurbJob(WritingJob):
 class RecapRequest(BaseModel):
     # Path of the document the recap is being written into.
     path: str
+    text: str
     # The earlier documents to summarise, named relative to that one. Resolved
     # and ordered here rather than by the editor: which file a relative path
     # means is a question about the disk, and the order they are read in is a
@@ -393,7 +396,7 @@ class RecapJob(WritingJob):
 @app.post("/generate/blurb", status_code=202)
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     """Start writing the story's blurb; poll /generate/status for it."""
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     job = BlurbJob(app.state.causal_model, document)
     app.state.jobs.start(job)
     return {"id": job.target}
@@ -409,7 +412,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
     of gets the story in the order it happened. A path named twice is one
     document, and is read once.
     """
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     if not request.documents:
         raise HTTPException(
             status_code=400,
@@ -536,6 +539,7 @@ def gemini_models(request: GeminiKeyRequest) -> dict[str, Any]:
 class StyleFixRequest(BaseModel):
     # Path of the document to correct.
     path: str
+    text: str
     # The author's Gemini key. Omitted, the environment is asked — which is how a
     # server somebody started themselves is given one.
     key: str | None = None
@@ -631,7 +635,7 @@ def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
             status_code=401,
             detail="Sign in to Gemini to correct the style of a manuscript.",
         )
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     job = StyleFixJob(key, configured_model(request.model), document)
     app.state.jobs.start(job)
     return {"id": job.target}
@@ -678,11 +682,10 @@ class ProseCheckRequest(BaseModel):
     # it — the text comes with the request — since a job is keyed by the document
     # it is about.
     path: str
-    # The document as the author has it. A check only reads, so unlike every
-    # other job here it has no need of the file: asked for the text, it can
-    # report on a paragraph that has not been saved and never asks the editor to
-    # save one on its behalf.
-    text: str | None = None
+    # The document as the author has it, as every job here is given it: the
+    # editor holds the document, so a check reads what the author sees rather
+    # than what was last saved, and never asks for a save on its behalf.
+    text: str
     # The lines to check. Omitted, the whole document is checked — which is what
     # turning the checks on asks for; a passage is what the paragraph under an
     # edit asks for.
@@ -846,11 +849,7 @@ def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
     the second is not a lesser kind of the first and returns findings of exactly
     the same shape.
     """
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
@@ -888,11 +887,7 @@ def check_grammar(request: ProseCheckRequest) -> dict[str, Any]:
     the other is not. The editor draws what the rules found while this is still
     reading.
     """
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
@@ -957,7 +952,7 @@ class SpanFixRequest(BaseModel):
     # Path of the document the fault is in.
     path: str
     # The document as the author has it, for the same reason a check is given it.
-    text: str | None = None
+    text: str
     where: Span
     # What found the fault, which is also what will judge the answer.
     rule: str
@@ -1073,11 +1068,7 @@ def fix_span(request: SpanFixRequest) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail="A fault is fixed a line at a time."
         )
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     if request.where.at.line >= len(document.lines):
         raise HTTPException(status_code=400, detail="There is no such line.")
     job = SpanFixJob(

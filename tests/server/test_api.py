@@ -210,8 +210,9 @@ class Jobs(unittest.TestCase):
         super().setUp()
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
-        self.manuscript = Path(self._dir.name) / "story.md"
-        self.manuscript.write_text("## One\n\nteh cat.\n", encoding="utf-8")
+        self.manuscript = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        self.written = storydoc.dumps([storydoc.markdown("teh cat.")])
+        self.manuscript.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
             app.state.grammar_model = None
@@ -234,7 +235,7 @@ class Jobs(unittest.TestCase):
         client = TestClient(app)
 
         started = client.post(
-            "/fix/grammar", json={"path": str(self.manuscript), "line": 0}
+            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
         )
         self.assertTrue(entered.acquire(timeout=5))
 
@@ -275,7 +276,7 @@ class Jobs(unittest.TestCase):
         client = TestClient(app)
 
         started = client.post(
-            "/fix/grammar", json={"path": str(self.manuscript), "line": 0}
+            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
         )
         self.assertTrue(entered.acquire(timeout=5))
 
@@ -305,9 +306,7 @@ class Jobs(unittest.TestCase):
         self.assertIsNone(status["error"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
         # A correction half done is not written: the file is as it was.
-        self.assertEqual(
-            self.manuscript.read_text(), "## One\n\nteh cat.\n"
-        )
+        self.assertEqual(self.manuscript.read_text(), self.written)
 
     def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
         client = TestClient(app)
@@ -358,7 +357,10 @@ class GenerateBlurb(unittest.TestCase):
 
     def test_runs_as_a_job_and_hands_the_blurb_back(self) -> None:
         client = TestClient(app)
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertEqual(started.status_code, 202)
 
         status = wait_for_writing(client, started.json()["id"])
@@ -371,23 +373,21 @@ class GenerateBlurb(unittest.TestCase):
         # The blurb comes back for the editor to place; a job that wrote it into
         # the file would be writing a cell the editor owns.
         client = TestClient(app)
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         wait_for_writing(client, started.json()["id"])
         self.assertEqual(self.document.read_text(), self.written)
 
     def test_is_dropped_from_the_work_in_hand_once_it_has_finished(self) -> None:
         client = TestClient(app)
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         wait_for_writing(client, started.json()["id"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
-
-    def test_a_missing_document_is_a_bad_request(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/generate/blurb",
-            json={"path": str(self.document.with_name("nope.author"))},
-        )
-        self.assertEqual(response.status_code, 400)
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
         client = TestClient(app)
@@ -408,7 +408,10 @@ class GenerateBlurb(unittest.TestCase):
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
 
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertTrue(entered.acquire(timeout=5))
 
         status = client.get(
@@ -437,7 +440,10 @@ class GenerateBlurb(unittest.TestCase):
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
 
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertTrue(entered.acquire(timeout=5))
 
         cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
@@ -465,7 +471,10 @@ class GenerateBlurb(unittest.TestCase):
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
 
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertTrue(entered.acquire(timeout=5))
         client.post("/jobs/cancel", json={"path": str(self.document)})
         release.set()
@@ -485,7 +494,10 @@ class GenerateBlurb(unittest.TestCase):
         # The click and the last chapter can land in either order, and an author
         # who pressed stop wanted a job that is not running.
         client = TestClient(app)
-        started = client.post("/generate/blurb", json={"path": str(self.document)})
+        started = client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         wait_for_writing(client, started.json()["id"])
 
         cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
@@ -542,7 +554,11 @@ class GenerateRecap(unittest.TestCase):
     def start(self, *documents: str):
         return TestClient(app).post(
             "/generate/recap",
-            json={"path": str(self.document), "documents": list(documents)},
+            json={
+                "path": str(self.document),
+                "text": self.document.read_text(),
+                "documents": list(documents),
+            },
         )
 
     def test_runs_as_a_job_and_hands_the_story_so_far_back(self) -> None:
@@ -659,7 +675,10 @@ class ExportEpub(unittest.TestCase):
     def test_writes_the_epub_beside_the_document(self) -> None:
         self._ready()
         client = TestClient(app)
-        response = client.post("/export/epub", json={"path": str(self.document)})
+        response = client.post(
+            "/export/epub",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ready"])
 
@@ -672,7 +691,10 @@ class ExportEpub(unittest.TestCase):
         # The document written in setUp has a title page and nothing else: no
         # blurb, no author page, and a title page with one field on it.
         client = TestClient(app)
-        response = client.post("/export/epub", json={"path": str(self.document)})
+        response = client.post(
+            "/export/epub",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertEqual(response.status_code, 200)
 
         said = response.json()
@@ -683,7 +705,8 @@ class ExportEpub(unittest.TestCase):
     def test_it_says_what_is_missing_rather_than_only_refusing(self) -> None:
         client = TestClient(app)
         said = client.post(
-            "/export/epub", json={"path": str(self.document)}
+            "/export/epub",
+            json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
             said["added"], [storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
@@ -699,7 +722,12 @@ class ExportEpub(unittest.TestCase):
     def test_force_binds_a_book_that_is_not_ready(self) -> None:
         client = TestClient(app)
         response = client.post(
-            "/export/epub", json={"path": str(self.document), "force": True}
+            "/export/epub",
+            json={
+                "path": str(self.document),
+                "text": self.document.read_text(),
+                "force": True,
+            },
         )
         self.assertEqual(response.status_code, 200)
 
@@ -770,7 +798,13 @@ class FixStyle(unittest.TestCase):
     def start(self, **asked: object) -> dict:
         client = TestClient(app)
         started = client.post(
-            "/fix/style", json={"path": str(self.document), "key": "k", **asked}
+            "/fix/style",
+            json={
+                "path": str(self.document),
+                "text": self.document.read_text(),
+                "key": "k",
+                **asked,
+            },
         )
         self.assertEqual(started.status_code, 202)
         return wait_for_style(client, started.json()["id"])
@@ -803,13 +837,19 @@ class FixStyle(unittest.TestCase):
 
     def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
         client = TestClient(app)
-        response = client.post("/fix/style", json={"path": str(self.document)})
+        response = client.post(
+            "/fix/style",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertEqual(response.status_code, 401)
 
     def test_the_environment_answers_for_a_server_somebody_started(self) -> None:
         with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "from-the-shell"}):
             client = TestClient(app)
-            started = client.post("/fix/style", json={"path": str(self.document)})
+            started = client.post(
+            "/fix/style",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
         self.assertEqual(started.status_code, 202)
         wait_for_style(client, started.json()["id"])
         self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
@@ -827,14 +867,6 @@ class FixStyle(unittest.TestCase):
         self.assertEqual(len(status["leftAlone"]), 1)
         self.assertEqual(status["leftAlone"][0]["chapter"], "One")
         self.assertIn("mid-sentence", status["leftAlone"][0]["why"])
-
-    def test_a_missing_document_is_a_bad_request(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/fix/style",
-            json={"path": str(self.document.with_name("nope.author")), "key": "k"},
-        )
-        self.assertEqual(response.status_code, 400)
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
         client = TestClient(app)

@@ -21,7 +21,7 @@ beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("WriteBlurbCommand — writes the blurb", () => {
-    it("saves the document, asks the server for a blurb, and writes what came back", async () => {
+    it("asks the server for a blurb and writes what came back, leaving the file alone", async () => {
         const asked: { url: string; body: unknown }[] = [];
         let chaptersRead = 0;
         vi.stubGlobal("fetch", (url: string, sent?: { body: string }) => {
@@ -44,12 +44,16 @@ describe("WriteBlurbCommand — writes the blurb", () => {
         });
 
         const session = openStory(A_STORY_WITH_A_BLURB_CELL);
+        const asItStoodWhenAsked = session.document.text;
 
         await new WriteBlurbCommand().invoke(session, { cellId: "b1" });
 
-        expect(files.get(STORY_FILE)).toContain("She saw the door.");
+        expect(files.get(STORY_FILE)).toBeUndefined();
         expect(asked[0].url).toContain("/generate/blurb");
-        expect(asked[0].body).toEqual({ path: STORY_FILE });
+        expect(asked[0].body).toEqual({
+            path: STORY_FILE,
+            text: asItStoodWhenAsked,
+        });
         expect(asked[1].url).toContain("/generate/status?id=job-1");
         expect(session.document.cells[0].source).toBe(
             "A woman loses her name.",

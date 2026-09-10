@@ -125,11 +125,13 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
         });
 
         const session = openStory(A_STORY_OF_TWO_CHAPTERS);
+        const asItStoodWhenAsked = session.document.text;
         await new FixStyleCommand().invoke(session);
 
         expect(asked[0].url).toContain("/fix/style");
         expect(asked[0].body).toEqual({
             path: STORY_FILE,
+            text: asItStoodWhenAsked,
             key: "AIza-the-authors-own",
             model: "gemini-flash",
         });

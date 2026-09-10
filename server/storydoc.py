@@ -99,25 +99,28 @@ class Cell:
 def parse(text: str) -> list[Cell]:
     cells: list[Cell] = []
     kind, attrs, body, first = MARKDOWN, {}, [], 0
+    opened = False
 
     def close() -> None:
         # `dumps` strips blank lines off both ends of a cell's text, so the lines
         # it occupies are the ones between the outermost non-blank ones.
         written = [i for i, line in enumerate(body) if line != ""]
         source = "\n".join(body).strip("\n")
-        # The run of text above the first marker is only a cell if the author
-        # wrote something there; a document that opens with a marker does not
-        # start with an empty one.
-        if source or cells or attrs or kind != MARKDOWN:
+        # A marker opens a cell, so the run of text above the first one belongs
+        # to no cell and is dropped — as the editor's reader drops it.
+        if opened:
             at = (first + written[0], first + written[-1]) if written else None
             cells.append(Cell(kind, source, dict(attrs), at))
 
-    for index, line in enumerate(text.splitlines()):
+    # Split on "\n" alone, as the editor's reader does: a form feed or a
+    # U+2028 is a character the author wrote, not a line the document has.
+    for index, line in enumerate(text.split("\n")):
         marker = _MARKER.match(line)
         if not marker:
             body.append(line)
             continue
         close()
+        opened = True
         kind = marker.group(1)
         attrs = _read_attrs(marker.group(2))
         body = []

@@ -150,11 +150,11 @@ export class FixStyleCommand implements AuthorDocumentCommand {
         if (!(await confirmSendingToGemini(session))) {
             return;
         }
-        await session.writeTheDocumentToItsFile();
         let jobId: string | undefined;
         try {
             jobId = await startServerJob("/fix/style", {
                 path: session.document.uri.fsPath,
+                text: session.document.text,
                 key: apiKey,
                 model: configuredModel(),
             });

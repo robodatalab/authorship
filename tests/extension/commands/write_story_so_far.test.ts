@@ -34,12 +34,14 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
         });
 
         const session = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
+        const asItStoodWhenAsked = session.document.text;
 
         await new WriteStorySoFarCommand().invoke(session, { cellId: "r1" });
 
         expect(asked[0].url).toContain("/generate/recap");
         expect(asked[0].body).toEqual({
             path: STORY_FILE,
+            text: asItStoodWhenAsked,
             documents: ["parts/part_1.author", "parts/part_2.author"],
         });
         expect(session.document.cells[0].source).toBe("She had lost her name.");
