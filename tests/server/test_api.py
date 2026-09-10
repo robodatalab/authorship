@@ -107,102 +107,15 @@ class Memory(unittest.TestCase):
         self.assertEqual(body["process"], 0.3)
 
 
-def wait_for_grammar(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
+    """The finished answer of whichever section is being written for a document."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        response = client.get("/fix/grammar/status", params={"id": job_id})
+        response = client.get("/generate/status", params={"id": job_id})
         if response.status_code == 200 and not response.json()["running"]:
             return response.json()
         time.sleep(0.005)
-    raise AssertionError(f"grammar job {job_id} did not finish within {timeout}s")
-
-
-class GrammarFix(unittest.TestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self._dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._dir.cleanup)
-        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = storydoc.dumps(
-            [
-                storydoc.chapter("One"),
-                storydoc.markdown("teh cat."),
-                storydoc.chapter("Two"),
-                storydoc.markdown("teh dog."),
-            ]
-        )
-        self.document.write_text(self.written, encoding="utf-8")
-
-        def _restore_model():
-            app.state.grammar_model = None
-
-        self.addCleanup(_restore_model)
-
-        app.state.grammar_model = build_fake_completion_model(reply="the cat.")
-        app.state.jobs = ParallelJobsManager()
-
-    def test_corrects_the_section_the_cursor_is_in_and_leaves_the_rest(self) -> None:
-        client = TestClient(app)
-        started = client.post(
-            "/fix/grammar", json={"path": str(self.document), "line": 4}
-        )
-        self.assertEqual(started.status_code, 202)
-
-        status = wait_for_grammar(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(
-            self.document.read_text(),
-            self.written.replace("teh cat.", "the cat."),
-        )
-
-    def test_corrects_the_selected_lines_rather_than_the_section_around_them(
-        self,
-    ) -> None:
-        client = TestClient(app)
-        started = client.post(
-            "/fix/grammar",
-            json={
-                "path": str(self.document),
-                "line": 10,
-                "selection": {"start": 10, "end": 10},
-            },
-        )
-        self.assertEqual(started.status_code, 202)
-
-        status = wait_for_grammar(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(
-            self.document.read_text(),
-            self.written.replace("teh dog.", "the cat."),
-        )
-
-    def test_a_selection_of_blank_lines_has_nothing_to_correct(self) -> None:
-        # Where a section ends is the server's to say, and so is whether there is
-        # prose in it — which it only knows once the job has the document open.
-        client = TestClient(app)
-        started = client.post(
-            "/fix/grammar",
-            json={
-                "path": str(self.document),
-                "line": 3,
-                "selection": {"start": 3, "end": 3},
-            },
-        )
-        self.assertEqual(started.status_code, 202)
-
-        status = wait_for_grammar(client, started.json()["id"])
-        self.assertEqual(status["error"], "There is no prose there to correct.")
-        self.assertEqual(
-            self.document.read_text(), self.written
-        )
-
-    def test_a_missing_document_is_a_bad_request(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/fix/grammar",
-            json={"path": str(self.document.with_name("nope.author")), "line": 0},
-        )
-        self.assertEqual(response.status_code, 400)
+    raise AssertionError(f"writing job {job_id} did not finish within {timeout}s")
 
 
 class Jobs(unittest.TestCase):
@@ -211,11 +124,17 @@ class Jobs(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.manuscript = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = storydoc.dumps([storydoc.markdown("teh cat.")])
+        self.written = storydoc.dumps(
+            [
+                storydoc.chapter("One"),
+                storydoc.markdown("The lantern had gone out."),
+                storydoc.Cell(storydoc.BLURB),
+            ]
+        )
         self.manuscript.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
-            app.state.grammar_model = None
+            app.state.causal_model = None
 
         self.addCleanup(_restore_model)
         app.state.jobs = ParallelJobsManager()
@@ -231,11 +150,12 @@ class Jobs(unittest.TestCase):
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
-        app.state.grammar_model = model
+        app.state.causal_model = model
         client = TestClient(app)
 
         started = client.post(
-            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
+            "/generate/blurb",
+            json={"path": str(self.manuscript), "text": self.written},
         )
         self.assertTrue(entered.acquire(timeout=5))
 
@@ -246,7 +166,7 @@ class Jobs(unittest.TestCase):
             {
                 "jobs": [
                     {
-                        "kind": "grammar fix",
+                        "kind": "blurb",
                         "path": str(self.manuscript),
                         "status": "running",
                         "cancelled": False,
@@ -256,12 +176,12 @@ class Jobs(unittest.TestCase):
         )
 
         release.set()
-        wait_for_grammar(client, started.json()["id"])
+        wait_for_writing(client, started.json()["id"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
 
     def test_any_job_can_be_stopped_and_says_so_while_it_finishes(self) -> None:
-        # Cancelling belongs to the jobs framework rather than to any one tool:
-        # what the drawer stops is a job, and this one writes no blurbs.
+        # Cancelling belongs to the jobs framework rather than to any one tool,
+        # so what is watched here is a job being stopped rather than a blurb.
         entered = threading.Semaphore(0)
         release = threading.Event()
 
@@ -272,11 +192,12 @@ class Jobs(unittest.TestCase):
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
-        app.state.grammar_model = model
+        app.state.causal_model = model
         client = TestClient(app)
 
         started = client.post(
-            "/fix/grammar", json={"path": str(self.manuscript), "line": 2}
+            "/generate/blurb",
+            json={"path": str(self.manuscript), "text": self.written},
         )
         self.assertTrue(entered.acquire(timeout=5))
 
@@ -292,7 +213,7 @@ class Jobs(unittest.TestCase):
             {
                 "jobs": [
                     {
-                        "kind": "grammar fix",
+                        "kind": "blurb",
                         "path": str(self.manuscript),
                         "status": "running",
                         "cancelled": True,
@@ -302,11 +223,9 @@ class Jobs(unittest.TestCase):
         )
 
         release.set()
-        status = wait_for_grammar(client, started.json()["id"])
+        status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
-        # A correction half done is not written: the file is as it was.
-        self.assertEqual(self.manuscript.read_text(), self.written)
 
     def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
         client = TestClient(app)
@@ -314,17 +233,6 @@ class Jobs(unittest.TestCase):
             "/jobs/cancel", json={"path": str(self.manuscript)}
         )
         self.assertEqual(response.status_code, 404)
-
-
-def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
-    """The finished answer of whichever section is being written for a document."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = client.get("/generate/status", params={"id": job_id})
-        if response.status_code == 200 and not response.json()["running"]:
-            return response.json()
-        time.sleep(0.005)
-    raise AssertionError(f"writing job {job_id} did not finish within {timeout}s")
 
 
 class GenerateBlurb(unittest.TestCase):

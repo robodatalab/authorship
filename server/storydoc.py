@@ -327,11 +327,6 @@ class Document:
     def load(cls, path: Path) -> "Document":
         return cls(path.read_text(encoding="utf-8"), path)
 
-    def save(self, path: Path | None = None) -> None:
-        target = path or self.path
-        assert target is not None
-        target.write_text(self.text, encoding="utf-8")
-
     @property
     def title(self) -> str:
         """What the book is called, which only the title page says."""

@@ -13,7 +13,6 @@ from server.publishing import authorship
 from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.recap import write_recap
-from server.writing_tools.grammar import correct_span
 from server.writing_tools import grammar_check, prose_check, style
 from server.writing_tools.gemini import (
     Gemini,
@@ -25,7 +24,7 @@ from vramen import (
     CausalModel,
     InferenceModelResourceManager,
     Seq2SeqModel,
-    coedit_prompt, machine_memory, qwen_chat_prompt
+    machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
@@ -34,7 +33,6 @@ from server.storydoc import Document
 _log = log.logger(__name__)
 
 
-GRAMMAR_MODEL = "grammarly/coedit-xl"
 
 # Grammar as a check rather than as a rewrite. A minimal-edit corrector: trained
 # to change as little as will make a sentence grammatical, which is the only kind
@@ -49,7 +47,6 @@ GEC_MODEL = "Unbabel/gec-t5_small"
 CAUSAL_MODEL = "Qwen/Qwen3-8B"
 
 # What the model was measured holding over a single batch, and what it is allowed.
-GRAMMAR_MODEL_GB = 5.0
 GEC_MODEL_GB = 1.0
 CAUSAL_MODEL_GB = 17.0
 MEMORY_QUOTA_GB = 24.0
@@ -58,9 +55,6 @@ MEMORY_QUOTA_GB = 24.0
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager(MEMORY_QUOTA_GB)
-    app.state.grammar_model = Seq2SeqModel(
-        GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
-    )
     app.state.causal_model = CausalModel(
         CAUSAL_MODEL, qwen_chat_prompt, app.state.models, CAUSAL_MODEL_GB
     )
@@ -68,7 +62,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         GEC_MODEL, grammar_check.gec_prompt, app.state.models, GEC_MODEL_GB
     )
     app.state.inference_models = [
-        app.state.grammar_model,
         app.state.causal_model,
         app.state.gec_model,
     ]
@@ -131,31 +124,6 @@ def _document(path: str) -> Document:
     if not target.is_file():
         raise HTTPException(status_code=400, detail=f"No such document: {path}")
     return Document.load(target)
-
-
-class GrammarFixJob(Job):
-    kind = "grammar fix"
-
-    def __init__(
-        self, model: Seq2SeqModel, document: Document, start: int, end: int
-    ) -> None:
-        super().__init__(str(document.path))
-        self._model = model
-        self._document = document
-        self._start = start
-        self._end = end
-
-    def execute(self) -> None:
-        correct_span(
-            self._model,
-            self._document,
-            self._start,
-            self._end,
-            lambda: self.cancelled,
-        )
-        if not self.cancelled:
-            self._document.save()
-
 
 
 @app.get("/jobs")
@@ -258,54 +226,6 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     out_path = document.beside(".epub")
     build_epub(document, out_path)
     return {**_said(found), "path": str(out_path)}
-
-
-class LineSelection(BaseModel):
-    # 0-based and inclusive.
-    start: int
-    end: int
-
-
-class GrammarFixRequest(BaseModel):
-    # Path of the document to correct.
-    path: str
-    # Where the cursor is.
-    line: int
-    # The lines the author selected, if they selected any.
-    selection: LineSelection | None = None
-
-
-@app.post("/fix/grammar", status_code=202)
-def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Start correcting a passage; poll /fix/grammar/status for the end of it.
-
-    A pass is over what the author is working on rather than the whole
-    document: the lines they selected, or — having selected none — the cell their
-    cursor is in. Where a cell ends is the server's to say, so the request
-    carries the cursor rather than a span it worked out for itself.
-    """
-    document = _document(request.path)
-    if request.selection:
-        start, end = request.selection.start, request.selection.end
-    else:
-        where = document.lines_at(request.line)
-        if where is None:
-            raise HTTPException(
-                status_code=400, detail="There is no prose there to correct."
-            )
-        start, end = where
-    job = GrammarFixJob(app.state.grammar_model, document, start, end)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/fix/grammar/status")
-def fix_grammar_status(id: str) -> dict[str, Any]:
-    """Whether the grammar job is still running; the document is its result."""
-    job = app.state.jobs.get(id)
-    if not isinstance(job, GrammarFixJob):
-        raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
-    return {"running": not job.done, "error": job.error}
 
 
 # --- writing a section from the story ------------------------------------
@@ -675,6 +595,12 @@ def fix_style_status(id: str) -> dict[str, Any]:
 # job in this file, and is why its target is the passage rather than the
 # document: two passages can be read at once, and a paragraph re-read after an
 # edit must not cancel the pass over the rest of the book.
+
+
+class LineSelection(BaseModel):
+    # 0-based and inclusive.
+    start: int
+    end: int
 
 
 class ProseCheckRequest(BaseModel):
