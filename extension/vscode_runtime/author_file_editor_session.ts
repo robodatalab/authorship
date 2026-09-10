@@ -21,19 +21,16 @@ export class AuthorFileEditorSession
     private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
 
-    private documentAsItStands: ImmutableAuthorDocument;
-
     private panel: vscode.WebviewPanel | undefined;
 
-    constructor(private readonly theDocument: MutableAuthorDocument) {
-        this.documentAsItStands = theDocument.toImmutable();
+    constructor(private documentAsItStands: ImmutableAuthorDocument) {
         this.synchronizer = new AuthorDocSynchronizer(this.proseErrors);
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
         this.wordCounter.synchronize(this.documentAsItStands);
     }
 
     get uri(): vscode.Uri {
-        return this.theDocument.uri;
+        return this.documentAsItStands.uri;
     }
 
     dispose(): void {}
@@ -52,32 +49,34 @@ export class AuthorFileEditorSession
     }
 
     importDocumentFromText(text: string): void {
-        this.changeTheDocument((document) => document.fromText(text));
+        this.documentAsItStands = new ImmutableAuthorDocument(this.uri, text);
+        this.synchronizeTheRepresentations();
     }
 
     changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
-        change(this.theDocument);
-        this.documentAsItStands = this.theDocument.toImmutable();
+        const documentBeingChanged = new MutableAuthorDocument(
+            this.uri,
+            this.documentAsItStands.text,
+        );
+        change(documentBeingChanged);
+        this.documentAsItStands = documentBeingChanged.toImmutable();
         this.synchronizeTheRepresentations();
     }
 
     async writeTheDocumentToItsFile(): Promise<void> {
-        await vscode.workspace.fs.writeFile(
-            this.theDocument.uri,
-            new TextEncoder().encode(this.theDocument.text),
-        );
+        await this.writeTheDocumentTo(this.uri);
     }
 
     async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
         await vscode.workspace.fs.writeFile(
             destination,
-            new TextEncoder().encode(this.theDocument.text),
+            new TextEncoder().encode(this.documentAsItStands.text),
         );
     }
 
     async readTheDocumentBackFromItsFile(): Promise<void> {
-        const bytes = await vscode.workspace.fs.readFile(this.theDocument.uri);
-        this.theDocument.fromText(new TextDecoder().decode(bytes));
+        const bytes = await vscode.workspace.fs.readFile(this.uri);
+        this.importDocumentFromText(new TextDecoder().decode(bytes));
     }
 
     showProseErrors(proseErrors: ProseCheckError[]): void {
@@ -132,7 +131,7 @@ export class AuthorFileEditorSession
         this.synchronizeTheRepresentations();
         void this.panel?.webview.postMessage({
             type: "document",
-            cells: this.theDocument.cells.map((cell) => ({
+            cells: this.documentAsItStands.cells.map((cell) => ({
                 kind: cell.kind,
                 source: cell.source,
                 attrs: cell.attrs,
@@ -147,5 +146,7 @@ export function openAuthorFileEditorSession(
     uri: vscode.Uri,
     text: string,
 ): AuthorFileEditorSession {
-    return new AuthorFileEditorSession(new MutableAuthorDocument(uri, text));
+    return new AuthorFileEditorSession(
+        new ImmutableAuthorDocument(uri, text),
+    );
 }
