@@ -10,7 +10,6 @@ import {
 import {
     AnAuthorDocumentCommandWasInvoked,
     ReadTheDocumentBackFromItsFile,
-    TheFileChangedUnderneath,
     ThePageIsReady,
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
@@ -18,6 +17,7 @@ import {
 import { authorDocumentCommandCards } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
 import { loadTemplates, watchSettings } from "./settings/file";
+import { watchTheAuthorFileForChanges } from "./storydoc/author_file_watcher";
 import { useTemplates } from "./settings/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorFileEditorSession> {
@@ -116,28 +116,15 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             },
         );
 
-        const fileWatcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(
-                vscode.Uri.joinPath(session.uri, ".."),
-                session.uri.path.split("/").pop() ?? "",
-            ),
+        const watchingTheFile = watchTheAuthorFileForChanges(
+            session,
+            documentChangesMessageQueue,
         );
-        const savedElsewhere = fileWatcher.onDidChange(async () => {
-            const bytes = await vscode.workspace.fs.readFile(session.uri);
-            const savedText = new TextDecoder().decode(bytes);
-            if (savedText === session.document.text) {
-                return;
-            }
-            await documentChangesMessageQueue.post(
-                new TheFileChangedUnderneath(savedText),
-            );
-        });
 
         panel.onDidDispose(() => {
             templatesWatcher.dispose();
             settingsChanged.dispose();
-            savedElsewhere.dispose();
-            fileWatcher.dispose();
+            watchingTheFile.dispose();
             onMessageFromWebView.dispose();
             this.documentChangesMessageQueues.delete(session.uri.toString());
         });

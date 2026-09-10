@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, files, watchersOnTheFiles } from "./vscode";
+import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
+import { Uri, files, watchersOnTheFiles } from "../vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
@@ -75,7 +75,7 @@ beforeEach(async () => {
     editor = await openEditor("<!-- cell: markdown -->\n\nThe lantern\n");
 });
 
-describe("the editor's own save reaching its watcher on the file", () => {
+describe("the watcher on the author file, when the editor saves it itself", () => {
     it("says nothing to the page, the file holding what the document holds", async () => {
         await editor.typeIntoTheCell("The lantern went out\n");
         await editor.save();
