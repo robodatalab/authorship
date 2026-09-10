@@ -12,39 +12,43 @@ import {
 } from "../../../extension/vscode_runtime/parts/manuscript_parts";
 import {
     CHAPTER,
-    Cell,
+    MutableCell,
     MARKDOWN,
     PART,
 } from "../../../extension/vscode_runtime/storydoc/model";
 
-function chapter(title: string): Cell {
-    return new Cell(CHAPTER, "", { title });
+function chapter(title: string): MutableCell {
+    return new MutableCell(CHAPTER, "", { title });
 }
 
-function markdown(source: string): Cell {
-    return new Cell(MARKDOWN, source, {});
+function markdown(source: string): MutableCell {
+    return new MutableCell(MARKDOWN, source, {});
 }
 
-function part(title: string, printed = true): Cell {
-    return new Cell(PART, "", printed ? { title } : { title, print: "no" });
+function part(title: string, printed = true): MutableCell {
+    return new MutableCell(
+        PART,
+        "",
+        printed ? { title } : { title, print: "no" },
+    );
 }
 
-function titlePage(attrs: Record<string, string>): Cell {
-    return new Cell("title-page", "", attrs);
+function titlePage(attrs: Record<string, string>): MutableCell {
+    return new MutableCell("title-page", "", attrs);
 }
 
-function image(src: string): Cell {
-    return new Cell("image", "", { src });
+function image(src: string): MutableCell {
+    return new MutableCell("image", "", { src });
 }
 
 /** A part that places a cut and prints no page: an author saying "break here"
  *  to the folder and to nobody else. */
-function seam(title = "Break"): Cell {
+function seam(title = "Break"): MutableCell {
     return part(title, false);
 }
 
 /** Prose of a given length, for a story that has to look like one. */
-function prose(words: number): Cell {
+function prose(words: number): MutableCell {
     return markdown(Array.from({ length: words }, () => "word").join(" "));
 }
 
@@ -211,11 +215,11 @@ describe("sectionsOf — the sections a division cuts along", () => {
     it("leaves the furniture, the blurb and the story so far out of the story", () => {
         const sections = sectionsOf([
             titlePage({ title: "Veriona" }),
-            new Cell("recap", "She has lost her name.", {}),
+            new MutableCell("recap", "She has lost her name.", {}),
             chapter("One"),
             markdown("alpha"),
-            new Cell("blurb", "A woman loses her name.", {}),
-            new Cell("about", "A. Writer lives by the sea.", {}),
+            new MutableCell("blurb", "A woman loses her name.", {}),
+            new MutableCell("about", "A. Writer lives by the sea.", {}),
         ]);
         expect(sections).toHaveLength(1);
         expect(sections[0].cells.map((cell) => cell.source)).toEqual([
@@ -228,7 +232,7 @@ describe("sectionsOf — the sections a division cuts along", () => {
         const sections = sectionsOf([
             chapter("One"),
             prose(10),
-            new Cell("note", "She has to find the letter here.", {}),
+            new MutableCell("note", "She has to find the letter here.", {}),
         ]);
         expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
             "chapter",
@@ -245,7 +249,7 @@ describe("furnitureOf — what stands before the story and after it", () => {
             titlePage({ title: "Veriona" }),
             chapter("One"),
             markdown("alpha"),
-            new Cell("about", "A. Writer lives by the sea.", {}),
+            new MutableCell("about", "A. Writer lives by the sea.", {}),
         ]);
         expect(front.map((cell) => cell.kind)).toEqual(["image", "title-page"]);
         expect(back.map((cell) => cell.kind)).toEqual(["about"]);
@@ -434,7 +438,7 @@ describe("partCells — a part as a document of its own", () => {
             seam(),
             chapter("Two"),
             markdown("beta"),
-            new Cell("about", "A. Writer lives by the sea.", {}),
+            new MutableCell("about", "A. Writer lives by the sea.", {}),
         ];
         const parts = intoParts(sectionsOf(cells));
         const second = partCells(furnitureOf(cells), 2, parts[1]);
@@ -451,7 +455,11 @@ describe("partCells — a part as a document of its own", () => {
     });
 
     it("carries a note into the part its chapter went to, and no other", () => {
-        const note = new Cell("note", "She has to find the letter here.", {});
+        const note = new MutableCell(
+            "note",
+            "She has to find the letter here.",
+            {},
+        );
         const cells = [
             chapter("One"),
             prose(10),

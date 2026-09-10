@@ -1,4 +1,8 @@
-import { MARKDOWN, type AuthorDocument, type Cell } from "./model";
+import {
+    MARKDOWN,
+    type ImmutableAuthorDocument,
+    type ImmutableCell,
+} from "./model";
 import {
     cellsBySection,
     cellsWithinASection,
@@ -10,7 +14,7 @@ export function numberOfWords(markdown: string): number {
     return markdown.split(/\s+/).filter((word) => /\w/.test(word)).length;
 }
 
-function wordsInTheCells(cells: readonly Cell[]): number {
+function wordsInTheCells(cells: readonly ImmutableCell[]): number {
     return cells
         .filter((cell) => cell.kind === MARKDOWN)
         .reduce((words, cell) => words + numberOfWords(cell.source), 0);
@@ -20,13 +24,13 @@ export class WordCounter {
     private wordsInEachSection = new Map<string, number>();
     private wordsInTheWholeDocument = 0;
 
-    synchronize(document: AuthorDocument): void {
+    synchronize(document: ImmutableAuthorDocument): void {
         this.wordsInEachSection = new Map<string, number>();
         this.countSections(cellsBySection(document.cells));
         this.wordsInTheWholeDocument = wordsInTheCells(document.cells);
     }
 
-    private countSections(sections: CellsInASection<Cell>[]): void {
+    private countSections(sections: CellsInASection<ImmutableCell>[]): void {
         for (const section of sections) {
             if (opensASection(section.cell.kind)) {
                 this.wordsInEachSection.set(

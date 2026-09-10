@@ -129,8 +129,6 @@ const { MarkdownEditor, MarkdownEditorMediator } =
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-const SETTLE_AFTER_TYPING_MS = 400;
-
 let root: Root;
 
 function emptyBody(): HTMLElement {
@@ -252,14 +250,6 @@ async function clickSomethingElse(): Promise<void> {
     });
 }
 
-async function waitForTypingToSettle(): Promise<void> {
-    await act(async () => {
-        await new Promise((settled) =>
-            setTimeout(settled, SETTLE_AFTER_TYPING_MS + 50),
-        );
-    });
-}
-
 beforeEach(() => {
     monacoEditors.length = 0;
 });
@@ -311,15 +301,27 @@ describe("opening the editor", () => {
 });
 
 describe("editing", () => {
-    it("commits a pause in the typing and stays open", async () => {
+    it("commits what was typed and stays open", async () => {
         const committed = await mount("The lantern.");
         await doubleClickRendered();
 
         await typeIntoEditor("The lantern had gone out.");
-        await waitForTypingToSettle();
 
         expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).not.toBeNull();
+    });
+
+    it("commits every change, so that none of them waits on the next", async () => {
+        const committed = await mount("The lantern.");
+        await doubleClickRendered();
+
+        await typeIntoEditor("The lantern had");
+        await typeIntoEditor("The lantern had gone out.");
+
+        expect(committed.mock.calls).toEqual([
+            ["The lantern had"],
+            ["The lantern had gone out."],
+        ]);
     });
 
     it("stays open when something else is clicked once", async () => {
@@ -333,7 +335,7 @@ describe("editing", () => {
 });
 
 describe("closing the editor", () => {
-    it("commits the draft and renders it when escape is pressed", async () => {
+    it("renders what was typed when escape is pressed", async () => {
         const committed = await mount("The lantern.");
         await doubleClickRendered();
 
@@ -342,6 +344,7 @@ describe("closing the editor", () => {
 
         expect(committed).toHaveBeenCalledWith("The lantern had gone out.");
         expect(openEditor()).toBeNull();
+        expect(rendered()?.textContent).toBe("The lantern had gone out.");
     });
 
     it("closes on escape after the editor has lost focus", async () => {
@@ -395,7 +398,7 @@ describe("two editors", () => {
         expect(renderedMarkdown()).toEqual(["The lantern."]);
     });
 
-    it("commits nothing on the way out, since the page may have moved on", async () => {
+    it("has nothing left to commit on the way out, every change having been committed as it was typed", async () => {
         const lantern = committedSpy();
         await mountAll([
             { markdown: "The lantern.", committed: lantern },
@@ -406,7 +409,7 @@ describe("two editors", () => {
         await typeIntoEditor("The lantern had gone out.");
         await doubleClickRenderedMarkdown("The night.");
 
-        expect(lantern).not.toHaveBeenCalled();
+        expect(lantern.mock.calls).toEqual([["The lantern had gone out."]]);
     });
 });
 

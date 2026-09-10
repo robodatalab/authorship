@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    AuthorDocument,
-    type Cell,
+    MutableAuthorDocument,
+    type MutableCell,
 } from "../../../extension/vscode_runtime/storydoc/model";
 import {
     cellsBySection,
@@ -11,8 +11,8 @@ import {
     moveTheSectionUp,
 } from "../../../extension/vscode_runtime/storydoc/sections";
 
-function story(...cells: string[]): AuthorDocument {
-    return AuthorDocument.fromText(
+function story(...cells: string[]): MutableAuthorDocument {
+    return MutableAuthorDocument.fromText(
         cells
             .map((cell) => {
                 const [kind, id] = cell.split(" ");
@@ -22,7 +22,7 @@ function story(...cells: string[]): AuthorDocument {
     );
 }
 
-function cellIds(document: AuthorDocument): string[] {
+function cellIds(document: MutableAuthorDocument): string[] {
     return document.cells.map((cell) => cell.uniqueId);
 }
 
@@ -31,11 +31,13 @@ interface SectionOfCellIds {
     within: SectionOfCellIds[];
 }
 
-function sectionsOf(document: AuthorDocument): SectionOfCellIds[] {
+function sectionsOf(document: MutableAuthorDocument): SectionOfCellIds[] {
     return byCellId(cellsBySection(document.cells));
 }
 
-function byCellId(sections: CellsInASection<Cell>[]): SectionOfCellIds[] {
+function byCellId(
+    sections: CellsInASection<MutableCell>[],
+): SectionOfCellIds[] {
     return sections.map((section) => ({
         cell: section.cell.uniqueId,
         within: byCellId(section.within),

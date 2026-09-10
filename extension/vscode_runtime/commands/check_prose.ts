@@ -1,10 +1,10 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { authorFileEditorSession } from "../author_file_editor_session";
 import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
-import type { AuthorDocument } from "../storydoc/model";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 
 export interface ProseCheckError extends SynchronizedRepresentation {
     ruleThatFoundTheError: string;
@@ -39,27 +39,24 @@ export class CheckProseCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "check";
     readonly iconClassName = "codicon codicon-checklist";
     readonly tooltip =
-        "Check Prose — read the whole document for faults of usage and style";
+        "Check Prose — read the whole session.document for faults of usage and style";
 
-    async invoke(document: AuthorDocument): Promise<void> {
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
         const documentToCheck = {
-            path: document.uri.fsPath,
-            text: document.text,
+            path: session.document.uri.fsPath,
+            text: session.document.text,
         };
         try {
             const rulesFound = await startAndAwaitServerJob(
                 "/check/prose",
                 documentToCheck,
             );
-            authorFileEditorSession(document)?.showProseErrors(rulesFound);
+            session.showProseErrors(rulesFound);
             const grammarFound = await startAndAwaitServerJob(
                 "/check/grammar",
                 documentToCheck,
             );
-            authorFileEditorSession(document)?.showProseErrors([
-                ...rulesFound,
-                ...grammarFound,
-            ]);
+            session.showProseErrors([...rulesFound, ...grammarFound]);
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot check the prose — is the model server running? (${failure instanceof Error ? failure.message : String(failure)})`,

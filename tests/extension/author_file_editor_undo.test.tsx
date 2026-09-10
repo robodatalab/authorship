@@ -11,7 +11,7 @@ const DOCUMENT_PATH = "/stories/expat_pet.author";
 const listeningForThePage: [string, EventListenerOrEventListenerObject][] = [];
 
 interface OpenEditor {
-    fileDocument: { text: string };
+    fileDocument: { document: { text: string } };
     edits: { undo(): void; redo(): void }[];
 }
 
@@ -79,7 +79,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     window.addEventListener = addEventListenerItself;
 
     return {
-        fileDocument: fileDocument as unknown as { text: string },
+        fileDocument: fileDocument as unknown as { document: { text: string } },
         edits,
     };
 }
@@ -114,7 +114,7 @@ async function undo(editor: OpenEditor): Promise<void> {
 }
 
 function cellsInTheFile(editor: OpenEditor): number {
-    return editor.fileDocument.text.split("<!-- cell:").length - 1;
+    return editor.fileDocument.document.text.split("<!-- cell:").length - 1;
 }
 
 function cellsOnThePage(): number {

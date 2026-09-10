@@ -1,4 +1,5 @@
-import type { AuthorDocument } from "../storydoc/model";
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class ReplaceMarkdownCommand implements AuthorDocumentCommand {
@@ -8,11 +9,13 @@ export class ReplaceMarkdownCommand implements AuthorDocumentCommand {
     readonly tooltip = "";
 
     invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        document
-            .cellWithId(commandArguments.cellId as string)
-            ?.replaceMarkdown(commandArguments.markdown as string);
+        session.changeTheDocument((story) =>
+            story
+                .cellWithId(commandArguments.cellId as string)
+                ?.replaceMarkdown(commandArguments.markdown as string),
+        );
     }
 }

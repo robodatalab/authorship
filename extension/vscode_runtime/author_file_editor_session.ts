@@ -1,35 +1,89 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./commands/check_prose";
+import type {
+    AuthorFileEditorMessage,
+    MessageQueueListener,
+} from "./message_queue_between_vscode_and_webview";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
-import { AuthorDocument } from "./storydoc/model";
+import {
+    ImmutableAuthorDocument,
+    MutableAuthorDocument,
+} from "./storydoc/model";
 import { WordCounter } from "./storydoc/word_counter";
 
-const openSessions = new Map<string, AuthorFileEditorSession>();
-
-export class AuthorFileEditorSession {
+export class AuthorFileEditorSession
+    implements vscode.CustomDocument, MessageQueueListener
+{
     private readonly proseErrors: ProseCheckError[] = [];
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly synchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private readonly wordCounter = new WordCounter();
-    private documentAsTheLastSynchronizationLeftIt: AuthorDocument;
+    private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
 
-    constructor(
-        readonly document: AuthorDocument,
-        private readonly panel: vscode.WebviewPanel,
-    ) {
+    private documentAsItStands: ImmutableAuthorDocument;
+
+    private panel: vscode.WebviewPanel | undefined;
+
+    constructor(private readonly theDocument: MutableAuthorDocument) {
+        this.documentAsItStands = theDocument.toImmutable();
         this.synchronizer = new AuthorDocSynchronizer(this.proseErrors);
-        this.documentAsTheLastSynchronizationLeftIt = AuthorDocument.fromText(
-            document.text,
+        this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
+        this.wordCounter.synchronize(this.documentAsItStands);
+    }
+
+    get uri(): vscode.Uri {
+        return this.theDocument.uri;
+    }
+
+    dispose(): void {}
+
+    showOn(panel: vscode.WebviewPanel): void {
+        this.panel = panel;
+    }
+
+    async onMessage(message: AuthorFileEditorMessage): Promise<void> {
+        await message.invoke(this);
+        this.sendDocument();
+    }
+
+    get document(): ImmutableAuthorDocument {
+        return this.documentAsItStands;
+    }
+
+    importDocumentFromText(text: string): void {
+        this.changeTheDocument((document) => document.fromText(text));
+    }
+
+    changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
+        change(this.theDocument);
+        this.documentAsItStands = this.theDocument.toImmutable();
+        this.synchronizeTheRepresentations();
+    }
+
+    async writeTheDocumentToItsFile(): Promise<void> {
+        const text = this.theDocument.text;
+        await vscode.workspace.fs.writeFile(
+            this.theDocument.uri,
+            new TextEncoder().encode(text),
         );
-        this.wordCounter.synchronize(document);
+        this.theDocument.fromText(text);
+    }
+
+    async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
+        await vscode.workspace.fs.writeFile(
+            destination,
+            new TextEncoder().encode(this.theDocument.text),
+        );
+    }
+
+    async readTheDocumentBackFromItsFile(): Promise<void> {
+        const bytes = await vscode.workspace.fs.readFile(this.theDocument.uri);
+        this.theDocument.fromText(new TextDecoder().decode(bytes));
     }
 
     showProseErrors(proseErrors: ProseCheckError[]): void {
         this.proseErrors.splice(0, this.proseErrors.length, ...proseErrors);
-        this.documentAsTheLastSynchronizationLeftIt = AuthorDocument.fromText(
-            this.document.text,
-        );
         this.sendProseErrors();
     }
 
@@ -43,8 +97,17 @@ export class AuthorFileEditorSession {
         this.sendCellsBeingWritten();
     }
 
+    private synchronizeTheRepresentations(): void {
+        this.synchronizer.synchronize(
+            this.documentAsTheLastSynchronizationLeftIt,
+            this.documentAsItStands,
+        );
+        this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
+        this.wordCounter.synchronize(this.documentAsItStands);
+    }
+
     sendCellsBeingWritten(): void {
-        void this.panel.webview.postMessage({
+        void this.panel?.webview.postMessage({
             type: "cellsBeingWritten",
             cellsBeingWritten: Object.fromEntries(
                 this.howFarEachCellHasBeenWritten,
@@ -53,7 +116,7 @@ export class AuthorFileEditorSession {
     }
 
     sendWordCounts(): void {
-        void this.panel.webview.postMessage({
+        void this.panel?.webview.postMessage({
             type: "wordCounts",
             wordsInEverySection: this.wordCounter.wordsInEverySection,
             wordsInTheDocument: this.wordCounter.wordsInTheDocument,
@@ -61,24 +124,17 @@ export class AuthorFileEditorSession {
     }
 
     sendProseErrors(): void {
-        void this.panel.webview.postMessage({
+        void this.panel?.webview.postMessage({
             type: "proseErrors",
             proseErrors: [...this.proseErrors],
         });
     }
 
     sendDocument(): void {
-        this.synchronizer.synchronize(
-            this.documentAsTheLastSynchronizationLeftIt,
-            this.document,
-        );
-        this.documentAsTheLastSynchronizationLeftIt = AuthorDocument.fromText(
-            this.document.text,
-        );
-        this.wordCounter.synchronize(this.document);
-        void this.panel.webview.postMessage({
+        this.synchronizeTheRepresentations();
+        void this.panel?.webview.postMessage({
             type: "document",
-            cells: this.document.cells.map((cell) => ({
+            cells: this.theDocument.cells.map((cell) => ({
                 kind: cell.kind,
                 source: cell.source,
                 attrs: cell.attrs,
@@ -90,20 +146,8 @@ export class AuthorFileEditorSession {
 }
 
 export function openAuthorFileEditorSession(
-    document: AuthorDocument,
-    panel: vscode.WebviewPanel,
+    uri: vscode.Uri,
+    text: string,
 ): AuthorFileEditorSession {
-    const session = new AuthorFileEditorSession(document, panel);
-    openSessions.set(document.uri.toString(), session);
-    return session;
-}
-
-export function authorFileEditorSession(
-    document: AuthorDocument,
-): AuthorFileEditorSession | undefined {
-    return openSessions.get(document.uri.toString());
-}
-
-export function closeAuthorFileEditorSession(document: AuthorDocument): void {
-    openSessions.delete(document.uri.toString());
+    return new AuthorFileEditorSession(new MutableAuthorDocument(uri, text));
 }

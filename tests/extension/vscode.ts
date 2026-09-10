@@ -116,7 +116,7 @@ export const workspace = {
     ): {
         get<Setting>(named: string, fallback?: Setting): Setting | undefined;
     } => ({
-        get: <Setting,>(named: string, fallback?: Setting) =>
+        get: <Setting>(named: string, fallback?: Setting) =>
             (settings.get(`${section}.${named}`) as Setting | undefined) ??
             fallback,
     }),

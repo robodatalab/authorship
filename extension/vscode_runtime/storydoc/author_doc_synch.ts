@@ -1,5 +1,5 @@
 import { diff } from "./diff";
-import type { AuthorDocument } from "./model";
+import type { ImmutableAuthorDocument } from "./model";
 
 export interface SynchronizedRepresentation {
     cellId: string;
@@ -23,7 +23,10 @@ export class AuthorDocSynchronizer<
 > {
     constructor(private readonly representations: Representation[]) {}
 
-    synchronize(docBefore: AuthorDocument, docAfter: AuthorDocument): void {
+    synchronize(
+        docBefore: ImmutableAuthorDocument,
+        docAfter: ImmutableAuthorDocument,
+    ): void {
         for (const cellDiff of diff(docBefore, docAfter)) {
             const markdownAfter = docAfter.cellWithId(cellDiff.cellId)?.source;
             const charactersAdded =

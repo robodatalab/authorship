@@ -1,5 +1,6 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import type { AuthorDocument } from "../storydoc/model";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 
 export class RunAllCommand implements AuthorDocumentCommand {
     readonly commandName = "runAll";
@@ -13,17 +14,17 @@ export class RunAllCommand implements AuthorDocumentCommand {
         ) => AuthorDocumentCommand | undefined,
     ) {}
 
-    async invoke(document: AuthorDocument): Promise<void> {
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
         const queued: { cellId: string; command: AuthorDocumentCommand }[] = [];
-        for (const cell of document.cells) {
+        for (const cell of session.document.cells) {
             const command = this.commandThatRunsCellsOfKind(cell.kind);
             if (command) {
                 queued.push({ cellId: cell.uniqueId, command });
             }
         }
         for (const { cellId, command } of queued) {
-            if (document.cellWithId(cellId)) {
-                await command.invoke(document, { cellId });
+            if (session.document.cellWithId(cellId)) {
+                await command.invoke(session, { cellId });
             }
         }
     }

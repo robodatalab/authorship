@@ -5,8 +5,8 @@ import { storyOfThreeCells } from "./open_story";
 
 describe("FixProseCommand — fixes one prose error", () => {
     it("writes the correct version over the words the error covers", () => {
-        const document = storyOfThreeCells();
-        new FixProseCommand().invoke(document, {
+        const session = storyOfThreeCells();
+        new FixProseCommand().invoke(session, {
             cellId: "c2",
             startCharacterOffsetInCell: 4,
             endCharacterOffsetInCell: 7,
@@ -17,12 +17,12 @@ describe("FixProseCommand — fixes one prose error", () => {
             reasonForError: "It reports.",
             correctVersion: "opened",
         });
-        expect(document.cells[1].source).toBe("She opened the door.");
+        expect(session.document.cells[1].source).toBe("She opened the door.");
     });
 
     it("leaves the prose alone when the error carries no correction", () => {
-        const document = storyOfThreeCells();
-        new FixProseCommand().invoke(document, {
+        const session = storyOfThreeCells();
+        new FixProseCommand().invoke(session, {
             cellId: "c2",
             startCharacterOffsetInCell: 4,
             endCharacterOffsetInCell: 7,
@@ -33,6 +33,6 @@ describe("FixProseCommand — fixes one prose error", () => {
             reasonForError: "Every sentence opens the same way.",
             correctVersion: "",
         });
-        expect(document.cells[1].source).toBe("She saw the door.");
+        expect(session.document.cells[1].source).toBe("She saw the door.");
     });
 });

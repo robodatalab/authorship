@@ -11,21 +11,21 @@ import {
 } from "../../../extension/vscode_runtime/publish/book_layout_report";
 import {
     CHAPTER,
-    Cell,
+    MutableCell,
     IMAGE,
     MARKDOWN,
 } from "../../../extension/vscode_runtime/storydoc/model";
 
-function chapter(title: string): Cell {
-    return new Cell(CHAPTER, "", { title });
+function chapter(title: string): MutableCell {
+    return new MutableCell(CHAPTER, "", { title });
 }
 
-function markdown(source: string): Cell {
-    return new Cell(MARKDOWN, source, {});
+function markdown(source: string): MutableCell {
+    return new MutableCell(MARKDOWN, source, {});
 }
 
-function image(src: string): Cell {
-    return new Cell(IMAGE, "", { src });
+function image(src: string): MutableCell {
+    return new MutableCell(IMAGE, "", { src });
 }
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
@@ -85,7 +85,7 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
     });
 
     it("carries a kind it has never heard of", () => {
-        const strange = new Cell("epigraph", "Whom the gods…", {});
+        const strange = new MutableCell("epigraph", "Whom the gods…", {});
         expect(
             cellsLaidOutByPlan([strange], [{ kind: "epigraph", at: 0 }]),
         ).toEqual([strange]);

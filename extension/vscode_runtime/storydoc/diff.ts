@@ -1,4 +1,4 @@
-import { AuthorDocument, Cell } from "./model";
+import { ImmutableAuthorDocument, ImmutableCell } from "./model";
 
 export interface AuthorDocCellDiff {
     cellId: string;
@@ -10,7 +10,7 @@ export interface AuthorDocCellDiff {
     attributesChanged: Record<string, string | undefined>;
 }
 
-function cellOnlyInLhs(cellInLhs: Cell): AuthorDocCellDiff {
+function cellOnlyInLhs(cellInLhs: ImmutableCell): AuthorDocCellDiff {
     return {
         cellId: cellInLhs.uniqueId,
         startCharacterIndexInRhsCell: 0,
@@ -22,7 +22,7 @@ function cellOnlyInLhs(cellInLhs: Cell): AuthorDocCellDiff {
     };
 }
 
-function cellOnlyInRhs(cellInRhs: Cell): AuthorDocCellDiff {
+function cellOnlyInRhs(cellInRhs: ImmutableCell): AuthorDocCellDiff {
     return {
         cellId: cellInRhs.uniqueId,
         startCharacterIndexInRhsCell: 0,
@@ -35,8 +35,8 @@ function cellOnlyInRhs(cellInRhs: Cell): AuthorDocCellDiff {
 }
 
 function attributesChangedBetween(
-    cellInLhs: Cell,
-    cellInRhs: Cell,
+    cellInLhs: ImmutableCell,
+    cellInRhs: ImmutableCell,
 ): Record<string, string | undefined> {
     const attributeNames = new Set([
         ...Object.keys(cellInLhs.attrs),
@@ -52,11 +52,12 @@ function attributesChangedBetween(
 }
 
 function cellInBoth(
-    cellInLhs: Cell,
-    cellInRhs: Cell,
+    cellInLhs: ImmutableCell,
+    cellInRhs: ImmutableCell,
 ): AuthorDocCellDiff | undefined {
     const attributesChanged = attributesChangedBetween(cellInLhs, cellInRhs);
     if (
+        cellInLhs.kind === cellInRhs.kind &&
         cellInLhs.source === cellInRhs.source &&
         Object.keys(attributesChanged).length === 0
     ) {
@@ -111,8 +112,8 @@ function cellInBoth(
  * @returns
  */
 export function diff(
-    lhs: AuthorDocument,
-    rhs: AuthorDocument,
+    lhs: ImmutableAuthorDocument,
+    rhs: ImmutableAuthorDocument,
 ): AuthorDocCellDiff[] {
     const differences: AuthorDocCellDiff[] = [];
     for (const cellInLhs of lhs.cells) {

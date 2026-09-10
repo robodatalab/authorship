@@ -44,7 +44,6 @@ monaco.editor.addKeybindingRules([
     { keybinding: monaco.KeyMod.Shift | monaco.KeyCode.F3, command: null },
 ]);
 
-const SETTLE_AFTER_TYPING_MS = 400;
 const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 
@@ -102,24 +101,16 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
         useMarkdownEditorBeingEdited(useId());
-    const [draftMarkdown, setDraftMarkdown] = useState(markdown);
+    const [markdownShown, showMarkdown] = useState(markdown);
 
     useEffect(() => {
-        setDraftMarkdown(markdown);
+        showMarkdown(markdown);
     }, [markdown]);
-
-    const openOnDoubleClick = (): void => {
-        setDraftMarkdown(markdown);
-        beginEditing();
-    };
 
     if (!isEditing && children) {
         return (
-            <div
-                className="markdown-rendered"
-                onDoubleClick={openOnDoubleClick}
-            >
-                {children(fenced(markdown, highlights))}
+            <div className="markdown-rendered" onDoubleClick={beginEditing}>
+                {children(fenced(markdownShown, highlights))}
             </div>
         );
     }
@@ -128,10 +119,10 @@ export function MarkdownEditor({
         return (
             <div
                 className="markdown-rendered"
-                onDoubleClick={openOnDoubleClick}
+                onDoubleClick={beginEditing}
                 dangerouslySetInnerHTML={{
                     __html: markedUp(
-                        marked.parse(fenced(markdown, highlights), {
+                        marked.parse(fenced(markdownShown, highlights), {
                             async: false,
                             gfm: true,
                         }),
@@ -143,16 +134,15 @@ export function MarkdownEditor({
 
     return (
         <MonacoMarkdownEditor
-            markdown={draftMarkdown}
+            markdown={markdownShown}
             errors={errors}
             highlights={highlights}
             onFixAsked={onFixAsked}
-            onMarkdownChanged={setDraftMarkdown}
-            onSettled={onMarkdownCommitted}
-            onFinished={() => {
-                finishEditing();
-                onMarkdownCommitted(draftMarkdown);
+            onMarkdownChanged={(typed) => {
+                showMarkdown(typed);
+                onMarkdownCommitted(typed);
             }}
+            onFinished={finishEditing}
         />
     );
 }
@@ -163,7 +153,6 @@ interface MonacoMarkdownEditorProps {
     highlights: AuthorFileEditorFindHighlight[];
     onFixAsked: (error: ProseCheckError) => void;
     onMarkdownChanged: (markdown: string) => void;
-    onSettled: (markdown: string) => void;
     onFinished: () => void;
 }
 
@@ -179,7 +168,6 @@ function MonacoMarkdownEditor({
     highlights,
     onFixAsked,
     onMarkdownChanged,
-    onSettled,
     onFinished,
 }: MonacoMarkdownEditorProps) {
     const editorHost = useRef<HTMLDivElement>(null);
@@ -198,12 +186,8 @@ function MonacoMarkdownEditor({
         undefined,
     );
     const pointerIsOnTheTooltip = useRef(false);
-    const latestCallbacks = useRef({
-        onMarkdownChanged,
-        onSettled,
-        onFinished,
-    });
-    latestCallbacks.current = { onMarkdownChanged, onSettled, onFinished };
+    const latestCallbacks = useRef({ onMarkdownChanged, onFinished });
+    latestCallbacks.current = { onMarkdownChanged, onFinished };
 
     useEffect(() => {
         const node = editorHost.current;
@@ -311,15 +295,9 @@ function MonacoMarkdownEditor({
         const pointerLeft = editor.onMouseLeave(
             hideTheTooltipUnlessItIsPointedAt,
         );
-        let settlingAfterTyping: ReturnType<typeof setTimeout> | undefined;
-        const contentChanged = editor.onDidChangeModelContent(() => {
-            latestCallbacks.current.onMarkdownChanged(editor.getValue());
-            clearTimeout(settlingAfterTyping);
-            settlingAfterTyping = setTimeout(
-                () => latestCallbacks.current.onSettled(editor.getValue()),
-                SETTLE_AFTER_TYPING_MS,
-            );
-        });
+        const contentChanged = editor.onDidChangeModelContent(() =>
+            latestCallbacks.current.onMarkdownChanged(editor.getValue()),
+        );
         const escapePressed = (event: KeyboardEvent): void => {
             if (event.key === "Escape") {
                 latestCallbacks.current.onFinished();
@@ -334,7 +312,6 @@ function MonacoMarkdownEditor({
         return () => {
             monacoEditor.current = null;
             window.removeEventListener("keydown", escapePressed, true);
-            clearTimeout(settlingAfterTyping);
             clearTimeout(hidingTheTooltip.current);
             contentResized.dispose();
             pointerMoved.dispose();

@@ -1,9 +1,9 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { authorFileEditorSession } from "../author_file_editor_session";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { BLURB, type AuthorDocument } from "../storydoc/model";
+import { BLURB, type ImmutableAuthorDocument } from "../storydoc/model";
 
 interface WrittenSection extends ServerJob {
     text: string;
@@ -24,30 +24,32 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
     readonly runsCellsOfKind = BLURB;
 
     async invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
-        const cell = document.cellWithId(cellId);
+        const cell = session.document.cellWithId(cellId);
         if (!cell) {
             return;
         }
-        const session = authorFileEditorSession(document);
+
         try {
             await vscode.workspace.fs.writeFile(
-                document.uri,
-                new TextEncoder().encode(document.text),
+                session.document.uri,
+                new TextEncoder().encode(session.document.text),
             );
             session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/blurb", {
-                path: document.uri.fsPath,
+                path: session.document.uri.fsPath,
             });
             const blurb = await awaitServerJob<WrittenSection>(
                 "/generate/status",
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
-            document.cellWithId(cellId)?.replaceMarkdown(blurb.text);
+            session?.changeTheDocument((story) =>
+                story.cellWithId(cellId)?.replaceMarkdown(blurb.text),
+            );
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot write the blurb — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,

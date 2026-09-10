@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WriteBlurbCommand } from "../../../extension/vscode_runtime/commands/write_blurb";
-import {
-    closeAuthorFileEditorSession,
-    openAuthorFileEditorSession,
-} from "../../../extension/vscode_runtime/author_file_editor_session";
 import { files } from "../vscode";
-import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
+import {
+    forgetWhatTheEditorDid,
+    openStory,
+    sentToThePage,
+    STORY_FILE,
+} from "./open_story";
 
 const A_STORY_WITH_A_BLURB_CELL = `
 <!-- cell: blurb id="b1" -->
@@ -42,32 +43,26 @@ describe("WriteBlurbCommand — writes the blurb", () => {
             });
         });
 
-        const document = openStory(A_STORY_WITH_A_BLURB_CELL);
-        const sentToTheWebview: unknown[] = [];
-        openAuthorFileEditorSession(document, {
-            webview: {
-                postMessage: (message: unknown) =>
-                    sentToTheWebview.push(message),
-            },
-        } as never);
+        const session = openStory(A_STORY_WITH_A_BLURB_CELL);
 
-        await new WriteBlurbCommand().invoke(document, { cellId: "b1" });
-        closeAuthorFileEditorSession(document);
+        await new WriteBlurbCommand().invoke(session, { cellId: "b1" });
 
         expect(files.get(STORY_FILE)).toContain("She saw the door.");
         expect(asked[0].url).toContain("/generate/blurb");
         expect(asked[0].body).toEqual({ path: STORY_FILE });
         expect(asked[1].url).toContain("/generate/status?id=job-1");
-        expect(document.cells[0].source).toBe("A woman loses her name.");
-        expect(sentToTheWebview).toContainEqual({
+        expect(session.document.cells[0].source).toBe(
+            "A woman loses her name.",
+        );
+        expect(sentToThePage).toContainEqual({
             type: "cellsBeingWritten",
             cellsBeingWritten: { b1: 0 },
         });
-        expect(sentToTheWebview).toContainEqual({
+        expect(sentToThePage).toContainEqual({
             type: "cellsBeingWritten",
             cellsBeingWritten: { b1: 0.5 },
         });
-        expect(sentToTheWebview.at(-1)).toEqual({
+        expect(sentToThePage.at(-1)).toEqual({
             type: "cellsBeingWritten",
             cellsBeingWritten: {},
         });
@@ -76,12 +71,14 @@ describe("WriteBlurbCommand — writes the blurb", () => {
 
 describe("WriteBlurbCommand — while the author keeps working", () => {
     it("writes the blurb into the cell even when the document was read again while the job ran", async () => {
-        const document = openStory(A_STORY_WITH_A_BLURB_CELL);
+        const session = openStory(A_STORY_WITH_A_BLURB_CELL);
         let statusAskedFor = 0;
         vi.stubGlobal("fetch", (url: string) => {
             const stillRunning = url.includes("status") && statusAskedFor++ < 1;
             if (stillRunning) {
-                document.fromText(document.text);
+                session.changeTheDocument((story) =>
+                    story.fromText(session.document.text),
+                );
             }
             return Promise.resolve({
                 ok: true,
@@ -99,9 +96,11 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
             });
         });
 
-        await new WriteBlurbCommand().invoke(document, { cellId: "b1" });
+        await new WriteBlurbCommand().invoke(session, { cellId: "b1" });
 
-        expect(document.cells[0].source).toBe("A woman loses her name.");
+        expect(session.document.cells[0].source).toBe(
+            "A woman loses her name.",
+        );
     });
 
     it("leaves the document alone when the cell it was asked for is not there", async () => {
@@ -110,9 +109,9 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
             asked.push(url);
             return Promise.resolve({ ok: true, json: () => ({}) });
         });
-        const document = openStory(A_STORY_WITH_A_BLURB_CELL);
+        const session = openStory(A_STORY_WITH_A_BLURB_CELL);
 
-        await new WriteBlurbCommand().invoke(document, { cellId: "nowhere" });
+        await new WriteBlurbCommand().invoke(session, { cellId: "nowhere" });
 
         expect(asked).toEqual([]);
     });

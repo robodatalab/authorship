@@ -18,11 +18,11 @@ const UNFOLD_ALL = new FoldAllCommand(
 
 describe("FoldAllCommand — folds and unfolds the whole document", () => {
     it("folds every cell away", () => {
-        const document = storyOfThreeCells();
+        const session = storyOfThreeCells();
 
-        FOLD_ALL.invoke(document);
+        FOLD_ALL.invoke(session);
 
-        expect(document.cells.map((cell) => cell.isFolded())).toEqual([
+        expect(session.document.cells.map((cell) => cell.isFolded())).toEqual([
             true,
             true,
             true,
@@ -30,32 +30,34 @@ describe("FoldAllCommand — folds and unfolds the whole document", () => {
     });
 
     it("unfolds every cell, the prose included", () => {
-        const document = openStory(
+        const session = openStory(
             '<!-- cell: chapter title="One" id="c1" folded="true" -->\n\n<!-- cell: markdown id="c2" folded="true" -->\n\nShe saw the door.\n',
         );
 
-        UNFOLD_ALL.invoke(document);
+        UNFOLD_ALL.invoke(session);
 
-        expect(document.cells.map((cell) => cell.isFolded())).toEqual([
+        expect(session.document.cells.map((cell) => cell.isFolded())).toEqual([
             false,
             false,
         ]);
     });
 
     it("leaves the prose alone", () => {
-        const document = storyOfThreeCells();
+        const session = storyOfThreeCells();
 
-        FOLD_ALL.invoke(document);
+        FOLD_ALL.invoke(session);
 
-        expect(document.cellWithId("c2")?.source).toBe("She saw the door.");
+        expect(session.document.cellWithId("c2")?.source).toBe(
+            "She saw the door.",
+        );
     });
 
     it("does nothing to a document with no cells at all", () => {
-        const document = openStory("");
+        const session = openStory("");
 
-        FOLD_ALL.invoke(document);
+        FOLD_ALL.invoke(session);
 
-        expect(document.cells).toEqual([]);
+        expect(session.document.cells).toEqual([]);
     });
 });
 

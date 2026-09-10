@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authorDocumentCommandThatRunsCellsOfKind } from "../../../extension/vscode_runtime/commands/author_document_commands";
 import { RunAllCommand } from "../../../extension/vscode_runtime/commands/run_all";
-import { BLURB, Cell } from "../../../extension/vscode_runtime/storydoc/model";
+import {
+    BLURB,
+    MutableCell,
+} from "../../../extension/vscode_runtime/storydoc/model";
 import { forgetWhatTheEditorDid, openStory } from "./open_story";
 
 const A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS = `
@@ -58,34 +61,36 @@ afterEach(() => vi.unstubAllGlobals());
 describe("RunAllCommand — runs every cell that writes itself", () => {
     it("writes each of them and leaves the others alone", async () => {
         const asked = serverThatWritesEveryBlurb();
-        const document = openStory(
+        const session = openStory(
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
 
         await new RunAllCommand(
             authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(document);
+        ).invoke(session);
 
         expect(blurbsAsked(asked)).toBe(2);
-        expect(document.cellWithId("b1")?.source).toBe(
+        expect(session.document.cellWithId("b1")?.source).toBe(
             "A woman loses her name.",
         );
-        expect(document.cellWithId("b2")?.source).toBe(
+        expect(session.document.cellWithId("b2")?.source).toBe(
             "A woman loses her name.",
         );
-        expect(document.cellWithId("toc")?.source).toBe("1. One");
-        expect(document.cellWithId("c2")?.source).toBe("She saw the door.");
+        expect(session.document.cellWithId("toc")?.source).toBe("1. One");
+        expect(session.document.cellWithId("c2")?.source).toBe(
+            "She saw the door.",
+        );
     });
 
     it("runs nothing at all when no cell writes itself", async () => {
         const asked = serverThatWritesEveryBlurb();
-        const document = openStory(
+        const session = openStory(
             '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
         );
 
         await new RunAllCommand(
             authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(document);
+        ).invoke(session);
 
         expect(asked).toEqual([]);
     });
@@ -93,35 +98,40 @@ describe("RunAllCommand — runs every cell that writes itself", () => {
 
 describe("RunAllCommand — while it runs", () => {
     it("leaves a cell the author added afterwards for another run", async () => {
-        const document = openStory(
+        const session = openStory(
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
         const asked = serverThatWritesEveryBlurb(() =>
-            document.insertBefore("toc", new Cell(BLURB, "", { id: "b3" })),
+            session.changeTheDocument((story) =>
+                story.insertBefore(
+                    "toc",
+                    new MutableCell(BLURB, "", { id: "b3" }),
+                ),
+            ),
         );
 
         await new RunAllCommand(
             authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(document);
+        ).invoke(session);
 
         expect(blurbsAsked(asked)).toBe(2);
-        expect(document.cellWithId("b3")?.source).toBe("");
+        expect(session.document.cellWithId("b3")?.source).toBe("");
     });
 
     it("passes over a cell the author deleted afterwards", async () => {
-        const document = openStory(
+        const session = openStory(
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
         const asked = serverThatWritesEveryBlurb(() =>
-            document.removeCell("b2"),
+            session.changeTheDocument((story) => story.removeCell("b2")),
         );
 
         await new RunAllCommand(
             authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(document);
+        ).invoke(session);
 
         expect(blurbsAsked(asked)).toBe(1);
-        expect(document.cellWithId("b2")).toBeUndefined();
-        expect(document.cellWithId("toc")?.source).toBe("1. One");
+        expect(session.document.cellWithId("b2")).toBeUndefined();
+        expect(session.document.cellWithId("toc")?.source).toBe("1. One");
     });
 });

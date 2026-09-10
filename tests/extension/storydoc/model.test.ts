@@ -7,8 +7,8 @@ import {
     CHAPTER,
     MARKDOWN,
     NOTE,
-    AuthorDocument,
-    Cell,
+    MutableAuthorDocument,
+    MutableCell,
 } from "../../../extension/vscode_runtime/storydoc/model";
 
 interface Case {
@@ -29,14 +29,14 @@ function cellsOfText(text: string): {
     source: string;
     attrs: Record<string, string>;
 }[] {
-    return AuthorDocument.fromText(text).cells.map((cell) => {
+    return MutableAuthorDocument.fromText(text).cells.map((cell) => {
         const { id: _id, ...attrs } = cell.attrs;
         return { kind: cell.kind, source: cell.source, attrs };
     });
 }
 
 function textWrittenBack(text: string): string {
-    return withoutIds(AuthorDocument.fromText(text).text);
+    return withoutIds(MutableAuthorDocument.fromText(text).text);
 }
 
 const CORPUS: { cases: Case[] } = JSON.parse(
@@ -85,7 +85,9 @@ describe("writing a document back out", () => {
     it("escapes a quote in an attribute on the way out", () => {
         expect(
             withoutIds(
-                new Cell(CHAPTER, "", { title: 'She said "no"' }).marker(),
+                new MutableCell(CHAPTER, "", {
+                    title: 'She said "no"',
+                }).marker(),
             ),
         ).toBe('<!-- cell: chapter title="She said \\"no\\"" -->');
     });
@@ -99,11 +101,11 @@ describe("writing a document back out", () => {
 
 describe("inserting a cell", () => {
     const blankChapter = () =>
-        AuthorDocument.fromText('<!-- cell: chapter title="New" -->\n')
+        MutableAuthorDocument.fromText('<!-- cell: chapter title="New" -->\n')
             .cells[0];
 
     it("puts it at the place it was given", () => {
-        const document = AuthorDocument.fromText(
+        const document = MutableAuthorDocument.fromText(
             "<!-- cell: markdown -->\n\none\n",
         );
 
@@ -116,7 +118,7 @@ describe("inserting a cell", () => {
     });
 
     it("puts it after the last cell when the place is the end", () => {
-        const document = AuthorDocument.fromText(
+        const document = MutableAuthorDocument.fromText(
             "<!-- cell: markdown -->\n\none\n",
         );
 
@@ -129,7 +131,7 @@ describe("inserting a cell", () => {
     });
 
     it("carries the attributes it was given", () => {
-        const document = AuthorDocument.fromText(
+        const document = MutableAuthorDocument.fromText(
             "<!-- cell: markdown -->\n\none\n",
         );
 
@@ -245,7 +247,7 @@ describe("what a document reads as", () => {
 
 describe("deleting a cell", () => {
     const twoCells = () =>
-        AuthorDocument.fromText(
+        MutableAuthorDocument.fromText(
             "<!-- cell: markdown -->\n\none\n\n<!-- cell: note -->\n\ntwo\n",
         );
 
@@ -275,7 +277,8 @@ describe("deleting a cell", () => {
 });
 
 describe("folding a cell", () => {
-    const cellOf = (text: string) => AuthorDocument.fromText(text).cells[0];
+    const cellOf = (text: string) =>
+        MutableAuthorDocument.fromText(text).cells[0];
 
     it("is not folded to begin with", () => {
         expect(cellOf("<!-- cell: markdown -->\n\none\n").isFolded()).toBe(
@@ -293,7 +296,7 @@ describe("folding a cell", () => {
     });
 
     it("writes the fold into the document", () => {
-        const document = AuthorDocument.fromText(
+        const document = MutableAuthorDocument.fromText(
             "<!-- cell: markdown -->\n\none\n",
         );
 
@@ -305,7 +308,7 @@ describe("folding a cell", () => {
     });
 
     it("takes the attribute out again when it is unfolded", () => {
-        const document = AuthorDocument.fromText(
+        const document = MutableAuthorDocument.fromText(
             '<!-- cell: markdown folded="true" -->\n\none\n',
         );
 

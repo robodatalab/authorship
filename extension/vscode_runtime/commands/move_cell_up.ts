@@ -1,4 +1,5 @@
-import type { AuthorDocument } from "../storydoc/model";
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 import { moveTheSectionUp } from "../storydoc/sections";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
@@ -9,9 +10,11 @@ export class MoveCellUpCommand implements AuthorDocumentCommand {
     readonly tooltip = "Move up";
 
     invoke(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        moveTheSectionUp(document, commandArguments.cellId as string);
+        session.changeTheDocument((story) =>
+            moveTheSectionUp(story, commandArguments.cellId as string),
+        );
     }
 }

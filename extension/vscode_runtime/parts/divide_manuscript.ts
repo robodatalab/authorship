@@ -16,7 +16,7 @@ import {
     partNumber,
     sectionsOf,
 } from "./manuscript_parts";
-import { authorFileText, type Cell } from "../storydoc/model";
+import { type ImmutableCell } from "../storydoc/model";
 
 /** What a division came to. */
 export interface DividedManuscript {
@@ -35,9 +35,23 @@ export interface DividedManuscript {
  * There is nothing to ask the author: the cuts fall where they put the Parts,
  * and a story with none divides into nothing.
  */
+
+function authorFileText(cells: readonly ImmutableCell[]): string {
+    const lines: string[] = [];
+    for (const cell of cells) {
+        lines.push(cell.marker());
+        lines.push("");
+        if (cell.source) {
+            lines.push(cell.source);
+            lines.push("");
+        }
+    }
+    return lines.join("\n");
+}
+
 export async function divideManuscript(
     document: vscode.Uri,
-    cells: readonly Cell[],
+    cells: readonly ImmutableCell[],
 ): Promise<DividedManuscript> {
     const parts = intoParts(sectionsOf(cells));
     const partsFolder = vscode.Uri.joinPath(document, "..", PARTS_FOLDER);

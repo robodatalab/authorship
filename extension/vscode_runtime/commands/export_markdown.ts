@@ -1,8 +1,9 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { toMarkdown } from "../markdown/exporter";
-import type { AuthorDocument } from "../storydoc/model";
+import type { ImmutableAuthorDocument } from "../storydoc/model";
 
 function markdownFileBeside(authorFile: vscode.Uri): vscode.Uri {
     return authorFile.with({
@@ -15,16 +16,16 @@ export class ExportMarkdownCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "transfer";
     readonly iconClassName = "aicon aicon-export-markdown";
     readonly tooltip =
-        "Export Markdown — write this document out as one plain markdown manuscript";
+        "Export Markdown — write this session.document out as one plain markdown manuscript";
 
-    async invoke(document: AuthorDocument): Promise<void> {
-        const manuscript = markdownFileBeside(document.uri);
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
+        const manuscript = markdownFileBeside(session.document.uri);
         await vscode.workspace.fs.writeFile(
             manuscript,
-            new TextEncoder().encode(toMarkdown(document.cells)),
+            new TextEncoder().encode(toMarkdown(session.document.cells)),
         );
         void vscode.window.showInformationMessage(
-            `Exported ${vscode.workspace.asRelativePath(document.uri)} to ${vscode.workspace.asRelativePath(manuscript)}`,
+            `Exported ${vscode.workspace.asRelativePath(session.document.uri)} to ${vscode.workspace.asRelativePath(manuscript)}`,
         );
     }
 }

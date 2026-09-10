@@ -124,8 +124,8 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
             ],
         });
 
-        const document = openStory(A_STORY_OF_TWO_CHAPTERS);
-        await new FixStyleCommand().invoke(document);
+        const session = openStory(A_STORY_OF_TWO_CHAPTERS);
+        await new FixStyleCommand().invoke(session);
 
         expect(asked[0].url).toContain("/fix/style");
         expect(asked[0].body).toEqual({
@@ -136,8 +136,12 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
         expect(asked[1].url).toContain(
             `/fix/style/status?id=${encodeURIComponent(STORY_FILE)}`,
         );
-        expect(document.cellWithId("c1")?.source).toBe("She opened the door.");
-        expect(document.cellWithId("c2")?.source).toBe("The bell rang.");
+        expect(session.document.cellWithId("c1")?.source).toBe(
+            "She opened the door.",
+        );
+        expect(session.document.cellWithId("c2")?.source).toBe(
+            "The bell rang.",
+        );
     });
 
     it("names the chapters it left as the author wrote them", async () => {
@@ -147,10 +151,12 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
             leftAlone: [{ chapter: "One", why: "it came back mid-sentence" }],
         });
 
-        const document = openStory(A_STORY_OF_TWO_CHAPTERS);
-        await new FixStyleCommand().invoke(document);
+        const session = openStory(A_STORY_OF_TWO_CHAPTERS);
+        await new FixStyleCommand().invoke(session);
 
-        expect(document.cellWithId("c1")?.source).toBe("She saw the door.");
+        expect(session.document.cellWithId("c1")?.source).toBe(
+            "She saw the door.",
+        );
         expect(shownMessages.at(-1)).toBe(
             "One chapter was left as you wrote it: “One” — it came back mid-sentence",
         );

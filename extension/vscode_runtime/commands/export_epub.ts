@@ -1,3 +1,4 @@
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
@@ -8,7 +9,7 @@ import {
     type BookLayoutReport,
 } from "../publish/book_layout_report";
 import { fetchFromServer } from "../server/fetch";
-import { AuthorDocument, Cell } from "../storydoc/model";
+import { ImmutableAuthorDocument, MutableCell } from "../storydoc/model";
 
 function fileNameOf(file: vscode.Uri): string {
     return file.path.split("/").pop() ?? file.path;
@@ -22,25 +23,26 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
     readonly commandName = "exportEpub";
     readonly buttonGroup = "transfer";
     readonly iconClassName = "aicon aicon-export-epub";
-    readonly tooltip = "Export EPUB — build the book beside this document";
+    readonly tooltip =
+        "Export EPUB — build the book beside this session.document";
 
-    async invoke(document: AuthorDocument): Promise<void> {
-        await this.bindTheBook(document, false);
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
+        await this.bindTheBook(session, false);
     }
 
     private async bindTheBook(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         bindWhateverIsThere: boolean,
     ): Promise<void> {
         try {
             await vscode.workspace.fs.writeFile(
-                document.uri,
-                new TextEncoder().encode(document.text),
+                session.document.uri,
+                new TextEncoder().encode(session.document.text),
             );
             const report = await fetchFromServer<BookLayoutReport>(
                 "/export/epub",
                 {
-                    path: document.uri.fsPath,
+                    path: session.document.uri.fsPath,
                     force: bindWhateverIsThere,
                 },
             );
@@ -50,7 +52,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
                 );
                 return;
             }
-            await this.askWhatToDoAboutIt(document, report);
+            await this.askWhatToDoAboutIt(session, report);
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Export failed — is the model server running? (${whatWentWrong(failure)})`,
@@ -59,10 +61,10 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
     }
 
     private async askWhatToDoAboutIt(
-        document: AuthorDocument,
+        session: AuthorFileEditorSession,
         report: BookLayoutReport,
     ): Promise<void> {
-        const fileName = fileNameOf(document.uri);
+        const fileName = fileNameOf(session.document.uri);
         const { message, detail } = askedBeforeBinding(fileName, report);
         const answer = await vscode.window.showWarningMessage(
             message,
@@ -71,20 +73,22 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
             "Export Anyway",
         );
         if (answer === "Export Anyway") {
-            await this.bindTheBook(document, true);
+            await this.bindTheBook(session, true);
             return;
         }
         if (answer !== "Fix") {
             return;
         }
-        const laidOut = cellsLaidOutByPlan(document.cells, report.plan);
-        document.removeCellsAt(0, document.cells.length);
-        laidOut.forEach((cell, cellIndex) =>
-            document.insertAt(
-                cellIndex,
-                new Cell(cell.kind, cell.source, cell.attrs),
-            ),
-        );
+        const laidOut = cellsLaidOutByPlan(session.document.cells, report.plan);
+        session.changeTheDocument((story) => {
+            story.removeCellsAt(0, story.cells.length);
+            laidOut.forEach((cell, cellIndex) =>
+                story.insertAt(
+                    cellIndex,
+                    new MutableCell(cell.kind, cell.source, cell.attrs),
+                ),
+            );
+        });
         void vscode.window.showInformationMessage(
             saidAfterLayingOut(fileName, report),
         );

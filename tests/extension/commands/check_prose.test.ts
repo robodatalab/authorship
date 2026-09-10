@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckProseCommand } from "../../../extension/vscode_runtime/commands/check_prose";
+import { openAuthorFileEditorSession } from "../../../extension/vscode_runtime/author_file_editor_session";
 import {
-    closeAuthorFileEditorSession,
-    openAuthorFileEditorSession,
-} from "../../../extension/vscode_runtime/author_file_editor_session";
-import { forgetWhatTheEditorDid, storyOfThreeCells } from "./open_story";
+    forgetWhatTheEditorDid,
+    sentToThePage,
+    storyOfThreeCells,
+} from "./open_story";
 
 const A_STYLE_ERROR = {
     cellId: "c2",
@@ -56,16 +57,9 @@ describe("CheckProseCommand — checks the document's prose", () => {
             });
         });
 
-        const document = storyOfThreeCells();
-        const sentToThePage: unknown[] = [];
-        openAuthorFileEditorSession(document, {
-            webview: {
-                postMessage: (message: unknown) => sentToThePage.push(message),
-            },
-        } as never);
+        const session = storyOfThreeCells();
 
-        await new CheckProseCommand().invoke(document);
-        closeAuthorFileEditorSession(document);
+        await new CheckProseCommand().invoke(session);
 
         expect(asked[0]).toContain("/check/prose");
         expect(asked[1]).toContain("/check/prose/status?id=job-1");

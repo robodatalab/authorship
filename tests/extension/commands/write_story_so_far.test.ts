@@ -33,16 +33,16 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
             });
         });
 
-        const document = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
+        const session = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
 
-        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
+        await new WriteStorySoFarCommand().invoke(session, { cellId: "r1" });
 
         expect(asked[0].url).toContain("/generate/recap");
         expect(asked[0].body).toEqual({
             path: STORY_FILE,
             documents: ["parts/part_1.author", "parts/part_2.author"],
         });
-        expect(document.cells[0].source).toBe("She had lost her name.");
+        expect(session.document.cells[0].source).toBe("She had lost her name.");
     });
 
     it("asks for the documents rather than the server when the cell names none", async () => {
@@ -52,9 +52,9 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
             return Promise.resolve({ ok: true, json: () => ({}) });
         });
 
-        const document = openStory(A_STORY_SO_FAR_THAT_NAMES_NONE);
+        const session = openStory(A_STORY_SO_FAR_THAT_NAMES_NONE);
 
-        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
+        await new WriteStorySoFarCommand().invoke(session, { cellId: "r1" });
 
         expect(asked).toEqual([]);
         expect(shownMessages[0]).toContain("Name the documents");
@@ -63,12 +63,14 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
 
 describe("WriteStorySoFarCommand — while the author keeps working", () => {
     it("writes it into the cell even when the document was read again while the job ran", async () => {
-        const document = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
+        const session = openStory(A_STORY_SO_FAR_THAT_NAMES_ITS_DOCUMENTS);
         let statusAskedFor = 0;
         vi.stubGlobal("fetch", (url: string) => {
             const stillRunning = url.includes("status") && statusAskedFor++ < 1;
             if (stillRunning) {
-                document.fromText(document.text);
+                session.changeTheDocument((story) =>
+                    story.fromText(session.document.text),
+                );
             }
             return Promise.resolve({
                 ok: true,
@@ -86,8 +88,8 @@ describe("WriteStorySoFarCommand — while the author keeps working", () => {
             });
         });
 
-        await new WriteStorySoFarCommand().invoke(document, { cellId: "r1" });
+        await new WriteStorySoFarCommand().invoke(session, { cellId: "r1" });
 
-        expect(document.cells[0].source).toBe("She had lost her name.");
+        expect(session.document.cells[0].source).toBe("She had lost her name.");
     });
 });
