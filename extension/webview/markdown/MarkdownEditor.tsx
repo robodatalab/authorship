@@ -147,6 +147,57 @@ export function MarkdownEditor({
     );
 }
 
+const NEIGHBOURHOOD_AROUND_THE_CURSOR = 40;
+
+function whereTheCursorStandsInTheNewText(
+    shown: string,
+    wanted: string,
+    stoodAt: number,
+): number {
+    if (shown.length === wanted.length) {
+        return stoodAt;
+    }
+    const wouldStandAt = Math.min(
+        wanted.length,
+        Math.round((stoodAt * wanted.length) / (shown.length || 1)),
+    );
+    const neighbourhood = shown.slice(
+        Math.max(0, stoodAt - NEIGHBOURHOOD_AROUND_THE_CURSOR),
+        stoodAt,
+    );
+    const neighbourhoodEndsAt = whereTheNeighbourhoodEndsNow(
+        wanted,
+        neighbourhood,
+        wouldStandAt,
+    );
+    return neighbourhoodEndsAt < 0 ? wouldStandAt : neighbourhoodEndsAt;
+}
+
+function whereTheNeighbourhoodEndsNow(
+    wanted: string,
+    neighbourhood: string,
+    wouldStandAt: number,
+): number {
+    if (!neighbourhood) {
+        return -1;
+    }
+    const before = wanted.lastIndexOf(neighbourhood, wouldStandAt);
+    const after = wanted.indexOf(neighbourhood, wouldStandAt);
+    if (before < 0 && after < 0) {
+        return -1;
+    }
+    if (before < 0) {
+        return after + neighbourhood.length;
+    }
+    if (after < 0) {
+        return before + neighbourhood.length;
+    }
+    return Math.abs(before + neighbourhood.length - wouldStandAt) <=
+        Math.abs(after + neighbourhood.length - wouldStandAt)
+        ? before + neighbourhood.length
+        : after + neighbourhood.length;
+}
+
 interface MonacoMarkdownEditorProps {
     markdown: string;
     errors: ProseCheckError[];
@@ -323,6 +374,23 @@ function MonacoMarkdownEditor({
             editor.dispose();
         };
     }, []);
+
+    useEffect(() => {
+        const editor = monacoEditor.current;
+        const model = editor?.getModel();
+        if (!editor || !model || editor.getValue() === markdown) {
+            return;
+        }
+        const shown = editor.getValue();
+        const position = editor.getPosition();
+        const stoodAt = position ? model.getOffsetAt(position) : 0;
+        editor.setValue(markdown);
+        editor.setPosition(
+            model.getPositionAt(
+                whereTheCursorStandsInTheNewText(shown, markdown, stoodAt),
+            ),
+        );
+    }, [markdown]);
 
     useEffect(() => {
         const editor = monacoEditor.current;

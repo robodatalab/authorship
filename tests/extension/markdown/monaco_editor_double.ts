@@ -1,5 +1,6 @@
 export interface MonacoEditorOnThePage {
     type(markdown: string): void;
+    putTheCursorAt(offset: number): void;
     typeCharacter(character: string): void;
     getValue(): string;
     cursorOffset(): number;
@@ -48,6 +49,16 @@ export function monacoEditorApi(): unknown {
                         value = next;
                         cursorOffset = 0;
                         changed({ isFlush: true });
+                    },
+                    getPosition: () => ({
+                        lineNumber: 1,
+                        column: cursorOffset + 1,
+                    }),
+                    setPosition: (position: { column: number }) => {
+                        cursorOffset = position.column - 1;
+                    },
+                    putTheCursorAt: (offset: number) => {
+                        cursorOffset = offset;
                     },
                     getContentHeight: () => 100,
                     layout: () => {},

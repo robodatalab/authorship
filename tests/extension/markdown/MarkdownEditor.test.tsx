@@ -137,6 +137,27 @@ async function typeCharacterIntoEditor(character: string): Promise<void> {
     });
 }
 
+async function putTheCursorAt(offset: number): Promise<void> {
+    await act(async () => {
+        latestEditor().putTheCursorAt(offset);
+    });
+}
+
+async function whereTheCursorStandsAfter(
+    shown: string,
+    stoodAt: number,
+    wanted: string,
+): Promise<number> {
+    const committed = committedSpy();
+    await mount(shown, committed);
+    await doubleClickRendered();
+    await putTheCursorAt(stoodAt);
+
+    await render(wanted, committed);
+
+    return latestEditor().cursorOffset();
+}
+
 async function pressEscape(): Promise<void> {
     await act(async () => {
         window.dispatchEvent(
@@ -279,7 +300,11 @@ describe("the host answering a keystroke later than the author typed it", () => 
 
     it("answers each message the page sent, and is sent each answer back", async () => {
         for (let answer = 0; answer < 6; answer++) {
-            await render(whatTheEditorReported[answer], reporting);
+            await render(
+                whatTheEditorReported[answer] ??
+                    whatTheEditorReported[whatTheEditorReported.length - 1],
+                reporting,
+            );
         }
 
         expect(whatTheEditorReported).toEqual(["a", "ab"]);
@@ -295,6 +320,102 @@ describe("markdown that changes underneath the editor", () => {
         await render("The lantern had gone out.", committed);
 
         expect(monacoEditorsOnThePage[0].getValue()).toBe("The lantern had gone out.");
+    });
+});
+
+describe("where the cursor stands when the text changes underneath the author", () => {
+    const A_SENTENCE = "The lantern went out.";
+
+    it("stands exactly where it stood when the new text is the same length", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                8,
+                "The lantern came out.",
+            ),
+        ).toBe(8);
+    });
+
+    it("keeps its place in the words before it when the text grows after it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "The lantern went out into the night.",
+            ),
+        ).toBe(16);
+    });
+
+    it("keeps its place in the words before it when the text shrinks after it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, 16, "The lantern went"),
+        ).toBe(16);
+    });
+
+    it("follows the words it stood behind when the text grows before it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "In the end, The lantern went out.",
+            ),
+        ).toBe(28);
+    });
+
+    it("stands where it stood in proportion when the words before it were themselves rewritten", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "In the end the lantern went out.",
+            ),
+        ).toBe(24);
+    });
+
+    it("stands where it stood in proportion when the text is nothing like it was", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, 10, "Something else."),
+        ).toBe(7);
+    });
+
+    it("stands at the start of an emptied cell", async () => {
+        expect(await whereTheCursorStandsAfter(A_SENTENCE, 10, "")).toBe(0);
+    });
+
+    it("stands at the end when the author was at the end and the text was replaced", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                A_SENTENCE.length,
+                "A different sentence altogether.",
+            ),
+        ).toBe(32);
+    });
+
+    it("stands at the start when the author was at the start", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                0,
+                "The lantern went out into the night.",
+            ),
+        ).toBe(0);
+    });
+
+    it("takes the nearer of two places the same words stand in", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                "one two one two",
+                7,
+                "one two one two three",
+            ),
+        ).toBe(15);
+    });
+
+    it("never stands past the end of a shorter text", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, A_SENTENCE.length, "x"),
+        ).toBe(1);
     });
 });
 
