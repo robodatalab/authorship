@@ -6,6 +6,7 @@ import type {
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
+import { AuthorDocDiff } from "./storydoc/diff";
 import {
     ImmutableAuthorDocument,
     MutableAuthorDocument,
@@ -95,22 +96,31 @@ export class AuthorFileEditorSession
     }
 
     changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
-        const asItStoodBefore = this.documentAsItStands;
-        const before = asItStoodBefore.text;
-        const documentBeingChanged = new MutableAuthorDocument(this.uri, before);
+        const documentBeingChanged = new MutableAuthorDocument(
+            this.uri,
+            this.documentAsItStands.text,
+        );
         change(documentBeingChanged);
-        this.documentAsItStands = documentBeingChanged.toImmutable();
-        this.sendWhatChanged(asItStoodBefore);
-        const after = this.documentAsItStands.text;
-        if (after === before) {
+        const documentChange = AuthorDocDiff.diff(
+            this.documentAsItStands,
+            documentBeingChanged.toImmutable(),
+        );
+        if (documentChange.empty()) {
             return;
         }
+        this.writeTheChange(documentChange);
         this.edited.fire({
             document: this,
             label: "Edit",
-            undo: () => this.importDocumentFromText(before),
-            redo: () => this.importDocumentFromText(after),
+            undo: () => this.writeTheChange(documentChange.invert()),
+            redo: () => this.writeTheChange(documentChange),
         });
+    }
+
+    private writeTheChange(documentChange: AuthorDocDiff): void {
+        const asItStoodBefore = this.documentAsItStands;
+        this.documentAsItStands = documentChange.applyTheDiff(asItStoodBefore);
+        this.sendWhatChanged(asItStoodBefore);
     }
 
     async writeTheDocumentToItsFile(): Promise<void> {
