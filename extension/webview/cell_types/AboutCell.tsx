@@ -13,6 +13,7 @@ import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEdito
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
+    sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
@@ -83,11 +84,11 @@ export function AboutCell({
                             )
                         }
                         onMarkdownCommitted={(markdown) =>
-                            invokeAuthorDocumentCommand(
-                                sendMessagesToVscode,
-                                "replaceMarkdown",
-                                { cellId, markdown: markdown },
-                            )
+                            sayTheAuthorTypedInTheCell(
+                            sendMessagesToVscode,
+                            cellId,
+                            markdown,
+                        )
                         }
                     />
                 </AuthorFileEditorCellCard>

@@ -43,6 +43,14 @@ function processMessageFromVscode(
 ): boolean {
     if (message.data?.type === "document") {
         drawn.cells = message.data.cells as WebviewCell[];
+    } else if (message.data?.type === "cells") {
+        const changed = message.data.cells as WebviewCell[];
+        drawn.cells = drawn.cells.map(
+            (drawing) =>
+                changed.find(
+                    (cell) => cell.attrs.id === drawing.attrs.id,
+                ) ?? drawing,
+        );
     } else if (message.data?.type === "commands") {
         drawn.commands = message.data
             .commands as WebviewAuthorDocumentCommandCard[];

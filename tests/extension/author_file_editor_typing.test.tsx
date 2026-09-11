@@ -25,8 +25,11 @@ const DOCUMENT_PATH = "/stories/expat_pet.author";
 
 const listeningForThePage: [string, EventListenerOrEventListenerObject][] = [];
 
+const answersFromTheHost: unknown[] = [];
+
 interface OpenEditor {
     save(): Promise<void>;
+    backUpWithoutWaitingForIt(): void;
     theFileChangedOnDisk(): Promise<void>;
 }
 
@@ -34,6 +37,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     files.clear();
     files.set(DOCUMENT_PATH, text);
     watchersOnTheFiles.length = 0;
+    answersFromTheHost.length = 0;
     monacoEditorsOnThePage.length = 0;
 
     const provider = new AuthorFileEditorProvider({
@@ -52,9 +56,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
             cspSource: "vscode-resource:",
             asWebviewUri: (uri: unknown) => uri,
             postMessage: (message: unknown) => {
-                window.dispatchEvent(
-                    new MessageEvent("message", { data: message }),
-                );
+                answersFromTheHost.push(message);
                 return Promise.resolve(true);
             },
             onDidReceiveMessage: (listener: (message: unknown) => void) => {
@@ -92,6 +94,11 @@ async function openEditor(text: string): Promise<OpenEditor> {
     await settle();
 
     return {
+        backUpWithoutWaitingForIt: () => {
+            void provider.backupCustomDocument(session, {
+                destination: Uri.file("/backups/-7220695711"),
+            } as never);
+        },
         save: async () => {
             await provider.saveCustomDocument(session);
             await settle();
@@ -103,10 +110,23 @@ async function openEditor(text: string): Promise<OpenEditor> {
     };
 }
 
-async function settle(): Promise<void> {
+async function answerTheOldestMessage(): Promise<void> {
+    const answer = answersFromTheHost.shift();
     await act(async () => {
-        await new Promise((settled) => setTimeout(settled, 0));
+        window.dispatchEvent(new MessageEvent("message", { data: answer }));
     });
+}
+
+async function settle(): Promise<void> {
+    for (let pass = 0; pass < 50; pass++) {
+        await act(async () => {
+            await new Promise((settled) => setTimeout(settled, 0));
+        });
+        if (answersFromTheHost.length === 0) {
+            return;
+        }
+        await answerTheOldestMessage();
+    }
 }
 
 async function openTheCellForTyping(): Promise<void> {
@@ -122,10 +142,16 @@ function theCellBeingTyped() {
 }
 
 async function typeCharacter(character: string): Promise<void> {
+    await typeCharacterWithoutWaitingForTheHost(character);
+    await settle();
+}
+
+async function typeCharacterWithoutWaitingForTheHost(
+    character: string,
+): Promise<void> {
     await act(async () => {
         theCellBeingTyped().typeCharacter(character);
     });
-    await settle();
 }
 
 let editor: OpenEditor;
@@ -136,6 +162,29 @@ beforeEach(async () => {
 });
 
 describe("the cursor while the author types in a cell", () => {
+    it("stays where the author is typing when the host answers a keystroke late", async () => {
+        await typeCharacterWithoutWaitingForTheHost(" ");
+        await typeCharacterWithoutWaitingForTheHost("w");
+        await answerTheOldestMessage();
+        await typeCharacterWithoutWaitingForTheHost("e");
+
+        await settle();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lantern we");
+        expect(theCellBeingTyped().cursorOffset()).toBe(14);
+    });
+
+    it("keeps the keystroke the author typed while the editor was being backed up", async () => {
+        await typeCharacterWithoutWaitingForTheHost(" ");
+        editor.backUpWithoutWaitingForIt();
+        await typeCharacterWithoutWaitingForTheHost("w");
+
+        await settle();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lantern w");
+        expect(theCellBeingTyped().cursorOffset()).toBe(13);
+    });
+
     it("stays where the author is typing when the file is saved as they type", async () => {
         await typeCharacter(" ");
         await typeCharacter("w");

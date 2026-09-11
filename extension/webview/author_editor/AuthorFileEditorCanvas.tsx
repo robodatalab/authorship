@@ -74,6 +74,14 @@ function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
         : scope;
 }
 
+export function sayTheAuthorTypedInTheCell(
+    sendMessagesToVscode: SendMessagesToVscode,
+    cellId: string,
+    markdown: string,
+): void {
+    sendMessagesToVscode({ type: "typed", cellId, markdown });
+}
+
 export function invokeAuthorDocumentCommand(
     sendMessagesToVscode: SendMessagesToVscode,
     commandName: string,

@@ -8,7 +8,37 @@ import type {
 } from "./message_queue_between_vscode_and_webview";
 
 export class ThePageIsReady implements AuthorFileEditorMessage {
-    invoke(): void {}
+    invoke(session: AuthorFileEditorSession): void {
+        session.sendDocument();
+    }
+}
+
+export class TheAuthorTypedInTheCell implements AuthorFileEditorMessage {
+    constructor(
+        private readonly cellId: string,
+        private readonly markdown: string,
+        private readonly edited: vscode.EventEmitter<
+            vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
+        >,
+        private readonly queue: MessageQueueBetweenVscodeAndWebview,
+    ) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        const before = session.document.text;
+        session.theAuthorTypedInTheCell(this.cellId, this.markdown);
+        const after = session.document.text;
+        if (after === before) {
+            return;
+        }
+        const wentBackTo = (text: string) => () =>
+            void this.queue.post(new TheDocumentWentBackTo(text));
+        this.edited.fire({
+            document: session,
+            label: "Edit",
+            undo: wentBackTo(before),
+            redo: wentBackTo(after),
+        });
+    }
 }
 
 export class TheAuthorIsEditingTheCell implements AuthorFileEditorMessage {

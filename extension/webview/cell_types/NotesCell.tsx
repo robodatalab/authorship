@@ -10,6 +10,7 @@ import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
+    sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
@@ -50,10 +51,10 @@ export function NotesCell({
                     highlights={findHighlights}
                     markdown={note}
                     onMarkdownCommitted={(editedNote) =>
-                        invokeAuthorDocumentCommand(
+                        sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            "replaceMarkdown",
-                            { cellId, markdown: `<!--\n${editedNote}\n-->` },
+                            cellId,
+                            `<!--\n${editedNote}\n-->`,
                         )
                     }
                 >

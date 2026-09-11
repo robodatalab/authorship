@@ -11,6 +11,7 @@ import {
     AnAuthorDocumentCommandWasInvoked,
     ReadTheDocumentBackFromItsFile,
     TheAuthorIsEditingTheCell,
+    TheAuthorTypedInTheCell,
     ThePageIsReady,
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
@@ -93,8 +94,18 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 cellId?: string | null;
                 commandName?: string;
                 commandArguments?: Record<string, unknown>;
+                markdown?: string;
             }) => {
-                if (message?.type === "editing") {
+                if (message?.type === "typed" && message.cellId) {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorTypedInTheCell(
+                            message.cellId,
+                            message.markdown ?? "",
+                            this.edited,
+                            documentChangesMessageQueue,
+                        ),
+                    );
+                } else if (message?.type === "editing") {
                     void documentChangesMessageQueue.post(
                         new TheAuthorIsEditingTheCell(message.cellId ?? null),
                     );

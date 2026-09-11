@@ -28,6 +28,8 @@ async function openEditor(text: string): Promise<OpenEditor> {
     );
 
     const documentsSentToThePage: { source: string }[][] = [];
+    let cellsOnThePage: { attrs: Record<string, string>; source: string }[] =
+        [];
     let receiveFromThePage: (message: unknown) => void = () => undefined;
     const panel = {
         webview: {
@@ -37,10 +39,20 @@ async function openEditor(text: string): Promise<OpenEditor> {
             asWebviewUri: (uri: unknown) => uri,
             postMessage: (message: {
                 type: string;
-                cells?: { source: string }[];
+                cells?: { attrs: Record<string, string>; source: string }[];
             }) => {
                 if (message.type === "document" && message.cells) {
                     documentsSentToThePage.push(message.cells);
+                    cellsOnThePage = message.cells;
+                } else if (message.type === "cells" && message.cells) {
+                    const changed = message.cells;
+                    documentsSentToThePage.push(changed);
+                    cellsOnThePage = cellsOnThePage.map(
+                        (drawing) =>
+                            changed.find(
+                                (cell) => cell.attrs.id === drawing.attrs.id,
+                            ) ?? drawing,
+                    );
                 }
                 return Promise.resolve(true);
             },
@@ -57,11 +69,12 @@ async function openEditor(text: string): Promise<OpenEditor> {
 
     return {
         typeIntoTheCell: async (cellId: string, markdown: string) => {
-            receiveFromThePage({
-                type: "invoke",
-                commandName: "replaceMarkdown",
-                commandArguments: { cellId, markdown },
-            });
+            cellsOnThePage = cellsOnThePage.map((drawing) =>
+                drawing.attrs.id === cellId
+                    ? { ...drawing, source: markdown }
+                    : drawing,
+            );
+            receiveFromThePage({ type: "typed", cellId, markdown });
             await new Promise((settled) => setTimeout(settled, 0));
         },
         theAuthorIsEditingTheCell: async (cellId: string | null) => {
@@ -73,10 +86,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
             await watchersOnTheFiles[0].theFileChanged();
             await new Promise((settled) => setTimeout(settled, 0));
         },
-        theCellsOnThePage: () =>
-            (
-                documentsSentToThePage[documentsSentToThePage.length - 1] ?? []
-            ).map((cell) => cell.source),
+        theCellsOnThePage: () => cellsOnThePage.map((cell) => cell.source),
         save: () => provider.saveCustomDocument(session),
         documentsSentToThePage: () => documentsSentToThePage.length,
     };
