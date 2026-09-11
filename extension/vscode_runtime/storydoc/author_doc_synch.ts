@@ -1,4 +1,4 @@
-import { diff } from "./diff";
+import { AuthorDocDiff } from "./diff";
 import type { ImmutableAuthorDocument } from "./model";
 
 export interface SynchronizedRepresentation {
@@ -27,13 +27,10 @@ export class AuthorDocSynchronizer<
         docBefore: ImmutableAuthorDocument,
         docAfter: ImmutableAuthorDocument,
     ): void {
-        for (const cellDiff of diff(docBefore, docAfter)) {
+        for (const cellDiff of AuthorDocDiff.diff(docBefore, docAfter).cells) {
             const markdownAfter = docAfter.cellWithId(cellDiff.cellId)?.source;
             const charactersAdded =
-                cellDiff.endCharacterIndexInRhsCell -
-                cellDiff.startCharacterIndexInRhsCell -
-                (cellDiff.endCharacterIndexInLhsCell -
-                    cellDiff.startCharacterIndexInLhsCell);
+                cellDiff.textInRhs.length - cellDiff.textInLhs.length;
 
             for (const repr of this.representations) {
                 if (cellDiff.cellId !== repr.cellId) {
@@ -51,7 +48,7 @@ export class AuthorDocSynchronizer<
                 );
                 if (
                     rangeOverlaps(
-                        cellDiff.startCharacterIndexInLhsCell,
+                        cellDiff.theyDifferFromCharacter,
                         endOfTheCell,
                         repr.startCharacterOffsetInCell,
                         repr.endCharacterOffsetInCell,
@@ -61,7 +58,7 @@ export class AuthorDocSynchronizer<
                 }
 
                 const theDiffEndedBeforeRepr =
-                    cellDiff.endCharacterIndexInLhsCell <=
+                    cellDiff.theyDifferToCharacterInLhs <=
                     repr.startCharacterOffsetInCell;
                 if (theDiffEndedBeforeRepr && repr.isVisible) {
                     repr.startCharacterOffsetInCell += charactersAdded;

@@ -74,6 +74,7 @@ export function RecapCell({
                         cellId={cellId}
                         highlights={findHighlights}
                         markdown={cell.source}
+                        timesTheHostWroteIt={cell.timesTheHostWroteIt}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
                             invokeAuthorDocumentCommand(
@@ -86,10 +87,10 @@ export function RecapCell({
                         }
                         onMarkdownCommitted={(markdown) =>
                             sayTheAuthorTypedInTheCell(
-                            sendMessagesToVscode,
-                            cellId,
-                            markdown,
-                        )
+                                sendMessagesToVscode,
+                                cellId,
+                                markdown,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>

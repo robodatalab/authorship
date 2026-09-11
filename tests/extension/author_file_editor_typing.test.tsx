@@ -31,6 +31,10 @@ interface OpenEditor {
     save(): Promise<void>;
     backUpWithoutWaitingForIt(): void;
     theFileChangedOnDisk(): Promise<void>;
+    editsRecorded: { undo(): void; redo(): void }[];
+    documentText(): string;
+    undoTheNewestEdit(): Promise<void>;
+    redoTheNewestEdit(): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -43,6 +47,10 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider({
         extensionUri: Uri.file("/extension"),
     } as never);
+    const editsRecorded: { undo(): void; redo(): void }[] = [];
+    provider.onDidChangeCustomDocument((edit) =>
+        editsRecorded.push(edit as unknown as { undo(): void; redo(): void }),
+    );
     const session = await provider.openCustomDocument(
         Uri.file(DOCUMENT_PATH) as never,
         {} as never,
@@ -94,6 +102,20 @@ async function openEditor(text: string): Promise<OpenEditor> {
     await settle();
 
     return {
+        editsRecorded,
+        documentText: () => session.document.text,
+        undoTheNewestEdit: async () => {
+            await act(async () => {
+                editsRecorded[editsRecorded.length - 1]?.undo();
+            });
+            await settle();
+        },
+        redoTheNewestEdit: async () => {
+            await act(async () => {
+                editsRecorded[editsRecorded.length - 1]?.redo();
+            });
+            await settle();
+        },
         backUpWithoutWaitingForIt: () => {
             void provider.backupCustomDocument(session, {
                 destination: Uri.file("/backups/-7220695711"),
@@ -205,5 +227,41 @@ describe("the cursor while the author types in a cell", () => {
 
         expect(theCellBeingTyped().cursorOffset()).toBe(12);
         expect(theCellBeingTyped().getValue()).toBe("The lantern\n");
+    });
+});
+
+describe("undoing what the author typed", () => {
+    it("takes the letter off the page, not only out of the document", async () => {
+        await typeCharacter("a");
+
+        await editor.undoTheNewestEdit();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lantern");
+        expect(editor.documentText()).toContain("The lantern\n");
+    });
+
+    it("takes back the whole run of typing, and puts it back", async () => {
+        for (const character of "gers") {
+            await typeCharacter(character);
+        }
+        expect(editor.editsRecorded).toHaveLength(1);
+
+        await editor.undoTheNewestEdit();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lantern");
+
+        await editor.redoTheNewestEdit();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lanterngers");
+    });
+
+    it("leaves the page saying what the document says, so the next keystroke follows on", async () => {
+        await typeCharacter("a");
+        await editor.undoTheNewestEdit();
+
+        await typeCharacter("b");
+
+        expect(theCellBeingTyped().getValue()).toBe("The lanternb");
+        expect(editor.documentText()).toContain("The lanternb\n");
     });
 });

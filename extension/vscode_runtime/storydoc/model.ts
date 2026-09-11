@@ -23,13 +23,38 @@ const CELL_MARKER_LINE =
 const MARKER_ATTRIBUTE =
     /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
+function copiedOutOfTheFileText(text: string): string {
+    return (" " + text).slice(1);
+}
+
+const KNOWN_CELL_KINDS = new Map(
+    [
+        MARKDOWN,
+        CHAPTER,
+        PART,
+        TITLE_PAGE,
+        IMAGE,
+        CONTENTS,
+        DISCLAIMER,
+        ABOUT,
+        BLURB,
+        NOTE,
+        RECAP,
+    ].map((cellKind) => [cellKind, cellKind]),
+);
+
+function theKindAsTheEditorKnowsIt(cellKind: string): string {
+    return KNOWN_CELL_KINDS.get(cellKind) ?? copiedOutOfTheFileText(cellKind);
+}
+
 function readAttributes(marker: string): Record<string, string> {
     const attributes: Record<string, string> = {};
     MARKER_ATTRIBUTE.lastIndex = 0;
     for (const [, attributeName, attributeValue] of marker.matchAll(
         MARKER_ATTRIBUTE,
     )) {
-        attributes[attributeName] = attributeValue.replace(/\\(.)/g, "$1");
+        attributes[copiedOutOfTheFileText(attributeName)] =
+            copiedOutOfTheFileText(attributeValue.replace(/\\(.)/g, "$1"));
     }
     return attributes;
 }
@@ -110,23 +135,23 @@ export class MutableCell implements ImmutableCell {
     }
 
     fold(folded: boolean): void {
-        if (this.isFolded() === folded) {
-            return;
-        }
-        const attributes = { ...this.attrs };
-        if (folded) {
-            attributes[FOLDED] = "true";
-        } else {
-            delete attributes[FOLDED];
-        }
-        this.attrs = attributes;
+        this.replaceAttribute(FOLDED, folded ? "true" : undefined);
     }
 
-    replaceAttribute(attributeName: string, attributeValue: string): void {
+    replaceAttribute(
+        attributeName: string,
+        attributeValue: string | undefined,
+    ): void {
         if (this.attrs[attributeName] === attributeValue) {
             return;
         }
-        this.attrs = { ...this.attrs, [attributeName]: attributeValue };
+        const attributes = { ...this.attrs };
+        if (attributeValue === undefined) {
+            delete attributes[attributeName];
+        } else {
+            attributes[attributeName] = attributeValue;
+        }
+        this.attrs = attributes;
     }
 }
 
@@ -185,12 +210,10 @@ export class MutableAuthorDocument implements vscode.CustomDocument {
         );
     }
 
-    insertAt(cellIndex: number, cell: ImmutableCell): void {
-        this.documentCells.splice(
-            cellIndex,
-            0,
-            new MutableCell(cell.kind, cell.source, cell.attrs),
-        );
+    insertAt(cellIndex: number, cell: ImmutableCell): MutableCell {
+        const inserted = new MutableCell(cell.kind, cell.source, cell.attrs);
+        this.documentCells.splice(cellIndex, 0, inserted);
+        return inserted;
     }
 
     moveCellsAt(cellIndex: number, howMany: number, toCellIndex: number): void {
@@ -252,7 +275,7 @@ function cellsFromText(text: string): MutableCell[] {
     return sections.map((section) => {
         const [, cellKind, markerAttributes] = section.markerLine;
         return new MutableCell(
-            cellKind,
+            theKindAsTheEditorKnowsIt(cellKind),
             withoutBlankLinesAtTheEnds(section.proseLines),
             readAttributes(markerAttributes),
         );
@@ -260,5 +283,7 @@ function cellsFromText(text: string): MutableCell[] {
 }
 
 function withoutBlankLinesAtTheEnds(proseLines: string[]): string {
-    return proseLines.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
+    return copiedOutOfTheFileText(
+        proseLines.join("\n").replace(/^\n+/, "").replace(/\n+$/, ""),
+    );
 }

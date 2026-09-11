@@ -73,6 +73,7 @@ export function AboutCell({
                         cellId={cellId}
                         highlights={findHighlights}
                         markdown={cell.source}
+                        timesTheHostWroteIt={cell.timesTheHostWroteIt}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
                             invokeAuthorDocumentCommand(
@@ -85,10 +86,10 @@ export function AboutCell({
                         }
                         onMarkdownCommitted={(markdown) =>
                             sayTheAuthorTypedInTheCell(
-                            sendMessagesToVscode,
-                            cellId,
-                            markdown,
-                        )
+                                sendMessagesToVscode,
+                                cellId,
+                                markdown,
+                            )
                         }
                     />
                 </AuthorFileEditorCellCard>

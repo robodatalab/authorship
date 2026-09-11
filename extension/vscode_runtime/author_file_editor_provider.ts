@@ -8,7 +8,6 @@ import {
     type AuthorFileEditorSession,
 } from "./author_file_editor_session";
 import {
-    AnAuthorDocumentCommandWasInvoked,
     ReadTheDocumentBackFromItsFile,
     TheAuthorIsEditingTheCell,
     TheAuthorTypedInTheCell,
@@ -16,7 +15,10 @@ import {
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
 } from "./author_file_editor_messages";
-import { authorDocumentCommandCards } from "./commands/author_document_commands";
+import {
+    authorDocumentCommand,
+    authorDocumentCommandCards,
+} from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
 import { loadTemplates, watchSettings } from "./settings/file";
 import { watchTheAuthorFileForChanges } from "./storydoc/author_file_watcher";
@@ -47,6 +49,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         return openAuthorFileEditorSession(
             uri,
             new TextDecoder().decode(bytes),
+            this.edited,
         );
     }
 
@@ -101,8 +104,6 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                         new TheAuthorTypedInTheCell(
                             message.cellId,
                             message.markdown ?? "",
-                            this.edited,
-                            documentChangesMessageQueue,
                         ),
                     );
                 } else if (message?.type === "editing") {
@@ -113,13 +114,9 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                     sendCommandCards();
                     void documentChangesMessageQueue.post(new ThePageIsReady());
                 } else if (message?.type === "invoke" && message.commandName) {
-                    void documentChangesMessageQueue.post(
-                        new AnAuthorDocumentCommandWasInvoked(
-                            message.commandName,
-                            message.commandArguments ?? {},
-                            documentChangesMessageQueue,
-                            this.edited,
-                        ),
+                    void authorDocumentCommand(message.commandName)?.invoke(
+                        session,
+                        message.commandArguments ?? {},
                     );
                 }
             },

@@ -37,20 +37,35 @@ interface WhatTheWebviewDraws {
     wordsInTheDocument: number;
 }
 
+function asTheHostWroteIt(
+    cell: WebviewCell,
+    asTheyWereDrawn: WebviewCell[],
+): WebviewCell {
+    const drawn = asTheyWereDrawn.find(
+        (drawing) => drawing.attrs.id === cell.attrs.id,
+    );
+    return {
+        ...cell,
+        timesTheHostWroteIt: (drawn?.timesTheHostWroteIt ?? 0) + 1,
+    };
+}
+
 function processMessageFromVscode(
     message: MessageEvent,
     drawn: WhatTheWebviewDraws,
 ): boolean {
     if (message.data?.type === "document") {
-        drawn.cells = message.data.cells as WebviewCell[];
+        drawn.cells = (message.data.cells as WebviewCell[]).map((cell) =>
+            asTheHostWroteIt(cell, drawn.cells),
+        );
     } else if (message.data?.type === "cells") {
         const changed = message.data.cells as WebviewCell[];
-        drawn.cells = drawn.cells.map(
-            (drawing) =>
-                changed.find(
-                    (cell) => cell.attrs.id === drawing.attrs.id,
-                ) ?? drawing,
-        );
+        drawn.cells = drawn.cells.map((drawing) => {
+            const written = changed.find(
+                (cell) => cell.attrs.id === drawing.attrs.id,
+            );
+            return written ? asTheHostWroteIt(written, drawn.cells) : drawing;
+        });
     } else if (message.data?.type === "commands") {
         drawn.commands = message.data
             .commands as WebviewAuthorDocumentCommandCard[];

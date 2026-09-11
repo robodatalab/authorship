@@ -31,6 +31,7 @@ export interface WebviewCell {
     readonly kind: string;
     readonly source: string;
     readonly attrs: Readonly<Record<string, string>>;
+    readonly timesTheHostWroteIt?: number;
 }
 
 export interface WebviewAuthorDocumentCommandCard {
@@ -167,10 +168,7 @@ export function AuthorFileEditorCanvas({
                         cellIdsInView.delete(cellId);
                     }
                 }
-                const inView = theInnermostCellInView(
-                    sections,
-                    cellIdsInView,
-                );
+                const inView = theInnermostCellInView(sections, cellIdsInView);
                 if (inView) {
                     setCellIdInView(inView);
                 }
