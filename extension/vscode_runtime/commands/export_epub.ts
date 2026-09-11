@@ -35,14 +35,11 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         bindWhateverIsThere: boolean,
     ): Promise<void> {
         try {
-            await vscode.workspace.fs.writeFile(
-                session.document.uri,
-                new TextEncoder().encode(session.document.text),
-            );
             const report = await fetchFromServer<BookLayoutReport>(
                 "/export/epub",
                 {
                     path: session.document.uri.fsPath,
+                    text: session.document.text,
                     force: bindWhateverIsThere,
                 },
             );

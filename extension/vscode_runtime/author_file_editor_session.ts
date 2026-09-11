@@ -9,6 +9,7 @@ import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import {
     ImmutableAuthorDocument,
     MutableAuthorDocument,
+    type ImmutableCell,
 } from "./storydoc/model";
 import { WordCounter } from "./storydoc/word_counter";
 
@@ -21,19 +22,21 @@ export class AuthorFileEditorSession
     private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
 
-    private documentAsItStands: ImmutableAuthorDocument;
-
     private panel: vscode.WebviewPanel | undefined;
 
-    constructor(private readonly theDocument: MutableAuthorDocument) {
-        this.documentAsItStands = theDocument.toImmutable();
+    private cellTheAuthorIsEditing: string | null = null;
+
+    private whatThePageJustTyped: { cellId: string; markdown: string } | null =
+        null;
+
+    constructor(private documentAsItStands: ImmutableAuthorDocument) {
         this.synchronizer = new AuthorDocSynchronizer(this.proseErrors);
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
         this.wordCounter.synchronize(this.documentAsItStands);
     }
 
     get uri(): vscode.Uri {
-        return this.theDocument.uri;
+        return this.documentAsItStands.uri;
     }
 
     dispose(): void {}
@@ -43,41 +46,76 @@ export class AuthorFileEditorSession
     }
 
     async onMessage(message: AuthorFileEditorMessage): Promise<void> {
+        const asItStoodBefore = this.documentAsItStands;
+        this.whatThePageJustTyped = null;
         await message.invoke(this);
-        this.sendDocument();
+        if (this.documentAsItStands === asItStoodBefore) {
+            this.sendProseErrors();
+            this.sendWordCounts();
+            return;
+        }
+        this.sendWhatChanged(asItStoodBefore);
     }
 
     get document(): ImmutableAuthorDocument {
         return this.documentAsItStands;
     }
 
+    theAuthorTypedInTheCell(cellId: string, markdown: string): void {
+        this.whatThePageJustTyped = { cellId, markdown };
+        this.changeTheDocument((story) =>
+            story.cellWithId(cellId)?.replaceMarkdown(markdown),
+        );
+    }
+
+    theAuthorIsEditingTheCell(cellId: string | null): void {
+        this.cellTheAuthorIsEditing = cellId;
+    }
+
+    importTheFileLeavingTheCellTheAuthorIsEditing(savedText: string): void {
+        const beingEdited = this.cellTheAuthorIsEditing;
+        const asTheAuthorHasIt = beingEdited
+            ? this.documentAsItStands.cellWithId(beingEdited)?.source
+            : undefined;
+        this.changeTheDocument((document) => {
+            document.fromText(savedText);
+            if (beingEdited && asTheAuthorHasIt !== undefined) {
+                document
+                    .cellWithId(beingEdited)
+                    ?.replaceMarkdown(asTheAuthorHasIt);
+            }
+        });
+    }
+
     importDocumentFromText(text: string): void {
-        this.changeTheDocument((document) => document.fromText(text));
+        this.documentAsItStands = new ImmutableAuthorDocument(this.uri, text);
+        this.synchronizeTheRepresentations();
     }
 
     changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
-        change(this.theDocument);
-        this.documentAsItStands = this.theDocument.toImmutable();
+        const documentBeingChanged = new MutableAuthorDocument(
+            this.uri,
+            this.documentAsItStands.text,
+        );
+        change(documentBeingChanged);
+        this.documentAsItStands = documentBeingChanged.toImmutable();
         this.synchronizeTheRepresentations();
     }
 
     async writeTheDocumentToItsFile(): Promise<void> {
-        await vscode.workspace.fs.writeFile(
-            this.theDocument.uri,
-            new TextEncoder().encode(this.theDocument.text),
-        );
+        await this.writeTheDocumentTo(this.uri);
     }
 
     async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
         await vscode.workspace.fs.writeFile(
             destination,
-            new TextEncoder().encode(this.theDocument.text),
+            new TextEncoder().encode(this.documentAsItStands.text),
         );
     }
 
     async readTheDocumentBackFromItsFile(): Promise<void> {
-        const bytes = await vscode.workspace.fs.readFile(this.theDocument.uri);
-        this.theDocument.fromText(new TextDecoder().decode(bytes));
+        const bytes = await vscode.workspace.fs.readFile(this.uri);
+        this.importDocumentFromText(new TextDecoder().decode(bytes));
     }
 
     showProseErrors(proseErrors: ProseCheckError[]): void {
@@ -102,6 +140,13 @@ export class AuthorFileEditorSession
         );
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
         this.wordCounter.synchronize(this.documentAsItStands);
+    }
+
+    private thePageDrewItAlready(cell: ImmutableCell): boolean {
+        return (
+            this.whatThePageJustTyped?.cellId === cell.uniqueId &&
+            this.whatThePageJustTyped.markdown === cell.source
+        );
     }
 
     sendCellsBeingWritten(): void {
@@ -132,20 +177,61 @@ export class AuthorFileEditorSession
         this.synchronizeTheRepresentations();
         void this.panel?.webview.postMessage({
             type: "document",
-            cells: this.theDocument.cells.map((cell) => ({
-                kind: cell.kind,
-                source: cell.source,
-                attrs: cell.attrs,
-            })),
+            cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
         this.sendWordCounts();
     }
+
+    private sendWhatChanged(asItStoodBefore: ImmutableAuthorDocument): void {
+        const theSameCellsInTheSameOrder =
+            asItStoodBefore.cells.length ===
+                this.documentAsItStands.cells.length &&
+            asItStoodBefore.cells.every(
+                (cell, standing) =>
+                    cell.uniqueId ===
+                    this.documentAsItStands.cells[standing].uniqueId,
+            );
+        if (!theSameCellsInTheSameOrder) {
+            this.sendDocument();
+            return;
+        }
+        this.synchronizeTheRepresentations();
+        const changed = this.documentAsItStands.cells.filter(
+            (cell, standing) => {
+                const before = asItStoodBefore.cells[standing];
+                return (
+                    (cell.source !== before.source ||
+                        cell.kind !== before.kind ||
+                        cell.marker() !== before.marker()) &&
+                    !this.thePageDrewItAlready(cell)
+                );
+            },
+        );
+        if (changed.length > 0) {
+            void this.panel?.webview.postMessage({
+                type: "cells",
+                cells: changed.map(asThePageDrawsIt),
+            });
+        }
+        this.sendProseErrors();
+        this.sendWordCounts();
+    }
+}
+
+function asThePageDrawsIt(cell: ImmutableCell): {
+    kind: string;
+    source: string;
+    attrs: Readonly<Record<string, string>>;
+} {
+    return { kind: cell.kind, source: cell.source, attrs: cell.attrs };
 }
 
 export function openAuthorFileEditorSession(
     uri: vscode.Uri,
     text: string,
 ): AuthorFileEditorSession {
-    return new AuthorFileEditorSession(new MutableAuthorDocument(uri, text));
+    return new AuthorFileEditorSession(
+        new ImmutableAuthorDocument(uri, text),
+    );
 }

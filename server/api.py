@@ -13,7 +13,6 @@ from server.publishing import authorship
 from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.recap import write_recap
-from server.writing_tools.grammar import correct_span
 from server.writing_tools import grammar_check, prose_check, style
 from server.writing_tools.gemini import (
     Gemini,
@@ -25,7 +24,7 @@ from vramen import (
     CausalModel,
     InferenceModelResourceManager,
     Seq2SeqModel,
-    coedit_prompt, machine_memory, qwen_chat_prompt
+    machine_memory, qwen_chat_prompt
 )
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
@@ -34,7 +33,6 @@ from server.storydoc import Document
 _log = log.logger(__name__)
 
 
-GRAMMAR_MODEL = "grammarly/coedit-xl"
 
 # Grammar as a check rather than as a rewrite. A minimal-edit corrector: trained
 # to change as little as will make a sentence grammatical, which is the only kind
@@ -49,7 +47,6 @@ GEC_MODEL = "Unbabel/gec-t5_small"
 CAUSAL_MODEL = "Qwen/Qwen3-8B"
 
 # What the model was measured holding over a single batch, and what it is allowed.
-GRAMMAR_MODEL_GB = 5.0
 GEC_MODEL_GB = 1.0
 CAUSAL_MODEL_GB = 17.0
 MEMORY_QUOTA_GB = 24.0
@@ -58,9 +55,6 @@ MEMORY_QUOTA_GB = 24.0
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
     app.state.models = InferenceModelResourceManager(MEMORY_QUOTA_GB)
-    app.state.grammar_model = Seq2SeqModel(
-        GRAMMAR_MODEL, coedit_prompt, app.state.models, GRAMMAR_MODEL_GB
-    )
     app.state.causal_model = CausalModel(
         CAUSAL_MODEL, qwen_chat_prompt, app.state.models, CAUSAL_MODEL_GB
     )
@@ -68,7 +62,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         GEC_MODEL, grammar_check.gec_prompt, app.state.models, GEC_MODEL_GB
     )
     app.state.inference_models = [
-        app.state.grammar_model,
         app.state.causal_model,
         app.state.gec_model,
     ]
@@ -133,31 +126,6 @@ def _document(path: str) -> Document:
     return Document.load(target)
 
 
-class GrammarFixJob(Job):
-    kind = "grammar fix"
-
-    def __init__(
-        self, model: Seq2SeqModel, document: Document, start: int, end: int
-    ) -> None:
-        super().__init__(str(document.path))
-        self._model = model
-        self._document = document
-        self._start = start
-        self._end = end
-
-    def execute(self) -> None:
-        correct_span(
-            self._model,
-            self._document,
-            self._start,
-            self._end,
-            lambda: self.cancelled,
-        )
-        if not self.cancelled:
-            self._document.save()
-
-
-
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
     """The work in hand: every unfinished job, the file it is queued on, and
@@ -205,6 +173,7 @@ class EpubExportRequest(BaseModel):
     # title page, its cover, its disclaimer, where to find the author — is in
     # the document's own cells.
     path: str
+    text: str
     # Bind the book though sections of it are missing or empty. The author has
     # been shown what is wanting and asked for the file anyway, which is theirs
     # to ask for; nothing else may skip the reading.
@@ -250,61 +219,13 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     said. `force` is how the author, having been shown what is missing, says they
     want the file regardless.
     """
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     found = report_of(document)
     if not (found.ready or request.force):
         return _said(found)
     out_path = document.beside(".epub")
     build_epub(document, out_path)
     return {**_said(found), "path": str(out_path)}
-
-
-class LineSelection(BaseModel):
-    # 0-based and inclusive.
-    start: int
-    end: int
-
-
-class GrammarFixRequest(BaseModel):
-    # Path of the document to correct.
-    path: str
-    # Where the cursor is.
-    line: int
-    # The lines the author selected, if they selected any.
-    selection: LineSelection | None = None
-
-
-@app.post("/fix/grammar", status_code=202)
-def fix_grammar_endpoint(request: GrammarFixRequest) -> dict[str, Any]:
-    """Start correcting a passage; poll /fix/grammar/status for the end of it.
-
-    A pass is over what the author is working on rather than the whole
-    document: the lines they selected, or — having selected none — the cell their
-    cursor is in. Where a cell ends is the server's to say, so the request
-    carries the cursor rather than a span it worked out for itself.
-    """
-    document = _document(request.path)
-    if request.selection:
-        start, end = request.selection.start, request.selection.end
-    else:
-        where = document.lines_at(request.line)
-        if where is None:
-            raise HTTPException(
-                status_code=400, detail="There is no prose there to correct."
-            )
-        start, end = where
-    job = GrammarFixJob(app.state.grammar_model, document, start, end)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/fix/grammar/status")
-def fix_grammar_status(id: str) -> dict[str, Any]:
-    """Whether the grammar job is still running; the document is its result."""
-    job = app.state.jobs.get(id)
-    if not isinstance(job, GrammarFixJob):
-        raise HTTPException(status_code=404, detail=f"No grammar job for {id}")
-    return {"running": not job.done, "error": job.error}
 
 
 # --- writing a section from the story ------------------------------------
@@ -350,6 +271,7 @@ class WritingJob(Job):
 class BlurbRequest(BaseModel):
     # Path of the document to write a blurb for.
     path: str
+    text: str
 
 
 class BlurbJob(WritingJob):
@@ -369,6 +291,7 @@ class BlurbJob(WritingJob):
 class RecapRequest(BaseModel):
     # Path of the document the recap is being written into.
     path: str
+    text: str
     # The earlier documents to summarise, named relative to that one. Resolved
     # and ordered here rather than by the editor: which file a relative path
     # means is a question about the disk, and the order they are read in is a
@@ -393,7 +316,7 @@ class RecapJob(WritingJob):
 @app.post("/generate/blurb", status_code=202)
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     """Start writing the story's blurb; poll /generate/status for it."""
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     job = BlurbJob(app.state.causal_model, document)
     app.state.jobs.start(job)
     return {"id": job.target}
@@ -409,7 +332,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
     of gets the story in the order it happened. A path named twice is one
     document, and is read once.
     """
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     if not request.documents:
         raise HTTPException(
             status_code=400,
@@ -536,6 +459,7 @@ def gemini_models(request: GeminiKeyRequest) -> dict[str, Any]:
 class StyleFixRequest(BaseModel):
     # Path of the document to correct.
     path: str
+    text: str
     # The author's Gemini key. Omitted, the environment is asked — which is how a
     # server somebody started themselves is given one.
     key: str | None = None
@@ -631,7 +555,7 @@ def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
             status_code=401,
             detail="Sign in to Gemini to correct the style of a manuscript.",
         )
-    document = _document(request.path)
+    document = Document(request.text, Path(request.path))
     job = StyleFixJob(key, configured_model(request.model), document)
     app.state.jobs.start(job)
     return {"id": job.target}
@@ -673,16 +597,21 @@ def fix_style_status(id: str) -> dict[str, Any]:
 # edit must not cancel the pass over the rest of the book.
 
 
+class LineSelection(BaseModel):
+    # 0-based and inclusive.
+    start: int
+    end: int
+
+
 class ProseCheckRequest(BaseModel):
     # Path of the document to check. What it is called rather than where to read
     # it — the text comes with the request — since a job is keyed by the document
     # it is about.
     path: str
-    # The document as the author has it. A check only reads, so unlike every
-    # other job here it has no need of the file: asked for the text, it can
-    # report on a paragraph that has not been saved and never asks the editor to
-    # save one on its behalf.
-    text: str | None = None
+    # The document as the author has it, as every job here is given it: the
+    # editor holds the document, so a check reads what the author sees rather
+    # than what was last saved, and never asks for a save on its behalf.
+    text: str
     # The lines to check. Omitted, the whole document is checked — which is what
     # turning the checks on asks for; a passage is what the paragraph under an
     # edit asks for.
@@ -846,11 +775,7 @@ def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
     the second is not a lesser kind of the first and returns findings of exactly
     the same shape.
     """
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
@@ -888,11 +813,7 @@ def check_grammar(request: ProseCheckRequest) -> dict[str, Any]:
     the other is not. The editor draws what the rules found while this is still
     reading.
     """
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
@@ -957,7 +878,7 @@ class SpanFixRequest(BaseModel):
     # Path of the document the fault is in.
     path: str
     # The document as the author has it, for the same reason a check is given it.
-    text: str | None = None
+    text: str
     where: Span
     # What found the fault, which is also what will judge the answer.
     rule: str
@@ -1073,11 +994,7 @@ def fix_span(request: SpanFixRequest) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail="A fault is fixed a line at a time."
         )
-    document = (
-        Document(request.text, Path(request.path))
-        if request.text is not None
-        else _document(request.path)
-    )
+    document = Document(request.text, Path(request.path))
     if request.where.at.line >= len(document.lines):
         raise HTTPException(status_code=400, detail="There is no such line.")
     job = SpanFixJob(

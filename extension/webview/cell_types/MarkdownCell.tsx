@@ -11,6 +11,7 @@ import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
+    sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
@@ -35,6 +36,7 @@ export function MarkdownCell({
             <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
                     errors={proseErrors}
@@ -48,10 +50,10 @@ export function MarkdownCell({
                         )
                     }
                     onMarkdownCommitted={(markdown) =>
-                        invokeAuthorDocumentCommand(
+                        sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            "replaceMarkdown",
-                            { cellId, markdown: markdown },
+                            cellId,
+                            markdown,
                         )
                     }
                 />

@@ -10,7 +10,8 @@ import {
 import {
     AnAuthorDocumentCommandWasInvoked,
     ReadTheDocumentBackFromItsFile,
-    TheFileChangedUnderneath,
+    TheAuthorIsEditingTheCell,
+    TheAuthorTypedInTheCell,
     ThePageIsReady,
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
@@ -18,6 +19,7 @@ import {
 import { authorDocumentCommandCards } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
 import { loadTemplates, watchSettings } from "./settings/file";
+import { watchTheAuthorFileForChanges } from "./storydoc/author_file_watcher";
 import { useTemplates } from "./settings/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorFileEditorSession> {
@@ -89,10 +91,25 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const onMessageFromWebView = panel.webview.onDidReceiveMessage(
             (message: {
                 type?: string;
+                cellId?: string | null;
                 commandName?: string;
                 commandArguments?: Record<string, unknown>;
+                markdown?: string;
             }) => {
-                if (message?.type === "ready") {
+                if (message?.type === "typed" && message.cellId) {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorTypedInTheCell(
+                            message.cellId,
+                            message.markdown ?? "",
+                            this.edited,
+                            documentChangesMessageQueue,
+                        ),
+                    );
+                } else if (message?.type === "editing") {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorIsEditingTheCell(message.cellId ?? null),
+                    );
+                } else if (message?.type === "ready") {
                     sendCommandCards();
                     void documentChangesMessageQueue.post(new ThePageIsReady());
                 } else if (message?.type === "invoke" && message.commandName) {
@@ -116,28 +133,15 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             },
         );
 
-        const fileWatcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(
-                vscode.Uri.joinPath(session.uri, ".."),
-                session.uri.path.split("/").pop() ?? "",
-            ),
+        const watchingTheFile = watchTheAuthorFileForChanges(
+            session,
+            documentChangesMessageQueue,
         );
-        const savedElsewhere = fileWatcher.onDidChange(async () => {
-            const bytes = await vscode.workspace.fs.readFile(session.uri);
-            const savedText = new TextDecoder().decode(bytes);
-            if (savedText === session.document.text) {
-                return;
-            }
-            await documentChangesMessageQueue.post(
-                new TheFileChangedUnderneath(savedText),
-            );
-        });
 
         panel.onDidDispose(() => {
             templatesWatcher.dispose();
             settingsChanged.dispose();
-            savedElsewhere.dispose();
-            fileWatcher.dispose();
+            watchingTheFile.dispose();
             onMessageFromWebView.dispose();
             this.documentChangesMessageQueues.delete(session.uri.toString());
         });

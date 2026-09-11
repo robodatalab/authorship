@@ -48,13 +48,10 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
         }
 
         try {
-            await vscode.workspace.fs.writeFile(
-                session.document.uri,
-                new TextEncoder().encode(session.document.text),
-            );
             session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/recap", {
                 path: session.document.uri.fsPath,
+                text: session.document.text,
                 documents,
             });
             const storySoFar = await awaitServerJob<WrittenSection>(

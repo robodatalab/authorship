@@ -74,6 +74,14 @@ function scopeOf(cell: WebviewCell, nothingOfItsKindFollows: boolean): string {
         : scope;
 }
 
+export function sayTheAuthorTypedInTheCell(
+    sendMessagesToVscode: SendMessagesToVscode,
+    cellId: string,
+    markdown: string,
+): void {
+    sendMessagesToVscode({ type: "typed", cellId, markdown });
+}
+
 export function invokeAuthorDocumentCommand(
     sendMessagesToVscode: SendMessagesToVscode,
     commandName: string,
@@ -325,7 +333,11 @@ export function AuthorFileEditorCanvas({
                 />
                 <AuthorFileEditorFindBar find={find} />
             </AuthorFileEditorMainMenu>
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator
+                onEditingTheCell={(cellId) =>
+                    sendMessagesToVscode({ type: "editing", cellId })
+                }
+            >
                 {cellsInScope(sections, null)}
             </MarkdownEditorMediator>
         </div>

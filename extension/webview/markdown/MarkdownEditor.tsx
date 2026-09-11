@@ -2,7 +2,6 @@ import {
     createContext,
     useContext,
     useEffect,
-    useId,
     useRef,
     useState,
 } from "react";
@@ -55,10 +54,28 @@ interface MarkdownEditorBeingEdited {
 const MarkdownEditorBeingEditedContext =
     createContext<MarkdownEditorBeingEdited | null>(null);
 
-export function MarkdownEditorMediator({ children }: { children: ReactNode }) {
+export function MarkdownEditorMediator({
+    children,
+    onEditingTheCell,
+}: {
+    children: ReactNode;
+    onEditingTheCell: (cellId: string | null) => void;
+}) {
     const [editorBeingEdited, editMarkdownEditor] = useState<string | null>(
         null,
     );
+    const sayWhichCellIsBeingEdited = useRef(onEditingTheCell);
+    sayWhichCellIsBeingEdited.current = onEditingTheCell;
+    const theCellTheHostWasTold = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (theCellTheHostWasTold.current === editorBeingEdited) {
+            return;
+        }
+        theCellTheHostWasTold.current = editorBeingEdited;
+        sayWhichCellIsBeingEdited.current(editorBeingEdited);
+    }, [editorBeingEdited]);
+
     return (
         <MarkdownEditorBeingEditedContext.Provider
             value={{ editorBeingEdited, editMarkdownEditor }}
@@ -83,6 +100,7 @@ function useMarkdownEditorBeingEdited(editorId: string) {
 }
 
 interface MarkdownEditorProps {
+    cellId: string;
     markdown: string;
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
@@ -92,6 +110,7 @@ interface MarkdownEditorProps {
 }
 
 export function MarkdownEditor({
+    cellId,
     markdown,
     onMarkdownCommitted,
     errors = [],
@@ -100,7 +119,7 @@ export function MarkdownEditor({
     children,
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
-        useMarkdownEditorBeingEdited(useId());
+        useMarkdownEditorBeingEdited(cellId);
     const [markdownShown, showMarkdown] = useState(markdown);
 
     useEffect(() => {
@@ -145,6 +164,57 @@ export function MarkdownEditor({
             onFinished={finishEditing}
         />
     );
+}
+
+const NEIGHBOURHOOD_AROUND_THE_CURSOR = 40;
+
+function whereTheCursorStandsInTheNewText(
+    shown: string,
+    wanted: string,
+    stoodAt: number,
+): number {
+    if (shown.length === wanted.length) {
+        return stoodAt;
+    }
+    const wouldStandAt = Math.min(
+        wanted.length,
+        Math.round((stoodAt * wanted.length) / (shown.length || 1)),
+    );
+    const neighbourhood = shown.slice(
+        Math.max(0, stoodAt - NEIGHBOURHOOD_AROUND_THE_CURSOR),
+        stoodAt,
+    );
+    const neighbourhoodEndsAt = whereTheNeighbourhoodEndsNow(
+        wanted,
+        neighbourhood,
+        wouldStandAt,
+    );
+    return neighbourhoodEndsAt < 0 ? wouldStandAt : neighbourhoodEndsAt;
+}
+
+function whereTheNeighbourhoodEndsNow(
+    wanted: string,
+    neighbourhood: string,
+    wouldStandAt: number,
+): number {
+    if (!neighbourhood) {
+        return -1;
+    }
+    const before = wanted.lastIndexOf(neighbourhood, wouldStandAt);
+    const after = wanted.indexOf(neighbourhood, wouldStandAt);
+    if (before < 0 && after < 0) {
+        return -1;
+    }
+    if (before < 0) {
+        return after + neighbourhood.length;
+    }
+    if (after < 0) {
+        return before + neighbourhood.length;
+    }
+    return Math.abs(before + neighbourhood.length - wouldStandAt) <=
+        Math.abs(after + neighbourhood.length - wouldStandAt)
+        ? before + neighbourhood.length
+        : after + neighbourhood.length;
 }
 
 interface MonacoMarkdownEditorProps {
@@ -323,6 +393,23 @@ function MonacoMarkdownEditor({
             editor.dispose();
         };
     }, []);
+
+    useEffect(() => {
+        const editor = monacoEditor.current;
+        const model = editor?.getModel();
+        if (!editor || !model || editor.getValue() === markdown) {
+            return;
+        }
+        const shown = editor.getValue();
+        const position = editor.getPosition();
+        const stoodAt = position ? model.getOffsetAt(position) : 0;
+        editor.setValue(markdown);
+        editor.setPosition(
+            model.getPositionAt(
+                whereTheCursorStandsInTheNewText(shown, markdown, stoodAt),
+            ),
+        );
+    }, [markdown]);
 
     useEffect(() => {
         const editor = monacoEditor.current;

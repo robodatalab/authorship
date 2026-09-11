@@ -87,14 +87,23 @@ export class RelativePattern {
     ) {}
 }
 
+export const watchersOnTheFiles: { theFileChanged(): Promise<void> }[] = [];
+
 export const workspace = {
     createFileSystemWatcher: (): {
-        onDidChange(listener: () => void): { dispose(): void };
+        onDidChange(listener: () => void | Promise<void>): { dispose(): void };
         dispose(): void;
-    } => ({
-        onDidChange: () => ({ dispose: () => undefined }),
-        dispose: () => undefined,
-    }),
+    } => {
+        let watching: () => void | Promise<void> = () => undefined;
+        watchersOnTheFiles.push({ theFileChanged: async () => watching() });
+        return {
+            onDidChange: (listener: () => void | Promise<void>) => {
+                watching = listener;
+                return { dispose: () => undefined };
+            },
+            dispose: () => undefined,
+        };
+    },
     fs: {
         readFile: (uri: StubUri): Promise<Uint8Array> =>
             Promise.resolve(

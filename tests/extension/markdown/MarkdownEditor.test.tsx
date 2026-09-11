@@ -4,19 +4,6 @@ import { createRoot, type Root } from "react-dom/client";
 
 import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
 
-const monacoEditors = vi.hoisted(() => {
-    return [] as {
-        type: (markdown: string) => void;
-        getValue: () => string;
-        point: (offset: number | null) => void;
-        pointAway: () => void;
-        marks: () => {
-            range: unknown;
-            options: { inlineClassName: string };
-        }[];
-    }[];
-});
-
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
     () => ({}),
@@ -25,107 +12,12 @@ vi.mock("monaco-editor/languages/definitions/markdown/markdown.js", () => ({
     conf: {},
     language: {},
 }));
-vi.mock("monaco-editor/editor/editor.api", () => {
-    const disposable = { dispose: () => {} };
-    return {
-        KeyMod: { CtrlCmd: 1, Shift: 2 },
-        Range: {
-            fromPositions: (from: unknown, to: unknown) => ({ from, to }),
-        },
-        KeyCode: { KeyZ: 4, KeyY: 8, KeyS: 16, Escape: 32 },
-        languages: {
-            register: () => {},
-            setLanguageConfiguration: () => {},
-            setMonarchTokensProvider: () => {},
-        },
-        editor: {
-            addKeybindingRules: () => {},
-            defineTheme: () => {},
-            create: (node: HTMLElement, options: { value: string }) => {
-                let value = options.value;
-                let changed = (_changed: { isFlush: boolean }): void => {};
-                let pointed: (event: unknown) => void = () => {};
-                let pointedAway = (): void => {};
-                const collections: {
-                    range: unknown;
-                    options: { inlineClassName: string };
-                }[][] = [];
-                const editor = {
-                    getValue: () => value,
-                    setValue: (next: string) => {
-                        value = next;
-                        changed({ isFlush: true });
-                    },
-                    getContentHeight: () => 100,
-                    layout: () => {},
-                    focus: () => {},
-                    dispose: () => {},
-                    addCommand: () => {},
-                    onDidContentSizeChange: () => disposable,
-                    onDidChangeModelContent: (
-                        listener: (changed: { isFlush: boolean }) => void,
-                    ) => {
-                        changed = listener;
-                        return disposable;
-                    },
-                    onMouseMove: (listener: (event: unknown) => void) => {
-                        pointed = listener;
-                        return disposable;
-                    },
-                    onMouseLeave: (listener: () => void) => {
-                        pointedAway = listener;
-                        return disposable;
-                    },
-                    createDecorationsCollection: () => {
-                        const drawn = collections.length;
-                        collections.push([]);
-                        return {
-                            set: (
-                                next: {
-                                    range: unknown;
-                                    options: { inlineClassName: string };
-                                }[],
-                            ) => {
-                                collections[drawn] = next;
-                            },
-                        };
-                    },
-                    getModel: () => ({
-                        getOffsetAt: (position: { column: number }) =>
-                            position.column - 1,
-                        getPositionAt: (offset: number) => ({
-                            lineNumber: 1,
-                            column: offset + 1,
-                        }),
-                    }),
-                    getScrolledVisiblePosition: () => ({
-                        top: 10,
-                        left: 20,
-                        height: 18,
-                    }),
-                    marks: () => collections.flat(),
-                    point: (offset: number | null) =>
-                        pointed({
-                            target: {
-                                position:
-                                    offset === null
-                                        ? null
-                                        : { lineNumber: 1, column: offset + 1 },
-                            },
-                        }),
-                    pointAway: () => pointedAway(),
-                    type: (markdown: string) => {
-                        value = markdown;
-                        changed({ isFlush: false });
-                    },
-                };
-                node.dataset.monaco = "open";
-                monacoEditors.push(editor);
-                return editor;
-            },
-        },
-    };
+vi.mock("monaco-editor/editor/editor.api", async () => {
+    const { monacoEditorApi } = await import("./monaco_editor_double");
+    return monacoEditorApi();
 });
+
+const { monacoEditorsOnThePage } = await import("./monaco_editor_double");
 
 const { MarkdownEditor, MarkdownEditorMediator } =
     await import("../../../extension/webview/markdown/MarkdownEditor");
@@ -160,8 +52,9 @@ async function render(
 ): Promise<void> {
     await act(async () => {
         root.render(
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                 <MarkdownEditor
+                    cellId="c1"
                     markdown={markdown}
                     onMarkdownCommitted={onMarkdownCommitted}
                 >
@@ -178,10 +71,11 @@ async function mountAll(
     root = createRoot(emptyBody());
     await act(async () => {
         root.render(
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                 {editors.map((editor, editorIndex) => (
                     <MarkdownEditor
                         key={editorIndex}
+                        cellId={`c${editorIndex}`}
                         markdown={editor.markdown}
                         onMarkdownCommitted={editor.committed}
                     >
@@ -230,13 +124,40 @@ async function doubleClickRenderedMarkdown(markdown: string): Promise<void> {
 }
 
 function latestEditor() {
-    return monacoEditors[monacoEditors.length - 1];
+    return monacoEditorsOnThePage[monacoEditorsOnThePage.length - 1];
 }
 
 async function typeIntoEditor(markdown: string): Promise<void> {
     await act(async () => {
         latestEditor().type(markdown);
     });
+}
+
+async function typeCharacterIntoEditor(character: string): Promise<void> {
+    await act(async () => {
+        latestEditor().typeCharacter(character);
+    });
+}
+
+async function putTheCursorAt(offset: number): Promise<void> {
+    await act(async () => {
+        latestEditor().putTheCursorAt(offset);
+    });
+}
+
+async function whereTheCursorStandsAfter(
+    shown: string,
+    stoodAt: number,
+    wanted: string,
+): Promise<number> {
+    const committed = committedSpy();
+    await mount(shown, committed);
+    await doubleClickRendered();
+    await putTheCursorAt(stoodAt);
+
+    await render(wanted, committed);
+
+    return latestEditor().cursorOffset();
 }
 
 async function pressEscape(): Promise<void> {
@@ -254,7 +175,7 @@ async function clickSomethingElse(): Promise<void> {
 }
 
 beforeEach(() => {
-    monacoEditors.length = 0;
+    monacoEditorsOnThePage.length = 0;
 });
 
 describe("markdown that is not being edited", () => {
@@ -269,8 +190,9 @@ describe("markdown that is not being edited", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="# The lantern"
                         onMarkdownCommitted={committedSpy()}
                     />
@@ -299,7 +221,7 @@ describe("opening the editor", () => {
 
         await doubleClickRendered();
 
-        expect(monacoEditors[0].getValue()).toBe("The lantern.");
+        expect(monacoEditorsOnThePage[0].getValue()).toBe("The lantern.");
     });
 });
 
@@ -381,7 +303,11 @@ describe("the host answering a keystroke later than the author typed it", () => 
 
     it("answers each message the page sent, and is sent each answer back", async () => {
         for (let answer = 0; answer < 6; answer++) {
-            await render(whatTheEditorReported[answer], reporting);
+            await render(
+                whatTheEditorReported[answer] ??
+                    whatTheEditorReported[whatTheEditorReported.length - 1],
+                reporting,
+            );
         }
 
         expect(whatTheEditorReported).toEqual(["a", "ab"]);
@@ -396,7 +322,103 @@ describe("markdown that changes underneath the editor", () => {
 
         await render("The lantern had gone out.", committed);
 
-        expect(monacoEditors[0].getValue()).toBe("The lantern had gone out.");
+        expect(monacoEditorsOnThePage[0].getValue()).toBe("The lantern had gone out.");
+    });
+});
+
+describe("where the cursor stands when the text changes underneath the author", () => {
+    const A_SENTENCE = "The lantern went out.";
+
+    it("stands exactly where it stood when the new text is the same length", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                8,
+                "The lantern came out.",
+            ),
+        ).toBe(8);
+    });
+
+    it("keeps its place in the words before it when the text grows after it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "The lantern went out into the night.",
+            ),
+        ).toBe(16);
+    });
+
+    it("keeps its place in the words before it when the text shrinks after it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, 16, "The lantern went"),
+        ).toBe(16);
+    });
+
+    it("follows the words it stood behind when the text grows before it", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "In the end, The lantern went out.",
+            ),
+        ).toBe(28);
+    });
+
+    it("stands where it stood in proportion when the words before it were themselves rewritten", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                16,
+                "In the end the lantern went out.",
+            ),
+        ).toBe(24);
+    });
+
+    it("stands where it stood in proportion when the text is nothing like it was", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, 10, "Something else."),
+        ).toBe(7);
+    });
+
+    it("stands at the start of an emptied cell", async () => {
+        expect(await whereTheCursorStandsAfter(A_SENTENCE, 10, "")).toBe(0);
+    });
+
+    it("stands at the end when the author was at the end and the text was replaced", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                A_SENTENCE.length,
+                "A different sentence altogether.",
+            ),
+        ).toBe(32);
+    });
+
+    it("stands at the start when the author was at the start", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                A_SENTENCE,
+                0,
+                "The lantern went out into the night.",
+            ),
+        ).toBe(0);
+    });
+
+    it("takes the nearer of two places the same words stand in", async () => {
+        expect(
+            await whereTheCursorStandsAfter(
+                "one two one two",
+                7,
+                "one two one two three",
+            ),
+        ).toBe(15);
+    });
+
+    it("never stands past the end of a shorter text", async () => {
+        expect(
+            await whereTheCursorStandsAfter(A_SENTENCE, A_SENTENCE.length, "x"),
+        ).toBe(1);
     });
 });
 
@@ -460,8 +482,9 @@ describe("what the checks found in the prose being written", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="It was very very late."
                         errors={[REPEATED]}
                         onFixAsked={onFixAsked}
@@ -555,8 +578,9 @@ describe("what the checks found in the prose being written", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="It was very very late."
                         errors={[{ ...REPEATED, correctVersion: "" }]}
                         onFixAsked={vi.fn()}
