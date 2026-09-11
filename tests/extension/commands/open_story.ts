@@ -21,6 +21,7 @@ export function openStory(text: string): AuthorFileEditorSession {
     const session = openAuthorFileEditorSession(
         vscode.Uri.file(STORY_FILE) as never,
         text.replace(/^\n/, ""),
+        new vscode.EventEmitter() as never,
     );
     session.showOn({
         webview: {
