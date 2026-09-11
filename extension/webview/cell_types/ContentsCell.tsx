@@ -39,6 +39,7 @@ export function ContentsCell({
                     cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
+                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
                     onMarkdownCommitted={(markdown) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,

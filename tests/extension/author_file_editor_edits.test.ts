@@ -51,6 +51,19 @@ function openSession(text: string): OpenSession {
     };
 }
 
+function typing(
+    session: AuthorFileEditorSession,
+    cellId: string,
+    markdownItStoodAs: string,
+    typed: string,
+): void {
+    let markdown = markdownItStoodAs;
+    for (const character of typed) {
+        markdown += character;
+        session.theAuthorTypedInTheCell(cellId, markdown);
+    }
+}
+
 function cellsOf(session: AuthorFileEditorSession): string[] {
     return session.document.cells.map(
         (cell) => `${cell.uniqueId}:${cell.kind}:${cell.source}`,
@@ -74,14 +87,79 @@ describe("what a change to the document records", () => {
         expect(editsRecorded).toEqual([]);
     });
 
-    it("records one edit for each change the author makes", () => {
+    it("records one edit for a run of keystrokes in the one cell", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
 
-        session.theAuthorTypedInTheCell("c1", "She saw the d");
-        session.theAuthorTypedInTheCell("c1", "She saw the do");
-        session.theAuthorTypedInTheCell("c1", "She saw the doo");
+        typing(session, "c1", "She saw the door.", "door!!!");
+
+        expect(editsRecorded).toHaveLength(1);
+    });
+
+    it("begins another edit at the space between two words", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!! Then");
+
+        expect(editsRecorded).toHaveLength(2);
+    });
+
+    it("begins another edit when the author types in another cell", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!!");
+        typing(session, "c2", "He heard the bell.", "!!");
+
+        expect(editsRecorded).toHaveLength(2);
+    });
+
+    it("begins another edit when the author leaves the cell and comes back", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!!");
+        session.theAuthorIsEditingTheCell(null);
+        typing(session, "c1", "She saw the door.!!", "!!");
+
+        expect(editsRecorded).toHaveLength(2);
+    });
+
+    it("begins another edit when a command changed the document in between", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!!");
+        session.changeTheDocument((story) =>
+            story.cellWithId("c0")?.fold(true),
+        );
+        typing(session, "c1", "She saw the door.!!", "!!");
 
         expect(editsRecorded).toHaveLength(3);
+    });
+
+    it("begins another edit once the document has been saved", async () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!!");
+        await session.writeTheDocumentToItsFile();
+        typing(session, "c1", "She saw the door.!!", "!!");
+
+        expect(editsRecorded).toHaveLength(2);
+    });
+
+    it("begins another edit once the author has undone one", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!!");
+        editsRecorded[0].undo();
+        typing(session, "c1", "She saw the door.", "!!");
+
+        expect(editsRecorded).toHaveLength(2);
+    });
+
+    it("does not let one run of typing grow without end", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+
+        typing(session, "c1", "She saw the door.", "!".repeat(60));
+
+        expect(editsRecorded).toHaveLength(2);
     });
 });
 
@@ -102,33 +180,40 @@ describe("undoing and redoing what the author did", () => {
         );
     });
 
-    it("undoes keystrokes one at a time, back to where the author started", () => {
-        const { session, editsRecorded, undoEverythingRecorded } =
-            openSession(THE_STORY);
+    it("takes back the whole run the author typed, and writes it again", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
         const asItStood = session.document.text;
 
-        for (const markdown of [
-            "She saw the door. ",
-            "She saw the door. I",
-            "She saw the door. It",
-        ]) {
-            session.theAuthorTypedInTheCell("c1", markdown);
-        }
+        typing(session, "c1", "She saw the door.", "way");
 
-        editsRecorded[2].undo();
+        expect(editsRecorded).toHaveLength(1);
         expect(session.document.cellWithId("c1")?.source).toEqual(
-            "She saw the door. I",
-        );
-
-        editsRecorded[1].undo();
-        expect(session.document.cellWithId("c1")?.source).toEqual(
-            "She saw the door. ",
+            "She saw the door.way",
         );
 
         editsRecorded[0].undo();
         expect(session.document.text).toEqual(asItStood);
 
-        undoEverythingRecorded();
+        editsRecorded[0].redo();
+        expect(session.document.cellWithId("c1")?.source).toEqual(
+            "She saw the door.way",
+        );
+    });
+
+    it("takes back one run of typing at a time, newest first", () => {
+        const { session, editsRecorded } = openSession(THE_STORY);
+        const asItStood = session.document.text;
+
+        typing(session, "c1", "She saw the door.", " It opened.");
+
+        expect(editsRecorded).toHaveLength(2);
+
+        editsRecorded[1].undo();
+        expect(session.document.cellWithId("c1")?.source).toEqual(
+            "She saw the door. It",
+        );
+
+        editsRecorded[0].undo();
         expect(session.document.text).toEqual(asItStood);
     });
 

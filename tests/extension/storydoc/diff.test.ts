@@ -51,16 +51,12 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 17,
-                {
-                    kind: "markdown",
-                    textWhereTheyDiffer: "",
-                    attributesWhereTheyDiffer: {},
-                },
-                {
-                    kind: "disclaimer",
-                    textWhereTheyDiffer: "",
-                    attributesWhereTheyDiffer: {},
-                },
+                "markdown",
+                "disclaimer",
+                "",
+                "",
+                {},
+                {},
             ),
         ]);
     });
@@ -74,16 +70,12 @@ describe("diff — what would have to change to turn one document into the other
                     new AuthorDocCellDiff(
                         "c2",
                         0,
-                        {
-                            kind: undefined,
-                            textWhereTheyDiffer: "",
-                            attributesWhereTheyDiffer: {},
-                        },
-                        {
-                            kind: "markdown",
-                            textWhereTheyDiffer: "He heard the bell.",
-                            attributesWhereTheyDiffer: { id: "c2" },
-                        },
+                        undefined,
+                        "markdown",
+                        "",
+                        "He heard the bell.",
+                        {},
+                        { id: "c2" },
                     ),
                 ],
                 ["c1"],
@@ -99,16 +91,12 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 0,
-                {
-                    kind: "markdown",
-                    textWhereTheyDiffer: "She saw the door.",
-                    attributesWhereTheyDiffer: { id: "c1" },
-                },
-                {
-                    kind: undefined,
-                    textWhereTheyDiffer: "",
-                    attributesWhereTheyDiffer: {},
-                },
+                "markdown",
+                undefined,
+                "She saw the door.",
+                "",
+                { id: "c1" },
+                {},
             ),
         ]);
     });
@@ -116,7 +104,7 @@ describe("diff — what would have to change to turn one document into the other
     it("tells a cell emptied of its text from a cell taken out of the document", () => {
         expect(
             theDifferenceBetween(SHE_SAW, '<!-- cell: markdown id="c1" -->\n')
-                .cells[0].inRhs.kind,
+                .cells[0].kindInRhs,
         ).toEqual("markdown");
     });
 
@@ -130,16 +118,12 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 4,
-                {
-                    kind: "markdown",
-                    textWhereTheyDiffer: "saw",
-                    attributesWhereTheyDiffer: {},
-                },
-                {
-                    kind: "markdown",
-                    textWhereTheyDiffer: "opened",
-                    attributesWhereTheyDiffer: {},
-                },
+                "markdown",
+                "markdown",
+                "saw",
+                "opened",
+                {},
+                {},
             ),
         ]);
     });
@@ -153,7 +137,7 @@ describe("diff — what would have to change to turn one document into the other
         expect(cellDiff.theyDifferFromCharacter).toBe(1);
         expect(cellDiff.theyDifferToCharacterInLhs).toBe(1);
         expect(cellDiff.theyDifferToCharacterInRhs).toBe(9);
-        expect(cellDiff.inRhs.textWhereTheyDiffer).toBe("lowly, S");
+        expect(cellDiff.textInRhs).toBe("lowly, S");
     });
 
     it("gives every attribute written, changed, or missing from the second", () => {
@@ -166,24 +150,12 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 0,
-                {
-                    kind: "chapter",
-                    textWhereTheyDiffer: "",
-                    attributesWhereTheyDiffer: {
-                        title: "One",
-                        folded: "true",
-                        printed: undefined,
-                    },
-                },
-                {
-                    kind: "chapter",
-                    textWhereTheyDiffer: "",
-                    attributesWhereTheyDiffer: {
-                        title: "Two",
-                        folded: undefined,
-                        printed: "no",
-                    },
-                },
+                "chapter",
+                "chapter",
+                "",
+                "",
+                { title: "One", folded: "true", printed: undefined },
+                { title: "Two", folded: undefined, printed: "no" },
             ),
         ]);
     });

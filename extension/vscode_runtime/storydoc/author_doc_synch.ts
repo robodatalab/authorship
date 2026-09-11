@@ -30,8 +30,7 @@ export class AuthorDocSynchronizer<
         for (const cellDiff of AuthorDocDiff.diff(docBefore, docAfter).cells) {
             const markdownAfter = docAfter.cellWithId(cellDiff.cellId)?.source;
             const charactersAdded =
-                cellDiff.inRhs.textWhereTheyDiffer.length -
-                cellDiff.inLhs.textWhereTheyDiffer.length;
+                cellDiff.textInRhs.length - cellDiff.textInLhs.length;
 
             for (const repr of this.representations) {
                 if (cellDiff.cellId !== repr.cellId) {

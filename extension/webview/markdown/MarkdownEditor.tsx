@@ -1,10 +1,4 @@
-import {
-    createContext,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import * as monaco from "monaco-editor/editor/editor.api";
@@ -102,6 +96,7 @@ function useMarkdownEditorBeingEdited(editorId: string) {
 interface MarkdownEditorProps {
     cellId: string;
     markdown: string;
+    timesTheHostWroteIt?: number;
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
     highlights?: AuthorFileEditorFindHighlight[];
@@ -112,6 +107,7 @@ interface MarkdownEditorProps {
 export function MarkdownEditor({
     cellId,
     markdown,
+    timesTheHostWroteIt = 0,
     onMarkdownCommitted,
     errors = [],
     highlights = [],
@@ -124,7 +120,7 @@ export function MarkdownEditor({
 
     useEffect(() => {
         showMarkdown(markdown);
-    }, [markdown]);
+    }, [markdown, timesTheHostWroteIt]);
 
     if (!isEditing && children) {
         return (

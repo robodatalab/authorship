@@ -47,6 +47,7 @@ export function BlurbCell({
                     cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
+                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
                         invokeAuthorDocumentCommand(

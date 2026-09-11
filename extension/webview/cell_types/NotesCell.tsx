@@ -50,6 +50,7 @@ export function NotesCell({
                     cellId={cellId}
                     highlights={findHighlights}
                     markdown={note}
+                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
                     onMarkdownCommitted={(editedNote) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,

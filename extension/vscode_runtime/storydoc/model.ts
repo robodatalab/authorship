@@ -27,6 +27,26 @@ function copiedOutOfTheFileText(text: string): string {
     return (" " + text).slice(1);
 }
 
+const KNOWN_CELL_KINDS = new Map(
+    [
+        MARKDOWN,
+        CHAPTER,
+        PART,
+        TITLE_PAGE,
+        IMAGE,
+        CONTENTS,
+        DISCLAIMER,
+        ABOUT,
+        BLURB,
+        NOTE,
+        RECAP,
+    ].map((cellKind) => [cellKind, cellKind]),
+);
+
+function theKindAsTheEditorKnowsIt(cellKind: string): string {
+    return KNOWN_CELL_KINDS.get(cellKind) ?? copiedOutOfTheFileText(cellKind);
+}
+
 function readAttributes(marker: string): Record<string, string> {
     const attributes: Record<string, string> = {};
     MARKER_ATTRIBUTE.lastIndex = 0;
@@ -255,7 +275,7 @@ function cellsFromText(text: string): MutableCell[] {
     return sections.map((section) => {
         const [, cellKind, markerAttributes] = section.markerLine;
         return new MutableCell(
-            copiedOutOfTheFileText(cellKind),
+            theKindAsTheEditorKnowsIt(cellKind),
             withoutBlankLinesAtTheEnds(section.proseLines),
             readAttributes(markerAttributes),
         );

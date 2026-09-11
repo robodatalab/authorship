@@ -6,20 +6,19 @@ import {
     UNIQUE_CELL_ID,
 } from "./model";
 
-export interface AuthorDocCellAsOneDocumentHasIt {
-    readonly kind: string | undefined;
-    readonly textWhereTheyDiffer: string;
-    readonly attributesWhereTheyDiffer: Readonly<
-        Record<string, string | undefined>
-    >;
-}
+const NO_ATTRIBUTES: Readonly<Record<string, string | undefined>> =
+    Object.freeze({});
 
 export class AuthorDocCellDiff {
     constructor(
         readonly cellId: string,
         readonly theyDifferFromCharacter: number,
-        readonly inLhs: AuthorDocCellAsOneDocumentHasIt,
-        readonly inRhs: AuthorDocCellAsOneDocumentHasIt,
+        readonly kindInLhs: string | undefined,
+        readonly kindInRhs: string | undefined,
+        readonly textInLhs: string,
+        readonly textInRhs: string,
+        readonly attributesInLhs: Readonly<Record<string, string | undefined>>,
+        readonly attributesInRhs: Readonly<Record<string, string | undefined>>,
     ) {}
 
     static between(
@@ -64,22 +63,18 @@ export class AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             cellInRhs.uniqueId,
             charactersSameAtTheStart,
-            {
-                kind: cellInLhs.kind,
-                textWhereTheyDiffer: markdownInLhs.slice(
-                    charactersSameAtTheStart,
-                    markdownInLhs.length - charactersSameAtTheEnd,
-                ),
-                attributesWhereTheyDiffer: attributesChanged.inLhs,
-            },
-            {
-                kind: cellInRhs.kind,
-                textWhereTheyDiffer: markdownInRhs.slice(
-                    charactersSameAtTheStart,
-                    markdownInRhs.length - charactersSameAtTheEnd,
-                ),
-                attributesWhereTheyDiffer: attributesChanged.inRhs,
-            },
+            cellInLhs.kind,
+            cellInRhs.kind,
+            markdownInLhs.slice(
+                charactersSameAtTheStart,
+                markdownInLhs.length - charactersSameAtTheEnd,
+            ),
+            markdownInRhs.slice(
+                charactersSameAtTheStart,
+                markdownInRhs.length - charactersSameAtTheEnd,
+            ),
+            attributesChanged.inLhs,
+            attributesChanged.inRhs,
         );
     }
 
@@ -87,42 +82,38 @@ export class AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             cell.uniqueId,
             0,
-            {
-                kind: cell.kind,
-                textWhereTheyDiffer: cell.source,
-                attributesWhereTheyDiffer: { ...cell.attrs },
-            },
-            {
-                kind: undefined,
-                textWhereTheyDiffer: "",
-                attributesWhereTheyDiffer: {},
-            },
+            cell.kind,
+            undefined,
+            cell.source,
+            "",
+            { ...cell.attrs },
+            NO_ATTRIBUTES,
         );
     }
 
     get theyDifferToCharacterInLhs(): number {
-        return (
-            this.theyDifferFromCharacter + this.inLhs.textWhereTheyDiffer.length
-        );
+        return this.theyDifferFromCharacter + this.textInLhs.length;
     }
 
     get theyDifferToCharacterInRhs(): number {
-        return (
-            this.theyDifferFromCharacter + this.inRhs.textWhereTheyDiffer.length
-        );
+        return this.theyDifferFromCharacter + this.textInRhs.length;
     }
 
     invert(): AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             this.cellId,
             this.theyDifferFromCharacter,
-            this.inRhs,
-            this.inLhs,
+            this.kindInRhs,
+            this.kindInLhs,
+            this.textInRhs,
+            this.textInLhs,
+            this.attributesInRhs,
+            this.attributesInLhs,
         );
     }
 
     writeInto(document: MutableAuthorDocument): void {
-        if (this.inRhs.kind === undefined) {
+        if (this.kindInRhs === undefined) {
             document.removeCell(this.cellId);
             return;
         }
@@ -130,18 +121,18 @@ export class AuthorDocCellDiff {
             document.cellWithId(this.cellId) ??
             document.insertAt(
                 document.cells.length,
-                new MutableCell(this.inRhs.kind, "", {
+                new MutableCell(this.kindInRhs, "", {
                     [UNIQUE_CELL_ID]: this.cellId,
                 }),
             );
-        cell.kind = this.inRhs.kind;
+        cell.kind = this.kindInRhs;
         cell.replaceMarkdown(
             cell.source.slice(0, this.theyDifferFromCharacter) +
-                this.inRhs.textWhereTheyDiffer +
+                this.textInRhs +
                 cell.source.slice(this.theyDifferToCharacterInLhs),
         );
         for (const [attributeName, attributeValue] of Object.entries(
-            this.inRhs.attributesWhereTheyDiffer,
+            this.attributesInRhs,
         )) {
             cell.replaceAttribute(attributeName, attributeValue);
         }
@@ -234,17 +225,23 @@ function attributesWhereTheyDiffer(
     inLhs: Record<string, string | undefined>;
     inRhs: Record<string, string | undefined>;
 } {
-    const attributeNames = new Set([
-        ...Object.keys(cellInLhs.attrs),
-        ...Object.keys(cellInRhs.attrs),
-    ]);
+    const attributeNames = [
+        ...new Set([
+            ...Object.keys(cellInLhs.attrs),
+            ...Object.keys(cellInRhs.attrs),
+        ]),
+    ].filter(
+        (attributeName) =>
+            cellInLhs.attrs[attributeName] !== cellInRhs.attrs[attributeName],
+    );
+    if (attributeNames.length === 0) {
+        return { inLhs: NO_ATTRIBUTES, inRhs: NO_ATTRIBUTES };
+    }
     const inLhs: Record<string, string | undefined> = {};
     const inRhs: Record<string, string | undefined> = {};
     for (const attributeName of attributeNames) {
-        if (cellInLhs.attrs[attributeName] !== cellInRhs.attrs[attributeName]) {
-            inLhs[attributeName] = cellInLhs.attrs[attributeName];
-            inRhs[attributeName] = cellInRhs.attrs[attributeName];
-        }
+        inLhs[attributeName] = cellInLhs.attrs[attributeName];
+        inRhs[attributeName] = cellInRhs.attrs[attributeName];
     }
     return { inLhs, inRhs };
 }

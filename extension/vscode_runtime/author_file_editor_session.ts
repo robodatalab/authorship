@@ -30,6 +30,8 @@ export class AuthorFileEditorSession
     private whatThePageJustTyped: { cellId: string; markdown: string } | null =
         null;
 
+    private burstBeingTyped: TypingBurst | null = null;
+
     constructor(
         private documentAsItStands: ImmutableAuthorDocument,
         private readonly edited: vscode.EventEmitter<
@@ -61,13 +63,33 @@ export class AuthorFileEditorSession
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
         this.whatThePageJustTyped = { cellId, markdown };
-        this.changeTheDocument((story) =>
+        const documentChange = this.theChangeThisWouldMake((story) =>
             story.cellWithId(cellId)?.replaceMarkdown(markdown),
         );
+        if (documentChange.empty()) {
+            return;
+        }
+        const burst = this.burstBeingTyped;
+        if (burst?.carriesOn(this.documentAsItStands, documentChange)) {
+            this.writeTheChange(documentChange);
+            burst.nowReaches(this.documentAsItStands);
+            return;
+        }
+        const documentWhenItBegan = this.documentAsItStands;
+        this.writeTheChange(documentChange);
+        const everythingTyped = { theChange: documentChange };
+        this.burstBeingTyped = new TypingBurst(
+            cellId,
+            documentWhenItBegan,
+            this.documentAsItStands,
+            everythingTyped,
+        );
+        this.recordAnEdit(everythingTyped);
     }
 
     theAuthorIsEditingTheCell(cellId: string | null): void {
         this.cellTheAuthorIsEditing = cellId;
+        this.burstBeingTyped = null;
     }
 
     importTheFileLeavingTheCellTheAuthorIsEditing(savedText: string): void {
@@ -96,24 +118,37 @@ export class AuthorFileEditorSession
     }
 
     changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
+        const documentChange = this.theChangeThisWouldMake(change);
+        if (documentChange.empty()) {
+            return;
+        }
+        this.writeTheChange(documentChange);
+        this.recordAnEdit({ theChange: documentChange });
+    }
+
+    private theChangeThisWouldMake(
+        change: (document: MutableAuthorDocument) => void,
+    ): AuthorDocDiff {
         const documentBeingChanged = new MutableAuthorDocument(
             this.uri,
             this.documentAsItStands.text,
         );
         change(documentBeingChanged);
-        const documentChange = AuthorDocDiff.diff(
+        return AuthorDocDiff.diff(
             this.documentAsItStands,
             documentBeingChanged.toImmutable(),
         );
-        if (documentChange.empty()) {
-            return;
-        }
-        this.writeTheChange(documentChange);
+    }
+
+    private recordAnEdit(everythingItChanged: {
+        theChange: AuthorDocDiff;
+    }): void {
         this.edited.fire({
             document: this,
             label: "Edit",
-            undo: () => this.writeTheChange(documentChange.invert()),
-            redo: () => this.writeTheChange(documentChange),
+            undo: () =>
+                this.writeTheChange(everythingItChanged.theChange.invert()),
+            redo: () => this.writeTheChange(everythingItChanged.theChange),
         });
     }
 
@@ -128,6 +163,7 @@ export class AuthorFileEditorSession
     }
 
     async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
+        this.burstBeingTyped = null;
         await vscode.workspace.fs.writeFile(
             destination,
             new TextEncoder().encode(this.documentAsItStands.text),
@@ -235,6 +271,43 @@ export class AuthorFileEditorSession
         }
         this.sendProseErrors();
         this.sendWordCounts();
+    }
+}
+
+const CHARACTERS_THE_AUTHOR_MAY_TYPE_IN_ONE_BURST = 50;
+
+class TypingBurst {
+    private charactersTyped = 1;
+
+    constructor(
+        private readonly cellId: string,
+        private readonly documentWhenItBegan: ImmutableAuthorDocument,
+        private documentAsItLastStood: ImmutableAuthorDocument,
+        private readonly everythingTyped: { theChange: AuthorDocDiff },
+    ) {}
+
+    carriesOn(
+        documentAsItStands: ImmutableAuthorDocument,
+        documentChange: AuthorDocDiff,
+    ): boolean {
+        const cellChanged = documentChange.cells[0];
+        return (
+            documentAsItStands === this.documentAsItLastStood &&
+            documentChange.cells.length === 1 &&
+            documentChange.cellIdsInRhs === undefined &&
+            cellChanged.cellId === this.cellId &&
+            !/\s/.test(cellChanged.textInRhs) &&
+            this.charactersTyped < CHARACTERS_THE_AUTHOR_MAY_TYPE_IN_ONE_BURST
+        );
+    }
+
+    nowReaches(documentAsItStands: ImmutableAuthorDocument): void {
+        this.everythingTyped.theChange = AuthorDocDiff.diff(
+            this.documentWhenItBegan,
+            documentAsItStands,
+        );
+        this.documentAsItLastStood = documentAsItStands;
+        this.charactersTyped += 1;
     }
 }
 
