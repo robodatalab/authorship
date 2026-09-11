@@ -6,8 +6,11 @@ import { Uri, files, watchersOnTheFiles } from "../vscode";
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
 interface OpenEditor {
-    typeIntoTheCell(markdown: string): Promise<void>;
+    typeIntoTheCell(cellId: string, markdown: string): Promise<void>;
+    theAuthorIsEditingTheCell(cellId: string | null): Promise<void>;
     save(): Promise<void>;
+    theFileWasWrittenElsewhere(text: string): Promise<void>;
+    theCellsOnThePage(): string[];
     documentsSentToThePage(): number;
 }
 
@@ -52,11 +55,8 @@ async function openEditor(text: string): Promise<OpenEditor> {
     receiveFromThePage({ type: "ready" });
     await new Promise((settled) => setTimeout(settled, 0));
 
-    const cellId = (session as unknown as { document: { cells: { attrs: Record<string, string> }[] } })
-        .document.cells[0].attrs.id;
-
     return {
-        typeIntoTheCell: async (markdown: string) => {
+        typeIntoTheCell: async (cellId: string, markdown: string) => {
             receiveFromThePage({
                 type: "invoke",
                 commandName: "replaceMarkdown",
@@ -64,20 +64,57 @@ async function openEditor(text: string): Promise<OpenEditor> {
             });
             await new Promise((settled) => setTimeout(settled, 0));
         },
+        theAuthorIsEditingTheCell: async (cellId: string | null) => {
+            receiveFromThePage({ type: "editing", cellId });
+            await new Promise((settled) => setTimeout(settled, 0));
+        },
+        theFileWasWrittenElsewhere: async (text: string) => {
+            files.set(DOCUMENT_PATH, text);
+            await watchersOnTheFiles[0].theFileChanged();
+            await new Promise((settled) => setTimeout(settled, 0));
+        },
+        theCellsOnThePage: () =>
+            (
+                documentsSentToThePage[documentsSentToThePage.length - 1] ?? []
+            ).map((cell) => cell.source),
         save: () => provider.saveCustomDocument(session),
         documentsSentToThePage: () => documentsSentToThePage.length,
     };
 }
 
+const TWO_CELLS = [
+    '<!-- cell: markdown id="one" -->',
+    "",
+    "The lantern",
+    "",
+    '<!-- cell: markdown id="two" -->',
+    "",
+    "The door",
+    "",
+].join("\n");
+
+function theFileNowReads(one: string, two: string): string {
+    return [
+        '<!-- cell: markdown id="one" -->',
+        "",
+        one,
+        "",
+        '<!-- cell: markdown id="two" -->',
+        "",
+        two,
+        "",
+    ].join("\n");
+}
+
 let editor: OpenEditor;
 
 beforeEach(async () => {
-    editor = await openEditor("<!-- cell: markdown -->\n\nThe lantern\n");
+    editor = await openEditor(TWO_CELLS);
 });
 
 describe("the watcher on the author file, when the editor saves it itself", () => {
     it("says nothing to the page, the file holding what the document holds", async () => {
-        await editor.typeIntoTheCell("The lantern went out\n");
+        await editor.typeIntoTheCell("one", "The lantern went out\n");
         await editor.save();
         const sentBeforeTheWatcherFired = editor.documentsSentToThePage();
 
@@ -87,5 +124,41 @@ describe("the watcher on the author file, when the editor saves it itself", () =
         expect(editor.documentsSentToThePage()).toBe(
             sentBeforeTheWatcherFired,
         );
+    });
+});
+
+describe("the watcher on the author file, when somebody else writes it", () => {
+    it("takes the whole file when no cell is being edited", async () => {
+        await editor.theFileWasWrittenElsewhere(
+            theFileNowReads("A lantern", "A door"),
+        );
+
+        expect(editor.theCellsOnThePage()).toEqual(["A lantern", "A door"]);
+    });
+
+    it("leaves the cell being edited as the author has it and takes the rest", async () => {
+        await editor.theAuthorIsEditingTheCell("one");
+        await editor.typeIntoTheCell("one", "The lantern went out");
+
+        await editor.theFileWasWrittenElsewhere(
+            theFileNowReads("A lantern", "A door"),
+        );
+
+        expect(editor.theCellsOnThePage()).toEqual([
+            "The lantern went out",
+            "A door",
+        ]);
+    });
+
+    it("takes that cell too once the author has left it", async () => {
+        await editor.theAuthorIsEditingTheCell("one");
+        await editor.typeIntoTheCell("one", "The lantern went out");
+        await editor.theAuthorIsEditingTheCell(null);
+
+        await editor.theFileWasWrittenElsewhere(
+            theFileNowReads("A lantern", "A door"),
+        );
+
+        expect(editor.theCellsOnThePage()).toEqual(["A lantern", "A door"]);
     });
 });

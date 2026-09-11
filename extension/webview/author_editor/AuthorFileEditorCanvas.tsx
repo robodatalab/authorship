@@ -325,7 +325,11 @@ export function AuthorFileEditorCanvas({
                 />
                 <AuthorFileEditorFindBar find={find} />
             </AuthorFileEditorMainMenu>
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator
+                onEditingTheCell={(cellId) =>
+                    sendMessagesToVscode({ type: "editing", cellId })
+                }
+            >
                 {cellsInScope(sections, null)}
             </MarkdownEditorMediator>
         </div>

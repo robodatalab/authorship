@@ -46,6 +46,7 @@ export function NotesCell({
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={note}
                     onMarkdownCommitted={(editedNote) =>

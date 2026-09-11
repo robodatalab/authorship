@@ -43,6 +43,7 @@ export function BlurbCell({
             <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
                     errors={proseErrors}

@@ -35,6 +35,7 @@ export function ContentsCell({
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
                     onMarkdownCommitted={(markdown) =>

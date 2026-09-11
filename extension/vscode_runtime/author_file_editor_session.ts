@@ -23,6 +23,8 @@ export class AuthorFileEditorSession
 
     private panel: vscode.WebviewPanel | undefined;
 
+    private cellTheAuthorIsEditing: string | null = null;
+
     constructor(private documentAsItStands: ImmutableAuthorDocument) {
         this.synchronizer = new AuthorDocSynchronizer(this.proseErrors);
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
@@ -46,6 +48,25 @@ export class AuthorFileEditorSession
 
     get document(): ImmutableAuthorDocument {
         return this.documentAsItStands;
+    }
+
+    theAuthorIsEditingTheCell(cellId: string | null): void {
+        this.cellTheAuthorIsEditing = cellId;
+    }
+
+    importTheFileLeavingTheCellTheAuthorIsEditing(savedText: string): void {
+        const beingEdited = this.cellTheAuthorIsEditing;
+        const asTheAuthorHasIt = beingEdited
+            ? this.documentAsItStands.cellWithId(beingEdited)?.source
+            : undefined;
+        this.changeTheDocument((document) => {
+            document.fromText(savedText);
+            if (beingEdited && asTheAuthorHasIt !== undefined) {
+                document
+                    .cellWithId(beingEdited)
+                    ?.replaceMarkdown(asTheAuthorHasIt);
+            }
+        });
     }
 
     importDocumentFromText(text: string): void {

@@ -52,8 +52,9 @@ async function render(
 ): Promise<void> {
     await act(async () => {
         root.render(
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                 <MarkdownEditor
+                    cellId="c1"
                     markdown={markdown}
                     onMarkdownCommitted={onMarkdownCommitted}
                 >
@@ -70,10 +71,11 @@ async function mountAll(
     root = createRoot(emptyBody());
     await act(async () => {
         root.render(
-            <MarkdownEditorMediator>
+            <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                 {editors.map((editor, editorIndex) => (
                     <MarkdownEditor
                         key={editorIndex}
+                        cellId={`c${editorIndex}`}
                         markdown={editor.markdown}
                         onMarkdownCommitted={editor.committed}
                     >
@@ -188,8 +190,9 @@ describe("markdown that is not being edited", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="# The lantern"
                         onMarkdownCommitted={committedSpy()}
                     />
@@ -479,8 +482,9 @@ describe("what the checks found in the prose being written", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="It was very very late."
                         errors={[REPEATED]}
                         onFixAsked={onFixAsked}
@@ -574,8 +578,9 @@ describe("what the checks found in the prose being written", () => {
         root = createRoot(emptyBody());
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator>
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor
+                        cellId="c1"
                         markdown="It was very very late."
                         errors={[{ ...REPEATED, correctVersion: "" }]}
                         onFixAsked={vi.fn()}

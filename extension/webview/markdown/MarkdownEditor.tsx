@@ -2,7 +2,6 @@ import {
     createContext,
     useContext,
     useEffect,
-    useId,
     useRef,
     useState,
 } from "react";
@@ -55,10 +54,28 @@ interface MarkdownEditorBeingEdited {
 const MarkdownEditorBeingEditedContext =
     createContext<MarkdownEditorBeingEdited | null>(null);
 
-export function MarkdownEditorMediator({ children }: { children: ReactNode }) {
+export function MarkdownEditorMediator({
+    children,
+    onEditingTheCell,
+}: {
+    children: ReactNode;
+    onEditingTheCell: (cellId: string | null) => void;
+}) {
     const [editorBeingEdited, editMarkdownEditor] = useState<string | null>(
         null,
     );
+    const sayWhichCellIsBeingEdited = useRef(onEditingTheCell);
+    sayWhichCellIsBeingEdited.current = onEditingTheCell;
+    const theCellTheHostWasTold = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (theCellTheHostWasTold.current === editorBeingEdited) {
+            return;
+        }
+        theCellTheHostWasTold.current = editorBeingEdited;
+        sayWhichCellIsBeingEdited.current(editorBeingEdited);
+    }, [editorBeingEdited]);
+
     return (
         <MarkdownEditorBeingEditedContext.Provider
             value={{ editorBeingEdited, editMarkdownEditor }}
@@ -83,6 +100,7 @@ function useMarkdownEditorBeingEdited(editorId: string) {
 }
 
 interface MarkdownEditorProps {
+    cellId: string;
     markdown: string;
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
@@ -92,6 +110,7 @@ interface MarkdownEditorProps {
 }
 
 export function MarkdownEditor({
+    cellId,
     markdown,
     onMarkdownCommitted,
     errors = [],
@@ -100,7 +119,7 @@ export function MarkdownEditor({
     children,
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
-        useMarkdownEditorBeingEdited(useId());
+        useMarkdownEditorBeingEdited(cellId);
     const [markdownShown, showMarkdown] = useState(markdown);
 
     useEffect(() => {

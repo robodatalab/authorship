@@ -69,6 +69,7 @@ export function AboutCell({
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
+                        cellId={cellId}
                         highlights={findHighlights}
                         markdown={cell.source}
                         errors={proseErrors}

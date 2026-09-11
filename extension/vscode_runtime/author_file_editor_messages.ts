@@ -11,6 +11,14 @@ export class ThePageIsReady implements AuthorFileEditorMessage {
     invoke(): void {}
 }
 
+export class TheAuthorIsEditingTheCell implements AuthorFileEditorMessage {
+    constructor(private readonly cellId: string | null) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        session.theAuthorIsEditingTheCell(this.cellId);
+    }
+}
+
 export class AnAuthorDocumentCommandWasInvoked implements AuthorFileEditorMessage {
     constructor(
         readonly commandName: string,
@@ -54,7 +62,7 @@ export class TheFileChangedUnderneath implements AuthorFileEditorMessage {
     constructor(private readonly savedText: string) {}
 
     invoke(session: AuthorFileEditorSession): void {
-        session.importDocumentFromText(this.savedText);
+        session.importTheFileLeavingTheCellTheAuthorIsEditing(this.savedText);
     }
 }
 

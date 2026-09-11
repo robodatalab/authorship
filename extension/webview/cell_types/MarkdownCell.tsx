@@ -35,6 +35,7 @@ export function MarkdownCell({
             <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
                     errors={proseErrors}

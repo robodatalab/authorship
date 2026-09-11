@@ -10,6 +10,7 @@ import {
 import {
     AnAuthorDocumentCommandWasInvoked,
     ReadTheDocumentBackFromItsFile,
+    TheAuthorIsEditingTheCell,
     ThePageIsReady,
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
@@ -89,10 +90,15 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const onMessageFromWebView = panel.webview.onDidReceiveMessage(
             (message: {
                 type?: string;
+                cellId?: string | null;
                 commandName?: string;
                 commandArguments?: Record<string, unknown>;
             }) => {
-                if (message?.type === "ready") {
+                if (message?.type === "editing") {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorIsEditingTheCell(message.cellId ?? null),
+                    );
+                } else if (message?.type === "ready") {
                     sendCommandCards();
                     void documentChangesMessageQueue.post(new ThePageIsReady());
                 } else if (message?.type === "invoke" && message.commandName) {

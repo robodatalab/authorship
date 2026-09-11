@@ -35,6 +35,7 @@ export function DisclaimerCell({
             <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
+                    cellId={cellId}
                     highlights={findHighlights}
                     markdown={cell.source}
                     errors={proseErrors}
