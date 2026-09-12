@@ -153,26 +153,12 @@ def cells_of(cells: list[Cell], kind: str) -> list[Cell]:
     return [cell for cell in cells if cell.kind == kind]
 
 
-def has(cells: list[Cell], kind: str) -> bool:
-    """Whether the document already carries a cell of this kind.
-
-    This is what keeps *prepare for publishing* from laying a second title page
-    over the one the author already wrote or edited.
-    """
-    return any(cell.kind == kind for cell in cells)
-
-
 def add_missing(cells: list[Cell], wanted: list[Cell]) -> list[Cell]:
-    """Add each wanted cell the document does not already have, in order.
-
-    Kind is the identity, so a cell the author has since rewritten still counts
-    as present and is left exactly as they left it.
-    """
-    added = list(cells)
+    added_cells = list(cells)
     for cell in wanted:
-        if not has(added, cell.kind):
-            added.append(cell)
-    return added
+        if not any(added_cell.kind == cell.kind for added_cell in added_cells):
+            added_cells.append(cell)
+    return added_cells
 
 
 def markdown(source: str) -> Cell:
@@ -180,36 +166,14 @@ def markdown(source: str) -> Cell:
 
 
 def chapter(title: str) -> Cell:
-    """A named place in the book and nothing else.
-
-    The prose beneath a chapter is markdown cells, as prose is everywhere else,
-    so a chapter carries a title and no source of its own.
-    """
     return Cell(CHAPTER, "", {"title": title})
 
 
 def part(title: str, printed: bool = True) -> Cell:
-    """A named division of the story, gathering the chapters that follow it.
-
-    The same bargain a chapter strikes, one level up: it names a run of chapters
-    and carries no prose of its own.
-    """
     return Cell(PART, "", {"title": title} if printed else {"title": title, PRINT: NO})
 
 
 def prints_page(cell: Cell) -> bool:
-    """Whether a part is a page the reader turns to, or only a seam in the story.
-
-    A part does two jobs and they are not the same one. It names a run of
-    chapters — the tale, in a book of tales — and it says where the story may be
-    cut into files. An author who wants the second without the first marks the
-    part unprinted: it divides the story exactly as any other part does, and the
-    book goes out with no page where it stands.
-
-    Saying nothing is printing, so a part written before there was anything to
-    say about this is the page it has always been. Mirrors `printsPage` in
-    `extension/storydoc/model.ts`.
-    """
     return cell.attrs.get(PRINT, "") != NO
 
 
@@ -222,17 +186,10 @@ def is_full_page(cell: Cell) -> bool:
 
 
 def contents() -> Cell:
-    """The table of contents, built at export from the chapters around it."""
     return Cell(CONTENTS)
 
 
 def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
-    """The stretches of those lines that are not the author's notes.
-
-    A note is `<!-- -->`, which is also what a cell marker is written as — so
-    this is the same rule keeping the structure out of the story and keeping the
-    author's asides out of it. Given indices as well as lines, so it can answer
-    about a stretch of a file rather than only about a whole one."""
     ranges: list[tuple[int, int]] = []
     kept_indices: list[int] = []
     inside = False
@@ -275,26 +232,11 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 
     return ranges
 
-
-# Built from the rest of the document rather than written, so never prose anyone
-# corrects or searches. Mirrors `automated` in the editor's own model.
 BUILT_KINDS = frozenset({CONTENTS})
-
-# Kept in the working document and printed in no book. What the author writes
-# *about* the story — the blurb for a shop page, the story so far for a reader
-# coming to this volume from the last one, a covering letter, a note on where
-# the plot is going — belongs beside it and never inside it, so it is written
-# here and published nowhere.
 PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP})
 
 
-def prose_of(lines: list[tuple[int, str]]) -> str:
-    """Those lines with the breaks between their paragraphs put back.
-
-    The story comes back as the lines that carry it, so where a paragraph ended
-    survives only as the gap in their numbering. Run together without it a
-    chapter arrives as one block, and reads to the model as one thought.
-    """
+def _prose_of(lines: list[tuple[int, str]]) -> str:
     written: list[str] = []
     previous: int | None = None
     for index, said in lines:
@@ -306,13 +248,7 @@ def prose_of(lines: list[tuple[int, str]]) -> str:
 
 
 class Document:
-    """A story document, and the file it is written in.
-
-    Everything the server does to a story it does through this: the prose it can
-    correct, the lines it can search, the chapters it can bind into a book. The
-    structure comes from the cells, so a heading in the prose is prose — which is
-    the whole reason the format marks its structure rather than inferring it.
-    """
+    """An .author document"""
 
     def __init__(self, text: str, path: Path | None = None) -> None:
         self.path = path
@@ -338,12 +274,6 @@ class Document:
     def story_lines(
         self, start: int = 0, end: int | None = None
     ) -> Iterator[tuple[int, str]]:
-        """The lines that are prose, by their number in the file.
-
-        The markers are not among them, nor is anything in a cell the document
-        writes for itself — asking a model to correct a table of contents would
-        be asking it to disagree with the chapters.
-        """
         last = len(self.lines) - 1 if end is None else end
         for cell in self.cells:
             if cell.at is None or cell.kind in BUILT_KINDS:
@@ -362,32 +292,14 @@ class Document:
 
     @property
     def chapters(self) -> list[tuple[str, str]]:
-        """Each chapter that has prose under it, and that prose.
-
-        A chapter cell opens one; the prose cells after it belong to it until the
-        next chapter opens. What stands before the first chapter is a title page,
-        a cover, a dedication — it is about the book, belongs to no chapter, and
-        is not read.
-
-        The story and only the story comes back. What the author writes *about*
-        the book is left out wherever it is written: a blurb, a note or a recap
-        standing between two chapters, and the `<!-- -->` notes in the margin of
-        the prose itself. Asking a model to summarise a table of contents or to
-        take the author's reminder to themselves for something that happened is
-        asking it to write down something nobody wrote.
-
-        This is how every tool that reads a book reads it — the blurb, the story
-        so far, and whatever is written from the whole story next — so the answer
-        to what counts as a chapter is given once, here, rather than once per
-        tool.
-        """
+        """The raw contents of chapters - stripped of comments and any other information"""
         found: list[tuple[str, list[tuple[int, str]]]] = []
         for cell in self.cells:
             if cell.kind == CHAPTER:
                 found.append((cell.title or f"Chapter {len(found) + 1}", []))
             elif found and cell.at and cell.kind not in PRIVATE_KINDS:
                 found[-1][1].extend(self.story_lines(*cell.at))
-        return [(title, prose_of(lines)) for title, lines in found if lines]
+        return [(title, _prose_of(lines)) for title, lines in found if lines]
 
     def __str__(self) -> str:
         return self.text

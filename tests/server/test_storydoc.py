@@ -82,24 +82,12 @@ class Writing(unittest.TestCase):
 
 
 class Asking(unittest.TestCase):
-    def test_has_finds_a_kind_the_document_carries(self) -> None:
-        cells = [storydoc.chapter("One"), storydoc.contents()]
-        self.assertTrue(storydoc.has(cells, storydoc.CONTENTS))
-        self.assertFalse(storydoc.has(cells, storydoc.IMAGE))
-
     def test_cells_of_returns_every_cell_of_a_kind_in_order(self) -> None:
         cells = [storydoc.chapter("One"), storydoc.contents(), storydoc.chapter("Two")]
         self.assertEqual(
             [cell.title for cell in storydoc.cells_of(cells, storydoc.CHAPTER)],
             ["One", "Two"],
         )
-
-    def test_a_cell_is_known_by_its_kind_and_not_by_its_title(self) -> None:
-        # The whole reason a cell carries a kind: a chapter the author named
-        # "Disclaimer" is a chapter.
-        cells = [storydoc.chapter("Disclaimer")]
-        self.assertFalse(storydoc.has(cells, storydoc.DISCLAIMER))
-        self.assertTrue(storydoc.has(cells, storydoc.CHAPTER))
 
 
 class Preparing(unittest.TestCase):

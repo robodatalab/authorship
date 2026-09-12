@@ -607,7 +607,7 @@ class ExportEpub(unittest.TestCase):
 
         said = response.json()
         self.assertFalse(said["ready"])
-        self.assertNotIn("path", said)
+        self.assertIsNone(said["path"])
         self.assertFalse(self.document.with_suffix(".epub").exists())
 
     def test_it_says_what_is_missing_rather_than_only_refusing(self) -> None:
