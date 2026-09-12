@@ -32,21 +32,8 @@ from server.storydoc import Document
 
 _log = log.logger(__name__)
 
-
-
-# Grammar as a check rather than as a rewrite. A minimal-edit corrector: trained
-# to change as little as will make a sentence grammatical, which is the only kind
-# of model that can be pointed at a novel without arguing with it. Small enough
-# to sit beside the others rather than take a turn with them.
 GEC_MODEL = "Unbabel/gec-t5_small"
-
-# Everything that is asked in words rather than trained for goes to this one:
-# blurbs now, and whatever else is written by instruction later. At 8B in bf16 it
-# leaves half the budget for the prompt, which is what a tool feeding it a whole
-# chapter needs; a larger model would buy prose and lose the room to read.
 CAUSAL_MODEL = "Qwen/Qwen3-8B"
-
-# What the model was measured holding over a single batch, and what it is allowed.
 GEC_MODEL_GB = 1.0
 CAUSAL_MODEL_GB = 17.0
 MEMORY_QUOTA_GB = 24.0
@@ -78,7 +65,6 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    """Is the application healthy and ready to serve traffic"""
     residents = app.state.models.residents
     return {
         "inference_server_status": "unloaded" if not residents else "serving",
@@ -87,7 +73,6 @@ def health() -> dict[str, Any]:
 
 @app.get("/models")
 def models() -> dict[str, Any]:
-    """Every inference model, and which of them are loaded."""
     residents = app.state.models.residents
     return {
         "models": [
@@ -103,12 +88,6 @@ def models() -> dict[str, Any]:
 
 @app.get("/memory")
 def memory() -> dict[str, Any]:
-    """What the models are holding, against what the machine has.
-
-    Each model runs in a process of its own, so these are their readings added
-    together, each taken when that model last had a moment between requests —
-    not the server's.
-    """
     residents = app.state.models.residents
     reading = app.state.models.memory()
     return {
@@ -128,13 +107,6 @@ def _document(path: str) -> Document:
 
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
-    """The work in hand: every unfinished job, the file it is queued on, and
-    whether it has been told to stop.
-
-    A job stops between the pieces of work it is made of, so being told and
-    being finished are minutes apart on a long one. Both are reported, because
-    a stop button whose row still says `running` reads as a button that failed.
-    """
     return {
         "jobs": [
             {
@@ -149,18 +121,11 @@ def jobs() -> dict[str, Any]:
 
 
 class JobCancelRequest(BaseModel):
-    # Path of the document whose job is to stop — a job is keyed by what it writes.
     path: str
 
 
 @app.post("/jobs/cancel")
 def cancel_job(request: JobCancelRequest) -> dict[str, Any]:
-    """Ask the job on a document to stop.
-
-    Asked rather than killed: a job stops between pieces of work, where it has
-    left nothing half-done. So this answers that it was asked, and the job's own
-    status endpoint is what says when it has.
-    """
     job = app.state.jobs.get(request.path)
     if job is None:
         raise HTTPException(status_code=404, detail=f"No job for {request.path}")
@@ -169,14 +134,8 @@ def cancel_job(request: JobCancelRequest) -> dict[str, Any]:
 
 
 class EpubExportRequest(BaseModel):
-    # Path of the document to publish. What the book says about itself — its
-    # title page, its cover, its disclaimer, where to find the author — is in
-    # the document's own cells.
     path: str
     text: str
-    # Bind the book though sections of it are missing or empty. The author has
-    # been shown what is wanting and asked for the file anyway, which is theirs
-    # to ask for; nothing else may skip the reading.
     force: bool = False
 
 
@@ -208,17 +167,6 @@ def read_authorship(path: str) -> dict[str, Any]:
 
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
-    """Export a document to an EPUB written beside it, as `<name>.epub`.
-
-    The document is the whole of the book, so there is nothing to fetch from
-    beside it and nothing that can disagree with it.
-
-    A document that is not ready is not bound: it answers what is wanting and
-    writes nothing. An EPUB with a blank title page and no cover is not a lesser
-    book, it is a file nobody can sell, and it used to be written without a word
-    said. `force` is how the author, having been shown what is missing, says they
-    want the file regardless.
-    """
     document = Document(request.text, Path(request.path))
     found = report_of(document)
     if not (found.ready or request.force):
@@ -228,34 +176,7 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     return {**_said(found), "path": str(out_path)}
 
 
-# --- writing a section from the story ------------------------------------
-#
-# Two sections are written by a model rather than by the author: the blurb, out
-# of the document it stands in, and the story so far, out of the earlier
-# documents of a serial. They are the same job to everybody watching — a bar
-# counting chapters, a button that stops it, and a piece of markdown handed back
-# for the editor to place — so they answer at one status endpoint and differ only
-# in what starts them.
-#
-# What comes back is handed over rather than written into the file. A cell's text
-# is the editor's to write, and an empty cell occupies no lines for the server to
-# replace.
-
-
 class WritingJob(Job):
-    """A section a model writes, and how far into the story it has read.
-
-    `cell_kind` is the kind of cell the answer belongs in. The server never
-    places it — that is the editor's, which is the half of this that knows where
-    the cell has moved to while the model wrote — but the editor has to be told
-    which kind of section is being written, because a document may hold one of
-    each and only one of them asked.
-
-    `written` and `chapters` are read from the thread answering the status
-    endpoint while the worker writes them, which two ints tolerate. A chapter at
-    a time is the only division the work has, so it is the only one the author
-    can be shown.
-    """
 
     def __init__(self, cell_kind: str, target: str) -> None:
         super().__init__(target)
@@ -551,24 +472,6 @@ def _story_lines(document: Document, start: int, end: int) -> list[tuple[int, st
         for index, _ in document.story_lines(start, end)
     ]
 
-_ABOUT: dict[str, tuple[frozenset[str], list[str]]] = {}
-
-
-def _learn(document: Document) -> tuple[frozenset[str], list[str]]:
-    global _ABOUT
-    assert document.path is not None
-    about = (
-        prose_check.crutch_lemmas(_story_lines(document, 0, len(document.lines) - 1)),
-        grammar_check.names_in(document.text),
-    )
-    _ABOUT[str(document.path)] = about
-    return about
-
-
-def _known(document: Document) -> tuple[frozenset[str], list[str]]:
-    global _ABOUT
-    return _ABOUT.get(str(document.path), (frozenset(), []))
-
 
 class ProseCheckJob(Job):
     """The rules that need no model: the story's own faults, and usage.
@@ -589,9 +492,13 @@ class ProseCheckJob(Job):
 
     def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
-        # Reading the whole document is also the only chance to learn what it is
-        # like — which words it wears out, and what its people are called.
-        crutches = _learn(self._document)[0] if self._selection is None else frozenset()
+        crutches = (
+            prose_check.crutch_lemmas(
+                _story_lines(self._document, 0, len(self._document.lines) - 1)
+            )
+            if self._selection is None
+            else frozenset()
+        )
         if self.cancelled:
             return
         self.findings = [
@@ -606,9 +513,9 @@ class ProseCheckJob(Job):
 class GrammarCheckJob(Job):
     """The grammar pass, which is a model and is therefore slow.
 
-    Its own job so that it is its own wait. The names it must not touch were
-    learned when the document was last read whole; a paragraph is in no position
-    to work out what the people in the book are called.
+    Its own job so that it is its own wait. The names it must not touch are read
+    off the whole document; a paragraph is in no position to work out what the
+    people in the book are called.
     """
 
     kind = "grammar check"
@@ -633,7 +540,7 @@ class GrammarCheckJob(Job):
             for finding in grammar_check.check(
                 self._model,
                 _story_lines(self._document, start, end),
-                _known(self._document)[1],
+                grammar_check.names_in(self._document.text),
             )
             for error in _prose_check_errors(self._document, finding)
         ]
@@ -689,14 +596,6 @@ def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
 
 @app.get("/check/prose/status")
 def check_prose_status(id: str) -> dict[str, Any]:
-    """Whether the check is still running, and what it found once it is not.
-
-    Empty findings on a job still running are not "nothing wrong" — the editor
-    has to keep the marks it already has until `running` goes false, or the
-    prose flickers clean every time the author touches it. Nor are they on one
-    that was cancelled, which is a check the author typed over: the pass that
-    superseded it is the one worth drawing.
-    """
     job = app.state.jobs.get(id)
     if not isinstance(job, ProseCheckJob):
         raise HTTPException(status_code=404, detail=f"No prose check for {id}")
@@ -710,12 +609,6 @@ def check_prose_status(id: str) -> dict[str, Any]:
 
 @app.post("/check/grammar", status_code=202)
 def check_grammar(request: ProseCheckRequest) -> dict[str, Any]:
-    """Start the grammar pass over a passage; poll /check/grammar/status for it.
-
-    The same request as a prose check and a separate job, because it is slow and
-    the other is not. The editor draws what the rules found while this is still
-    reading.
-    """
     document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
@@ -736,192 +629,4 @@ def check_grammar_status(id: str) -> dict[str, Any]:
         "cancelled": job.cancelled,
         "error": job.error,
         "findings": job.findings,
-    }
-
-
-
-
-# --- putting one fault right -----------------------------------------------
-#
-# The counterpart of the checks, and the reason they are worth having beyond the
-# underline: a fault that was found by a rule can be described to a model, and
-# the same rule can be run over what comes back.
-#
-# Two things follow from that which correcting a passage cannot have. The model
-# is answering a question — these words, this is wrong with them — rather than
-# being handed a paragraph and asked what it thinks. And the answer is checked
-# before it is offered, because the thing that found the fault is still there to
-# ask again. A fix that leaves the rule firing is not a fix.
-
-
-# A phrase, not a paragraph. What comes back replaces a few words.
-FIX_TOKENS = 64
-
-FIX_INSTRUCTION = (
-    "You are correcting one phrase in a novel. You are told what is wrong with "
-    "it and shown the sentence it sits in. Answer with the replacement for that "
-    "phrase and nothing else — no quotation marks, no explanation, and not the "
-    "rest of the sentence. Keep the author's voice, tense and register, and "
-    "change as little as will put the fault right."
-)
-
-
-class Place(BaseModel):
-    # 0-based, as everything the server says about a file is.
-    line: int
-    character: int
-
-
-class Span(BaseModel):
-    at: Place
-    end: Place
-
-
-class SpanFixRequest(BaseModel):
-    # Path of the document the fault is in.
-    path: str
-    # The document as the author has it, for the same reason a check is given it.
-    text: str
-    where: Span
-    # What found the fault, which is also what will judge the answer.
-    rule: str
-    message: str
-    detail: str = ""
-
-
-class SpanFixJob(Job):
-    """Rewrite one marked phrase, and refuse the rewrite if it does not work."""
-
-    kind = "span fix"
-
-    def __init__(
-        self,
-        model: CausalModel,
-        document: Document,
-        where: Span,
-        rule: str,
-        message: str,
-    ) -> None:
-        assert document.path is not None
-        super().__init__(f"{document.path}#fix:{where.at.line}:{where.at.character}")
-        self._model = model
-        self._document = document
-        self._where = where
-        self._rule = rule
-        self._message = message
-        self.replacement = ""
-        self.verified = False
-
-    def execute(self) -> None:
-        line = self._document.lines[self._where.at.line]
-        first, last = self._where.at.character, self._where.end.character
-        wrong = line[first:last]
-        if not wrong.strip():
-            return
-
-        answer = self._model.complete(
-            FIX_INSTRUCTION,
-            _asking(self._rule, self._message, line, first, last),
-            max_new_tokens=FIX_TOKENS,
-        )
-        if self.cancelled:
-            return
-        self.replacement = _phrase(answer)
-        if not self.replacement:
-            return
-
-        # The rule that found it is asked again, over the paragraph as it would
-        # be — a repetition is only answered if the other half still stands.
-        rewritten = line[:first] + self.replacement + line[last:]
-        self.verified = not _fires(
-            self._rule,
-            self._context(rewritten),
-            self._where.at.line,
-            first,
-            first + len(self.replacement),
-        )
-
-    def _context(self, rewritten: str) -> list[tuple[int, str]]:
-        """The cell's prose with this line as the model would leave it."""
-        where = self._document.lines_at(self._where.at.line)
-        first, last = where or (self._where.at.line, self._where.at.line)
-        return [
-            (
-                index,
-                rewritten if index == self._where.at.line else self._document.lines[index],
-            )
-            for index, _ in self._document.story_lines(first, last)
-        ]
-
-
-def _asking(rule: str, message: str, line: str, at: int, end: int) -> str:
-    """What the model is shown: the sentence, the words, and the complaint.
-
-    The complaint is the whole point. A model handed a paragraph guesses at what
-    it is for; a model handed a phrase and told what is wrong with it is doing
-    something it can be judged on.
-    """
-    return (
-        f"The sentence:\n\n{line}\n\n"
-        f'The phrase to replace: "{line[at:end]}"\n'
-        f"What is wrong with it ({rule}): {message}\n\n"
-        "Write the replacement phrase."
-    )
-
-
-def _phrase(answer: str) -> str:
-    """The phrase out of whatever the model wrapped it in."""
-    for said in answer.strip().splitlines():
-        said = said.strip().strip('"“”\'')
-        if said:
-            return said
-    return ""
-
-
-def _fires(
-    rule: str, prose: list[tuple[int, str]], line: int, at: int, end: int
-) -> bool:
-    """Whether that rule still finds fault where the fix was put in."""
-    return prose_check.fires(rule, prose, line, at, end)
-
-
-@app.post("/fix/span", status_code=202)
-def fix_span(request: SpanFixRequest) -> dict[str, Any]:
-    """Start rewriting one marked phrase; poll /fix/span/status for the answer.
-
-    The document is not written. What comes back is a phrase, and where it goes
-    is the editor's to say — the mark it belongs to has very likely moved while
-    the model was reading, and only the page knows where it is now.
-    """
-    if request.where.at.line != request.where.end.line:
-        raise HTTPException(
-            status_code=400, detail="A fault is fixed a line at a time."
-        )
-    document = Document(request.text, Path(request.path))
-    if request.where.at.line >= len(document.lines):
-        raise HTTPException(status_code=400, detail="There is no such line.")
-    job = SpanFixJob(
-        app.state.causal_model, document, request.where, request.rule, request.message
-    )
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/fix/span/status")
-def fix_span_status(id: str) -> dict[str, Any]:
-    """Whether the fix is still being written, what it is, and whether it worked.
-
-    `verified` is the rule's own answer, not the model's: it is false when the
-    phrase came back and the fault is still there. The editor shows the author
-    what was offered and leaves the prose alone.
-    """
-    job = app.state.jobs.get(id)
-    if not isinstance(job, SpanFixJob):
-        raise HTTPException(status_code=404, detail=f"No span fix for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "replacement": job.replacement,
-        "verified": job.verified,
     }
