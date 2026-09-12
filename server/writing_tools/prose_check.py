@@ -1,23 +1,3 @@
-"""What is wrong with a passage of a novel, and why.
-
-Every rule here answers about *fiction*, which is why they are written rather
-than taken from a prose linter. A usage linter is built for people trying to
-write standard English and failing; a novelist breaks it on purpose, and a tool
-that cannot tell the difference spends its day underlining craft. So there is
-nothing here about clichés, hedging or archaism — in dialogue those are
-characterisation — and everything here is about the distance between the reader
-and the scene.
-
-A rule flags. It does not rewrite. What it produces is a span, a name for what is
-wrong, and a sentence saying why, which is the only part the author cannot work
-out for themselves. Because the fault has a name, the same rule can be asked
-again about a proposed fix, which is what `fires` is for.
-
-The parse comes from spaCy, so a rule can ask what a word *is* rather than what
-it looks like: "felt" as a verb of perception is a filter, "felt" as the cloth is
-a hat.
-"""
-
 from __future__ import annotations
 
 import statistics
@@ -26,22 +6,14 @@ from bisect import bisect_right
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 import spacy
 from proselint.config import Config
 from proselint.tools import LintFile
 from spacy.tokens import Doc, Span, Token
 
-from server.jobs import Job
-from server.storydoc import Document
-
 MODEL = "en_core_web_sm"
-
-# One parser, and one passage through it at a time. A parse is milliseconds and
-# the jobs run on a thread pool, so waiting for the one in front is cheaper than
-# the question of whether a pipeline may be shared.
 _LOCK = threading.Lock()
 _NLP: spacy.Language | None = None
 
@@ -56,22 +28,12 @@ def _nlp() -> spacy.Language:
 
 @dataclass(frozen=True)
 class Place:
-    """Somewhere in the file, which is how the server says where anything is."""
-
     line: int
     character: int
 
 
 @dataclass(frozen=True)
 class Finding:
-    """One thing wrong, and everywhere it is wrong.
-
-    `kind` is what colour it is drawn in and `rule` is what it is — the first is
-    for the reader of the underline, the second for whatever has to act on it.
-    `related` is the rest of the same fault: an echo is a pair, and an underline
-    under one half of it says nothing.
-    """
-
     rule: str
     kind: str
     message: str
@@ -79,19 +41,10 @@ class Finding:
     at: Place
     end: Place
     related: tuple[tuple[Place, Place], ...] = field(default=())
-    # What could go there instead, when the rule that found the fault already
-    # knows. A fault with a replacement needs no model to put it right.
     replacements: tuple[str, ...] = field(default=())
 
 
 class Passage:
-    """The prose as one string, and where each character of it is in the file.
-
-    The rules want sentences, and sentences run across the lines a file is
-    written in — so the passage is parsed whole and every offset is put back
-    afterwards.
-    """
-
     def __init__(self, prose: Iterable[tuple[int, str]]) -> None:
         lines = list(prose)
         self._lines = [index for index, _ in lines]
@@ -121,20 +74,12 @@ class Passage:
         return list(zip(self._starts, ends))
 
 
-# --- the rules -------------------------------------------------------------
-
-
-# Verbs of perceiving and of thinking. Said of the point-of-view character they
-# report the scene instead of rendering it, which is the one distance an author
-# almost never means to put there.
 FILTERS = frozenset(
     {
         "see", "hear", "feel", "notice", "realize", "realise", "watch",
         "think", "wonder", "remember", "decide", "know", "observe", "perceive",
     }
 )
-
-# Dialogue tags that ask to be noticed. "Said" disappears; these do not.
 BOOKISMS = frozenset(
     {
         "exclaim", "retort", "growl", "hiss", "bark", "snarl", "sneer",
@@ -142,30 +87,20 @@ BOOKISMS = frozenset(
         "expostulate", "ejaculate",
     }
 )
-
-# The same fault with a second thing wrong: nobody can chuckle a sentence.
 UNSPEAKABLE = frozenset(
     {"chuckle", "laugh", "smile", "grin", "shrug", "nod", "frown", "sigh", "wince"}
 )
 
-# The verbs a tag is built on, for the adverb that should not be leaning on them.
 TAGS = frozenset(
     {"say", "ask", "reply", "answer", "whisper", "shout", "murmur", "mutter", "call"}
 )
 
 QUOTES = '"“”'
 
-# What an echo is heard across. Characters rather than sentences, because what
-# the ear notices is nearness on the page.
 ECHO_REACH = 400
 ECHO_SHORTEST = 4
-
-# A run this long with lengths this close together has stopped having a rhythm.
 MONOTONY_RUN = 5
 MONOTONY_SPREAD = 2.5
-
-# A word has to be worn before it is a crutch, and only the worst few are worth
-# saying — a page underlined everywhere says nothing.
 CRUTCH_LEAST = 8
 CRUTCH_TIMES_MEDIAN = 4.0
 CRUTCH_MOST = 5
@@ -605,78 +540,3 @@ def fires(
     with _LOCK:
         doc = _nlp()(passage.text)
         return any(covers(finding) for finding in found(doc, passage))
-
-
-def check_target(path: Path, selection: tuple[int, int] | None) -> str:
-    where = "all" if selection is None else f"{selection[0]}-{selection[1]}"
-    return f"{path}#{where}"
-
-
-def story_lines(document: Document, start: int, end: int) -> list[tuple[int, str]]:
-    return [
-        (index, document.lines[index])
-        for index, _ in document.story_lines(start, end)
-    ]
-
-
-def check_errors(document: Document, finding: Finding) -> list[dict[str, Any]]:
-    errors = []
-    for at, end in [(finding.at, finding.end), *finding.related]:
-        cell = document.cell_at(at.line)
-        if cell is None or cell is not document.cell_at(end.line):
-            continue
-        errors.append(
-            {
-                "cellId": cell.unique_id,
-                "startCharacterOffsetInCell": cell.offset_of(at.line, at.character),
-                "endCharacterOffsetInCell": cell.offset_of(end.line, end.character),
-                "wordsInTheCell": cell.source[
-                    cell.offset_of(at.line, at.character) : cell.offset_of(
-                        end.line, end.character
-                    )
-                ],
-                "isVisible": True,
-                "ruleThatFoundTheError": finding.rule,
-                "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
-                "reasonForError": finding.detail,
-                "correctVersion": finding.replacements[0]
-                if finding.replacements
-                else "",
-            }
-        )
-    return errors
-
-
-class ProseCheckJob(Job):
-    """The rules that need no model: the story's own faults, and usage.
-
-    Kept apart from the grammar pass because it is a hundred times faster, and a
-    report that waits for the slowest thing in it is a report nobody sees. This
-    one answers while the author is still looking at the paragraph.
-    """
-
-    kind = "prose check"
-
-    def __init__(self, document: Document, selection: tuple[int, int] | None) -> None:
-        assert document.path is not None
-        super().__init__(check_target(document.path, selection))
-        self._document = document
-        self._selection = selection
-        self.findings: list[dict[str, Any]] = []
-
-    def execute(self) -> None:
-        start, end = self._selection or (0, len(self._document.lines) - 1)
-        crutches = (
-            crutch_lemmas(
-                story_lines(self._document, 0, len(self._document.lines) - 1)
-            )
-            if self._selection is None
-            else frozenset()
-        )
-        if self.cancelled:
-            return
-        self.findings = [
-            error
-            for finding in check(story_lines(self._document, start, end), crutches)
-            for error in check_errors(self._document, finding)
-        ]

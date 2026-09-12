@@ -10,8 +10,9 @@ from pydantic import BaseModel
 from server import log
 from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
+from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
-from server.writing_tools import grammar_check, prose_check, style
+from server.writing_tools import grammar_check, style
 from server.models.gemini import (
     Gemini,
     GeminiError,
@@ -354,15 +355,15 @@ class LineSelection(BaseModel):
     end: int
 
 
-class ProseCheckRequest(BaseModel):
+class CheckErrorsRequest(BaseModel):
     path: str
     text: str
     selection: LineSelection | None = None
 
 
-@app.post("/check/prose", status_code=202)
-def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
-    """Start checking a passage; poll /check/prose/status for what it found.
+@app.post("/check/errors", status_code=202)
+def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
+    """Start checking a passage; poll /check/errors/status for what it found.
 
     The whole document when the author turns the checks on, and one paragraph
     when they have just written in it — the same rules over a different span, so
@@ -373,41 +374,16 @@ def check_prose(request: ProseCheckRequest) -> dict[str, Any]:
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
-    job = prose_check.ProseCheckJob(document, selection)
+    job = CheckErrorsJob(app.state.gec_model, document, selection)
     app.state.jobs.start(job)
     return {"id": job.target}
 
 
-@app.get("/check/prose/status")
-def check_prose_status(id: str) -> dict[str, Any]:
+@app.get("/check/errors/status")
+def check_errors_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
-    if not isinstance(job, prose_check.ProseCheckJob):
-        raise HTTPException(status_code=404, detail=f"No prose check for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "findings": job.findings,
-    }
-
-
-@app.post("/check/grammar", status_code=202)
-def check_grammar(request: ProseCheckRequest) -> dict[str, Any]:
-    document = Document(request.text, Path(request.path))
-    selection = (
-        (request.selection.start, request.selection.end) if request.selection else None
-    )
-    job = grammar_check.GrammarCheckJob(app.state.gec_model, document, selection)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/check/grammar/status")
-def check_grammar_status(id: str) -> dict[str, Any]:
-    """Whether the grammar pass is still reading, and what it found once it is not."""
-    job = app.state.jobs.get(id)
-    if not isinstance(job, grammar_check.GrammarCheckJob):
-        raise HTTPException(status_code=404, detail=f"No grammar check for {id}")
+    if not isinstance(job, CheckErrorsJob):
+        raise HTTPException(status_code=404, detail=f"No check for {id}")
     return {
         "running": not job.done,
         "cancelled": job.cancelled,

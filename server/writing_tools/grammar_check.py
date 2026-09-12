@@ -1,47 +1,11 @@
-"""Grammar, a sentence at a time, by asking a model to write each one properly.
-
-The model is a minimal-edit corrector: it is trained to change as little as will
-make a sentence grammatical, which is why it can be pointed at a novel at all. An
-instruction-following editor asked to "fix the grammar" gives an editor's opinion
-and rewrites the prose; this one puts a comma in.
-
-What comes back is a *sentence*, and what the author needs is a *word*. So the
-two are diffed and each run of changed words becomes its own mark — the author
-takes the comma without swallowing four other opinions, and the underline sits
-under the fault rather than under the paragraph.
-
-Quotation marks are hidden from it too, blanked to spaces before the sentence
-goes out. It learned from essays, which have almost no dialogue in them, so a
-sentence opening on a quote reads to it as a sentence with a stray character at
-the front: it deletes the opening mark and puts a space before the closing one,
-every time. Blanking keeps the length, so every offset it reports is still an
-offset into the sentence as the author wrote it — and whether the quotes
-themselves are right is a question for the rules, which can see them.
-
-Names are hidden from it first. An invented name is a run of word-pieces the
-model has never seen sitting in a grammatical slot, which is the shape of a typo
-— so every one of them would come back "corrected". They go out as ordinary
-names and are put back afterwards.
-"""
-
 from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
-from typing import Any
 
 from vramen import Seq2SeqModel
 
-from server.jobs import Job
-from server.storydoc import Document
-from server.writing_tools.prose_check import (
-    Finding,
-    Passage,
-    check_errors,
-    check_target,
-    sentences,
-    story_lines,
-)
+from server.writing_tools.prose_check import Finding, Passage, sentences
 
 # What the model was trained to answer to. Not an instruction — the prefix *is*
 # the task, and anything else in front of the sentence is read as part of it.
@@ -382,39 +346,3 @@ def check(
                 )
             )
     return found
-
-
-class GrammarCheckJob(Job):
-    """The grammar pass, which is a model and is therefore slow.
-
-    Its own job so that it is its own wait. The names it must not touch are read
-    off the whole document; a paragraph is in no position to work out what the
-    people in the book are called.
-    """
-
-    kind = "grammar check"
-
-    def __init__(
-        self,
-        model: Seq2SeqModel,
-        document: Document,
-        selection: tuple[int, int] | None,
-    ) -> None:
-        assert document.path is not None
-        super().__init__(f"{check_target(document.path, selection)}#gec")
-        self._model = model
-        self._document = document
-        self._selection = selection
-        self.findings: list[dict[str, Any]] = []
-
-    def execute(self) -> None:
-        start, end = self._selection or (0, len(self._document.lines) - 1)
-        self.findings = [
-            error
-            for finding in check(
-                self._model,
-                story_lines(self._document, start, end),
-                names_in(self._document.text),
-            )
-            for error in check_errors(self._document, finding)
-        ]
