@@ -12,6 +12,7 @@ from unittest import mock
 
 from server import storydoc
 from server.storydoc import Document
+from server.models.gemini import GeminiError
 from server.writing_tools.style import (
     FIX_REQUEST,
     SEAM,
@@ -284,11 +285,11 @@ class FixStyle(unittest.TestCase):
     ) -> None:
         # A novel is dozens of chapters, and losing the rest of them because one
         # ran out of room would be a poor trade.
-        class Truncated(RuntimeError):
-            one_chapter = True
-
         model = build_model()
-        model.complete.side_effect = [Truncated("ran out of room"), THIRD_FIXED]
+        model.complete.side_effect = [
+            GeminiError("ran out of room", truncated=True),
+            THIRD_FIXED,
+        ]
         revised: dict[str, str] = {}
         told: list[tuple[str, str]] = []
         fix_style(
@@ -302,12 +303,9 @@ class FixStyle(unittest.TestCase):
 
     def test_a_chapter_the_model_would_not_read_costs_one_chapter_too(self) -> None:
         # A filter that refused chapter three says nothing about chapter four.
-        class Refused(RuntimeError):
-            one_chapter = True
-
         model = build_model()
         model.complete.side_effect = [
-            Refused("Google would not read this chapter"),
+            GeminiError("Google would not read this chapter", refused=True),
             THIRD_FIXED,
         ]
         told: list[tuple[str, str]] = []

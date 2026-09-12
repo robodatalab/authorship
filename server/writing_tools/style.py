@@ -1,29 +1,4 @@
-"""Copy-editing the whole manuscript, a chapter at a time.
-
-The counterpart of the grammar pass over a paragraph, at the other end of the
-scale. That one is a minimal-edit model told to change as little as will make a
-sentence grammatical; this one is a large model told to read the book and fix
-how it is written. The first is what an author asks for while writing a
-sentence, the second is what they ask for when the draft is done.
-
-The unit is the chapter, because style is not a property of a sentence. Whether
-a paragraph leans on the same construction twice, whether a scene keeps its
-tense, whether a name is spelt the way it was spelt in chapter one — none of it
-can be seen from inside one paragraph. So each chapter goes to the model with
-every chapter already corrected in front of it, and what comes back is the
-chapter written the way the corrected ones are.
-
-What goes in is the story and only the story: the chapters' titles and the
-markdown written under them. A note the author left themselves, a blurb, a
-cover, a table of contents — those are about the book rather than in it, and a
-model asked to improve the style of a table of contents will improve it.
-
-A chapter is very often several sections, and it has to come back as the same
-several: the author cut them where they wanted them cut. So the sections go in
-with a seam between them and are asked to come back with the seams still there.
-A chapter whose seams do not survive is left exactly as it was, which is the
-only honest thing to do with an answer that cannot be put back.
-"""
+"""Upgrade the style of the document."""
 
 from __future__ import annotations
 
@@ -33,55 +8,17 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from server import storydoc
+from server.models.gemini import GeminiError
 from server.storydoc import Document
 
-# The line between two sections of one chapter. Written as an HTML comment
-# because that is what the format's own markers are, so it reads to the model as
-# something structural rather than as something to improve.
 SEAM = "<!-- section -->"
-
 _SEAM_LINE = re.compile(r"^[ \t]*<!--[ \t]*section[ \t]*-->[ \t]*$", re.MULTILINE)
-
-# A fence the model wrapped the whole answer in, despite being asked not to.
 _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(?P<body>.*)\n```\s*\Z", re.DOTALL)
-
-# A heading the model put back at the top of the chapter, despite being asked
-# not to. Only stripped when it says what the chapter is already called — a
-# heading the author wrote inside their own prose is theirs.
 _HEADING = re.compile(r"\A[ \t]*#{1,6}[ \t]*(?P<said>.+?)[ \t]*(?:\n|\Z)")
-
-# What the ceiling has to cover beyond the chapter itself.
-#
-# A chapter's length in characters is already about four times the tokens its
-# prose needs, so on its own it looks like ample room. It is not: a reasoning
-# model spends output budget thinking before it writes a word, and a ceiling
-# that only covers the prose is one the answer is cut off against. That is not
-# a slow chapter or a short one — it is the opening paragraph of the right
-# answer, arriving as if it were the whole of it.
 THINKING_HEADROOM = 8192
-
-# How far a corrected chapter may be from the length it went in as.
-#
-# Copy-editing is not summarising. A chapter that comes back at half its length
-# has not been tightened, it has been cut off or thrown away, and the only safe
-# reading of it is that something went wrong. Wide enough that real editing
-# never trips it, narrow enough that losing half a chapter always does.
 SHORTEST = 0.6
 LONGEST = 1.8
-
-# What the end of a finished piece of prose looks like: sentence-ending
-# punctuation, or one of the marks that legitimately close over it.
 _FINISHED = tuple(".!?\u2026\"'\u201d\u2019\u00bb)]}*_`")
-
-
-# How much corrected book is carried in front of the chapter being corrected.
-#
-# The whole of it, until the whole of it stops being sensible: a long novel
-# corrected chapter by chapter would otherwise send its opening pages a hundred
-# times over, and eventually send more than the model will read. Past the cap
-# the oldest chapters are dropped, so what the model has is always the part of
-# the book nearest to what it is reading — which is the part the voice has to
-# match.
 CONTEXT_CHARS = 400_000
 
 STYLE_INSTRUCTION = (
@@ -98,38 +35,15 @@ STYLE_INSTRUCTION = (
     "explanation, no code fence."
 )
 
-# The words the pass is named after, and the sentence the model is actually
-# asked. Kept apart from the instruction so that what is asked of it reads the
-# same in the prompt as it does in the button that starts it.
 FIX_REQUEST = "Fix the writing style and the grammar in the following chapter."
 
 
 class Editor(Protocol):
-    """Anything that can be handed an instruction and a chapter and answer.
-
-    Both `vramen.CausalModel` and `server.writing_tools.gemini.Gemini` satisfy
-    it, which is what lets the tests for what this says to a model be written
-    without one — and what would let a model running on this machine take the
-    work over from Gemini without this module knowing.
-
-    Positional, so a model that calls its arguments something else is still a
-    model. The token ceiling is part of the bargain rather than an extra: a
-    local model will not generate without one, and a chapter is the longest
-    thing anything here asks for.
-    """
-
     def complete(self, instruction: str, said: str, max_new_tokens: int, /) -> str: ...
 
 
 @dataclass(frozen=True)
 class Section:
-    """One markdown section of a chapter, and which cell of the document it is.
-
-    `cell_id` is what the editor needs to put the corrected text back — a line
-    span would name a section that has moved by the time the next chapter is
-    done, and a place in the document is no steadier.
-    """
-
     cell_id: str
     source: str
 
@@ -229,29 +143,16 @@ def fix_style(
 def _corrected(
     model: Editor, corrected: list[tuple[str, str]], chapter: Chapter
 ) -> tuple[list[str] | None, str]:
-    """One chapter's sections back from the model, or why they are not.
-
-    An answer the model could not finish is one chapter's problem and not the
-    pass's: a novel is dozens of chapters and losing the other thirty-nine
-    because the fortieth ran out of room would be a poor trade. Anything else
-    that goes wrong — a key, a quota, a network — is not about this chapter and
-    is left to end the job.
-    """
     try:
         answer = model.complete(
             STYLE_INSTRUCTION,
             _reading(corrected, chapter),
             len(chapter.text) + THINKING_HEADROOM,
         )
-    except Exception as err:
-        # Duck-typed on purpose: what this needs to know is whether the fault
-        # was with this one answer — cut short, or refused for what it said —
-        # and a model that is not Gemini says so its own way or not at all.
-        # Anything that does not claim to be about this chapter is fatal, since
-        # a key or a quota will fail the next chapter identically.
-        if not getattr(err, "one_chapter", False):
+    except GeminiError as ge:
+        if not ge.one_chapter:
             raise
-        return None, str(err)
+        return None, str(ge)
     return _sections_of(answer, chapter)
 
 

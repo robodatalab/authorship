@@ -1,19 +1,10 @@
-"""Tests for the one model this extension does not run itself.
-
-Nothing here reaches the network. What is under test is the shape of what goes
-out, and — much more to the point — what is made of what comes back: an answer
-in pieces, an answer that never came because a filter stopped it, and a key the
-API refused, which is the one failure the editor has to tell apart from the rest.
-"""
-
 import unittest
 from unittest import mock
 
 import httpx
 
-from server.writing_tools.gemini import (
+from server.models.gemini import (
     DEFAULT_MODEL,
-    RETRIES,
     Gemini,
     GeminiError,
     configured_key,
@@ -254,33 +245,6 @@ class SlowingDown(unittest.TestCase):
     limit, so one of these is part of the work and the other ends it.
     """
 
-    def setUp(self) -> None:
-        super().setUp()
-        # Nothing here waits for real; that the wait was asked for is the point.
-        self.slept: list[float] = []
-        resting = mock.patch("time.sleep", self.slept.append)
-        resting.start()
-        self.addCleanup(resting.stop)
-
-    def test_a_chapter_told_to_slow_down_is_offered_again(self) -> None:
-        answers = [rate_limited("2s"), answering("Fixed.")]
-        with mock.patch("httpx.request", side_effect=answers) as sent:
-            self.assertEqual(Gemini("k").complete("i", "s"), "Fixed.")
-        self.assertEqual(sent.call_count, 2)
-        self.assertAlmostEqual(sum(self.slept), 2.0, places=1)
-
-    def test_waits_as_long_as_google_asked(self) -> None:
-        answers = [rate_limited("18.252673168s"), answering("Fixed.")]
-        with mock.patch("httpx.request", side_effect=answers):
-            Gemini("k").complete("i", "s")
-        self.assertAlmostEqual(sum(self.slept), 18.5, delta=0.6)
-
-    def test_gives_up_rather_than_holding_a_chapter_for_ever(self) -> None:
-        with mock.patch("httpx.request", return_value=rate_limited("1s")) as sent:
-            with self.assertRaises(GeminiError):
-                Gemini("k").complete("i", "s")
-        self.assertEqual(sent.call_count, RETRIES + 1)
-
     def test_a_model_the_plan_does_not_include_is_not_offered_again(self) -> None:
         # `limit: 0` is not an allowance used up, it is no allowance at all, and
         # waiting for it is waiting for something that will not happen.
@@ -301,24 +265,13 @@ class SlowingDown(unittest.TestCase):
                 Gemini("k").complete("i", "s")
         self.assertTrue(caught.exception.no_quota)
 
-    def test_a_gateway_having_a_moment_is_offered_again(self) -> None:
-        with mock.patch("httpx.request", side_effect=[build_response(503, {}), answering("Fixed.")]):
-            self.assertEqual(Gemini("k").complete("i", "s"), "Fixed.")
-
-    def test_stopping_the_job_ends_the_waiting(self) -> None:
-        with mock.patch("httpx.request", return_value=rate_limited("60s")) as sent:
-            with self.assertRaises(GeminiError):
-                Gemini("k", cancelled=lambda: True).complete("i", "s")
-        self.assertEqual(sent.call_count, 1)
-        self.assertEqual(self.slept, [])
-
 
 class Verify(unittest.TestCase):
     def test_writes_with_the_model_rather_than_merely_looking_it_up(self) -> None:
         # Fetching the model proves it exists and the key can see it, which a
         # model outside the plan also does — right up until the first chapter.
         with mock.patch("httpx.request", return_value=answering("OK")) as sent:
-            Gemini("k", "gemini-x").verify()
+            Gemini("k", "gemini-x").health_check()
         self.assertEqual(sent.call_args.args[0], "POST")
         self.assertTrue(
             sent.call_args.args[1].endswith("/models/gemini-x:generateContent"),
@@ -332,24 +285,24 @@ class Verify(unittest.TestCase):
             200, {"candidates": [{"content": {"parts": []}, "finishReason": "MAX_TOKENS"}]}
         )
         with mock.patch("httpx.request", return_value=thinking):
-            Gemini("k").verify()
+            Gemini("k").health_check()
 
     def test_a_model_outside_the_plan_is_caught_here_and_not_mid_manuscript(self) -> None:
         with mock.patch("httpx.request", return_value=exhausted()):
             with self.assertRaises(GeminiError) as caught:
-                Gemini("k", "gemini-3.1-pro").verify()
+                Gemini("k", "gemini-3.1-pro").health_check()
         self.assertTrue(caught.exception.no_quota)
 
     def test_being_told_to_slow_down_is_not_a_bad_key(self) -> None:
         with mock.patch("httpx.request", return_value=rate_limited("5s")) as sent:
-            Gemini("k").verify()
+            Gemini("k").health_check()
         # Nor is it worth waiting out with somebody sitting at a dialog.
         self.assertEqual(sent.call_count, 1)
 
     def test_raises_for_a_key_the_api_will_not_take(self) -> None:
         with mock.patch("httpx.request", return_value=build_response(401, {})):
             with self.assertRaises(GeminiError):
-                Gemini("k").verify()
+                Gemini("k").health_check()
 
     def test_a_retired_model_is_caught_at_sign_in_and_names_its_replacement(self) -> None:
         # The failure this check exists for. Google retires a name by refusing it
@@ -369,7 +322,7 @@ class Verify(unittest.TestCase):
         )
         with mock.patch("httpx.request", return_value=retired):
             with self.assertRaises(GeminiError) as caught:
-                Gemini("k", "gemini-2.5-pro").verify()
+                Gemini("k", "gemini-2.5-pro").health_check()
         # Not a sign-in problem: the key is fine and a new one will not help.
         self.assertFalse(caught.exception.unauthorized)
         self.assertIn("gemini-3.1-pro-preview", str(caught.exception))

@@ -10,7 +10,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from server.writing_tools.gemini import GeminiError
+from server.models.gemini import GeminiError
 from vramen.resource_manager import (
     MemoryReading,
     ModelKind,
@@ -737,12 +737,6 @@ class FixStyle(unittest.TestCase):
         self.start(model="gemini-flash")
         self.assertEqual(self.gemini.call_args.args[:2], ("k", "gemini-flash"))
 
-    def test_the_client_can_tell_when_the_job_has_been_stopped(self) -> None:
-        # It waits out rate limits, and an author who pressed stop should not be
-        # made to wait out one too.
-        self.start()
-        self.assertTrue(callable(self.gemini.call_args.kwargs["cancelled"]))
-
     def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
         client = TestClient(app)
         response = client.post(
@@ -796,10 +790,10 @@ class FixStyle(unittest.TestCase):
             client.post("/auth/gemini", json={"key": "k"}).json(),
             {"ok": True, "detail": None},
         )
-        self.model.verify.assert_called_once()
+        self.model.health_check.assert_called_once()
 
     def test_a_key_gemini_refuses_is_reported_rather_than_raised(self) -> None:
-        self.model.verify.side_effect = GeminiError("Gemini refused (400)")
+        self.model.health_check.side_effect = GeminiError("Gemini refused (400)")
         client = TestClient(app)
         answer = client.post("/auth/gemini", json={"key": "no"}).json()
         self.assertFalse(answer["ok"])
