@@ -346,7 +346,7 @@ def fix_style_status(id: str) -> dict[str, Any]:
         "noQuota": job.no_quota,
         "leftAlone": list(job.left_alone),
         "sections": list(job.sections),
-        "progress": {"written": job.fixed, "chapters": job.chapters},
+        "progress": {"fixed": job.fixed, "sections": job.to_fix},
     }
 
 

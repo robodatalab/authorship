@@ -727,7 +727,7 @@ class FixStyle(unittest.TestCase):
                 {"cellId": "door", "source": CORRECTED},
             ],
         )
-        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+        self.assertEqual(status["progress"], {"fixed": 2, "sections": 2})
 
     def test_leaves_the_document_alone(self) -> None:
         self.start()
@@ -756,9 +756,9 @@ class FixStyle(unittest.TestCase):
         wait_for_style(client, started.json()["id"])
         self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
 
-    def test_names_the_chapters_it_left_as_the_author_wrote_them(self) -> None:
-        # A chapter the pass could not use an answer for is left alone, which is
-        # right and is invisible — the document looks as it would if the chapter
+    def test_names_the_sections_it_left_as_the_author_wrote_them(self) -> None:
+        # A section the pass could not use an answer for is left alone, which is
+        # right and is invisible — the document looks as it would if the section
         # had needed nothing. The editor is told so it can say so.
         self.model.complete.side_effect = [
             'She reached for it and said, "Come closer',
@@ -767,7 +767,7 @@ class FixStyle(unittest.TestCase):
         status = self.start()
         self.assertEqual(status["sections"], [{"cellId": "door", "source": CORRECTED}])
         self.assertEqual(len(status["leftAlone"]), 1)
-        self.assertEqual(status["leftAlone"][0]["chapter"], "One")
+        self.assertEqual(status["leftAlone"][0]["opening"], "The lantern had gone out.")
         self.assertIn("mid-sentence", status["leftAlone"][0]["why"])
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
@@ -775,14 +775,14 @@ class FixStyle(unittest.TestCase):
         response = client.get("/fix/style/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
 
-    def test_a_document_with_no_chapters_fails_the_job_rather_than_the_request(
+    def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(
         self,
     ) -> None:
         self.document.write_text(
-            storydoc.dumps([storydoc.markdown("Just prose.")]), encoding="utf-8"
+            storydoc.dumps([storydoc.chapter("One")]), encoding="utf-8"
         )
         status = self.start()
-        self.assertIn("no chapters", status["error"])
+        self.assertIn("no prose", status["error"])
 
     def test_a_signed_in_key_is_checked_before_it_is_used(self) -> None:
         client = TestClient(app)

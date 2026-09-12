@@ -109,7 +109,7 @@ describe("FixStyleCommand — the experiment the author has to turn on", () => {
         await new FixStyleCommand().invoke(openStory(A_STORY_OF_TWO_CHAPTERS));
 
         expect(asked).toEqual([]);
-        expect(shownMessages[0]).toContain("Send the chapters of");
+        expect(shownMessages[0]).toContain("Send the prose of");
     });
 });
 
@@ -146,11 +146,13 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
         );
     });
 
-    it("names the chapters it left as the author wrote them", async () => {
+    it("names the sections it left as the author wrote them", async () => {
         turnTheExperimentOn();
         geminiAnswers({
             sections: [{ cellId: "c2", source: "The bell rang." }],
-            leftAlone: [{ chapter: "One", why: "it came back mid-sentence" }],
+            leftAlone: [
+                { opening: "She saw the door.", why: "it came back mid-sentence" },
+            ],
         });
 
         const session = openStory(A_STORY_OF_TWO_CHAPTERS);
@@ -160,7 +162,7 @@ describe("FixStyleCommand — the pass over the whole manuscript", () => {
             "She saw the door.",
         );
         expect(shownMessages.at(-1)).toBe(
-            "One chapter was left as you wrote it: “One” — it came back mid-sentence",
+            "One section was left as you wrote it: “She saw the door.…” — it came back mid-sentence",
         );
     });
 
