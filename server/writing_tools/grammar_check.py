@@ -28,10 +28,20 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
+from typing import Any
 
 from vramen import Seq2SeqModel
 
-from server.writing_tools.prose_check import Finding, Passage, sentences
+from server.jobs import Job
+from server.storydoc import Document
+from server.writing_tools.prose_check import (
+    Finding,
+    Passage,
+    check_errors,
+    check_target,
+    sentences,
+    story_lines,
+)
 
 # What the model was trained to answer to. Not an instruction — the prefix *is*
 # the task, and anything else in front of the sentence is read as part of it.
@@ -372,3 +382,39 @@ def check(
                 )
             )
     return found
+
+
+class GrammarCheckJob(Job):
+    """The grammar pass, which is a model and is therefore slow.
+
+    Its own job so that it is its own wait. The names it must not touch are read
+    off the whole document; a paragraph is in no position to work out what the
+    people in the book are called.
+    """
+
+    kind = "grammar check"
+
+    def __init__(
+        self,
+        model: Seq2SeqModel,
+        document: Document,
+        selection: tuple[int, int] | None,
+    ) -> None:
+        assert document.path is not None
+        super().__init__(f"{check_target(document.path, selection)}#gec")
+        self._model = model
+        self._document = document
+        self._selection = selection
+        self.findings: list[dict[str, Any]] = []
+
+    def execute(self) -> None:
+        start, end = self._selection or (0, len(self._document.lines) - 1)
+        self.findings = [
+            error
+            for finding in check(
+                self._model,
+                story_lines(self._document, start, end),
+                names_in(self._document.text),
+            )
+            for error in check_errors(self._document, finding)
+        ]

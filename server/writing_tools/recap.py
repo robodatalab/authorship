@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 from vramen import CausalModel
 
@@ -53,3 +56,16 @@ def write_recap(
     
     return running_summary.strip()
 
+
+_DIGITS = re.compile(r"(\d+)")
+
+
+def _digits_as_numbers(named: str) -> list[Any]:
+    return [
+        int(piece) if index % 2 else piece
+        for index, piece in enumerate(_DIGITS.split(named))
+    ]
+
+
+def volumes_in_reading_order(beside: Path, named: list[str]) -> list[Path]:
+    return [beside / name for name in sorted(set(named), key=_digits_as_numbers)]

@@ -26,12 +26,16 @@ from bisect import bisect_right
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from typing import Callable
+from pathlib import Path
+from typing import Any, Callable
 
 import spacy
 from proselint.config import Config
 from proselint.tools import LintFile
 from spacy.tokens import Doc, Span, Token
+
+from server.jobs import Job
+from server.storydoc import Document
 
 MODEL = "en_core_web_sm"
 
@@ -601,3 +605,78 @@ def fires(
     with _LOCK:
         doc = _nlp()(passage.text)
         return any(covers(finding) for finding in found(doc, passage))
+
+
+def check_target(path: Path, selection: tuple[int, int] | None) -> str:
+    where = "all" if selection is None else f"{selection[0]}-{selection[1]}"
+    return f"{path}#{where}"
+
+
+def story_lines(document: Document, start: int, end: int) -> list[tuple[int, str]]:
+    return [
+        (index, document.lines[index])
+        for index, _ in document.story_lines(start, end)
+    ]
+
+
+def check_errors(document: Document, finding: Finding) -> list[dict[str, Any]]:
+    errors = []
+    for at, end in [(finding.at, finding.end), *finding.related]:
+        cell = document.cell_at(at.line)
+        if cell is None or cell is not document.cell_at(end.line):
+            continue
+        errors.append(
+            {
+                "cellId": cell.unique_id,
+                "startCharacterOffsetInCell": cell.offset_of(at.line, at.character),
+                "endCharacterOffsetInCell": cell.offset_of(end.line, end.character),
+                "wordsInTheCell": cell.source[
+                    cell.offset_of(at.line, at.character) : cell.offset_of(
+                        end.line, end.character
+                    )
+                ],
+                "isVisible": True,
+                "ruleThatFoundTheError": finding.rule,
+                "isAnErrorOf": "style" if finding.kind == "style" else "grammar",
+                "reasonForError": finding.detail,
+                "correctVersion": finding.replacements[0]
+                if finding.replacements
+                else "",
+            }
+        )
+    return errors
+
+
+class ProseCheckJob(Job):
+    """The rules that need no model: the story's own faults, and usage.
+
+    Kept apart from the grammar pass because it is a hundred times faster, and a
+    report that waits for the slowest thing in it is a report nobody sees. This
+    one answers while the author is still looking at the paragraph.
+    """
+
+    kind = "prose check"
+
+    def __init__(self, document: Document, selection: tuple[int, int] | None) -> None:
+        assert document.path is not None
+        super().__init__(check_target(document.path, selection))
+        self._document = document
+        self._selection = selection
+        self.findings: list[dict[str, Any]] = []
+
+    def execute(self) -> None:
+        start, end = self._selection or (0, len(self._document.lines) - 1)
+        crutches = (
+            crutch_lemmas(
+                story_lines(self._document, 0, len(self._document.lines) - 1)
+            )
+            if self._selection is None
+            else frozenset()
+        )
+        if self.cancelled:
+            return
+        self.findings = [
+            error
+            for finding in check(story_lines(self._document, start, end), crutches)
+            for error in check_errors(self._document, finding)
+        ]

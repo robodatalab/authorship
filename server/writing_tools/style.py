@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 from server import storydoc
+from server.jobs import Job
 from server.models.gemini import GeminiError
 from server.storydoc import Document
 
@@ -261,3 +262,44 @@ def _unheaded(said: str, title: str) -> str:
     if heading and heading.group("said").strip().casefold() == title.strip().casefold():
         return said[heading.end() :].lstrip("\n")
     return said
+
+
+class StyleFixJob(Job):
+    """Fix the style of writing in the document using Gemini"""
+
+    kind = "style fix"
+
+    def __init__(self, model: Editor, document: Document) -> None:
+        super().__init__(str(document.path))
+        self._model = model
+        self._document = document
+        self.sections: list[dict[str, Any]] = []
+        self.fixed = 0
+        self.chapters = 0
+        self.unauthorized = False
+        self.no_quota = False
+        self.left_alone: list[dict[str, str]] = []
+
+    def execute(self) -> None:
+        try:
+            fix_style(
+                self._model,
+                self._document,
+                lambda: self.cancelled,
+                self._reached,
+                self._revised,
+                self._left_alone,
+            )
+        except GeminiError as err:
+            self.unauthorized = err.unauthorized
+            self.no_quota = err.no_quota
+            raise
+
+    def _reached(self, fixed: int, chapters: int) -> None:
+        self.fixed, self.chapters = fixed, chapters
+
+    def _revised(self, cell_id: str, source: str) -> None:
+        self.sections.append({"cellId": cell_id, "source": source})
+
+    def _left_alone(self, title: str, why: str) -> None:
+        self.left_alone.append({"chapter": title, "why": why})
