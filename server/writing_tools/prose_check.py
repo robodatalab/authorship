@@ -13,17 +13,16 @@ from proselint.config import Config
 from proselint.tools import LintFile
 from spacy.tokens import Doc, Span, Token
 
-MODEL = "en_core_web_sm"
+PARSER_MODEL = "en_core_web_sm"
 _LOCK = threading.Lock()
-_NLP: spacy.Language | None = None
+_PARSER: spacy.Language | None = None
 
 
-def _nlp() -> spacy.Language:
-    global _NLP
-    if _NLP is None:
-        # Entities are the one thing no rule here asks about.
-        _NLP = spacy.load(MODEL, exclude=["ner"])
-    return _NLP
+def _parser() -> spacy.Language:
+    global _PARSER
+    if _PARSER is None:
+        _PARSER = spacy.load(PARSER_MODEL, exclude=["ner"])
+    return _PARSER
 
 
 @dataclass(frozen=True)
@@ -63,13 +62,6 @@ class Passage:
         return self.place(at), self.place(end)
 
     def line_spans(self) -> list[tuple[int, int]]:
-        """Where each line of the passage begins and ends.
-
-        The blank lines between paragraphs are gone by the time a passage is
-        built — `story_lines` yields only lines with something on them — so a
-        paragraph break survives here as nothing but the join between two lines.
-        Anything that needs to know where one paragraph stops has to ask.
-        """
         ends = [start - 1 for start in self._starts[1:]] + [len(self.text)]
         return list(zip(self._starts, ends))
 
@@ -101,23 +93,23 @@ ECHO_REACH = 400
 ECHO_SHORTEST = 4
 MONOTONY_RUN = 5
 MONOTONY_SPREAD = 2.5
+SHORTEST_MONOTONOUS_SENTENCE = 5
 CRUTCH_LEAST = 8
 CRUTCH_TIMES_MEDIAN = 4.0
 CRUTCH_MOST = 5
+ENOUGH_WORDS_TO_JUDGE = 20
 
 CONTENT = frozenset({"NOUN", "VERB", "ADJ", "ADV"})
 
 
 def _filter_words(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """A perception verb standing between the reader and what is perceived."""
     for token in doc:
         if token.pos_ != "VERB" or token.lemma_.lower() not in FILTERS:
             continue
-        subject = next(
+        perceiver = next(
             (child for child in token.children if child.dep_ == "nsubj"), None
         )
-        # Somebody has to be doing the perceiving for it to be a filter at all.
-        if subject is None or subject.pos_ not in {"PRON", "PROPN"}:
+        if perceiver is None or perceiver.pos_ not in {"PRON", "PROPN"}:
             continue
         at, end = passage.span(token.idx, token.idx + len(token.text))
         yield Finding(
@@ -125,7 +117,7 @@ def _filter_words(doc: Doc, passage: Passage) -> Iterator[Finding]:
             kind="style",
             message=f"“{token.text}” reports rather than shows",
             detail=(
-                f"“{subject.text} {token.text}…” tells the reader that the "
+                f"“{perceiver.text} {token.text}…” tells the reader that the "
                 "point-of-view character perceived something, and only then what "
                 "it was. The perceiving is almost never the news. Cutting the "
                 "verb usually leaves the sentence saying the same thing from "
@@ -137,7 +129,6 @@ def _filter_words(doc: Doc, passage: Passage) -> Iterator[Finding]:
 
 
 def _said_bookisms(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """A dialogue tag doing work the line should be doing."""
     for sentence in doc.sents:
         if not any(quote in sentence.text for quote in QUOTES):
             continue
@@ -179,7 +170,6 @@ def _said_bookisms(doc: Doc, passage: Passage) -> Iterator[Finding]:
 
 
 def _adverbial_tags(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """An adverb propping up a dialogue tag."""
     for token in doc:
         if token.pos_ != "ADV" or not token.text.lower().endswith("ly"):
             continue
@@ -206,7 +196,6 @@ def _adverbial_tags(doc: Doc, passage: Passage) -> Iterator[Finding]:
 
 
 def _passive_voice(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """A sentence whose subject is having something done to it."""
     for token in doc:
         if token.dep_ != "nsubjpass":
             continue
@@ -234,23 +223,22 @@ def _passive_voice(doc: Doc, passage: Passage) -> Iterator[Finding]:
 
 
 def _echo(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """A content word said twice inside the reader's hearing."""
-    seen: dict[str, Token] = {}
+    said_before: dict[str, Token] = {}
     for token in doc:
         if token.pos_ not in CONTENT or token.is_stop:
             continue
         lemma = token.lemma_.lower()
         if len(lemma) < ECHO_SHORTEST:
             continue
-        before = seen.get(lemma)
-        if before is not None and token.idx - before.idx <= ECHO_REACH:
+        earlier = said_before.get(lemma)
+        if earlier is not None and token.idx - earlier.idx <= ECHO_REACH:
             at, end = passage.span(token.idx, token.idx + len(token.text))
             yield Finding(
                 rule="echo",
                 kind="style",
                 message=f"“{token.text}” again",
                 detail=(
-                    f"“{before.text}” appears just above and “{token.text}” here. "
+                    f"“{earlier.text}” appears just above and “{token.text}” here. "
                     "A word repeated within a few lines is heard as an echo "
                     "rather than as emphasis — the reader notices the writing "
                     "instead of the scene. Deliberate repetition works, but it "
@@ -258,27 +246,26 @@ def _echo(doc: Doc, passage: Passage) -> Iterator[Finding]:
                 ),
                 at=at,
                 end=end,
-                related=(passage.span(before.idx, before.idx + len(before.text)),),
+                related=(passage.span(earlier.idx, earlier.idx + len(earlier.text)),),
             )
-        seen[lemma] = token
+        said_before[lemma] = token
 
 
 def _openings(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """Consecutive sentences that begin the same way."""
-    before: Token | None = None
+    opener_before: Token | None = None
     for sentence in doc.sents:
-        first = next(
+        opener = next(
             (token for token in sentence if not token.is_punct and not token.is_space),
             None,
         )
-        if first is None:
+        if opener is None:
             continue
-        if before is not None and first.lemma_.lower() == before.lemma_.lower():
-            at, end = passage.span(first.idx, first.idx + len(first.text))
+        if opener_before is not None and opener.lemma_.lower() == opener_before.lemma_.lower():
+            at, end = passage.span(opener.idx, opener.idx + len(opener.text))
             yield Finding(
                 rule="opening",
                 kind="style",
-                message=f"another sentence opening on “{first.text}”",
+                message=f"another sentence opening on “{opener.text}”",
                 detail=(
                     "Two sentences in a row starting with the same word give the "
                     "passage a pulse the reader hears before they hear the "
@@ -288,27 +275,30 @@ def _openings(doc: Doc, passage: Passage) -> Iterator[Finding]:
                 ),
                 at=at,
                 end=end,
-                related=(passage.span(before.idx, before.idx + len(before.text)),),
+                related=(
+                    passage.span(
+                        opener_before.idx, opener_before.idx + len(opener_before.text)
+                    ),
+                ),
             )
-        before = first
+        opener_before = opener
 
 
 def _monotony(doc: Doc, passage: Passage) -> Iterator[Finding]:
-    """A run of sentences all of the same length."""
-    sentences: list[Span] = [
+    sentences_with_words: list[Span] = [
         sentence for sentence in doc.sents if any(not t.is_punct for t in sentence)
     ]
-    lengths = [
+    word_counts = [
         len([token for token in sentence if not token.is_punct])
-        for sentence in sentences
+        for sentence in sentences_with_words
     ]
 
     index = 0
-    while index + MONOTONY_RUN <= len(sentences):
-        window = lengths[index : index + MONOTONY_RUN]
-        # Very short sentences in a row are a rhythm rather than the lack of one.
-        if min(window) > 4 and statistics.pstdev(window) <= MONOTONY_SPREAD:
-            last = sentences[index + MONOTONY_RUN - 1]
+    while index + MONOTONY_RUN <= len(sentences_with_words):
+        run = word_counts[index : index + MONOTONY_RUN]
+        long_enough_to_drag = min(run) >= SHORTEST_MONOTONOUS_SENTENCE
+        if long_enough_to_drag and statistics.pstdev(run) <= MONOTONY_SPREAD:
+            last = sentences_with_words[index + MONOTONY_RUN - 1]
             at, end = passage.span(last.start_char, last.end_char)
             yield Finding(
                 rule="monotony",
@@ -316,7 +306,7 @@ def _monotony(doc: Doc, passage: Passage) -> Iterator[Finding]:
                 message=f"{MONOTONY_RUN} sentences of the same length",
                 detail=(
                     "The last five sentences are all about "
-                    f"{round(statistics.fmean(window))} words long. Sentence "
+                    f"{round(statistics.fmean(run))} words long. Sentence "
                     "length is where prose gets its pace: a run of equal ones "
                     "reads as flat however good each of them is. One short "
                     "sentence in the middle of them is usually the whole fix."
@@ -324,14 +314,12 @@ def _monotony(doc: Doc, passage: Passage) -> Iterator[Finding]:
                 at=at,
                 end=end,
             )
-            # Said once about a run, not once for every window inside it.
             index += MONOTONY_RUN
         else:
             index += 1
 
 
 def _crutches(doc: Doc, passage: Passage, worn: frozenset[str]) -> Iterator[Finding]:
-    """A word this author leans on, wherever it turns up here."""
     for token in doc:
         if token.pos_ not in CONTENT or token.lemma_.lower() not in worn:
             continue
@@ -352,65 +340,39 @@ def _crutches(doc: Doc, passage: Passage, worn: frozenset[str]) -> Iterator[Find
         )
 
 
-# --- usage, from proselint ------------------------------------------------
-#
-# A second opinion, and a borrowed one: proselint carries word lists nobody
-# should be retyping — clichés, mixed metaphors, malapropisms, the redundancies.
-#
-# Most of it is switched off. It is a usage linter written for journalism and
-# argument, and a novel is neither: hedging and weasel words are how a character
-# talks, archaism is period voice, and typography is the author's own punctuation
-# being argued with. What is left is the part that is about words being wrong
-# rather than about prose being unbusinesslike.
+ABOUT_WORDS_BEING_WRONG = (
+    "cliches", "lexical_illusions", "malapropisms", "mixed_metaphors",
+    "mondegreens", "nonwords", "oxymorons", "redundancy", "spelling",
+    "uncomparables",
+)
+ABOUT_PROSE_BEING_UNBUSINESSLIKE = (
+    "annotations", "archaism", "dates_times", "hedging", "industrial_language",
+    "misc", "needless_variants", "psychology", "restricted", "skunked_terms",
+    "social_awareness", "terms", "typography", "weasel_words",
+)
+
 USAGE_CHECKS = {
-    "annotations": False,
-    "archaism": False,
-    "cliches": True,
-    "dates_times": False,
-    "hedging": False,
-    "industrial_language": False,
-    "lexical_illusions": True,
-    "malapropisms": True,
-    "misc": False,
-    "mixed_metaphors": True,
-    "mondegreens": True,
-    "needless_variants": False,
-    "nonwords": True,
-    "oxymorons": True,
-    "psychology": False,
-    "redundancy": True,
-    "restricted": False,
-    "skunked_terms": False,
-    "social_awareness": False,
-    "spelling": True,
-    "terms": False,
-    "typography": False,
-    "uncomparables": True,
-    "weasel_words": False,
+    **{check: True for check in ABOUT_WORDS_BEING_WRONG},
+    **{check: False for check in ABOUT_PROSE_BEING_UNBUSINESSLIKE},
 }
 
 USAGE_CONFIG: Config = {"max_errors": 200, "checks": USAGE_CHECKS}
 
-# proselint's own rule names, kept whole and prefixed so that what fires can
-# always be traced back to what wrote it.
-USAGE = "usage:"
+USAGE_RULE_PREFIX = "usage:"
 
-# `LintFile` puts a newline in front of what it is given, so every offset it
-# reports is one further along than the text the caller handed it.
-_USAGE_OFFSET = 1
+_NEWLINE_LINTFILE_PREPENDS = 1
 
 
 def _usage(passage: Passage) -> Iterator[Finding]:
-    """What proselint makes of the passage, in this document's terms."""
     for found, _ in LintFile("passage", passage.text).lint(USAGE_CONFIG):
-        first = found.span[0] - _USAGE_OFFSET
-        last = found.span[1] - _USAGE_OFFSET
+        first = found.span[0] - _NEWLINE_LINTFILE_PREPENDS
+        last = found.span[1] - _NEWLINE_LINTFILE_PREPENDS
         if first < 0 or last <= first:
             continue
         at, end = passage.span(first, last)
         replacements = tuple(found.replacements) if found.replacements else ()
         yield Finding(
-            rule=f"{USAGE}{found.check_path}",
+            rule=f"{USAGE_RULE_PREFIX}{found.check_path}",
             kind="usage",
             message=found.message.strip().rstrip("."),
             detail=(
@@ -425,8 +387,6 @@ def _usage(passage: Passage) -> Iterator[Finding]:
         )
 
 
-# Every rule by the name its findings carry, so that what found a fault can be
-# asked again about a proposed fix. Adding a rule here is the whole of adding it.
 RULES: dict[str, Callable[[Doc, Passage], Iterator[Finding]]] = {
     "filter-word": _filter_words,
     "said-bookism": _said_bookisms,
@@ -439,17 +399,10 @@ RULES: dict[str, Callable[[Doc, Passage], Iterator[Finding]]] = {
 
 
 def sentences(text: str) -> list[tuple[int, int]]:
-    """Where each sentence of the text begins and ends.
-
-    From the parser rather than from the full stops. Dialogue ends on question
-    marks and exclamation marks as often as on periods, and a period is as often
-    an initial, an abbreviation or the middle of a number — a rule written by
-    hand gets the first page of any novel wrong.
-    """
     if not text.strip():
         return []
     with _LOCK:
-        doc = _nlp()(text)
+        doc = _parser()(text)
         return [
             (sentence.start_char, sentence.end_char)
             for sentence in doc.sents
@@ -458,85 +411,40 @@ def sentences(text: str) -> list[tuple[int, int]]:
 
 
 def crutch_lemmas(prose: Iterable[tuple[int, str]]) -> frozenset[str]:
-    """The words a whole manuscript leans on.
-
-    Worked out over the document rather than the passage, because that is the
-    only place the habit is visible — and it is why an editor holding the whole
-    book can say something a checker in a text box never can.
-    """
     with _LOCK:
-        doc = _nlp()(Passage(prose).text)
+        doc = _parser()(Passage(prose).text)
         counts = Counter(
             token.lemma_.lower()
             for token in doc
             if token.pos_ in CONTENT and not token.is_stop and len(token.lemma_) > 3
         )
-    if len(counts) < 20:
+    if len(counts) < ENOUGH_WORDS_TO_JUDGE:
         return frozenset()
     middle = statistics.median(counts.values())
-    worn = [
+    worn_out = [
         lemma
         for lemma, count in counts.most_common()
         if count >= CRUTCH_LEAST and count >= middle * CRUTCH_TIMES_MEDIAN
     ]
-    return frozenset(worn[:CRUTCH_MOST])
+    return frozenset(worn_out[:CRUTCH_MOST])
 
 
 def check(
     prose: Iterable[tuple[int, str]], crutches: frozenset[str] = frozenset()
 ) -> list[Finding]:
-    """Everything wrong with a passage, by every rule there is.
-
-    `prose` is the lines and their numbers in the file — the same shape
-    `Document.story_lines` yields, so what is checked is what is story and never
-    the markers or the author's own notes.
-    """
     passage = Passage(prose)
     if not passage.text.strip():
         return []
 
     with _LOCK:
-        doc = _nlp()(passage.text)
+        doc = _parser()(passage.text)
         found = [
             finding for rule in RULES.values() for finding in rule(doc, passage)
         ]
         if crutches:
             found.extend(_crutches(doc, passage, crutches))
 
-    # Outside the parser's lock: proselint reads the text and nothing else.
     found.extend(_usage(passage))
 
     return sorted(found, key=lambda f: (f.at.line, f.at.character))
 
-
-def fires(
-    rule: str, prose: Iterable[tuple[int, str]], line: int, at: int, end: int
-) -> bool:
-    """Whether that one rule still finds fault where a fix was put in.
-
-    The point of a rule having a name. A model asked to put something right can
-    be judged by the thing that found it, which a model asked to reread a
-    paragraph never can.
-    """
-    passage = Passage(prose)
-    if not passage.text.strip():
-        return False
-
-    def covers(finding: Finding) -> bool:
-        return (
-            finding.at.line == line
-            and finding.at.character < end
-            and finding.end.character > at
-        )
-
-    if rule.startswith(USAGE):
-        return any(
-            covers(finding) for finding in _usage(passage) if finding.rule == rule
-        )
-
-    found = RULES.get(rule)
-    if found is None:
-        return False
-    with _LOCK:
-        doc = _nlp()(passage.text)
-        return any(covers(finding) for finding in found(doc, passage))
