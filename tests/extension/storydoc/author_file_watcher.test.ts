@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, files, watchersOnTheFiles } from "../vscode";
+import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
@@ -19,9 +19,10 @@ async function openEditor(text: string): Promise<OpenEditor> {
     files.set(DOCUMENT_PATH, text);
     watchersOnTheFiles.length = 0;
 
-    const provider = new AuthorFileEditorProvider({
-        extensionUri: Uri.file("/extension"),
-    } as never);
+    const provider = new AuthorFileEditorProvider(
+        { extensionUri: Uri.file("/extension") } as never,
+        vscodeWindow.createOutputChannel("Authorship") as never,
+    );
     const session = await provider.openCustomDocument(
         Uri.file(DOCUMENT_PATH) as never,
         {} as never,

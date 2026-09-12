@@ -145,7 +145,24 @@ export const commands = {
     },
 };
 
+export const linesWrittenToTheLog: string[] = [];
+
 export const window = {
+    createOutputChannel: (name: string) => ({
+        name,
+        append: (line: string) => linesWrittenToTheLog.push(line),
+        appendLine: (line: string) => linesWrittenToTheLog.push(line),
+        trace: (line: string) => linesWrittenToTheLog.push(line),
+        debug: (line: string) => linesWrittenToTheLog.push(line),
+        info: (line: string) => linesWrittenToTheLog.push(line),
+        warn: (line: string) => linesWrittenToTheLog.push(line),
+        error: (line: string | Error) => linesWrittenToTheLog.push(String(line)),
+        clear: () => linesWrittenToTheLog.splice(0),
+        show: () => undefined,
+        hide: () => undefined,
+        replace: () => undefined,
+        dispose: () => undefined,
+    }),
     registerCustomEditorProvider: (): { dispose(): void } => ({
         dispose: () => undefined,
     }),

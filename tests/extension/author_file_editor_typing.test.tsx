@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, files, watchersOnTheFiles } from "./vscode";
+import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "./vscode";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -44,9 +44,10 @@ async function openEditor(text: string): Promise<OpenEditor> {
     answersFromTheHost.length = 0;
     monacoEditorsOnThePage.length = 0;
 
-    const provider = new AuthorFileEditorProvider({
-        extensionUri: Uri.file("/extension"),
-    } as never);
+    const provider = new AuthorFileEditorProvider(
+        { extensionUri: Uri.file("/extension") } as never,
+        vscodeWindow.createOutputChannel("Authorship") as never,
+    );
     const editsRecorded: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
         editsRecorded.push(edit as unknown as { undo(): void; redo(): void }),
