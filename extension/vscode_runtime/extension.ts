@@ -7,7 +7,7 @@ import { ModelServer } from "./server/process";
 import { serverPort } from "./server/fetch";
 
 export function activate(context: vscode.ExtensionContext) {
-    const log = vscode.window.createOutputChannel("Authorship");
+    const log = vscode.window.createOutputChannel("Authorship", { log: true });
     context.subscriptions.push(log);
 
     context.subscriptions.push(new ModelServer(context, serverPort(), log));
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
     }
 
-    const authorFileEditor = new AuthorFileEditorProvider(context);
+    const authorFileEditor = new AuthorFileEditorProvider(context, log);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
             AuthorFileEditorProvider.viewType,

@@ -19,67 +19,67 @@ def lines(text: str) -> list[tuple[int, str]]:
 class Typography(unittest.TestCase):
     def test_a_spaced_dash_closed_up_is_not_a_correction(self) -> None:
         self.assertEqual(
-            grammar_check._typography("after - complete"),
-            grammar_check._typography("after-complete"),
+            grammar_check._apart_from_typography("after - complete"),
+            grammar_check._apart_from_typography("after-complete"),
         )
 
     def test_an_em_dash_turned_into_a_hyphen_is_not_a_correction(self) -> None:
         self.assertEqual(
-            grammar_check._typography("after — complete"),
-            grammar_check._typography("after-complete"),
+            grammar_check._apart_from_typography("after — complete"),
+            grammar_check._apart_from_typography("after-complete"),
         )
 
     def test_a_space_put_in_front_of_a_bracket_is_not_a_correction(self) -> None:
         self.assertEqual(
-            grammar_check._typography("crossed)."),
-            grammar_check._typography("crossed )."),
+            grammar_check._apart_from_typography("crossed)."),
+            grammar_check._apart_from_typography("crossed )."),
         )
 
     def test_a_deleted_quotation_mark_is_not_a_correction(self) -> None:
         self.assertEqual(
-            grammar_check._typography('"Hello'),
-            grammar_check._typography("Hello"),
+            grammar_check._apart_from_typography('"Hello'),
+            grammar_check._apart_from_typography("Hello"),
         )
 
     def test_a_missing_comma_is_a_correction(self) -> None:
         self.assertNotEqual(
-            grammar_check._typography("well then"),
-            grammar_check._typography("well, then"),
+            grammar_check._apart_from_typography("well then"),
+            grammar_check._apart_from_typography("well, then"),
         )
 
     def test_a_missing_apostrophe_is_a_correction(self) -> None:
         # Apostrophes are left out of the set on purpose: they are quotation
         # marks only some of the time, and a missing one is a real fault.
         self.assertNotEqual(
-            grammar_check._typography("dont"),
-            grammar_check._typography("don't"),
+            grammar_check._apart_from_typography("dont"),
+            grammar_check._apart_from_typography("don't"),
         )
 
 
 class Trimming(unittest.TestCase):
     def test_drops_a_closing_quote_the_previous_sentence_left_behind(self) -> None:
         text = '" She was expecting the room to start whispering.'
-        at, end = grammar_check._trimmed(text, 0, len(text))
+        at, end = grammar_check._trimmed_of_orphan_quotes(text, 0, len(text))
         self.assertEqual(text[at:end], "She was expecting the room to start whispering.")
 
     def test_drops_a_curly_closer_at_the_head(self) -> None:
         text = "” And then she left."
-        at, end = grammar_check._trimmed(text, 0, len(text))
+        at, end = grammar_check._trimmed_of_orphan_quotes(text, 0, len(text))
         self.assertEqual(text[at:end], "And then she left.")
 
     def test_leaves_a_balanced_pair_alone(self) -> None:
         text = '"And what caused it?" she asked.'
-        at, end = grammar_check._trimmed(text, 0, len(text))
+        at, end = grammar_check._trimmed_of_orphan_quotes(text, 0, len(text))
         self.assertEqual(text[at:end], text)
 
     def test_leaves_dialogue_that_opens_a_sentence_alone(self) -> None:
         text = '"Hello everyone, nice to see you again" she said.'
-        at, end = grammar_check._trimmed(text, 0, len(text))
+        at, end = grammar_check._trimmed_of_orphan_quotes(text, 0, len(text))
         self.assertEqual(text[at:end], text)
 
     def test_only_ever_narrows(self) -> None:
         text = 'She said "no".'
-        at, end = grammar_check._trimmed(text, 0, len(text))
+        at, end = grammar_check._trimmed_of_orphan_quotes(text, 0, len(text))
         self.assertGreaterEqual(at, 0)
         self.assertLessEqual(end, len(text))
 
@@ -87,7 +87,7 @@ class Trimming(unittest.TestCase):
 def segments(text: str) -> list[str]:
     """The runs the model would be asked about, as strings."""
     passage = Passage(lines(text))
-    return [passage.text[at:end] for at, end in grammar_check._segments(passage)]
+    return [passage.text[at:end] for at, end in grammar_check._sentences_to_ask_about(passage)]
 
 
 class Segmenting(unittest.TestCase):
@@ -215,12 +215,12 @@ class Segmenting(unittest.TestCase):
 
     def test_segments_stay_in_the_order_they_were_written(self) -> None:
         passage = Passage(lines('"One." she said.\n"Two." he said.'))
-        found = grammar_check._segments(passage)
+        found = grammar_check._sentences_to_ask_about(passage)
         self.assertEqual(found, sorted(found))
 
     def test_segments_never_overlap(self) -> None:
         passage = Passage(lines('"Hello," she said. "Come in," he answered.'))
-        found = grammar_check._segments(passage)
+        found = grammar_check._sentences_to_ask_about(passage)
         for (_, end), (at, _) in zip(found, found[1:]):
             self.assertLessEqual(end, at)
 
@@ -249,7 +249,7 @@ class Segmenting(unittest.TestCase):
 class Edits(unittest.TestCase):
     def test_a_replaced_word_is_one_edit_over_that_word(self) -> None:
         before = "I like to swimming"
-        edits = grammar_check._edits(before, "I like swimming")
+        edits = grammar_check._word_aligned_edits(before, "I like swimming")
         self.assertEqual(len(edits), 1)
         at, end, now = edits[0]
         self.assertEqual(before[at:end], "to ")
@@ -260,7 +260,7 @@ class Edits(unittest.TestCase):
         # or putting the fix in takes a character out with it.
         before = "I went store"
         after = "I went to the store"
-        edits = grammar_check._edits(before, after)
+        edits = grammar_check._word_aligned_edits(before, after)
         self.assertEqual(len(edits), 1)
         at, end, now = edits[0]
         self.assertEqual(before[:at] + now + before[end:], after)
@@ -269,44 +269,44 @@ class Edits(unittest.TestCase):
         before = "she dont know it was them"
         after = "She doesn't know it was them."
         rebuilt = before
-        for at, end, now in reversed(grammar_check._edits(before, after)):
+        for at, end, now in reversed(grammar_check._word_aligned_edits(before, after)):
             rebuilt = rebuilt[:at] + now + rebuilt[end:]
         self.assertEqual(rebuilt, after)
 
     def test_an_unchanged_sentence_has_no_edits(self) -> None:
-        self.assertEqual(grammar_check._edits("Nothing wrong.", "Nothing wrong."), [])
+        self.assertEqual(grammar_check._word_aligned_edits("Nothing wrong.", "Nothing wrong."), [])
 
 
 class Renaming(unittest.TestCase):
     def test_a_capitalised_word_swapped_for_another_is_a_rename(self) -> None:
-        self.assertTrue(grammar_check._renames("Henry ", "Avenue "))
+        self.assertTrue(grammar_check._renames_somebody("Henry ", "Avenue "))
 
     def test_an_invented_name_swapped_for_a_word_is_a_rename(self) -> None:
-        self.assertTrue(grammar_check._renames("Kaelith", "Kenneth"))
+        self.assertTrue(grammar_check._renames_somebody("Kaelith", "Kenneth"))
 
     def test_a_name_left_where_it_was_is_not_a_rename(self) -> None:
-        self.assertFalse(grammar_check._renames("Diane leaned", "Diane leant"))
+        self.assertFalse(grammar_check._renames_somebody("Diane leaned", "Diane leant"))
 
     def test_a_lower_case_correction_is_not_a_rename(self) -> None:
-        self.assertFalse(grammar_check._renames("their", "there"))
+        self.assertFalse(grammar_check._renames_somebody("their", "there"))
 
     def test_a_sentence_opener_is_not_a_name(self) -> None:
-        self.assertFalse(grammar_check._renames("The door", "A door"))
+        self.assertFalse(grammar_check._renames_somebody("The door", "A door"))
 
     def test_a_pronoun_is_not_a_name(self) -> None:
-        self.assertFalse(grammar_check._renames("She was", "He was"))
+        self.assertFalse(grammar_check._renames_somebody("She was", "He was"))
 
     def test_a_month_is_not_a_name(self) -> None:
-        self.assertFalse(grammar_check._renames("August was", "April was"))
+        self.assertFalse(grammar_check._renames_somebody("August was", "April was"))
 
     def test_a_name_among_words_that_change_is_still_protected(self) -> None:
-        self.assertTrue(grammar_check._renames("Kendra who sat", "Kendrick that sat"))
+        self.assertTrue(grammar_check._renames_somebody("Kendra who sat", "Kendrick that sat"))
 
     def test_a_correction_around_a_name_is_allowed(self) -> None:
-        self.assertFalse(grammar_check._renames("Kendra who sat", "Kendra that sat"))
+        self.assertFalse(grammar_check._renames_somebody("Kendra who sat", "Kendra that sat"))
 
     def test_capitalising_a_lower_case_word_is_not_a_rename(self) -> None:
-        self.assertFalse(grammar_check._renames("henry was", "Henry was"))
+        self.assertFalse(grammar_check._renames_somebody("henry was", "Henry was"))
 
     def test_check_does_not_report_a_renamed_character(self) -> None:
         written = "Henry was the CEO of their fintech arm."
@@ -346,10 +346,10 @@ class Names(unittest.TestCase):
         self.assertNotIn("August", grammar_check.names_in("It was over in August that year."))
 
     def test_masking_goes_out_and_comes_back(self) -> None:
-        out, back = grammar_check._masking(["Kaelith"])
-        sent = grammar_check._swapped("Kaelith ran home.", out)
+        out, back = grammar_check._name_disguises(["Kaelith"])
+        sent = grammar_check._with_words_swapped("Kaelith ran home.", out)
         self.assertNotIn("Kaelith", sent)
-        self.assertEqual(grammar_check._swapped(sent, back), "Kaelith ran home.")
+        self.assertEqual(grammar_check._with_words_swapped(sent, back), "Kaelith ran home.")
 
 
 class Check(unittest.TestCase):

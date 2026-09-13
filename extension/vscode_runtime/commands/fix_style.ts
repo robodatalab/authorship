@@ -18,15 +18,15 @@ interface CorrectedSection {
     source: string;
 }
 
-interface ChapterLeftAlone {
-    chapter: string;
+interface SectionLeftAlone {
+    opening: string;
     why: string;
 }
 
 interface StyleFixJob extends ServerJob {
     unauthorized: boolean;
     noQuota: boolean;
-    leftAlone: ChapterLeftAlone[];
+    leftAlone: SectionLeftAlone[];
     sections: CorrectedSection[];
 }
 
@@ -35,14 +35,14 @@ async function confirmSendingToGemini(
 ): Promise<boolean> {
     const send = "Send to Gemini";
     const answer = await vscode.window.showWarningMessage(
-        `Send the chapters of ${vscode.workspace.asRelativePath(session.document.uri)} to Google Gemini?`,
+        `Send the prose of ${vscode.workspace.asRelativePath(session.document.uri)} to Google Gemini?`,
         {
             modal: true,
             detail:
                 "Fixing style and grammar is the one tool in Authorship that does " +
-                "not run on your machine. The chapter titles and the prose written " +
-                "under them are sent over the internet to the Gemini API, on your " +
-                "own account, and are billed to it.\n\n" +
+                "not run on your machine. Every section of prose is sent over the " +
+                "internet to the Gemini API, on your own account, and is billed " +
+                "to it.\n\n" +
                 "Your notes, blurb, cover, title page and table of contents are " +
                 "not sent. Nothing else Authorship does leaves this computer.",
         },
@@ -70,17 +70,17 @@ function putCorrectedSectionsIn(
     }
 }
 
-function sayWhichChaptersWereLeftAlone(leftAlone: ChapterLeftAlone[]): void {
+function sayWhichSectionsWereLeftAlone(leftAlone: SectionLeftAlone[]): void {
     if (leftAlone.length === 0) {
         return;
     }
     const named = leftAlone
-        .map((left) => `“${left.chapter}” — ${left.why}`)
+        .map((left) => `“${left.opening}…” — ${left.why}`)
         .join("; ");
     void vscode.window.showWarningMessage(
         leftAlone.length === 1
-            ? `One chapter was left as you wrote it: ${named}`
-            : `${leftAlone.length} chapters were left as you wrote them: ${named}`,
+            ? `One section was left as you wrote it: ${named}`
+            : `${leftAlone.length} sections were left as you wrote them: ${named}`,
     );
 }
 
@@ -133,7 +133,7 @@ export class FixStyleCommand implements AuthorDocumentCommand {
     readonly commandName = "fixStyle";
     readonly buttonGroup = "check";
     readonly tooltip =
-        "Fix Style and Grammar — send every chapter to Google Gemini to be copy-edited";
+        "Fix Style and Grammar — send every section to Google Gemini to be copy-edited";
 
     get iconClassName(): string {
         return styleFixEnabled() ? "codicon codicon-sparkle" : "";
@@ -164,7 +164,7 @@ export class FixStyleCommand implements AuthorDocumentCommand {
                 (sofar) => putCorrectedSectionsIn(session, sofar.sections),
             );
             putCorrectedSectionsIn(session, pass.sections);
-            sayWhichChaptersWereLeftAlone(pass.leftAlone);
+            sayWhichSectionsWereLeftAlone(pass.leftAlone);
         } catch (failure) {
             await sayWhyThePassStopped(jobId, failure);
         }

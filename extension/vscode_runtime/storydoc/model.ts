@@ -5,6 +5,7 @@ export const AUTHOR_FILE_EXTENSION = ".author";
 export const MARKDOWN = "markdown";
 export const CHAPTER = "chapter";
 export const PART = "part";
+export const DIVIDER = "divider";
 export const TITLE_PAGE = "title-page";
 export const IMAGE = "image";
 export const CONTENTS = "contents";
@@ -32,6 +33,7 @@ const KNOWN_CELL_KINDS = new Map(
         MARKDOWN,
         CHAPTER,
         PART,
+        DIVIDER,
         TITLE_PAGE,
         IMAGE,
         CONTENTS,

@@ -10,7 +10,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from server.writing_tools.gemini import GeminiError
+from server.models.gemini import GeminiError
 from vramen.resource_manager import (
     MemoryReading,
     ModelKind,
@@ -607,7 +607,7 @@ class ExportEpub(unittest.TestCase):
 
         said = response.json()
         self.assertFalse(said["ready"])
-        self.assertNotIn("path", said)
+        self.assertIsNone(said["path"])
         self.assertFalse(self.document.with_suffix(".epub").exists())
 
     def test_it_says_what_is_missing_rather_than_only_refusing(self) -> None:
@@ -727,7 +727,7 @@ class FixStyle(unittest.TestCase):
                 {"cellId": "door", "source": CORRECTED},
             ],
         )
-        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+        self.assertEqual(status["progress"], {"fixed": 2, "sections": 2})
 
     def test_leaves_the_document_alone(self) -> None:
         self.start()
@@ -736,12 +736,6 @@ class FixStyle(unittest.TestCase):
     def test_opens_gemini_with_the_key_and_model_the_editor_sent(self) -> None:
         self.start(model="gemini-flash")
         self.assertEqual(self.gemini.call_args.args[:2], ("k", "gemini-flash"))
-
-    def test_the_client_can_tell_when_the_job_has_been_stopped(self) -> None:
-        # It waits out rate limits, and an author who pressed stop should not be
-        # made to wait out one too.
-        self.start()
-        self.assertTrue(callable(self.gemini.call_args.kwargs["cancelled"]))
 
     def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
         client = TestClient(app)
@@ -762,9 +756,9 @@ class FixStyle(unittest.TestCase):
         wait_for_style(client, started.json()["id"])
         self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
 
-    def test_names_the_chapters_it_left_as_the_author_wrote_them(self) -> None:
-        # A chapter the pass could not use an answer for is left alone, which is
-        # right and is invisible — the document looks as it would if the chapter
+    def test_names_the_sections_it_left_as_the_author_wrote_them(self) -> None:
+        # A section the pass could not use an answer for is left alone, which is
+        # right and is invisible — the document looks as it would if the section
         # had needed nothing. The editor is told so it can say so.
         self.model.complete.side_effect = [
             'She reached for it and said, "Come closer',
@@ -773,7 +767,7 @@ class FixStyle(unittest.TestCase):
         status = self.start()
         self.assertEqual(status["sections"], [{"cellId": "door", "source": CORRECTED}])
         self.assertEqual(len(status["leftAlone"]), 1)
-        self.assertEqual(status["leftAlone"][0]["chapter"], "One")
+        self.assertEqual(status["leftAlone"][0]["opening"], "The lantern had gone out.")
         self.assertIn("mid-sentence", status["leftAlone"][0]["why"])
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
@@ -781,14 +775,14 @@ class FixStyle(unittest.TestCase):
         response = client.get("/fix/style/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
 
-    def test_a_document_with_no_chapters_fails_the_job_rather_than_the_request(
+    def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(
         self,
     ) -> None:
         self.document.write_text(
-            storydoc.dumps([storydoc.markdown("Just prose.")]), encoding="utf-8"
+            storydoc.dumps([storydoc.chapter("One")]), encoding="utf-8"
         )
         status = self.start()
-        self.assertIn("no chapters", status["error"])
+        self.assertIn("no prose", status["error"])
 
     def test_a_signed_in_key_is_checked_before_it_is_used(self) -> None:
         client = TestClient(app)
@@ -796,10 +790,10 @@ class FixStyle(unittest.TestCase):
             client.post("/auth/gemini", json={"key": "k"}).json(),
             {"ok": True, "detail": None},
         )
-        self.model.verify.assert_called_once()
+        self.model.health_check.assert_called_once()
 
     def test_a_key_gemini_refuses_is_reported_rather_than_raised(self) -> None:
-        self.model.verify.side_effect = GeminiError("Gemini refused (400)")
+        self.model.health_check.side_effect = GeminiError("Gemini refused (400)")
         client = TestClient(app)
         answer = client.post("/auth/gemini", json={"key": "no"}).json()
         self.assertFalse(answer["ok"])

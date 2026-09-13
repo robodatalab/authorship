@@ -1,0 +1,43 @@
+.divider-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-editorWidget-background);
+    border: 1px dashed var(--vscode-panel-border);
+    border-radius: 4px;
+}
+
+.divider-cell:hover .author-file-editor-cell-actions {
+    visibility: visible;
+}
+
+.divider-cell-mark {
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+}
+
+.divider-cell-label::before,
+.divider-cell-label::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 15%;
+    border-top: 1px dashed var(--vscode-panel-border);
+}
+
+.divider-cell-label::before {
+    left: 10px;
+}
+
+.divider-cell-label::after {
+    right: 10px;
+}

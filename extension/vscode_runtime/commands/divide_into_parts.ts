@@ -19,7 +19,7 @@ export class DivideIntoPartsCommand implements AuthorDocumentCommand {
         );
         void vscode.window.showInformationMessage(
             dividedManuscript.partFilesWritten === 0
-                ? `Nothing to divide — add a Part where ${vscode.workspace.asRelativePath(session.document.uri)} should break.`
+                ? `Nothing to divide — add a Divider where ${vscode.workspace.asRelativePath(session.document.uri)} should break.`
                 : `Wrote ${dividedManuscript.partFilesWritten} ${dividedManuscript.partFilesWritten === 1 ? "part" : "parts"} to ${vscode.workspace.asRelativePath(dividedManuscript.partsFolder)}`,
         );
     }

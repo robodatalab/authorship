@@ -9,9 +9,9 @@
 // of those is done.
 //
 // Where the cuts fall is the author's own answer, given in the document rather
-// than to a form: the story divides where its Parts stand, one file per Part. A
-// Part that is only there to place a cut is marked unprinted and the book goes
-// out without a page for it, so dividing the files costs the reader nothing.
+// than to a form: the story divides where its Dividers stand, one file per
+// Divider. A Divider is a page in no book and a line of no manuscript, so
+// dividing the files costs the reader nothing.
 //
 // Deliberately free of the `vscode` module, so a division can be read and tested
 // without launching an editor. Everything here deals in cells; divide_manuscript.ts
@@ -24,6 +24,7 @@ import {
 import {
     AUTHOR_FILE_EXTENSION,
     CHAPTER,
+    DIVIDER,
     ImmutableCell,
     MutableCell,
     IMAGE,
@@ -31,29 +32,11 @@ import {
     TITLE_PAGE,
 } from "../storydoc/model";
 
-export function partIsPrintedInTheBook(cell: ImmutableCell): boolean {
-    return cell.attrs.print !== "no";
-}
-
-/** A chapter and the cells written under it. */
-export interface Section {
-    cells: ImmutableCell[];
-    /**
-     * What the story calls the part this section stands in, or '' where it stands
-     * in none.
-     *
-     * Only a part the book prints names anything. One marked unprinted places a
-     * cut and says nothing else, so a file cut at a seam inside "Day One" is
-     * still a file of "Day One".
-     */
-    under: string;
-}
-
-/** Whole sections, gathered into one part. */
+/** The cells of the story that travel together, as one part. */
 export interface Part {
-    sections: Section[];
-    /** The part of the story these sections were taken from, or '' for the
-     *  chapters that stand before the first the book prints. */
+    cells: ImmutableCell[];
+    /** The part of the story these cells were taken from, or '' for the
+     *  chapters that stand before the first Part. */
     under: string;
 }
 
@@ -66,70 +49,6 @@ export interface Part {
 export interface Furniture {
     front: ImmutableCell[];
     back: ImmutableCell[];
-}
-
-/**
- * The story, as the sections a division cuts along.
- *
- * A chapter cell opens a section and the prose under it belongs to that section
- * until the next chapter opens. Which cells those are is the document's to say,
- * so a heading someone wrote in their prose stays prose — the one thing cutting
- * along `##` in flattened markdown could never get right.
- *
- * A part names the chapters that follow it and stands above the first of them, so
- * it travels with the section it opens rather than joining the one it happens to
- * stand after — which is what makes the section it opens a place to cut. Every
- * section carries the name of the part it fell in, and only a part the book
- * prints has a name to give: one marked unprinted is a seam and leaves the name
- * where it was.
- *
- * The book's furniture is not the story and belongs to every part rather than to
- * one; what the author keeps beside the story and publishes nowhere belongs to
- * neither. An aside is the exception: it was written about the passage it stands
- * beside, so it goes wherever that passage goes.
- */
-export function sectionsOf(cells: readonly ImmutableCell[]): Section[] {
-    const sections: Section[] = [];
-    // A part waits here for the chapter it names, and so does anything written
-    // between the two: they are the head of that section and not the tail of the
-    // one above it.
-    let opening: Section | null = null;
-    let under = "";
-
-    for (const cell of cells.slice(picturesTheStoryOpensWith(cells))) {
-        if (cell.kind === PART) {
-            under = partIsPrintedInTheBook(cell)
-                ? (cell.attrs.title ?? "")
-                : under;
-            opening = opening ?? { cells: [], under };
-            opening.cells.push(cell);
-            continue;
-        }
-        if (cell.kind === CHAPTER) {
-            const opened = opening ?? { cells: [], under };
-            opened.cells.push(cell);
-            opened.under = under;
-            sections.push(opened);
-            opening = null;
-            continue;
-        }
-        if (standsOutsideTheStory(cell.kind)) {
-            continue;
-        }
-        const holding = opening ?? sections[sections.length - 1];
-        if (!holding) {
-            continue;
-        }
-        holding.cells.push(cell);
-    }
-
-    // A part nobody wrote a chapter under names nothing, and what stands after it
-    // is left where it was written rather than dropped.
-    const last = sections[sections.length - 1];
-    if (opening && last) {
-        last.cells.push(...opening.cells);
-    }
-    return sections;
 }
 
 /** What stands before the story and what stands after it. */
@@ -158,51 +77,52 @@ function picturesTheStoryOpensWith(cells: readonly ImmutableCell[]): number {
 }
 
 /**
- * One file per part the author marked, in the order they marked them.
+ * One file per Divider the author placed, in the order they placed them.
  *
  * There is no arithmetic in this and no form to fill in: where a story divides
- * is a question about the story, and the author answers it by putting a Part
- * where the answer is. A Part the book prints divides the files as well — a tale
- * in a book of tales is one file for the same reason it is one tale — and a Part
- * marked unprinted divides the files and nothing else.
+ * is a question about the story, and the author answers it by putting a Divider
+ * where the answer is. The cut falls exactly there and nowhere near it, so an
+ * author who puts one in the middle of a chapter has asked for a file that opens
+ * in the middle of a chapter, and gets one.
  *
- * A story with no Parts at all is asking to be divided nowhere, so it divides
+ * A story with no Dividers at all is asking to be divided nowhere, so it divides
  * into nothing rather than into one file holding all of it.
+ *
+ * The book's furniture is not the story and belongs to every part rather than to
+ * one; what the author keeps beside the story and publishes nowhere belongs to
+ * neither. An aside is the exception: it was written about the passage it stands
+ * beside, so it goes wherever that passage goes.
+ *
+ * A Part names the chapters that follow it, and a file cut anywhere under one is
+ * still a file of it. The Divider itself is written into neither file: it said
+ * where to cut, which was the only thing it had to say.
  */
-export function intoParts(sections: readonly Section[]): Part[] {
-    if (!sections.some(opensAPart)) {
+export function intoParts(cells: readonly ImmutableCell[]): Part[] {
+    if (!cells.some((cell) => cell.kind === DIVIDER)) {
         return [];
     }
-    return divisions(sections).map((run) => ({
-        sections: run,
-        under: run[0].under,
-    }));
-}
+    const parts: Part[] = [];
+    let open: Part | null = null;
+    let under = "";
 
-/**
- * The sections in the runs the author divided them into.
- *
- * Cut where a part cell stands rather than wherever the name changes, so two
- * parts the author happened to give the same name are still two parts — and so
- * are two seams, which have no name to differ by at all. What the author wrote
- * before the first part is a run of its own: it is in the book and has to be in
- * some file.
- */
-function divisions(sections: readonly Section[]): Section[][] {
-    const runs: Section[][] = [];
-    for (const section of sections) {
-        if (runs.length === 0 || opensAPart(section)) {
-            runs.push([section]);
+    for (const cell of cells.slice(picturesTheStoryOpensWith(cells))) {
+        if (standsOutsideTheStory(cell.kind)) {
             continue;
         }
-        runs[runs.length - 1].push(section);
+        if (cell.kind === DIVIDER) {
+            open = null;
+            continue;
+        }
+        if (cell.kind === PART) {
+            under = cell.attrs.title ?? "";
+        }
+        if (!open) {
+            open = { cells: [], under };
+            parts.push(open);
+        }
+        open.cells.push(cell);
     }
-    return runs;
-}
-
-/** Whether the author put a part where this section starts. */
-function opensAPart(section: Section): boolean {
-    return section.cells[0]?.kind === PART;
+    return parts;
 }
 
 /** A part as a document of its own: the furniture, then its share of the story. */
@@ -211,11 +131,9 @@ export function partCells(
     number: number,
     part: Part,
 ): ImmutableCell[] {
-    return [
-        ...furniture.front,
-        ...part.sections.flatMap((section) => section.cells),
-        ...furniture.back,
-    ].map((cell) => carried(cell, number, part.under));
+    return [...furniture.front, ...part.cells, ...furniture.back].map((cell) =>
+        carried(cell, number, part.under),
+    );
 }
 
 /**
@@ -269,8 +187,8 @@ const PART_MARKER = " — ";
  *
  * `Veriona — Day One — Part 3`, so a reader holding one file can see all three.
  * A piece the story does not have is left out rather than left blank: a file cut
- * at a seam the book does not print stands under nothing it can name, and says
- * so by saying nothing.
+ * where the book names no part stands under nothing it can name, and says so by
+ * saying nothing.
  */
 export function partTitle(title: string, number: number, under = ""): string {
     return [title, under, `Part ${number}`].filter(Boolean).join(PART_MARKER);

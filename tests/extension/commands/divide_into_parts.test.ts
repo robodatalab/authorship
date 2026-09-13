@@ -10,17 +10,15 @@ const SECOND_PART = "/stories/story.author/../parts/part_2.author";
 beforeEach(forgetWhatTheEditorDid);
 
 describe("DivideIntoPartsCommand — divides the document into parts", () => {
-    it("writes one file per part the author marked", async () => {
+    it("writes one file per divider the author placed", async () => {
         const session = openStory(`
-<!-- cell: part title="Day One" id="p1" -->
-
 <!-- cell: chapter title="One" id="c1" -->
 
 <!-- cell: markdown id="c2" -->
 
 She saw the door.
 
-<!-- cell: part title="Day Two" id="p2" -->
+<!-- cell: divider id="d1" -->
 
 <!-- cell: chapter title="Two" id="c3" -->
 
@@ -36,7 +34,7 @@ He heard the bell.
         expect(files.get(SECOND_PART)).toContain("He heard the bell.");
     });
 
-    it("writes no files when the author marked no parts", async () => {
+    it("writes no files when the author placed no dividers", async () => {
         const session = openStory(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n',
         );

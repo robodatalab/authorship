@@ -36,21 +36,23 @@ beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("CheckProseCommand — checks the document's prose", () => {
-    it("asks the rules and then the model, drawing what the rules found first", async () => {
+    it("draws what the rules found while the model is still reading", async () => {
         const asked: string[] = [];
+        let polls = 0;
         vi.stubGlobal("fetch", (url: string) => {
             asked.push(url);
+            const stillReading = url.includes("status") && polls++ === 0;
             return Promise.resolve({
                 ok: true,
                 json: () =>
                     Promise.resolve(
                         url.includes("status")
                             ? {
-                                  running: false,
+                                  running: stillReading,
                                   error: null,
-                                  findings: url.includes("grammar")
-                                      ? [A_GRAMMAR_ERROR]
-                                      : [A_STYLE_ERROR],
+                                  findings: stillReading
+                                      ? [A_STYLE_ERROR]
+                                      : [A_STYLE_ERROR, A_GRAMMAR_ERROR],
                               }
                             : { id: "job-1" },
                     ),
@@ -61,10 +63,8 @@ describe("CheckProseCommand — checks the document's prose", () => {
 
         await new CheckProseCommand().invoke(session);
 
-        expect(asked[0]).toContain("/check/prose");
-        expect(asked[1]).toContain("/check/prose/status?id=job-1");
-        expect(asked[2]).toContain("/check/grammar");
-        expect(asked[3]).toContain("/check/grammar/status?id=job-1");
+        expect(asked[0]).toContain("/check/errors");
+        expect(asked[1]).toContain("/check/errors/status?id=job-1");
         expect(sentToThePage).toEqual([
             { type: "proseErrors", proseErrors: [A_STYLE_ERROR] },
             {

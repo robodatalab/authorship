@@ -36,7 +36,10 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     >();
     readonly onDidChangeCustomDocument = this.edited.event;
 
-    constructor(private readonly context: vscode.ExtensionContext) {}
+    constructor(
+        private readonly context: vscode.ExtensionContext,
+        private readonly log: vscode.LogOutputChannel,
+    ) {}
 
     async openCustomDocument(
         uri: vscode.Uri,
@@ -71,7 +74,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         );
         session.showOn(panel);
         const documentChangesMessageQueue =
-            new MessageQueueBetweenVscodeAndWebview();
+            new MessageQueueBetweenVscodeAndWebview(this.log);
         documentChangesMessageQueue.addListener(session);
         this.documentChangesMessageQueues.set(
             session.uri.toString(),

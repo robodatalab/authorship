@@ -5,13 +5,12 @@ import {
     intoParts,
     partCells,
     partFileName,
-    partIsPrintedInTheBook,
     partNumber,
     partTitle,
-    sectionsOf,
 } from "../../../extension/vscode_runtime/parts/manuscript_parts";
 import {
     CHAPTER,
+    DIVIDER,
     MutableCell,
     MARKDOWN,
     PART,
@@ -25,12 +24,12 @@ function markdown(source: string): MutableCell {
     return new MutableCell(MARKDOWN, source, {});
 }
 
-function part(title: string, printed = true): MutableCell {
-    return new MutableCell(
-        PART,
-        "",
-        printed ? { title } : { title, print: "no" },
-    );
+function part(title: string): MutableCell {
+    return new MutableCell(PART, "", { title });
+}
+
+function divider(): MutableCell {
+    return new MutableCell(DIVIDER, "", {});
 }
 
 function titlePage(attrs: Record<string, string>): MutableCell {
@@ -41,206 +40,10 @@ function image(src: string): MutableCell {
     return new MutableCell("image", "", { src });
 }
 
-/** A part that places a cut and prints no page: an author saying "break here"
- *  to the folder and to nobody else. */
-function seam(title = "Break"): MutableCell {
-    return part(title, false);
-}
-
 /** Prose of a given length, for a story that has to look like one. */
 function prose(words: number): MutableCell {
     return markdown(Array.from({ length: words }, () => "word").join(" "));
 }
-
-describe("sectionsOf — the sections a division cuts along", () => {
-    it("makes a section of each chapter and the cells written under it", () => {
-        const sections = sectionsOf([
-            chapter("One"),
-            markdown("alpha"),
-            markdown("beta"),
-            chapter("Two"),
-            markdown("gamma"),
-        ]);
-        expect(sections).toHaveLength(2);
-        expect(sections[0].cells.map((cell) => cell.source)).toEqual([
-            "",
-            "alpha",
-            "beta",
-        ]);
-        expect(sections[1].cells.map((cell) => cell.source)).toEqual([
-            "",
-            "gamma",
-        ]);
-    });
-
-    it("a heading someone wrote in their prose is prose", () => {
-        // The one thing cutting along `##` in flattened markdown could never get
-        // right, and the reason a division reads cells.
-        const sections = sectionsOf([
-            chapter("One"),
-            markdown("## Not A Chapter"),
-        ]);
-        expect(sections).toHaveLength(1);
-    });
-
-    it("cuts nothing from a story with no chapters at all", () => {
-        expect(sectionsOf([markdown("alpha beta")])).toEqual([]);
-    });
-
-    it("a part travels with the chapter it opens, not the one it stands after", () => {
-        // The divider is printed above the chapters it names, so a cut made
-        // between the two sections must leave it at the head of the second.
-        const sections = sectionsOf([
-            chapter("One"),
-            markdown("alpha"),
-            part("Day Two"),
-            chapter("Two"),
-            markdown("beta"),
-        ]);
-        expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
-            "chapter",
-            "markdown",
-        ]);
-        expect(sections[1].cells.map((cell) => cell.kind)).toEqual([
-            "part",
-            "chapter",
-            "markdown",
-        ]);
-    });
-
-    it("names the part every section stands in", () => {
-        const sections = sectionsOf([
-            part("Day One"),
-            chapter("One"),
-            chapter("Two"),
-            part("Day Two"),
-            chapter("Three"),
-        ]);
-        expect(sections.map((section) => section.under)).toEqual([
-            "Day One",
-            "Day One",
-            "Day Two",
-        ]);
-    });
-
-    it("a section written before the first part stands under none", () => {
-        const sections = sectionsOf([
-            chapter("Prologue"),
-            part("Day One"),
-            chapter("One"),
-        ]);
-        expect(sections.map((section) => section.under)).toEqual([
-            "",
-            "Day One",
-        ]);
-    });
-
-    it("a story with no parts has every section standing under nothing", () => {
-        const sections = sectionsOf([chapter("One"), markdown("alpha")]);
-        expect(sections.map((section) => section.under)).toEqual([""]);
-    });
-
-    it("a seam leaves the name of the part it was cut inside where it was", () => {
-        // The author breaking a long part in two has not started a new part of the
-        // book, and the chapters after the break are still where they were.
-        const sections = sectionsOf([
-            part("Day One"),
-            chapter("One"),
-            seam(),
-            chapter("Two"),
-        ]);
-        expect(sections.map((section) => section.under)).toEqual([
-            "Day One",
-            "Day One",
-        ]);
-    });
-
-    it("a seam standing under no part of the book names nothing", () => {
-        const sections = sectionsOf([chapter("One"), seam(), chapter("Two")]);
-        expect(sections.map((section) => section.under)).toEqual(["", ""]);
-    });
-
-    it("prose written between a part and its first chapter travels with the part", () => {
-        // An epigraph under a part title belongs to the part, not to the chapter
-        // that happened to come before it.
-        const sections = sectionsOf([
-            chapter("One"),
-            markdown("alpha"),
-            part("Day Two"),
-            markdown("an epigraph"),
-            chapter("Two"),
-        ]);
-        expect(sections[0].cells.map((cell) => cell.source)).toEqual([
-            "",
-            "alpha",
-        ]);
-        expect(sections[1].cells.map((cell) => cell.kind)).toEqual([
-            "part",
-            "markdown",
-            "chapter",
-        ]);
-    });
-
-    it("a part with no chapter under it leaves what follows where it was written", () => {
-        const sections = sectionsOf([
-            chapter("One"),
-            markdown("alpha"),
-            part("Day Two"),
-            markdown("beta"),
-        ]);
-        expect(sections).toHaveLength(1);
-        expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
-            "chapter",
-            "markdown",
-            "part",
-            "markdown",
-        ]);
-    });
-
-    it("two parts in a row both open the chapter that follows them", () => {
-        const sections = sectionsOf([
-            part("Day One"),
-            part("Day Two"),
-            chapter("One"),
-        ]);
-        expect(sections).toHaveLength(1);
-        expect(sections[0].cells.map((cell) => cell.attrs.title)).toEqual([
-            "Day One",
-            "Day Two",
-            "One",
-        ]);
-        expect(sections[0].under).toBe("Day Two");
-    });
-
-    it("leaves the furniture, the blurb and the story so far out of the story", () => {
-        const sections = sectionsOf([
-            titlePage({ title: "Veriona" }),
-            new MutableCell("recap", "She has lost her name.", {}),
-            chapter("One"),
-            markdown("alpha"),
-            new MutableCell("blurb", "A woman loses her name.", {}),
-            new MutableCell("about", "A. Writer lives by the sea.", {}),
-        ]);
-        expect(sections).toHaveLength(1);
-        expect(sections[0].cells.map((cell) => cell.source)).toEqual([
-            "",
-            "alpha",
-        ]);
-    });
-
-    it("keeps a note with the chapter it was written under", () => {
-        const sections = sectionsOf([
-            chapter("One"),
-            prose(10),
-            new MutableCell("note", "She has to find the letter here.", {}),
-        ]);
-        expect(sections[0].cells.map((cell) => cell.kind)).toEqual([
-            "chapter",
-            "markdown",
-            "note",
-        ]);
-    });
-});
 
 describe("furnitureOf — what stands before the story and after it", () => {
     it("splits at the first chapter", () => {
@@ -285,122 +88,171 @@ describe("furnitureOf — what stands before the story and after it", () => {
     });
 });
 
-describe("intoParts — one file per Part the author marked", () => {
-    it("cuts where a part stands", () => {
+describe("intoParts — one file per Divider the author placed", () => {
+    it("cuts where a divider stands", () => {
         const cells = [
             part("Day One"),
             chapter("One"),
             prose(10),
-            part("Day Two"),
+            divider(),
             chapter("Two"),
             prose(10),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         expect(parts).toHaveLength(2);
-        expect(parts.map((held) => held.under)).toEqual(["Day One", "Day Two"]);
+        expect(
+            parts.map((held) => held.cells.map((cell) => cell.kind)),
+        ).toEqual([
+            ["part", "chapter", "markdown"],
+            ["chapter", "markdown"],
+        ]);
     });
 
-    it("holds every chapter of a part in one file, however long it runs", () => {
+    it("cuts inside a chapter when that is where the divider stands", () => {
+        // The author asked for a file that opens in the middle of a chapter, so
+        // that is the file they get.
+        const cells = [
+            chapter("One"),
+            markdown("alpha"),
+            divider(),
+            markdown("beta"),
+            chapter("Two"),
+        ];
+        expect(
+            intoParts(cells).map((held) => held.cells.map((cell) => cell.kind)),
+        ).toEqual([
+            ["chapter", "markdown"],
+            ["markdown", "chapter"],
+        ]);
+    });
+
+    it("writes the divider into neither file", () => {
+        const cells = [chapter("One"), divider(), chapter("Two")];
+        expect(
+            intoParts(cells).flatMap((held) => held.cells.map((c) => c.kind)),
+        ).toEqual(["chapter", "chapter"]);
+    });
+
+    it("two dividers in a row cut once, leaving no empty file", () => {
+        const cells = [chapter("One"), divider(), divider(), chapter("Two")];
+        expect(intoParts(cells)).toHaveLength(2);
+    });
+
+    it("holds every chapter of a run in one file, however long it runs", () => {
         // Length has nothing to do with it any more: a part is a file because the
         // author said it is one.
         const cells = [
-            part("Day One"),
             chapter("One"),
             prose(9000),
             chapter("Two"),
             prose(9000),
-            part("Day Two"),
+            divider(),
             chapter("Three"),
             prose(10),
         ];
-        const parts = intoParts(sectionsOf(cells));
-        expect(parts.map((held) => held.sections.length)).toEqual([2, 1]);
+        expect(
+            intoParts(cells).map(
+                (held) =>
+                    held.cells.filter((cell) => cell.kind === CHAPTER).length,
+            ),
+        ).toEqual([2, 1]);
     });
 
-    it("a story with no parts at all divides into nothing", () => {
+    it("a story with no dividers at all divides into nothing", () => {
         // Nowhere was named as a place to break, and one file holding the whole
         // story is not a division of it.
         const cells = [chapter("One"), prose(10), chapter("Two"), prose(10)];
-        expect(intoParts(sectionsOf(cells))).toEqual([]);
+        expect(intoParts(cells)).toEqual([]);
     });
 
     it("nothing to divide makes no parts", () => {
         expect(intoParts([])).toEqual([]);
     });
 
-    it("a seam divides the files exactly as a printed part does", () => {
-        const cells = [
-            chapter("One"),
-            prose(10),
-            seam(),
-            chapter("Two"),
-            prose(10),
-        ];
-        const parts = intoParts(sectionsOf(cells));
-        expect(parts).toHaveLength(2);
-    });
-
-    it("a file cut at a seam stands under the part it was cut inside", () => {
+    it("names the part every file stands in", () => {
         const cells = [
             part("Day One"),
             chapter("One"),
-            prose(10),
-            seam(),
+            divider(),
             chapter("Two"),
+            part("Day Two"),
+            divider(),
+            chapter("Three"),
+        ];
+        expect(intoParts(cells).map((held) => held.under)).toEqual([
+            "Day One",
+            "Day One",
+            "Day Two",
+        ]);
+    });
+
+    it("a file cut before the first part stands under none", () => {
+        const cells = [
+            chapter("Prologue"),
+            prose(10),
+            divider(),
+            part("Day One"),
+            chapter("One"),
             prose(10),
         ];
-        expect(intoParts(sectionsOf(cells)).map((held) => held.under)).toEqual([
-            "Day One",
+        expect(intoParts(cells).map((held) => held.under)).toEqual([
+            "",
             "Day One",
         ]);
     });
 
-    it("the chapters written before the first part are a division of their own", () => {
+    it("leaves the furniture, the blurb and the story so far out of the story", () => {
+        const cells = [
+            titlePage({ title: "Veriona" }),
+            new MutableCell("recap", "She has lost her name.", {}),
+            chapter("One"),
+            markdown("alpha"),
+            divider(),
+            new MutableCell("blurb", "A woman loses her name.", {}),
+            chapter("Two"),
+            new MutableCell("about", "A. Writer lives by the sea.", {}),
+        ];
+        expect(
+            intoParts(cells).map((held) => held.cells.map((cell) => cell.kind)),
+        ).toEqual([
+            ["chapter", "markdown"],
+            ["chapter"],
+        ]);
+    });
+
+    it("keeps a note with the chapter it was written under", () => {
+        const cells = [
+            chapter("One"),
+            prose(10),
+            new MutableCell("note", "She has to find the letter here.", {}),
+            divider(),
+            chapter("Two"),
+        ];
+        expect(intoParts(cells)[0].cells.map((cell) => cell.kind)).toEqual([
+            "chapter",
+            "markdown",
+            "note",
+        ]);
+    });
+
+    it("every cell lands in exactly one part, in the order it was written", () => {
         const cells = [
             chapter("Prologue"),
             prose(10),
+            divider(),
             part("Day One"),
             chapter("One"),
             prose(10),
-        ];
-        const parts = intoParts(sectionsOf(cells));
-        expect(parts.map((held) => held.under)).toEqual(["", "Day One"]);
-    });
-
-    it("two parts the author gave the same name are still two parts", () => {
-        const cells = [
-            part("Day One"),
-            chapter("One"),
-            prose(10),
-            part("Day One"),
+            divider(),
             chapter("Two"),
             prose(10),
         ];
-        expect(intoParts(sectionsOf(cells))).toHaveLength(2);
-    });
-
-    it("every section lands in exactly one part, in the order it was written", () => {
-        const cells = [
-            chapter("Prologue"),
-            prose(10),
-            part("Day One"),
-            chapter("One"),
-            prose(10),
-            seam(),
-            chapter("Two"),
-            prose(10),
-            part("Day Two"),
-            chapter("Three"),
-            prose(10),
-        ];
-        const titles = intoParts(sectionsOf(cells)).flatMap((held) =>
-            held.sections.map(
-                (section) =>
-                    section.cells.find((cell) => cell.kind === "chapter")!.attrs
-                        .title,
-            ),
+        const titles = intoParts(cells).flatMap((held) =>
+            held.cells
+                .filter((cell) => cell.kind === CHAPTER)
+                .map((cell) => cell.attrs.title),
         );
-        expect(titles).toEqual(["Prologue", "One", "Two", "Three"]);
+        expect(titles).toEqual(["Prologue", "One", "Two"]);
     });
 
     it("numbers the files across the whole division, not within each part", () => {
@@ -410,14 +262,15 @@ describe("intoParts — one file per Part the author marked", () => {
             part("Day One"),
             chapter("One"),
             prose(10),
-            seam(),
+            divider(),
             chapter("Two"),
             prose(10),
+            divider(),
             part("Day Two"),
             chapter("Three"),
             prose(10),
         ];
-        const named = intoParts(sectionsOf(cells)).map((held, at) =>
+        const named = intoParts(cells).map((held, at) =>
             partTitle("Veriona", at + 1, held.under),
         );
         expect(named).toEqual([
@@ -435,23 +288,22 @@ describe("partCells — a part as a document of its own", () => {
             titlePage({ title: "Veriona", subtitle: "A Queendom drama" }),
             chapter("One"),
             markdown("alpha"),
-            seam(),
+            divider(),
             chapter("Two"),
             markdown("beta"),
             new MutableCell("about", "A. Writer lives by the sea.", {}),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const second = partCells(furnitureOf(cells), 2, parts[1]);
 
         expect(second.map((cell) => cell.kind)).toEqual([
             "image",
             "title-page",
-            "part",
             "chapter",
             "markdown",
             "about",
         ]);
-        expect(second[4].source).toBe("beta");
+        expect(second[3].source).toBe("beta");
     });
 
     it("carries a note into the part its chapter went to, and no other", () => {
@@ -464,11 +316,11 @@ describe("partCells — a part as a document of its own", () => {
             chapter("One"),
             prose(10),
             note,
-            seam(),
+            divider(),
             chapter("Two"),
             prose(10),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
 
         expect(parts).toHaveLength(2);
         expect(partCells(furnitureOf(cells), 1, parts[0])).toContainEqual(note);
@@ -480,11 +332,11 @@ describe("partCells — a part as a document of its own", () => {
     it("renumbers the title page, and leaves the subtitle as it stands", () => {
         const cells = [
             titlePage({ title: "Veriona", subtitle: "A Queendom drama" }),
-            seam(),
+            divider(),
             chapter("One"),
             markdown("alpha"),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const only = partCells(furnitureOf(cells), 3, parts[0]);
 
         expect(only[0].attrs.title).toBe("Veriona — Part 3");
@@ -506,59 +358,46 @@ describe("partCells — a part as a document of its own", () => {
             part("Day One"),
             chapter("One"),
             prose(100),
-            seam(),
+            divider(),
             chapter("Two"),
             prose(100),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const second = partCells(furnitureOf(cells), 2, parts[1]);
 
         expect(second[0].attrs.title).toBe("Veriona — Day One — Part 2");
     });
 
-    it("opens each file with the part that cut it, and the printed one only once", () => {
+    it("opens the first file with the part the story opens with, and no other", () => {
         const cells = [
             titlePage({ title: "Veriona" }),
             part("Day One"),
             chapter("One"),
             prose(100),
-            seam(),
+            divider(),
             chapter("Two"),
             prose(100),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const furniture = furnitureOf(cells);
 
-        // The divider is printed once, above the chapters it names. The file
-        // carrying the rest of them opens with the seam that cut it — which is a
-        // cell like any other and a page in no book.
         expect(
             partCells(furniture, 1, parts[0]).map((cell) => cell.kind),
         ).toEqual(["title-page", "part", "chapter", "markdown"]);
-        const second = partCells(furniture, 2, parts[1]);
-        expect(second.map((cell) => cell.kind)).toEqual([
-            "title-page",
-            "part",
-            "chapter",
-            "markdown",
-        ]);
-        expect(partIsPrintedInTheBook(second[1])).toBe(false);
         expect(
-            second.filter(
-                (cell) => partIsPrintedInTheBook(cell) && cell.kind === "part",
-            ),
-        ).toEqual([]);
+            partCells(furniture, 2, parts[1]).map((cell) => cell.kind),
+        ).toEqual(["title-page", "chapter", "markdown"]);
     });
 
     it("points the cover at art that is now a folder away", () => {
         // The parts sit in `parts/`; the art did not move with them.
         const cells = [
             image("art/cover.jpg"),
-            seam(),
+            divider(),
             chapter("One"),
             markdown("alpha"),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only[0].attrs.src).toBe("../art/cover.jpg");
@@ -566,27 +405,26 @@ describe("partCells — a part as a document of its own", () => {
 
     it("points a picture standing in the prose at art a folder away too", () => {
         const cells = [
-            seam(),
+            divider(),
             chapter("One"),
             markdown("alpha"),
             image("art/veriona.jpg"),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only.map((cell) => cell.kind)).toEqual([
-            "part",
             "chapter",
             "markdown",
             "image",
         ]);
-        expect(only[3].attrs.src).toBe("../art/veriona.jpg");
+        expect(only[2].attrs.src).toBe("../art/veriona.jpg");
     });
 
     it("leaves a cover that already says where its art is from", () => {
         for (const src of ["https://art.example/c.jpg", "/shared/art/c.jpg"]) {
-            const cells = [image(src), seam(), chapter("One"), markdown("a")];
-            const parts = intoParts(sectionsOf(cells));
+            const cells = [image(src), divider(), chapter("One"), markdown("a")];
+            const parts = intoParts(cells);
             const only = partCells(furnitureOf(cells), 1, parts[0]);
 
             expect(only[0].attrs.src, src).toBe(src);
@@ -597,11 +435,11 @@ describe("partCells — a part as a document of its own", () => {
         // Written from where the story stands, so a part stands one folder deeper.
         const cells = [
             image("../shared/c.jpg"),
-            seam(),
+            divider(),
             chapter("One"),
             markdown("a"),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         const only = partCells(furnitureOf(cells), 1, parts[0]);
 
         expect(only[0].attrs.src).toBe("../../shared/c.jpg");
@@ -611,11 +449,11 @@ describe("partCells — a part as a document of its own", () => {
         const cells = [
             chapter("One"),
             markdown("alpha"),
-            seam(),
+            divider(),
             chapter("Two"),
             markdown("beta"),
         ];
-        const parts = intoParts(sectionsOf(cells));
+        const parts = intoParts(cells);
         expect(
             partCells(furnitureOf(cells), 1, parts[0]).map((c) => c.kind),
         ).toEqual(["chapter", "markdown"]);

@@ -113,36 +113,42 @@ export function isDrawnOnCell(
     );
 }
 
+export function AuthorFileEditorCellActions() {
+    const { cellCommands, cellId, cellAttributes, sendMessagesToVscode } =
+        useContext(AuthorFileEditorCellStateContext);
+    return (
+        <div className="author-file-editor-cell-actions">
+            {cellCommands
+                .filter((command) => isDrawnOnCell(command, cellAttributes))
+                .map((command) => (
+                    <button
+                        key={command.commandName}
+                        type="button"
+                        className="author-file-editor-cell-actions-button"
+                        title={command.tooltip}
+                        aria-label={command.tooltip}
+                        onClick={() =>
+                            invokeAuthorDocumentCommand(
+                                sendMessagesToVscode,
+                                command.commandName,
+                                { cellId },
+                            )
+                        }
+                    >
+                        <i className={command.iconClassName} />
+                    </button>
+                ))}
+        </div>
+    );
+}
+
 export function AuthorFileEditorCell({
     sidebar,
     children,
 }: AuthorFileEditorCellProps) {
-    const { cellCommands, cellId, cellAttributes, sendMessagesToVscode } =
-        useContext(AuthorFileEditorCellStateContext);
     return (
         <section className="author-file-editor-cell">
-            <div className="author-file-editor-cell-actions">
-                {cellCommands
-                    .filter((command) => isDrawnOnCell(command, cellAttributes))
-                    .map((command) => (
-                        <button
-                            key={command.commandName}
-                            type="button"
-                            className="author-file-editor-cell-actions-button"
-                            title={command.tooltip}
-                            aria-label={command.tooltip}
-                            onClick={() =>
-                                invokeAuthorDocumentCommand(
-                                    sendMessagesToVscode,
-                                    command.commandName,
-                                    { cellId },
-                                )
-                            }
-                        >
-                            <i className={command.iconClassName} />
-                        </button>
-                    ))}
-            </div>
+            <AuthorFileEditorCellActions />
             <div className="author-file-editor-cell-sidebar">{sidebar}</div>
             <div className="author-file-editor-cell-main">{children}</div>
         </section>

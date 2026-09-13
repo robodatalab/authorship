@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, executedCommands, files } from "./vscode";
+import { Uri, executedCommands, files, window as vscodeWindow } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -19,9 +19,10 @@ async function openEditor(text: string): Promise<OpenEditor> {
     files.clear();
     files.set(DOCUMENT_PATH, text);
 
-    const provider = new AuthorFileEditorProvider({
-        extensionUri: Uri.file("/extension"),
-    } as never);
+    const provider = new AuthorFileEditorProvider(
+        { extensionUri: Uri.file("/extension") } as never,
+        vscodeWindow.createOutputChannel("Authorship") as never,
+    );
     const edits: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
         edits.push(edit as unknown as { undo(): void; redo(): void }),
