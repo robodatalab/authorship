@@ -2,7 +2,7 @@
 // nothing left over from a division that made more of them.
 //
 // The whole of the work is here and in manuscript_parts.ts. Cutting a story
-// where its own Parts stand is bookkeeping — it asks nothing of a model, so it never leaves
+// where its own Dividers stand is bookkeeping — it asks nothing of a model, so it never leaves
 // the editor.
 
 import * as vscode from "vscode";
@@ -14,7 +14,6 @@ import {
     partCells,
     partFileName,
     partNumber,
-    sectionsOf,
 } from "./manuscript_parts";
 import { type ImmutableCell } from "../storydoc/model";
 
@@ -32,7 +31,7 @@ export interface DividedManuscript {
  * other, so exporting one to an EPUB is the export that already exists rather
  * than a second way of building a book.
  *
- * There is nothing to ask the author: the cuts fall where they put the Parts,
+ * There is nothing to ask the author: the cuts fall where they put the Dividers,
  * and a story with none divides into nothing.
  */
 
@@ -53,7 +52,7 @@ export async function divideManuscript(
     document: vscode.Uri,
     cells: readonly ImmutableCell[],
 ): Promise<DividedManuscript> {
-    const parts = intoParts(sectionsOf(cells));
+    const parts = intoParts(cells);
     const partsFolder = vscode.Uri.joinPath(document, "..", PARTS_FOLDER);
     if (parts.length === 0) {
         return { partsFolder, partFilesWritten: 0 };

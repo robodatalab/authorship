@@ -1,6 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { partIsPrintedInTheBook } from "../parts/manuscript_parts";
 import {
     CHAPTER,
     CONTENTS,
@@ -29,15 +28,10 @@ function linesOfTheContents(
         if (section.cell.kind !== PART) {
             return [];
         }
-        return partIsPrintedInTheBook(section.cell)
-            ? [
-                  listed,
-                  ...linesOfTheContents(
-                      section.within,
-                      `${indent}${UNDER_THE_PART}`,
-                  ),
-              ]
-            : linesOfTheContents(section.within, indent);
+        return [
+            listed,
+            ...linesOfTheContents(section.within, `${indent}${UNDER_THE_PART}`),
+        ];
     });
 }
 

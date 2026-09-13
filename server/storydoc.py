@@ -42,6 +42,7 @@ EXTENSION = ".author"
 MARKDOWN = "markdown"
 CHAPTER = "chapter"
 PART = "part"
+DIVIDER = "divider"
 TITLE_PAGE = "title-page"
 IMAGE = "image"
 CONTENTS = "contents"
@@ -51,10 +52,8 @@ BLURB = "blurb"
 NOTE = "note"
 RECAP = "recap"
 
-# What an attribute says when the answer to it is no, and the attribute a part
-# says it of: whether the book prints a page where the part stands.
+# What an attribute says when the answer to it is no.
 NO = "no"
-PRINT = "print"
 
 FULL_PAGE = "full-page"
 
@@ -169,12 +168,12 @@ def chapter(title: str) -> Cell:
     return Cell(CHAPTER, "", {"title": title})
 
 
-def part(title: str, printed: bool = True) -> Cell:
-    return Cell(PART, "", {"title": title} if printed else {"title": title, PRINT: NO})
+def part(title: str) -> Cell:
+    return Cell(PART, "", {"title": title})
 
 
-def prints_page(cell: Cell) -> bool:
-    return cell.attrs.get(PRINT, "") != NO
+def divider() -> Cell:
+    return Cell(DIVIDER, "")
 
 
 def image(src: str, full_page: bool = True) -> Cell:
@@ -233,7 +232,7 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
     return ranges
 
 BUILT_KINDS = frozenset({CONTENTS})
-PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP})
+PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
 
 
 def _prose_of(lines: list[tuple[int, str]]) -> str:

@@ -58,18 +58,22 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
         );
     });
 
-    it("leaves out a part the book does not print, and the chapters under it stand alone", () => {
+    it("leaves out a divider, and the chapters around it stand alone", () => {
         const session = openStory(`
 <!-- cell: contents id="toc" -->
 
-<!-- cell: part title="Break" print="no" id="p1" -->
-
 <!-- cell: chapter title="The Door" id="c1" -->
+
+<!-- cell: divider id="d1" -->
+
+<!-- cell: chapter title="The Bell" id="c2" -->
 `);
 
         new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
-        expect(session.document.cells[0].source).toBe("1. The Door");
+        expect(session.document.cells[0].source).toBe(
+            "1. The Door\n1. The Bell",
+        );
     });
 
     it("writes nothing into a story with no chapters", () => {

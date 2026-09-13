@@ -80,6 +80,22 @@ describe("the sections a document reads itself into", () => {
             { cell: "c1", within: [{ cell: "n1", within: [] }] },
         ]);
     });
+
+    it("holds a divider under the chapter it was placed in, and opens nothing", () => {
+        const sections = sectionsOf(
+            story("chapter c1", "divider d1", "markdown m1"),
+        );
+
+        expect(sections).toEqual([
+            {
+                cell: "c1",
+                within: [
+                    { cell: "d1", within: [] },
+                    { cell: "m1", within: [] },
+                ],
+            },
+        ]);
+    });
 });
 
 describe("moving a cell, and everything written under it", () => {

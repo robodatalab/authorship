@@ -5,6 +5,7 @@ import {
     MutableCell,
     BLURB,
     CHAPTER,
+    DIVIDER,
     ImmutableCell,
     IMAGE,
     MARKDOWN,
@@ -20,7 +21,7 @@ const MARKDOWN_HEADING = /^(#{1,3})\s+(.*)$/;
 
 const KINDS_WRITTEN_AS_COMMENTS: string[] = [NOTE];
 
-const KINDS_LEFT_OUT_OF_THE_MANUSCRIPT: string[] = [NOTE, BLURB, RECAP];
+const KINDS_LEFT_OUT_OF_THE_MANUSCRIPT: string[] = [NOTE, BLURB, RECAP, DIVIDER];
 
 const AUTHOR_LINK_ATTRIBUTES: [string, string][] = [
     ["kdp", "Books on Amazon"],

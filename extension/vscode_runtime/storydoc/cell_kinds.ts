@@ -4,6 +4,7 @@ import {
     BLURB,
     CHAPTER,
     CONTENTS,
+    DIVIDER,
     IMAGE,
     MutableCell,
     DISCLAIMER,
@@ -63,6 +64,14 @@ const CELL_KINDS: CellKind[] = [
         label: "Part",
         fields: [{ attributeName: "title", label: "Title" }],
         blank: () => new MutableCell(PART, "", { title: "Untitled" }),
+    },
+    {
+        cellKind: DIVIDER,
+        label: "Divider",
+        fields: [],
+        isKeptOutOfTheBook: true,
+        isAnAsideToTheProseAroundIt: true,
+        blank: () => new MutableCell(DIVIDER, "", {}),
     },
     {
         cellKind: TITLE_PAGE,

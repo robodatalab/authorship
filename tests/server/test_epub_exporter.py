@@ -586,37 +586,42 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("<h1>Part 1</h1>", first)
         self.assertIn("<h1>Part 2</h1>", second)
 
-    def test_a_part_marked_unprinted_reaches_no_page_of_the_book(self) -> None:
+    def test_a_divider_reaches_no_page_of_the_book(self) -> None:
         # What it is for: the author says where the story divides into files, and
-        # the reader turns from one chapter to the next without meeting the seam.
+        # the reader turns from one chapter to the next without meeting the cut.
         out = written(
             self.root,
             title_page(title="Book"),
             storydoc.chapter("One"),
             storydoc.markdown("prose"),
-            storydoc.part("Break", printed=False),
+            storydoc.divider(),
             storydoc.chapter("Two"),
             storydoc.markdown("more"),
         )
 
         with zipfile.ZipFile(out) as z:
-            names = z.namelist()
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
             nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
 
-        self.assertNotIn("OEBPS/part.xhtml", names)
-        self.assertNotIn("Break", nav)
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(
+            order, ["titlepage", "copyright", "chap_000", "chap_001"]
+        )
+        self.assertNotIn("divider", nav)
 
-    def test_a_seam_does_not_take_a_number_from_the_parts_the_book_prints(
-        self,
-    ) -> None:
-        # The reader numbers the pages they meet: a part printed after a seam is
-        # the second part of the book, not the third.
+    def test_a_divider_does_not_take_a_number_from_the_parts(self) -> None:
+        # The reader numbers the pages they meet: a part after a divider is the
+        # second part of the book, not the third.
         out = written(
             self.root,
             title_page(title="Book"),
             Cell(storydoc.PART, "", {}),
             storydoc.chapter("One"),
-            storydoc.part("Break", printed=False),
+            storydoc.divider(),
             storydoc.chapter("Two"),
             Cell(storydoc.PART, "", {}),
             storydoc.chapter("Three"),
@@ -685,14 +690,12 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("padding-left: 2em;", css)
         self.assertNotIn(".contents ol { list-style: none;", css)
 
-    def test_the_chapters_of_a_part_the_book_does_not_print_stand_alone(
-        self,
-    ) -> None:
+    def test_a_divider_reaches_no_line_of_the_contents(self) -> None:
         out = written(
             self.root,
             title_page(title="Book"),
             storydoc.contents(),
-            storydoc.part("Break", printed=False),
+            storydoc.divider(),
             storydoc.chapter("One"),
             storydoc.markdown("a"),
         )
@@ -700,7 +703,7 @@ class BuildEpub(unittest.TestCase):
         with zipfile.ZipFile(out) as z:
             page = z.read("OEBPS/contents.xhtml").decode("utf-8")
 
-        self.assertNotIn("Break", page)
+        self.assertNotIn("divider", page)
         self.assertIn('    <li><a href="chap_000.xhtml">One</a></li>', page)
 
     def test_the_navigation_holds_the_chapters_under_their_part(self) -> None:
