@@ -67,6 +67,20 @@ class Models(unittest.TestCase):
         serving_status.assert_any_call(deploying)
 
 
+class RequestBeforeTheModelsAreDeployed(unittest.TestCase):
+    def test_is_told_the_models_are_still_being_deployed(self) -> None:
+        app.state.causal_model = None
+
+        response = TestClient(app).post(
+            "/generate/blurb", json={"path": "manuscript.author", "text": ""}
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json(), {"detail": "The models are still being deployed"}
+        )
+
+
 def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
     """The finished answer of whichever section is being written for a document."""
     deadline = time.monotonic() + timeout

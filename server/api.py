@@ -114,6 +114,15 @@ def _document(path: str) -> Document:
     return Document.load(target)
 
 
+def _deployed(model_client_name: str) -> Any:
+    model_client = getattr(app.state, model_client_name, None)
+    if model_client is None:
+        raise HTTPException(
+            status_code=503, detail="The models are still being deployed"
+        )
+    return model_client
+
+
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
     return {
@@ -247,7 +256,7 @@ class RecapJob(WritingJob):
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     """Start writing the story's blurb; poll /generate/status for it."""
     document = Document(request.text, Path(request.path))
-    job = BlurbJob(app.state.causal_model, document)
+    job = BlurbJob(_deployed("causal_model"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -266,7 +275,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
             Path(request.path).parent, request.documents
         )
     ]
-    job = RecapJob(app.state.causal_model, document, earlier)
+    job = RecapJob(_deployed("causal_model"), document, earlier)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -292,7 +301,7 @@ class StyleFixRequest(BaseModel):
 @app.post("/fix/style", status_code=202)
 def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = style.StyleFixJob(app.state.style_model, document)
+    job = style.StyleFixJob(_deployed("style_model"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -336,7 +345,7 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
-    job = CheckErrorsJob(app.state.gec_model, document, selection)
+    job = CheckErrorsJob(_deployed("gec_model"), document, selection)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -362,7 +371,7 @@ class StoryPlotsRequest(BaseModel):
 @app.post("/analyze/plots", status_code=202)
 def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(app.state.story_plot_classifier, document)
+    job = StoryPlotsJob(_deployed("story_plot_classifier"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
