@@ -7,8 +7,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from vramen import CausalModel
+from cortexgrid_infer import ServedCompletingModel
 
+from server.models import causal_model
 from server.storydoc import Document
 
 
@@ -24,7 +25,7 @@ Return the summary that combines the overall text, without adding any tokens.
 
 
 def write_recap(
-    model: CausalModel,
+    model: ServedCompletingModel,
     documents: list[Document],
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda read, chapters: None,
@@ -45,8 +46,8 @@ def write_recap(
 
         to_summarize = f"<summary_so_far>\n{running_summary}\n</sumary_so_far><new_part>\n{prose}\n</new_part>"
 
-        new_running_summary = model.complete(
-            SUMMARY_INSTRUCTION, to_summarize, max_new_tokens=SUMMARY_TOKENS,
+        new_running_summary = causal_model.complete(
+            model, SUMMARY_INSTRUCTION, to_summarize, max_new_tokens=SUMMARY_TOKENS,
         ).strip()
         running_summary = new_running_summary
         progress(read, len(chapters))

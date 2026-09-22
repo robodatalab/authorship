@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from vramen import CausalModel
+from cortexgrid_infer import ServedCompletingModel
 
+from server.models import causal_model
 from server.storydoc import Document
 
 # A blurb that runs longer than this has stopped being a blurb.
@@ -34,7 +35,7 @@ BLURB_INSTRUCTION = (
 
 
 def write_blurb(
-    model: CausalModel,
+    model: ServedCompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda written, chapters: None,
@@ -62,7 +63,8 @@ def write_blurb(
     for written, (title, prose) in enumerate(chapters, start=1):
         if cancelled():
             return ""
-        blurb = model.complete(
+        blurb = causal_model.complete(
+            model,
             BLURB_INSTRUCTION,
             _reading(document.title, blurb, title, prose),
             max_new_tokens=BLURB_TOKENS,

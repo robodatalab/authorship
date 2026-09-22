@@ -3,16 +3,19 @@
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
 
 
 @dataclass
-class _Span[T]:
+class _Span(Generic[T]):
     start: int
     end: int
     values: list[T]
 
 
-class RangeDict[T]:
+class RangeDict(Generic[T]):
     """Half-open ranges `[start, end)` holding the values recorded over them.
 
     Assigning a value to a range adds it to every point of that range. A range
