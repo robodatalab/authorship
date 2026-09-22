@@ -5,7 +5,11 @@ A place to write a novel inside VS Code.
 Your manuscript stays a file — markdown, in your own repository, with your own
 history. Authorship adds an editor that understands what a story is made of, a
 reader that tells you what is wrong with a passage, and a way out to an EPUB.
-Every model it uses runs on your machine; nothing you write is sent anywhere.
+
+Authorship is meant to run entirely on your machine, and that is where it is
+heading. Not every machine has the memory its models need, though, so for now the
+heavier work is moving to a backend we host ourselves: open-weight models, on our
+own hardware, kept private. See [Privacy](#privacy).
 
 <!-- CAPTURE hero.webp — the whole VS Code window with a `.author` manuscript
      open: the toolbar across the top of the editor, three or four sections down
@@ -718,6 +722,13 @@ about a document:
 ---
 
 ## Privacy
+
+**Where this is going.** The goal is an Authorship that runs entirely on your
+machine. Today that takes more memory than most machines have, so the heavier
+work is moving to a hosted backend instead — one we run ourselves, on our own
+hardware, with open-weight models. Your manuscript goes to it and no further: not
+to Google, and not to any other AI company. Once it is in place it replaces Gemini
+too. Until then, what follows is what the extension does today.
 
 Everything runs on your machine, with one exception, and the exception is opt-in.
 

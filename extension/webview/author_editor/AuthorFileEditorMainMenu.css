@@ -27,7 +27,6 @@
 }
 
 .author-file-editor-main-menu {
-    flex: 0 0 auto;
     position: relative;
     display: flex;
     gap: 2px;

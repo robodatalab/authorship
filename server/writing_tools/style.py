@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Any
+
+from cortexgrid_infer import ServedCompletingModel
 
 from server import storydoc
 from server.jobs import Job
-from server.models.gemini import GeminiError
 from server.storydoc import Cell, Document
 
 _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(?P<body>.*)\n```\s*\Z", re.DOTALL)
@@ -34,12 +35,8 @@ STYLE_INSTRUCTION = (
 FIX_REQUEST = "Fix the writing style and the grammar in the following section."
 
 
-class Editor(Protocol):
-    def complete(self, instruction: str, said: str, max_new_tokens: int, /) -> str: ...
-
-
-def fix_style(
-    model: Editor,
+async def fix_style(
+    model: ServedCompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, sections: None,
@@ -59,7 +56,7 @@ def fix_style(
     for fixed, section in enumerate(sections, start=1):
         if cancelled():
             return
-        fix, why = _corrected(model, corrected, section)
+        fix, why = await _corrected(model, corrected, section)
         if cancelled():
             return
         if why:
@@ -70,19 +67,22 @@ def fix_style(
         progress(fixed, len(sections))
 
 
-def _corrected(
-    model: Editor, corrected: list[str], section: Cell
+async def _corrected(
+    model: ServedCompletingModel, corrected: list[str], section: Cell
 ) -> tuple[str | None, str]:
-    try:
-        answer = model.complete(
-            STYLE_INSTRUCTION,
-            _reading(corrected, section.source),
-            len(section.source) + THINKING_HEADROOM,
-        )
-    except GeminiError as ge:
-        if not ge.one_chapter:
-            raise
-        return None, str(ge)
+    answer = "".join(
+        [
+            chunk.content
+            async for chunk in model.complete(
+                [
+                    {"role": "system", "content": STYLE_INSTRUCTION},
+                    {"role": "user", "content": _reading(corrected, section.source)},
+                ],
+                max_new_tokens=len(section.source) + THINKING_HEADROOM,
+                temperature=0.0,
+            )
+        ]
+    )
     fix = _unfenced(answer).strip("\n")
     wrong = _unfinished(fix, section.source)
     return (None, wrong) if wrong else (fix, "")
@@ -138,31 +138,24 @@ def _opening(source: str) -> str:
 class StyleFixJob(Job):
     kind = "style fix"
 
-    def __init__(self, model: Editor, document: Document) -> None:
+    def __init__(self, model: ServedCompletingModel, document: Document) -> None:
         super().__init__(str(document.path))
         self._model = model
         self._document = document
         self.sections: list[dict[str, Any]] = []
         self.fixed = 0
         self.to_fix = 0
-        self.unauthorized = False
-        self.no_quota = False
         self.left_alone: list[dict[str, str]] = []
 
-    def execute(self) -> None:
-        try:
-            fix_style(
-                self._model,
-                self._document,
-                lambda: self.cancelled,
-                self._reached,
-                self._revised,
-                self._left_alone,
-            )
-        except GeminiError as err:
-            self.unauthorized = err.unauthorized
-            self.no_quota = err.no_quota
-            raise
+    async def execute(self) -> None:
+        await fix_style(
+            self._model,
+            self._document,
+            lambda: self.cancelled,
+            self._reached,
+            self._revised,
+            self._left_alone,
+        )
 
     def _reached(self, fixed: int, sections: int) -> None:
         self.fixed, self.to_fix = fixed, sections

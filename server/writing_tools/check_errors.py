@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +79,7 @@ class CheckErrorsJob(Job):
         self._selection = selection
         self.findings: list[dict[str, Any]] = []
 
-    def execute(self) -> None:
+    async def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
         crutches = (
             prose_check.crutch_lemmas(
@@ -91,7 +93,7 @@ class CheckErrorsJob(Job):
         passage = _story_lines(self._document, start, end)
         by_the_rules = [
             error
-            for finding in prose_check.check(passage, crutches)
+            for finding in await asyncio.to_thread(prose_check.check, passage, crutches)
             for error in _errors_of(self._document, finding)
         ]
         self.findings = by_the_rules
@@ -99,7 +101,7 @@ class CheckErrorsJob(Job):
             return
         self.findings = by_the_rules + [
             error
-            for finding in grammar_check.check(
+            for finding in await grammar_check.check(
                 self._model, passage, grammar_check.names_in(self._document.text)
             )
             for error in _errors_of(self._document, finding)

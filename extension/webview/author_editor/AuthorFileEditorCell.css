@@ -127,6 +127,10 @@
     padding: 10px;
 }
 
+.author-file-editor-cell-body:has(.markdown-editor) {
+    background: color-mix(in srgb, var(--vscode-editor-background), #d4a72c 8%);
+}
+
 .author-file-editor-cell-card {
     display: flex;
     flex-direction: column;

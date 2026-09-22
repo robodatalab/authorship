@@ -3,14 +3,12 @@ import {
     AuthorshipPanelCanvas,
     type SendMessagesToVscode,
 } from "./panel/AuthorshipPanelCanvas";
-import type { GeminiAccountStatus } from "./panel/AuthorshipPanelGeminiAccount";
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
 interface WhatThePanelDraws {
-    account?: GeminiAccountStatus;
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
 }
@@ -19,16 +17,7 @@ function processMessageFromVscode(
     message: MessageEvent,
     drawn: WhatThePanelDraws,
 ): boolean {
-    if (message.data?.type === "account") {
-        drawn.account = {
-            off: Boolean(message.data.off),
-            label: message.data.account as string | null,
-            model: (message.data.model as string) ?? "",
-            shipped: (message.data.shipped as string) ?? "",
-            models:
-                (message.data.models as GeminiAccountStatus["models"]) ?? [],
-        };
-    } else if (message.data?.type === "models") {
+    if (message.data?.type === "models") {
         drawn.models = message.data.models as ModelServingStatus[] | null;
     } else if (message.data?.type === "jobs") {
         drawn.jobs = message.data.jobs as AsyncJobStatus[] | null;
@@ -47,7 +36,6 @@ function openTheAuthorshipPanel(): void {
     function drawThePanel(): void {
         root.render(
             <AuthorshipPanelCanvas
-                account={drawn.account}
                 models={drawn.models}
                 jobs={drawn.jobs}
                 sendMessagesToVscode={sendMessagesToVscode}

@@ -8,10 +8,15 @@ import {
 } from "monaco-editor/languages/definitions/markdown/markdown.js";
 import "monaco-editor/editor/contrib/multicursor/browser/multicursor.js";
 import { marked } from "marked";
-import { fenced, markedUp } from "../author_editor/AuthorFileEditorFind";
+import {
+    fenced,
+    markedUp,
+    unfenced,
+} from "../author_editor/AuthorFileEditorFind";
 import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileEditorFind";
 import { LinterTooltip } from "../linter/LinterTooltip";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -39,6 +44,12 @@ monaco.editor.addKeybindingRules([
 
 const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
+const STORY_PLOT_COLORS_THE_STYLESHEET_DEFINES = 6;
+const MONACO_STOPS_WRAPPING_THIS_FAR_BEFORE_ITS_VERTICAL_SCROLLBAR_PX = 2;
+
+export function storyPlotColorClassName(storyPlotIndex: number): string {
+    return `markdown-editor-story-plot-${storyPlotIndex % STORY_PLOT_COLORS_THE_STYLESHEET_DEFINES}`;
+}
 
 interface MarkdownEditorBeingEdited {
     editorBeingEdited: string | null;
@@ -100,6 +111,7 @@ interface MarkdownEditorProps {
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
     highlights?: AuthorFileEditorFindHighlight[];
+    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     onFixAsked?: (error: ProseCheckError) => void;
     children?: (markdown: string) => ReactNode;
 }
@@ -111,6 +123,7 @@ export function MarkdownEditor({
     onMarkdownCommitted,
     errors = [],
     highlights = [],
+    paragraphsInStoryPlots = [],
     onFixAsked = () => undefined,
     children,
 }: MarkdownEditorProps) {
@@ -137,10 +150,10 @@ export function MarkdownEditor({
                 onDoubleClick={beginEditing}
                 dangerouslySetInnerHTML={{
                     __html: markedUp(
-                        marked.parse(fenced(markdownShown, highlights), {
-                            async: false,
-                            gfm: true,
-                        }),
+                        renderedWithStoryPlotBorders(
+                            fenced(markdownShown, highlights),
+                            paragraphsInStoryPlots,
+                        ),
                     ),
                 }}
             />
@@ -152,6 +165,7 @@ export function MarkdownEditor({
             markdown={markdownShown}
             errors={errors}
             highlights={highlights}
+            paragraphsInStoryPlots={paragraphsInStoryPlots}
             onFixAsked={onFixAsked}
             onMarkdownChanged={(typed) => {
                 showMarkdown(typed);
@@ -160,6 +174,48 @@ export function MarkdownEditor({
             onFinished={finishEditing}
         />
     );
+}
+
+function storyPlotColorClassNamesOf(
+    paragraphsInStoryPlots: ParagraphInStoryPlots[],
+): string[] {
+    return [
+        ...new Set(
+            paragraphsInStoryPlots.flatMap((paragraph) =>
+                paragraph.storyPlotIndices.map(storyPlotColorClassName),
+            ),
+        ),
+    ];
+}
+
+function renderedWithStoryPlotBorders(
+    fencedMarkdown: string,
+    paragraphsInStoryPlots: ParagraphInStoryPlots[],
+): string {
+    let html = "";
+    let blockStartsAt = 0;
+    for (const block of marked.lexer(fencedMarkdown, { gfm: true })) {
+        const blockEndsAt = blockStartsAt + unfenced(block.raw).length;
+        const blockHtml = marked.parser([block]);
+        const colorClassNames = storyPlotColorClassNamesOf(
+            paragraphsInStoryPlots.filter(
+                (paragraph) =>
+                    paragraph.startCharacterOffsetInCell < blockEndsAt &&
+                    blockStartsAt < paragraph.endCharacterOffsetInCell,
+            ),
+        );
+        blockStartsAt = blockEndsAt;
+        html +=
+            blockHtml && colorClassNames.length > 0
+                ? `<div class="markdown-rendered-paragraph-in-story-plots">${blockHtml}${colorClassNames
+                      .map(
+                          (colorClassName) =>
+                              `<span class="markdown-editor-story-plot-border ${colorClassName}"></span>`,
+                      )
+                      .join("")}</div>`
+                : blockHtml;
+    }
+    return html;
 }
 
 const NEIGHBOURHOOD_AROUND_THE_CURSOR = 40;
@@ -217,6 +273,7 @@ interface MonacoMarkdownEditorProps {
     markdown: string;
     errors: ProseCheckError[];
     highlights: AuthorFileEditorFindHighlight[];
+    paragraphsInStoryPlots: ParagraphInStoryPlots[];
     onFixAsked: (error: ProseCheckError) => void;
     onMarkdownChanged: (markdown: string) => void;
     onFinished: () => void;
@@ -232,6 +289,7 @@ function MonacoMarkdownEditor({
     markdown,
     errors,
     highlights,
+    paragraphsInStoryPlots,
     onFixAsked,
     onMarkdownChanged,
     onFinished,
@@ -243,6 +301,8 @@ function MonacoMarkdownEditor({
     const drawnMarks =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const drawnHighlights =
+        useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const drawnStoryPlotBorders =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const errorsNow = useRef(errors);
     errorsNow.current = errors;
@@ -260,7 +320,8 @@ function MonacoMarkdownEditor({
         if (!node) {
             return;
         }
-        const editorForeground = getComputedStyle(document.body)
+        const styleOfThePage = getComputedStyle(document.body);
+        const editorForeground = styleOfThePage
             .getPropertyValue("--vscode-editor-foreground")
             .trim()
             .replace("#", "");
@@ -280,6 +341,26 @@ function MonacoMarkdownEditor({
             theme: MONACO_THEME_FROM_VSCODE,
             editContext: false,
             automaticLayout: true,
+            fontFamily:
+                styleOfThePage
+                    .getPropertyValue("--vscode-editor-font-family")
+                    .trim() || undefined,
+            fontSize:
+                parseFloat(
+                    styleOfThePage.getPropertyValue(
+                        "--vscode-editor-font-size",
+                    ),
+                ) || undefined,
+            fontWeight:
+                styleOfThePage
+                    .getPropertyValue("--vscode-editor-font-weight")
+                    .trim() || undefined,
+            lineHeight:
+                parseFloat(
+                    styleOfThePage.getPropertyValue(
+                        "--markdown-editor-line-height-to-font-size",
+                    ),
+                ) || undefined,
             wordWrap: "on",
             lineNumbers: "off",
             glyphMargin: false,
@@ -293,6 +374,14 @@ function MonacoMarkdownEditor({
             scrollbar: {
                 vertical: "hidden",
                 horizontal: "hidden",
+                verticalScrollbarSize:
+                    parseFloat(
+                        styleOfThePage.getPropertyValue(
+                            "--markdown-editor-story-plot-gutter",
+                        ),
+                    ) -
+                        MONACO_STOPS_WRAPPING_THIS_FAR_BEFORE_ITS_VERTICAL_SCROLLBAR_PX ||
+                    undefined,
                 alwaysConsumeMouseWheel: false,
                 useShadows: false,
             },
@@ -312,6 +401,7 @@ function MonacoMarkdownEditor({
 
         drawnMarks.current = editor.createDecorationsCollection([]);
         drawnHighlights.current = editor.createDecorationsCollection([]);
+        drawnStoryPlotBorders.current = editor.createDecorationsCollection([]);
 
         const errorUnderPointer = (
             event: monaco.editor.IEditorMouseEvent,
@@ -455,6 +545,33 @@ function MonacoMarkdownEditor({
             })),
         );
     }, [highlights, markdown]);
+
+    useEffect(() => {
+        const model = monacoEditor.current?.getModel();
+        if (!model) {
+            return;
+        }
+        drawnStoryPlotBorders.current?.set(
+            paragraphsInStoryPlots.flatMap((paragraph) =>
+                storyPlotColorClassNamesOf([paragraph]).map(
+                    (colorClassName) => ({
+                        range: monaco.Range.fromPositions(
+                            model.getPositionAt(
+                                paragraph.startCharacterOffsetInCell,
+                            ),
+                            model.getPositionAt(
+                                paragraph.endCharacterOffsetInCell,
+                            ),
+                        ),
+                        options: {
+                            isWholeLine: true,
+                            className: `markdown-editor-story-plot-border ${colorClassName}`,
+                        },
+                    }),
+                ),
+            ),
+        );
+    }, [paragraphsInStoryPlots, markdown]);
 
     return (
         <>

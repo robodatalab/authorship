@@ -38,23 +38,7 @@
                 "priority": "default"
             }
         ],
-        "commands": [
-            {
-                "command": "authorship.gemini.signIn",
-                "title": "Sign in to Gemini",
-                "category": "Authorship"
-            },
-            {
-                "command": "authorship.gemini.signOut",
-                "title": "Sign out of Gemini",
-                "category": "Authorship"
-            },
-            {
-                "command": "authorship.gemini.chooseModel",
-                "title": "Choose Gemini Model",
-                "category": "Authorship"
-            }
-        ],
+        "commands": [],
         "configuration": [
             {
                 "title": "Model server",
@@ -64,41 +48,9 @@
                         "type": "number",
                         "default": 8765,
                         "scope": "window",
-                        "markdownDescription": "The port the model server listens on. Every window that finds a server already answering there uses it rather than starting a second one, so one server serves them all. Give a window a port of its own — or set `AUTHORSHIP_MODEL_SERVER_PORT` in a launch configuration — when it should start and own a server nobody else shares."
+                        "markdownDescription": "The port the model server listens on. Every window that finds a server already answering there uses it rather than starting a second one, so one server serves them all. Give a window a port of its own \u2014 or set `AUTHORSHIP_MODEL_SERVER_PORT` in a launch configuration \u2014 when it should start and own a server nobody else shares."
                     }
                 }
-            },
-            {
-                "title": "Experimental",
-                "order": 1,
-                "properties": {
-                    "authorship.experimental.useGeminiForStyleCorrection": {
-                        "type": "boolean",
-                        "default": false,
-                        "order": 1,
-                        "tags": [
-                            "experimental"
-                        ],
-                        "markdownDescription": "Correct the style and grammar of a whole manuscript with Google Gemini.\n\n**This is the one feature in Authorship that does not run on your machine.** It sends the chapters of the document it is run on to the Gemini API, on your own API key, and is billed to that account. Everything else Authorship does is local.\n\nOff, the tool is hidden and nothing is ever sent. On, a sparkle appears in the `.author` toolbar and a Gemini account appears in the Authorship sidebar.",
-                        "scope": "window"
-                    },
-                    "authorship.gemini.model": {
-                        "type": "string",
-                        "default": "",
-                        "order": 2,
-                        "tags": [
-                            "experimental"
-                        ],
-                        "markdownDescription": "Which Gemini model fixes style and grammar. Left empty, Authorship uses the one it ships with. Google retires model names from time to time; when a pass fails with *no longer available*, the error names its replacement — put that name here.\n\nThe **Account** drawer in the Authorship sidebar lists the models your key can actually reach.",
-                        "scope": "window"
-                    }
-                }
-            }
-        ],
-        "authentication": [
-            {
-                "id": "gemini",
-                "label": "Google Gemini"
             }
         ],
         "viewsContainers": {

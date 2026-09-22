@@ -7,6 +7,7 @@ every one of its chapters reaches the model.
 """
 
 from collections.abc import AsyncIterator
+import asyncio
 import unittest
 from unittest import mock
 
@@ -16,6 +17,10 @@ from parameterized import parameterized  # type: ignore
 from server import storydoc
 from server.storydoc import Document
 from server.writing_tools.recap import write_recap
+
+
+def recap_written(*arguments: object, **named: object) -> str:
+    return asyncio.run(write_recap(*arguments, **named))
 
 
 async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
@@ -84,7 +89,7 @@ class WriteRecap(unittest.TestCase):
         model = mock.MagicMock()
         model.complete.side_effect = lambda messages, **_: streamed("The story so far.")
 
-        write_recap(model, [volume(title, chapters) for title, chapters in books])
+        recap_written(model, [volume(title, chapters) for title, chapters in books])
 
         read = [call.args[0][1]["content"] for call in model.complete.call_args_list]
         chapters = [chapter for _, chapters in books for chapter in chapters]

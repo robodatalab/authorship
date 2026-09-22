@@ -1,10 +1,5 @@
 import * as vscode from "vscode";
 
-import {
-    GeminiAccount,
-    configuredModel,
-    styleFixEnabled,
-} from "../gemini/account";
 import { fetchFromServer } from "../server/fetch";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
@@ -16,16 +11,7 @@ export class PublishView implements vscode.WebviewViewProvider {
     private statusPollTimer?: ReturnType<typeof setInterval>;
     private readonly whenEachJobFirstAppeared = new Map<string, number>();
 
-    private watchingTheAccount?: vscode.Disposable;
-    private watchingTheSettings?: vscode.Disposable;
-
-    private geminiModels?: GeminiModel[];
-    private modelShippedWithAuthorship = "";
-
-    constructor(
-        private readonly context: vscode.ExtensionContext,
-        private readonly account: GeminiAccount,
-    ) {}
+    constructor(private readonly context: vscode.ExtensionContext) {}
 
     resolveWebviewView(view: vscode.WebviewView): void {
         this.view = view;
@@ -41,30 +27,10 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.pollTheServer();
-                void this.showAccount();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
-            } else if (message?.type === "signInGemini") {
-                void this.account.require();
-            } else if (message?.type === "signOutGemini") {
-                void this.account.forget();
-            } else if (message?.type === "setGeminiModel") {
-                void this.useGeminiModel(message.model as string);
-            } else if (message?.type === "refreshGeminiModels") {
-                void this.showAccount(true);
             }
         });
-
-        this.watchingTheAccount = this.account.onDidChangeSessions(
-            () => void this.showAccount(),
-        );
-        this.watchingTheSettings = vscode.workspace.onDidChangeConfiguration(
-            (changed) => {
-                if (changed.affectsConfiguration("authorship")) {
-                    void this.showAccount();
-                }
-            },
-        );
 
         void this.pollTheServer();
         this.statusPollTimer = setInterval(
@@ -77,56 +43,8 @@ export class PublishView implements vscode.WebviewViewProvider {
                 clearInterval(this.statusPollTimer);
                 this.statusPollTimer = undefined;
             }
-            this.watchingTheAccount?.dispose();
-            this.watchingTheAccount = undefined;
-            this.watchingTheSettings?.dispose();
-            this.watchingTheSettings = undefined;
             this.view = undefined;
         });
-    }
-
-    private async showAccount(askGeminiAgain = false): Promise<void> {
-        if (!this.view) {
-            return;
-        }
-        if (!styleFixEnabled()) {
-            void this.view.webview.postMessage({ type: "account", off: true });
-            return;
-        }
-        const [session] = await this.account.getSessions();
-        if (!session) {
-            this.geminiModels = undefined;
-        } else if (askGeminiAgain || this.geminiModels === undefined) {
-            await this.readModelsThisKeyCanUse(session.accessToken);
-        }
-        void this.view.webview.postMessage({
-            type: "account",
-            account: session ? session.account.label : null,
-            model: configuredModel() ?? "",
-            shipped: this.modelShippedWithAuthorship,
-            models: this.geminiModels ?? [],
-        });
-    }
-
-    private async readModelsThisKeyCanUse(apiKey: string): Promise<void> {
-        try {
-            const answered = await fetchFromServer<{
-                default?: string;
-                models?: GeminiModel[];
-            }>(
-                "/gemini/models",
-                { key: apiKey, model: configuredModel() },
-                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-            );
-            this.modelShippedWithAuthorship = answered.default ?? "";
-            this.geminiModels = answered.models ?? [];
-        } catch {}
-    }
-
-    private async useGeminiModel(model: string): Promise<void> {
-        await vscode.workspace
-            .getConfiguration("authorship")
-            .update("gemini.model", model, vscode.ConfigurationTarget.Global);
     }
 
     private async pollTheServer(): Promise<void> {
@@ -254,12 +172,6 @@ export class PublishView implements vscode.WebviewViewProvider {
 </body>
 </html>`;
     }
-}
-
-interface GeminiModel {
-    model: string;
-    label: string;
-    detail: string;
 }
 
 function isTimeout(failure: unknown): boolean {

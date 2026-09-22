@@ -38,22 +38,6 @@ export const shownMessages: string[] = [];
 
 export const settings = new Map<string, unknown>();
 
-export const geminiKeyInTheKeychain: { key: string | undefined } = {
-    key: undefined,
-};
-
-export const authentication = {
-    registerAuthenticationProvider: (): { dispose(): void } => ({
-        dispose: () => undefined,
-    }),
-    getSession: (): Promise<{ accessToken: string } | undefined> =>
-        Promise.resolve(
-            geminiKeyInTheKeychain.key
-                ? { accessToken: geminiKeyInTheKeychain.key }
-                : undefined,
-        ),
-};
-
 export const dialogs: {
     filesTheAuthorChose: StubUri[];
     answerToTheWarning: string | undefined;

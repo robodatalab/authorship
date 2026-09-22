@@ -9,6 +9,7 @@ import { FixProseCommand } from "./fix_prose";
 import { FixStyleCommand } from "./fix_style";
 import { FoldAllCommand } from "./fold_all";
 import { FoldCellCommand } from "./fold_cell";
+import { IdentifyStoryPlotsCommand } from "./identify_story_plots";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
@@ -17,6 +18,7 @@ import { OpenAsTextCommand } from "./open_as_text";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceTextsCommand } from "./replace_texts";
 import { RunAllCommand } from "./run_all";
+import { ToggleStoryPlotsCommand } from "./toggle_story_plots";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
@@ -60,6 +62,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
+    new ToggleStoryPlotsCommand(),
+    new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),
     new WriteStorySoFarCommand(),

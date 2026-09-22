@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
+import type { ParagraphInStoryPlots } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -610,5 +611,89 @@ describe("what the checks found in the prose being written", () => {
         });
 
         expect(onFixAsked).toHaveBeenCalledWith(REPEATED);
+    });
+});
+
+describe("the plots the paragraphs belong to", () => {
+    const THE_DOOR: ParagraphInStoryPlots = {
+        cellId: "c1",
+        startCharacterOffsetInCell: 14,
+        endCharacterOffsetInCell: 23,
+        wordsInTheCell: "The door.",
+        isVisible: true,
+        storyPlotIndices: [1, 8],
+    };
+
+    async function mountWithStoryPlots(): Promise<void> {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown={"The lantern.\n\nThe door.\n\nThe key."}
+                        highlights={[{ at: 4, end: 11, isCurrent: false }]}
+                        paragraphsInStoryPlots={[THE_DOOR]}
+                        onMarkdownCommitted={committedSpy()}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+    }
+
+    it("borders the rendered paragraph once for every plot it belongs to", async () => {
+        await mountWithStoryPlots();
+
+        const inStoryPlots = [
+            ...document.querySelectorAll(
+                ".markdown-rendered-paragraph-in-story-plots",
+            ),
+        ];
+        expect(
+            inStoryPlots.map((paragraph) => paragraph.textContent),
+        ).toEqual(["The door.\n"]);
+        expect(
+            [
+                ...inStoryPlots[0].querySelectorAll(
+                    ".markdown-editor-story-plot-border",
+                ),
+            ].map((border) => border.className),
+        ).toEqual([
+            "markdown-editor-story-plot-border markdown-editor-story-plot-1",
+            "markdown-editor-story-plot-border markdown-editor-story-plot-2",
+        ]);
+    });
+
+    it("borders the lines of the paragraph in the editor", async () => {
+        await mountWithStoryPlots();
+
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        expect(latestEditor().marks()).toEqual(
+            expect.arrayContaining([
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 15 },
+                        to: { lineNumber: 1, column: 24 },
+                    },
+                    options: {
+                        isWholeLine: true,
+                        className:
+                            "markdown-editor-story-plot-border markdown-editor-story-plot-1",
+                    },
+                },
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 15 },
+                        to: { lineNumber: 1, column: 24 },
+                    },
+                    options: {
+                        isWholeLine: true,
+                        className:
+                            "markdown-editor-story-plot-border markdown-editor-story-plot-2",
+                    },
+                },
+            ]),
+        );
     });
 });

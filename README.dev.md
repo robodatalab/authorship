@@ -61,6 +61,9 @@ Examples of such edits:
    some long (>50k words), some short (~5k words).
 2. The entire thing thoroughly tested.
 3. Experiment with running local language models (max 32 GB RAM on a Mac), multiplexed and
-   finetuned to perform very specific tasks.
+   finetuned to perform very specific tasks. Running locally stays the goal, but not everyone
+   has that compute: for now the models are served from a private backend we host ourselves —
+   open-weight models on our own hardware, served with cortexgrid — which later moves behind a
+   web server. Gemini is to be retired.
 4. Expose the plugin immediately for myself — install it and keep updating it in VS Code on my
    laptop.

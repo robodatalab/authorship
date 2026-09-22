@@ -6,6 +6,7 @@ import {
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import type {
     AuthorFileEditorFindHighlight,
     AuthorFileEditorFindMatch,
@@ -46,6 +47,7 @@ interface AuthorFileEditorCellStateProps {
     cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
+    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     findMatches?: AuthorFileEditorFindMatch[];
     currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
@@ -62,6 +64,7 @@ const AuthorFileEditorCellStateContext = createContext<
     cellId: "",
     cellAttributes: {},
     proseErrors: [],
+    paragraphsInStoryPlots: [],
     findMatches: [],
     currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
@@ -75,6 +78,7 @@ export function AuthorFileEditorCellState({
     cellId,
     cellAttributes,
     proseErrors = [],
+    paragraphsInStoryPlots = [],
     findMatches = [],
     currentFindMatch = null,
     howFarTheCellHasBeenWritten,
@@ -90,6 +94,7 @@ export function AuthorFileEditorCellState({
                 cellId,
                 cellAttributes,
                 proseErrors,
+                paragraphsInStoryPlots,
                 findMatches,
                 currentFindMatch,
                 howFarTheCellHasBeenWritten,
@@ -199,6 +204,13 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function useAuthorFileEditorCellParagraphsInStoryPlots(): ParagraphInStoryPlots[] {
+    return (
+        useContext(AuthorFileEditorCellStateContext).paragraphsInStoryPlots ??
+        []
+    );
 }
 
 export function useAuthorFileEditorCellFind(): {

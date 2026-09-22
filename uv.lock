@@ -213,7 +213,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cortexgrid-infer", specifier = ">=0.3.4" },
+    { name = "cortexgrid-infer", specifier = ">=0.3.6" },
     { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
@@ -521,7 +521,7 @@ wheels = [
 
 [[package]]
 name = "cortexgrid"
-version = "0.3.11"
+version = "0.3.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
@@ -541,14 +541,14 @@ dependencies = [
     { name = "setuptools" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/28/2c54186eba598be6770ce8f7fea0625e72e449a9d90b8a7026ade32dfc27/cortexgrid-0.3.11.tar.gz", hash = "sha256:83a00e8c6cc661ab560cd39d6c6405d5d19a78ee5455692c1516fa83dd115b4f", size = 56357, upload-time = "2026-09-22T12:34:06.08Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/06/f27c1ac8835d0a368d1b129b44d76cf3d2fa0f2700a8f32f6cf16967fb04/cortexgrid-0.3.12.tar.gz", hash = "sha256:c4a1139f58393fe917a7892656a83bb6a8cd1d6367d14e95eec7e45174e8cfdd", size = 59188, upload-time = "2026-09-22T17:00:29.867Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/27/d2515903dedbbffc3d96e9b4fb2a56e98861aaaf7547f2491555c56b3c4d/cortexgrid-0.3.11-py3-none-any.whl", hash = "sha256:2d47ad4c9179fd4c6e0829a97c1dd9f3f444429a3fc271ef859da2921beb2e82", size = 65207, upload-time = "2026-09-22T12:34:04.722Z" },
+    { url = "https://files.pythonhosted.org/packages/82/5e/3a49aa55a9d6c22ccc9b199b330944aa0a54abe3a6059b453828edc4a358/cortexgrid-0.3.12-py3-none-any.whl", hash = "sha256:f31f4a4c5bba2303152bb4c8b12c84f7a1420b400901c1c253b969fefbb5c511", size = 71634, upload-time = "2026-09-22T17:00:28.203Z" },
 ]
 
 [[package]]
 name = "cortexgrid-infer"
-version = "0.3.4"
+version = "0.3.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate" },
@@ -567,9 +567,9 @@ dependencies = [
     { name = "torch" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/d7/db98a944959511440a8e196f1762ae241d8de34786f186868ae749f77117/cortexgrid_infer-0.3.4.tar.gz", hash = "sha256:7403c25bed596d1357327de226f76b07e824f9b4c1ebab663b8b3dede05a635d", size = 36953, upload-time = "2026-09-22T15:35:11.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/bb/642072e7632fc729bdaf1bb8d0d088f25940bf5aeb308d11f5cea4de6886/cortexgrid_infer-0.3.6.tar.gz", hash = "sha256:2fd5c6c8f9b8270922cec98bca60a630049efbe5ee783feb1608c3fb7ef30f41", size = 38817, upload-time = "2026-09-22T17:27:48.009Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/54/9fbcb766821d84dd35c6b271f8ff646ec5912a72da0cb310031d139ca24d/cortexgrid_infer-0.3.4-py3-none-any.whl", hash = "sha256:119bd1470d1de779b2c4256a43fef0ad4a6f6931d052c19aa3a0c11ec15191a4", size = 50448, upload-time = "2026-09-22T15:35:09.932Z" },
+    { url = "https://files.pythonhosted.org/packages/78/7d/17402bde0dc6ffe58280d1c756de8bb5607e06de50a0c8ae8ab02e0d7658/cortexgrid_infer-0.3.6-py3-none-any.whl", hash = "sha256:4b21b6b2ac117eda62ca568e8e51fdf21af284bfbbee24e642789ef3a1bca1c6", size = 52769, upload-time = "2026-09-22T17:27:46.64Z" },
 ]
 
 [[package]]

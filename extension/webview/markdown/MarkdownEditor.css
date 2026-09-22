@@ -1,3 +1,8 @@
+:root {
+    --markdown-editor-line-height-to-font-size: 1.5;
+    --markdown-editor-story-plot-gutter: 32px;
+}
+
 .markdown-editor-mark {
     text-decoration-skip-ink: none;
     text-underline-offset: 2px;
@@ -46,16 +51,88 @@
 .markdown-rendered {
     flex: 1 1 auto;
     min-height: 1.4em;
+    padding-right: var(--markdown-editor-story-plot-gutter);
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    font-weight: var(--vscode-editor-font-weight);
+    line-height: round(
+        calc(
+            var(--vscode-editor-font-size) *
+                var(--markdown-editor-line-height-to-font-size)
+        ),
+        1px
+    );
 }
 
-.markdown-rendered > :first-child {
-    margin-top: 0;
+.markdown-rendered > * {
+    margin-block: 0 1lh;
 }
 
 .markdown-rendered > :last-child {
-    margin-bottom: 0;
+    margin-block-end: 0;
+}
+
+.markdown-rendered p {
+    white-space: break-spaces;
 }
 
 .markdown-rendered img {
     max-width: 100%;
+}
+
+.markdown-rendered-paragraph-in-story-plots {
+    position: relative;
+    margin-right: calc(-1 * var(--markdown-editor-story-plot-gutter));
+    padding-right: var(--markdown-editor-story-plot-gutter);
+}
+
+.markdown-rendered-paragraph-in-story-plots > :first-child {
+    margin: 0;
+}
+
+.markdown-rendered-paragraph-in-story-plots
+    > .markdown-editor-story-plot-border {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.markdown-editor-story-plot-border::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(var(--markdown-editor-story-plot-lane) * 5px);
+    width: 3px;
+    background: var(--markdown-editor-story-plot-color);
+}
+
+.markdown-editor-story-plot-0 {
+    --markdown-editor-story-plot-lane: 0;
+    --markdown-editor-story-plot-color: var(--vscode-charts-blue, #3794ff);
+}
+
+.markdown-editor-story-plot-1 {
+    --markdown-editor-story-plot-lane: 1;
+    --markdown-editor-story-plot-color: var(--vscode-charts-orange, #d18616);
+}
+
+.markdown-editor-story-plot-2 {
+    --markdown-editor-story-plot-lane: 2;
+    --markdown-editor-story-plot-color: var(--vscode-charts-green, #89d185);
+}
+
+.markdown-editor-story-plot-3 {
+    --markdown-editor-story-plot-lane: 3;
+    --markdown-editor-story-plot-color: var(--vscode-charts-purple, #b180d7);
+}
+
+.markdown-editor-story-plot-4 {
+    --markdown-editor-story-plot-lane: 4;
+    --markdown-editor-story-plot-color: var(--vscode-charts-red, #f14c4c);
+}
+
+.markdown-editor-story-plot-5 {
+    --markdown-editor-story-plot-lane: 5;
+    --markdown-editor-story-plot-color: var(--vscode-charts-yellow, #cca700);
 }
