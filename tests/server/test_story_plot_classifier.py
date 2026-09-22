@@ -125,7 +125,6 @@ class DeployingTheClassifier(unittest.TestCase):
             family=STORY_PLOT_CLASSIFIER_FAMILY,
             suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
             run_name=cortexgrid.IMPORTED,
-            wait=True,
             timeout=cluster.DEPLOY_TIMEOUT_S,
             config={BASE_MODEL_PARAM: STORY_PLOT_CLASSIFIER_BASE_MODEL},
         )

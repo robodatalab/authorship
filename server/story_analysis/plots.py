@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections.abc import Callable, Collection, Sequence
@@ -8,6 +9,7 @@ from itertools import combinations
 from typing import Any
 
 import numpy as np
+from cortexgrid_infer import ServedCompletingModel
 
 from server import storydoc
 from server.jobs import Job
@@ -24,6 +26,10 @@ _LOWEST_PROBABILITY_THAT_PASSES = 0.5
 _ALREADY_IN_A_PLOT = "[in a plot]"
 _SEPARATION_A_REAL_PLOT_SHOWS = 4.0
 _OVERLAP_THAT_MAKES_ONE_PLOT = 0.7
+_FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(.*)\n```\s*\Z", re.DOTALL)
+
+STORY_PLOTS_TOKENS = 640
+STORY_PLOT_KEY_EVENTS_TOKENS = 1200
 
 
 def _log_odds(probability: float) -> float:
@@ -235,6 +241,130 @@ def _one_plot_of(one: StoryPlotClaim, another: StoryPlotClaim) -> StoryPlotClaim
         paragraphs=told.paragraphs | absorbed.paragraphs,
         separation=told.separation,
     )
+
+
+STORY_PLOT_DISCOVERY_INSTRUCTION = (
+    "You read a novel and say what plots run through it. A plot is a thread the "
+    "story follows: who takes part in it, how it began, and where it is heading. "
+    "The people in it are named as the story names them, and a plot is told as a "
+    "thread of the whole book rather than of the page it is read on. Answer with "
+    'JSON and nothing else: a list of objects with the keys "title", '
+    '"characters", "origin" and "goal", where "characters" is a list of names '
+    "and the rest are one sentence each."
+)
+
+CHAPTER_PLOT_REQUEST = (
+    "Name the one plot this chapter carries - the main theme it turns on."
+)
+
+UNCLAIMED_PLOTS_REQUEST = (
+    "The paragraphs marked [in a plot] belong to a plot that has been found "
+    "already. Name the plots that account for the paragraphs that are not "
+    "marked. A plot you name may run through marked paragraphs too - the "
+    "unmarked ones are what is missing from the plots found so far. Paragraphs "
+    "that belong to no plot at all, such as the scenery a scene stands in, need "
+    "no plot naming them."
+)
+
+STORY_PLOT_KEY_EVENTS_INSTRUCTION = (
+    "You read one plot of a novel and the numbered paragraphs that belong to it. "
+    "Say what happens along the plot in them: one sentence for each paragraph "
+    "that moves the thread on, in the story's own names. A paragraph that shows "
+    "the plot without moving it on gets none. Answer with JSON and nothing else: "
+    'a list of objects with the keys "paragraph", the number it is read in, and '
+    '"what_happened".'
+)
+
+
+async def story_plots_in_the_chapters(
+    model: ServedCompletingModel,
+    document: Document,
+    cancelled: Callable[[], bool] = lambda: False,
+) -> list[StoryPlot]:
+    named: list[StoryPlot] = []
+    for title, prose in document.chapters:
+        if cancelled():
+            return []
+        named.extend(
+            _story_plots_named(
+                await _answered(
+                    model,
+                    STORY_PLOT_DISCOVERY_INSTRUCTION,
+                    f'The chapter "{title}":\n\n{prose}\n\n{CHAPTER_PLOT_REQUEST}',
+                    STORY_PLOTS_TOKENS,
+                )
+            )
+        )
+    return named
+
+
+async def story_plots_in_what_no_plot_claims(
+    model: ServedCompletingModel,
+    paragraphs: Sequence[StoryParagraph],
+    in_a_plot: Collection[int],
+) -> list[StoryPlot]:
+    return _story_plots_named(
+        await _answered(
+            model,
+            STORY_PLOT_DISCOVERY_INSTRUCTION,
+            f"{the_story(paragraphs, in_a_plot)}\n\n{UNCLAIMED_PLOTS_REQUEST}",
+            STORY_PLOTS_TOKENS,
+        )
+    )
+
+
+async def story_plot_key_events(
+    model: ServedCompletingModel,
+    plot: StoryPlot,
+    paragraphs: Sequence[StoryParagraph],
+    claimed: Collection[int],
+) -> tuple[StoryPlotKeyEvent, ...]:
+    read = "\n\n".join(
+        f"{index}. {paragraphs[index].words}" for index in sorted(claimed)
+    )
+    happened = await _answered(
+        model,
+        STORY_PLOT_KEY_EVENTS_INSTRUCTION,
+        f"The plot:\n{plot.title}\n{story_plot_summary(plot)}\n\n"
+        f"Its paragraphs:\n\n{read}",
+        STORY_PLOT_KEY_EVENTS_TOKENS,
+    )
+    return tuple(
+        StoryPlotKeyEvent(str(event["what_happened"]), int(event["paragraph"]))
+        for event in happened
+        if int(event["paragraph"]) in claimed
+    )
+
+
+async def _answered(
+    model: ServedCompletingModel, instruction: str, read: str, tokens: int
+) -> Any:
+    answer = "".join(
+        [
+            chunk.content
+            async for chunk in model.complete(
+                [
+                    {"role": "system", "content": instruction},
+                    {"role": "user", "content": read},
+                ],
+                max_new_tokens=tokens,
+                temperature=0.0,
+            )
+        ]
+    ).strip()
+    return json.loads(_FENCED.sub(r"\1", answer))
+
+
+def _story_plots_named(answered: Any) -> list[StoryPlot]:
+    return [
+        StoryPlot(
+            title=str(plot["title"]),
+            characters=tuple(str(character) for character in plot["characters"]),
+            origin=str(plot["origin"]),
+            goal=str(plot["goal"]),
+        )
+        for plot in (answered if isinstance(answered, list) else [answered])
+    ]
 
 
 _FAKE_STORY_PLOTS = [

@@ -1,8 +1,12 @@
 import asyncio
+import itertools
 import math
 import unittest
+from collections.abc import AsyncIterator
 from typing import Any
 from unittest import mock
+
+from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
 from server.storydoc import Document
@@ -12,7 +16,10 @@ from server.story_analysis.plots import (
     StoryPlotKeyEvent,
     one_pass,
     story_paragraphs,
+    story_plot_key_events,
     story_plot_pass_level,
+    story_plots_in_the_chapters,
+    story_plots_in_what_no_plot_claims,
     the_story,
 )
 
@@ -49,6 +56,35 @@ def passed(*arguments: Any, **named: Any) -> Any:
 
 def asked_about(classifier: mock.MagicMock, plot: int) -> list[Any]:
     return classifier.probabilities.call_args_list[plot].args[1]
+
+
+async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
+    yield CompletionChunk(content=reply)
+
+
+def build_model(*replies: str) -> mock.MagicMock:
+    answers = iter(replies) if replies else itertools.repeat("[]")
+    model = mock.MagicMock()
+    model.complete.side_effect = lambda messages, **_: streamed(next(answers))
+    return model
+
+
+def read_by(model: mock.MagicMock, turn: int = 0) -> str:
+    return str(model.complete.call_args_list[turn].args[0][1]["content"])
+
+
+def discovered(*arguments: Any, **named: Any) -> Any:
+    return asyncio.run(story_plots_in_the_chapters(*arguments, **named))
+
+
+A_CHAPTER_PLOT = """[
+    {
+        "title": "The crush",
+        "characters": ["Bob", "Alice"],
+        "origin": "Bob has a crush on Alice",
+        "goal": "Bob gets a date with Alice"
+    }
+]"""
 
 
 class StoryPlotPassLevel(unittest.TestCase):
@@ -209,6 +245,118 @@ class OnePass(unittest.TestCase):
 
         self.assertEqual(claims, [])
         self.assertEqual(classifier.probabilities.call_count, 1)
+
+
+class DiscoveringTheStoryPlots(unittest.TestCase):
+    def test_each_chapter_is_read_for_the_plot_it_turns_on(self) -> None:
+        model = build_model(A_CHAPTER_PLOT, A_CHAPTER_PLOT)
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                    storydoc.chapter("The Second"),
+                    storydoc.markdown("The door stood open."),
+                ]
+            )
+        )
+
+        plots = discovered(model, document)
+
+        self.assertEqual(model.complete.call_count, 2)
+        self.assertIn("The lantern had gone out.", read_by(model, 0))
+        self.assertNotIn("The door stood open.", read_by(model, 0))
+        self.assertEqual([plot.title for plot in plots], ["The crush", "The crush"])
+        self.assertEqual(plots[0].characters, ("Bob", "Alice"))
+
+    def test_a_fenced_answer_is_read_as_the_json_it_holds(self) -> None:
+        model = build_model(f"```json\n{A_CHAPTER_PLOT}\n```")
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                ]
+            )
+        )
+
+        plots = discovered(model, document)
+
+        self.assertEqual([plot.title for plot in plots], ["The crush"])
+
+    def test_cancelling_stops_before_the_next_chapter_is_read(self) -> None:
+        model = build_model(A_CHAPTER_PLOT, A_CHAPTER_PLOT)
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                    storydoc.chapter("The Second"),
+                    storydoc.markdown("The door stood open."),
+                ]
+            )
+        )
+
+        plots = discovered(model, document, lambda: model.complete.call_count > 0)
+
+        self.assertEqual(plots, [])
+        self.assertEqual(model.complete.call_count, 1)
+
+    def test_what_no_plot_claims_is_read_with_the_claimed_paragraphs_marked(
+        self,
+    ) -> None:
+        model = build_model(A_CHAPTER_PLOT)
+
+        plots = asyncio.run(
+            story_plots_in_what_no_plot_claims(model, PARAGRAPHS[:3], {0, 2})
+        )
+
+        self.assertIn(
+            "[in a plot] Paragraph 0\n\nParagraph 1\n\n[in a plot] Paragraph 2",
+            read_by(model),
+        )
+        self.assertEqual([plot.title for plot in plots], ["The crush"])
+
+
+class KeyEventsOfAStoryPlot(unittest.TestCase):
+    def test_are_read_from_the_paragraphs_the_plot_claims(self) -> None:
+        model = build_model(
+            """[
+                {"paragraph": 1, "what_happened": "Bob approached Alice"},
+                {"paragraph": 4, "what_happened": "Bob asked Alice out"}
+            ]"""
+        )
+
+        events = asyncio.run(
+            story_plot_key_events(
+                model, a_story_plot("The crush"), PARAGRAPHS, {1, 4}
+            )
+        )
+
+        self.assertEqual(
+            events,
+            (
+                StoryPlotKeyEvent("Bob approached Alice", 1),
+                StoryPlotKeyEvent("Bob asked Alice out", 4),
+            ),
+        )
+        self.assertIn("1. Paragraph 1\n\n4. Paragraph 4", read_by(model))
+
+    def test_an_event_put_in_a_paragraph_the_plot_does_not_claim_is_dropped(
+        self,
+    ) -> None:
+        model = build_model(
+            """[
+                {"paragraph": 1, "what_happened": "Bob approached Alice"},
+                {"paragraph": 3, "what_happened": "Alice left town"}
+            ]"""
+        )
+
+        events = asyncio.run(
+            story_plot_key_events(model, a_story_plot("The crush"), PARAGRAPHS, {1, 4})
+        )
+
+        self.assertEqual(events, (StoryPlotKeyEvent("Bob approached Alice", 1),))
 
 
 if __name__ == "__main__":
