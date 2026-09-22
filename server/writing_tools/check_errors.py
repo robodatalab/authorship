@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from vramen import Seq2SeqModel
+from cortexgrid_infer import ServedRewritingModel
 
 from server.jobs import Job
 from server.storydoc import Document
@@ -66,7 +66,7 @@ class CheckErrorsJob(Job):
 
     def __init__(
         self,
-        model: Seq2SeqModel,
+        model: ServedRewritingModel,
         document: Document,
         selection: tuple[int, int] | None,
     ) -> None:

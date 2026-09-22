@@ -3,13 +3,9 @@ import { fetchFromServer } from "./fetch";
 const MILLISECONDS_BEFORE_A_PROBE_TIMES_OUT = 1_000;
 const MILLISECONDS_BEFORE_A_HEALTH_READING_TIMES_OUT = 10_000;
 
-export interface ServerHealth {
-    inference_server_status?: string;
-}
-
 export async function somethingIsAnsweringOnTheServerPort(): Promise<boolean> {
     try {
-        await fetchFromServer<ServerHealth>(
+        await fetchFromServer<unknown>(
             "/health",
             undefined,
             MILLISECONDS_BEFORE_A_PROBE_TIMES_OUT,
@@ -20,8 +16,8 @@ export async function somethingIsAnsweringOnTheServerPort(): Promise<boolean> {
     }
 }
 
-export function serverHealth(): Promise<ServerHealth> {
-    return fetchFromServer<ServerHealth>(
+export function serverHealth(): Promise<unknown> {
+    return fetchFromServer<unknown>(
         "/health",
         undefined,
         MILLISECONDS_BEFORE_A_HEALTH_READING_TIMES_OUT,

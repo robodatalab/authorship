@@ -132,7 +132,6 @@ export class PublishView implements vscode.WebviewViewProvider {
     private async pollTheServer(): Promise<void> {
         await Promise.all([
             this.showServingModels(),
-            this.showMemoryInUse(),
             this.showRunningJobs(),
         ]);
     }
@@ -156,27 +155,6 @@ export class PublishView implements vscode.WebviewViewProvider {
                 void this.view.webview.postMessage({
                     type: "models",
                     models: null,
-                });
-            }
-        }
-    }
-
-    private async showMemoryInUse(): Promise<void> {
-        if (!this.view) {
-            return;
-        }
-        try {
-            const memory = await fetchFromServer(
-                "/memory",
-                undefined,
-                MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT,
-            );
-            void this.view.webview.postMessage({ type: "memory", memory });
-        } catch (unanswered) {
-            if (!isTimeout(unanswered)) {
-                void this.view.webview.postMessage({
-                    type: "memory",
-                    memory: null,
                 });
             }
         }

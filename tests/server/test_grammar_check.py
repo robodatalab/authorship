@@ -8,7 +8,12 @@ from server.writing_tools.prose_check import Passage
 def build_fake_model(answers: dict[str, str]) -> mock.MagicMock:
     """A model that answers by lookup, and answers with the question otherwise."""
     model = mock.MagicMock()
-    model.complete.side_effect = lambda system, user, tokens: answers.get(user, user)
+    model.rewrite = mock.AsyncMock(
+        side_effect=lambda text, max_new_tokens: answers.get(
+            text.removeprefix(grammar_check.GEC_PREFIX),
+            text.removeprefix(grammar_check.GEC_PREFIX),
+        )
+    )
     return model
 
 
@@ -383,7 +388,7 @@ class Check(unittest.TestCase):
             lines('"Hello everyone, nice to see you again" she said in a voice.'),
             [],
         )
-        asked = " ".join(call.args[1] for call in model.complete.call_args_list)
+        asked = " ".join(call.args[0] for call in model.rewrite.call_args_list)
         self.assertTrue(asked, "the model was never asked anything")
         for mark in '"“”«»':
             self.assertNotIn(mark, asked)
@@ -403,7 +408,7 @@ class Check(unittest.TestCase):
             lines('"That is all."\nShe was expecting the room to start whispering.'),
             [],
         )
-        asked = [call.args[1] for call in model.complete.call_args_list]
+        asked = [call.args[0] for call in model.rewrite.call_args_list]
         self.assertTrue(asked, "the model was never asked anything")
         for one in asked:
             self.assertEqual(one, one.strip(), one)
@@ -411,7 +416,7 @@ class Check(unittest.TestCase):
     def test_hides_the_names_from_the_model(self) -> None:
         model = build_fake_model({})
         grammar_check.check(model, lines("The door opened. Then Kaelith ran home."), ["Kaelith"])
-        asked = " ".join(call.args[1] for call in model.complete.call_args_list)
+        asked = " ".join(call.args[0] for call in model.rewrite.call_args_list)
         self.assertNotIn("Kaelith", asked)
 
     def test_puts_the_names_back_before_reporting(self) -> None:

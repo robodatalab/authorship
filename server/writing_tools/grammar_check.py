@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from difflib import SequenceMatcher
 
-from vramen import Seq2SeqModel
+from cortexgrid_infer import ServedRewritingModel
 
 from server.writing_tools.prose_check import Finding, Passage, sentences
 
@@ -38,10 +39,6 @@ NOT_NAMES = frozenset(
         "Ms", "Dr",
     }
 )
-
-
-def gec_prompt(ignored_instruction: str, text: str) -> str:
-    return f"{GEC_PREFIX}{text}"
 
 
 def names_in(text: str) -> list[str]:
@@ -174,7 +171,7 @@ def _fault_named(was: str, now: str) -> tuple[str, str]:
 
 
 def check(
-    model: Seq2SeqModel, prose: list[tuple[int, str]], names_to_protect: list[str]
+    model: ServedRewritingModel, prose: list[tuple[int, str]], names_to_protect: list[str]
 ) -> list[Finding]:
     passage = Passage(prose)
     if not passage.text.strip():
@@ -190,8 +187,11 @@ def check(
     for at, end in asking_about:
         original = passage.text[at:end]
         quotes_blanked = _QUOTES.sub(" ", original)
-        answered = model.complete(
-            "", _with_words_swapped(quotes_blanked, as_stand_ins), CORRECTION_TOKENS
+        answered = asyncio.run(
+            model.rewrite(
+                f"{GEC_PREFIX}{_with_words_swapped(quotes_blanked, as_stand_ins)}",
+                max_new_tokens=CORRECTION_TOKENS,
+            )
         )
         corrected = _with_words_swapped(answered.strip(), as_names)
         if not corrected or corrected == quotes_blanked:

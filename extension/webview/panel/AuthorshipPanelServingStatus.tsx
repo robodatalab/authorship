@@ -1,29 +1,22 @@
-import "./AuthorshipPanelResourceManager.css";
+import "./AuthorshipPanelServingStatus.css";
 
 export interface ModelServingStatus {
     model: string;
     status: string;
-    resident: boolean;
-}
-
-/** The server prefixes the model id onto its download progress; drop it here. */
-function phaseText(status: string): string {
-    const progress = status.match(/\d+% downloaded/);
-    return progress ? progress[0] : status;
 }
 
 function phaseClass(status: string): string {
-    if (status === "serving") {
-        return "authorship-panel-model-serving";
+    if (status === "running") {
+        return "authorship-panel-model-running";
     }
-    if (status.includes("downloaded")) {
-        return "authorship-panel-model-downloading";
+    if (status === "not_started" || status === "deploying") {
+        return "authorship-panel-model-deploying";
     }
-    return "authorship-panel-model-unloaded";
+    return "authorship-panel-model-stopped";
 }
 
-/** null means the server did not answer; a list is its models and which is resident. */
-export function AuthorshipPanelResourceManager({
+/** null means the server did not answer; a list is its models. */
+export function AuthorshipPanelServingStatus({
     models,
 }: {
     models: ModelServingStatus[] | null;
@@ -41,14 +34,7 @@ export function AuthorshipPanelResourceManager({
     return (
         <div className="authorship-panel-models">
             {models.map((model) => (
-                <div
-                    key={model.model}
-                    className={
-                        model.resident
-                            ? "authorship-panel-model authorship-panel-model-resident"
-                            : "authorship-panel-model"
-                    }
-                >
+                <div key={model.model} className="authorship-panel-model">
                     <span
                         className="authorship-panel-model-name"
                         title={model.model}
@@ -60,7 +46,7 @@ export function AuthorshipPanelResourceManager({
                             model.status,
                         )}`}
                     >
-                        {phaseText(model.status)}
+                        {model.status}
                     </span>
                 </div>
             ))}

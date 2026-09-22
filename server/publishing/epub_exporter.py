@@ -887,16 +887,17 @@ def build_content_opf(book_id: uuid.UUID, book: Book, modified: str) -> str:
         )
         spine.append(f'<itemref idref="{item.id}"/>')
 
+    indent = "\n    "
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    {"\n    ".join(said)}
+    {indent.join(said)}
   </metadata>
   <manifest>
-    {"\n    ".join(manifest)}
+    {indent.join(manifest)}
   </manifest>
   <spine toc="ncx">
-    {"\n    ".join(spine)}
+    {indent.join(spine)}
   </spine>
 </package>
 """

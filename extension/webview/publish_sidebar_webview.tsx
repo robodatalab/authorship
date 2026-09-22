@@ -4,8 +4,7 @@ import {
     type SendMessagesToVscode,
 } from "./panel/AuthorshipPanelCanvas";
 import type { GeminiAccountStatus } from "./panel/AuthorshipPanelGeminiAccount";
-import type { ModelServingStatus } from "./panel/AuthorshipPanelResourceManager";
-import type { MemoryInUse } from "./panel/AuthorshipPanelMemory";
+import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -13,7 +12,6 @@ declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 interface WhatThePanelDraws {
     account?: GeminiAccountStatus;
     models?: ModelServingStatus[] | null;
-    memory?: MemoryInUse | null;
     jobs?: AsyncJobStatus[] | null;
 }
 
@@ -32,8 +30,6 @@ function processMessageFromVscode(
         };
     } else if (message.data?.type === "models") {
         drawn.models = message.data.models as ModelServingStatus[] | null;
-    } else if (message.data?.type === "memory") {
-        drawn.memory = message.data.memory as MemoryInUse | null;
     } else if (message.data?.type === "jobs") {
         drawn.jobs = message.data.jobs as AsyncJobStatus[] | null;
     } else {
@@ -53,7 +49,6 @@ function openTheAuthorshipPanel(): void {
             <AuthorshipPanelCanvas
                 account={drawn.account}
                 models={drawn.models}
-                memory={drawn.memory}
                 jobs={drawn.jobs}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,
