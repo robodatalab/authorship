@@ -3,13 +3,9 @@ import {
     type GeminiAccountStatus,
 } from "./AuthorshipPanelGeminiAccount";
 import {
-    AuthorshipPanelResourceManager,
+    AuthorshipPanelServingStatus,
     type ModelServingStatus,
-} from "./AuthorshipPanelResourceManager";
-import {
-    AuthorshipPanelMemory,
-    type MemoryInUse,
-} from "./AuthorshipPanelMemory";
+} from "./AuthorshipPanelServingStatus";
 import {
     AuthorshipPanelAsyncJobs,
     type AsyncJobStatus,
@@ -21,7 +17,6 @@ export type SendMessagesToVscode = (message: unknown) => void;
 interface AuthorshipPanelCanvasProps {
     account?: GeminiAccountStatus;
     models?: ModelServingStatus[] | null;
-    memory?: MemoryInUse | null;
     jobs?: AsyncJobStatus[] | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -29,7 +24,6 @@ interface AuthorshipPanelCanvasProps {
 export function AuthorshipPanelCanvas({
     account,
     models,
-    memory,
     jobs,
     sendMessagesToVscode,
 }: AuthorshipPanelCanvasProps) {
@@ -50,15 +44,7 @@ export function AuthorshipPanelCanvas({
                 <summary>Serving Status</summary>
                 <div className="authorship-panel-drawer-body">
                     {models !== undefined && (
-                        <AuthorshipPanelResourceManager models={models} />
-                    )}
-                </div>
-            </details>
-            <details className="authorship-panel-drawer" open>
-                <summary>Memory</summary>
-                <div className="authorship-panel-drawer-body">
-                    {memory !== undefined && (
-                        <AuthorshipPanelMemory memory={memory} />
+                        <AuthorshipPanelServingStatus models={models} />
                     )}
                 </div>
             </details>

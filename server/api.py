@@ -12,18 +12,20 @@ from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
-from server.writing_tools import grammar_check, style
+from server.writing_tools import style
+from server.models import cluster
 from server.models.gemini import (
     Gemini,
     GeminiError,
     configured_key,
     configured_model,
 )
-from vramen import (
-    CausalModel,
-    InferenceModelResourceManager,
-    Seq2SeqModel,
-    machine_memory, qwen_chat_prompt
+import cortexgrid
+from cortexgrid_infer import (
+    HuggingFaceImporter,
+    ServedCompletingModel,
+    Text2Text,
+    TextRewriter,
 )
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
@@ -33,24 +35,17 @@ _log = log.logger(__name__)
 
 GEC_MODEL = "Unbabel/gec-t5_small"
 CAUSAL_MODEL = "Qwen/Qwen3-8B"
-GEC_MODEL_GB = 1.0
-CAUSAL_MODEL_GB = 17.0
-MEMORY_QUOTA_GB = 24.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("Starting the completion models")
-    app.state.models = InferenceModelResourceManager(MEMORY_QUOTA_GB)
-    app.state.causal_model = CausalModel(
-        CAUSAL_MODEL, qwen_chat_prompt, app.state.models, CAUSAL_MODEL_GB
+    causal_model = HuggingFaceImporter(CAUSAL_MODEL, Text2Text)
+    app.state.causal_model = cluster.deploy(
+        causal_model, enable_thinking="false", max_total_tokens="16384"
     )
-    app.state.gec_model = Seq2SeqModel(
-        GEC_MODEL, grammar_check.gec_prompt, app.state.models, GEC_MODEL_GB
-    )
-    app.state.inference_models = [
-        app.state.causal_model,
-        app.state.gec_model,
-    ]
+    gec_model = HuggingFaceImporter(GEC_MODEL, TextRewriter)
+    app.state.gec_model = cluster.deploy(gec_model)
+    app.state.inference_models = [causal_model, gec_model]
     app.state.jobs = ParallelJobsManager()
     _log.info("Completion models created")
 
@@ -64,36 +59,21 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    residents = app.state.models.residents
-    return {
-        "inference_server_status": "unloaded" if not residents else "serving",
-    }
+    return {}
 
 
 @app.get("/models")
 def models() -> dict[str, Any]:
-    residents = app.state.models.residents
     return {
         "models": [
             {
                 "model": model.model_id,
-                "status": "serving" if model in residents else "unloaded",
-                "resident": model in residents,
+                "status": cortexgrid.model_serving_status(
+                    model.family, model.suffix, cortexgrid.IMPORTED
+                ).phase,
             }
             for model in app.state.inference_models
         ]
-    }
-
-
-@app.get("/memory")
-def memory() -> dict[str, Any]:
-    residents = app.state.models.residents
-    reading = app.state.models.memory()
-    return {
-        "gpu": {"used": reading.gpu_used, "limit": reading.gpu_limit},
-        "process": reading.process,
-        "machine": machine_memory(),
-        "serving": ", ".join(model.model_id for model in residents) or None,
     }
 
 
@@ -202,7 +182,7 @@ class BlurbRequest(BaseModel):
 class BlurbJob(WritingJob):
     kind = "blurb"
 
-    def __init__(self, model: CausalModel, document: Document) -> None:
+    def __init__(self, model: ServedCompletingModel, document: Document) -> None:
         super().__init__(storydoc.BLURB, str(document.path))
         self._model = model
         self._document = document
@@ -222,7 +202,7 @@ class RecapRequest(BaseModel):
 class RecapJob(WritingJob):
     kind = "recap"
 
-    def __init__(self, model: CausalModel, document: Document, earlier: list[Document]) -> None:
+    def __init__(self, model: ServedCompletingModel, document: Document, earlier: list[Document]) -> None:
         super().__init__(storydoc.RECAP, str(document.path))
         self._model = model
         self._earlier = earlier

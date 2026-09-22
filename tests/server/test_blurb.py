@@ -6,21 +6,33 @@ under test is what the model is shown of the document and what it is not, what
 the caller is told while it runs, and that a job asked to stop stops.
 """
 
+from collections.abc import AsyncIterator
+import itertools
+from typing import Any
 import unittest
 from unittest import mock
+
+from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
 from server.storydoc import Document
 from server.writing_tools.blurb import BLURB_INSTRUCTION, write_blurb
 
 
+async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
+    yield CompletionChunk(content=reply)
+
+
 def build_model(*replies: str) -> mock.MagicMock:
     """A model that answers with each reply in turn, and refuses a turn too many."""
+    answers = iter(replies) if replies else itertools.repeat("A woman loses her name.")
     model = mock.MagicMock()
-    model.complete.return_value = "A woman loses her name."
-    if replies:
-        model.complete.side_effect = replies
+    model.complete.side_effect = lambda messages, **_: streamed(next(answers))
     return model
+
+
+def said_in(call: Any) -> str:
+    return call.args[0][1]["content"]
 
 
 STORY = storydoc.dumps(
@@ -51,7 +63,7 @@ class WriteBlurb(unittest.TestCase):
     def test_asks_as_the_instruction_and_shows_the_chapter_as_the_turn(self) -> None:
         model = build_model()
         write_blurb(model, Document(STORY))
-        system, user = model.complete.call_args_list[0].args
+        system, user = (turn["content"] for turn in model.complete.call_args_list[0].args[0])
         self.assertEqual(system, BLURB_INSTRUCTION)
         self.assertIn("The First Night", user)
         self.assertIn("The lantern had gone out again.", user)
@@ -59,8 +71,8 @@ class WriteBlurb(unittest.TestCase):
     def test_every_chapter_after_the_first_is_read_with_the_blurb_so_far(self) -> None:
         model = build_model("After the first.", "After the second.")
         write_blurb(model, Document(STORY))
-        first = model.complete.call_args_list[0].args[1]
-        second = model.complete.call_args_list[1].args[1]
+        first = said_in(model.complete.call_args_list[0])
+        second = said_in(model.complete.call_args_list[1])
         self.assertNotIn("After the first.", first)
         self.assertIn("After the first.", second)
         self.assertIn("The door stood open.", second)
@@ -68,25 +80,25 @@ class WriteBlurb(unittest.TestCase):
     def test_the_book_is_named_by_its_title_page(self) -> None:
         model = build_model()
         write_blurb(model, Document(STORY))
-        self.assertIn("Veriona", model.complete.call_args_list[0].args[1])
+        self.assertIn("Veriona", said_in(model.complete.call_args_list[0]))
 
     def test_the_author_s_notes_are_not_the_story(self) -> None:
         model = build_model()
         write_blurb(model, Document(STORY))
         for call in model.complete.call_args_list:
-            self.assertNotIn("ask Mara", call.args[1])
+            self.assertNotIn("ask Mara", said_in(call))
 
     def test_what_stands_before_the_first_chapter_is_not_read(self) -> None:
         model = build_model()
         write_blurb(model, Document(STORY))
         for call in model.complete.call_args_list:
-            self.assertNotIn("Front matter", call.args[1])
+            self.assertNotIn("Front matter", said_in(call))
 
     def test_a_table_of_contents_is_written_rather_than_told(self) -> None:
         model = build_model()
         write_blurb(model, Document(STORY))
         for call in model.complete.call_args_list:
-            self.assertNotIn("1. The First Night", call.args[1])
+            self.assertNotIn("1. The First Night", said_in(call))
 
     def test_a_part_is_a_division_of_the_story_and_not_a_chapter_of_it(self) -> None:
         document = Document(
@@ -101,7 +113,7 @@ class WriteBlurb(unittest.TestCase):
         model = build_model()
         write_blurb(model, document)
         self.assertEqual(model.complete.call_count, 1)
-        self.assertNotIn("Day One", model.complete.call_args_list[0].args[1])
+        self.assertNotIn("Day One", said_in(model.complete.call_args_list[0]))
 
     def test_a_blurb_already_in_the_document_is_not_read_back(self) -> None:
         document = Document(
@@ -116,7 +128,7 @@ class WriteBlurb(unittest.TestCase):
         model = build_model()
         write_blurb(model, document)
         self.assertNotIn(
-            "The last thing this wrote.", model.complete.call_args_list[0].args[1]
+            "The last thing this wrote.", said_in(model.complete.call_args_list[0])
         )
 
     def test_the_breaks_between_paragraphs_survive(self) -> None:
@@ -130,7 +142,7 @@ class WriteBlurb(unittest.TestCase):
         )
         model = build_model()
         write_blurb(model, document)
-        self.assertIn("The lantern.\n\nThe door.", model.complete.call_args_list[0].args[1])
+        self.assertIn("The lantern.\n\nThe door.", said_in(model.complete.call_args_list[0]))
 
     def test_a_chapter_with_nothing_written_under_it_is_not_read(self) -> None:
         document = Document(
@@ -154,7 +166,7 @@ class WriteBlurb(unittest.TestCase):
         )
         model = build_model()
         write_blurb(model, document)
-        self.assertIn("Chapter 1", model.complete.call_args_list[0].args[1])
+        self.assertIn("Chapter 1", said_in(model.complete.call_args_list[0]))
 
     def test_the_blurb_comes_back_without_the_whitespace_around_it(self) -> None:
         model = build_model("  After the first.  ", "\n  A woman loses her name.\n\n")

@@ -6,14 +6,20 @@ missed: every document handed over is parsed, and every markdown section under
 every one of its chapters reaches the model.
 """
 
+from collections.abc import AsyncIterator
 import unittest
 from unittest import mock
 
+from cortexgrid_infer import CompletionChunk
 from parameterized import parameterized  # type: ignore
 
 from server import storydoc
 from server.storydoc import Document
 from server.writing_tools.recap import write_recap
+
+
+async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
+    yield CompletionChunk(content=reply)
 
 
 def volume(title: str, chapters: list[tuple[str, list[str]]]) -> Document:
@@ -76,11 +82,11 @@ class WriteRecap(unittest.TestCase):
         self, _name: str, books: list[tuple[str, list[tuple[str, list[str]]]]]
     ) -> None:
         model = mock.MagicMock()
-        model.complete.return_value = "The story so far."
+        model.complete.side_effect = lambda messages, **_: streamed("The story so far.")
 
         write_recap(model, [volume(title, chapters) for title, chapters in books])
 
-        read = [call.args[1] for call in model.complete.call_args_list]
+        read = [call.args[0][1]["content"] for call in model.complete.call_args_list]
         chapters = [chapter for _, chapters in books for chapter in chapters]
         # A turn for each chapter of each volume, in the order they were handed
         # over, and everything written under a chapter reaches its turn.

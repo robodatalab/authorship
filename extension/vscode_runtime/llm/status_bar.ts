@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import { serverHealth, theServerTookTooLongToAnswer } from "../server/health";
-import { phaseFor, renderStatus, type ServerPhase } from "./state";
+import { renderStatus, type ServerPhase } from "./state";
 
 const MILLISECONDS_BETWEEN_SERVER_PHASE_READINGS = 2_000;
 
@@ -27,8 +27,8 @@ export class ServerStatusBarItem implements vscode.Disposable {
 
     private async readTheServerPhase(): Promise<void> {
         try {
-            const health = await serverHealth();
-            this.serverPhase = phaseFor(health.inference_server_status);
+            await serverHealth();
+            this.serverPhase = "ready";
         } catch (unanswered) {
             if (!theServerTookTooLongToAnswer(unanswered)) {
                 this.serverPhase = "offline";

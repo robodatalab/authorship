@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 import os
 from pathlib import Path
 import tempfile
@@ -7,14 +8,12 @@ import unittest
 import zipfile
 from unittest import mock
 
+import cortexgrid
+from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server.models.gemini import GeminiError
-from vramen.resource_manager import (
-    MemoryReading,
-    ModelKind,
-)
 from server import storydoc
 
 
@@ -23,88 +22,48 @@ DEFAULT_REPLY = (
 )
 
 
+async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
+    yield CompletionChunk(content=reply)
+
+
 def build_fake_completion_model(reply: str = DEFAULT_REPLY) -> mock.MagicMock:
     model = mock.MagicMock()
-    model.complete.return_value = reply
+    model.complete.side_effect = lambda messages, **_: streamed(reply)
     return model
 
 
-def build_fake_kind(model_id: str) -> mock.MagicMock:
-    kind = mock.MagicMock(spec=ModelKind)
-    kind.model_id = model_id
-    return kind
-
-
 class Health(unittest.TestCase):
-    def test_reports_serving_while_a_model_is_loaded(self) -> None:
-        app.state.models = mock.Mock(residents=[build_fake_kind("Qwen/Qwen3.5-4B")])
+    def test_answers_while_the_server_is_up(self) -> None:
         response = TestClient(app).get("/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"inference_server_status": "serving"})
-
-    def test_reports_unloaded_when_no_model_is_loaded(self) -> None:
-        app.state.models = mock.Mock(residents=[])
-        response = TestClient(app).get("/health")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"inference_server_status": "unloaded"})
 
 
 class Models(unittest.TestCase):
-    def test_lists_each_model_and_marks_the_loaded_one(self) -> None:
-        classifier = build_fake_kind("Qwen/Qwen3.5-4B")
-        grammar = build_fake_kind("grammarly/coedit-xl")
-        app.state.inference_models = [classifier, grammar]
-        app.state.models = mock.Mock(residents=[grammar])
+    def test_lists_each_model_with_its_serving_phase_on_the_cluster(self) -> None:
+        app.state.inference_models = [
+            mock.Mock(model_id="Qwen/Qwen3-8B", family="Qwen3", suffix="8B"),
+            mock.Mock(model_id="Unbabel/gec-t5_small", family="gec", suffix="t5_small"),
+        ]
+        phases = {"Qwen3": "running", "gec": "deploying"}
 
-        response = TestClient(app).get("/models")
+        with mock.patch(
+            "server.api.cortexgrid.model_serving_status",
+            side_effect=lambda family, suffix, run_name: mock.Mock(phase=phases[family]),
+        ) as serving_status:
+            response = TestClient(app).get("/models")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
             {
                 "models": [
-                    {
-                        "model": "Qwen/Qwen3.5-4B",
-                        "status": "unloaded",
-                        "resident": False,
-                    },
-                    {
-                        "model": "grammarly/coedit-xl",
-                        "status": "serving",
-                        "resident": True,
-                    },
+                    {"model": "Qwen/Qwen3-8B", "status": "running"},
+                    {"model": "Unbabel/gec-t5_small", "status": "deploying"},
                 ]
             },
         )
-
-
-class Memory(unittest.TestCase):
-    def test_reports_what_the_models_hold_and_which_they_are(self) -> None:
-        app.state.models = mock.Mock(
-            residents=[build_fake_kind("grammarly/coedit-xl")]
-        )
-        app.state.models.memory.return_value = MemoryReading(6.2, 30.2, 9.4)
-
-        response = TestClient(app).get("/memory")
-
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["gpu"], {"used": 6.2, "limit": 30.2})
-        self.assertEqual(body["process"], 9.4)
-        self.assertEqual(body["serving"], "grammarly/coedit-xl")
-        self.assertGreater(body["machine"], 0)
-
-    def test_reads_on_with_no_model_loaded(self) -> None:
-        app.state.models = mock.Mock(residents=[])
-        app.state.models.memory.return_value = MemoryReading(0.0, 30.2, 0.3)
-
-        response = TestClient(app).get("/memory")
-
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertIsNone(body["serving"])
-        self.assertEqual(body["gpu"], {"used": 0.0, "limit": 30.2})
-        self.assertEqual(body["process"], 0.3)
+        serving_status.assert_any_call("Qwen3", "8B", cortexgrid.IMPORTED)
+        serving_status.assert_any_call("gec", "t5_small", cortexgrid.IMPORTED)
 
 
 def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
@@ -143,10 +102,10 @@ class Jobs(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "the cat."
+            return streamed("the cat.")
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
@@ -185,10 +144,10 @@ class Jobs(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "the cat."
+            return streamed("the cat.")
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
@@ -308,10 +267,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "A woman loses her name."
+            return streamed("A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -340,10 +299,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "A woman loses her name."
+            return streamed("A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -371,10 +330,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "A woman loses her name."
+            return streamed("A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -495,7 +454,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("a.author")
         wait_for_writing(client, started.json()["id"])
-        said = app.state.causal_model.complete.call_args_list[0].args[1]
+        said = app.state.causal_model.complete.call_args_list[0].args[0][1]["content"]
         self.assertIn("The lantern had gone out.", said)
 
     def test_leaves_every_document_alone(self) -> None:
@@ -517,10 +476,10 @@ class GenerateRecap(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> str:
+        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
             release.wait(timeout=5)
-            return "She has lost her name."
+            return streamed("She has lost her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
