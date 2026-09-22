@@ -6,7 +6,12 @@ import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
+    useAuthorFileEditorCellParagraphsInStoryPlots,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
+import type {
+    ParagraphInStoryPlots,
+    StoryPlot,
+} from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,
@@ -63,6 +68,9 @@ async function mountCanvas(options: {
     commands?: WebviewAuthorDocumentCommandCard[];
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
+    storyPlotsAreShown?: boolean;
+    storyPlots?: StoryPlot[];
+    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
 }): Promise<void> {
     posted = [];
     document.body.innerHTML = "";
@@ -80,6 +88,9 @@ async function mountCanvas(options: {
                     posted.push(message as Invocation)
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
+                storyPlotsAreShown={options.storyPlotsAreShown}
+                storyPlots={options.storyPlots}
+                paragraphsInStoryPlots={options.paragraphsInStoryPlots}
             />,
         );
     });
@@ -898,5 +909,84 @@ describe("a folded cell", () => {
                 item.classList.contains("author-file-editor-cell-folded"),
             ),
         ).toEqual([false, false, true]);
+    });
+});
+
+describe("the plots the story weaves", () => {
+    const THE_QUEST: StoryPlot = {
+        title: "The quest",
+        summary: "Someone goes looking.",
+    };
+
+    const THE_DOOR: ParagraphInStoryPlots = {
+        cellId: "m1",
+        startCharacterOffsetInCell: 0,
+        endCharacterOffsetInCell: 9,
+        wordsInTheCell: "The door.",
+        isVisible: true,
+        storyPlotIndices: [0],
+    };
+
+    function StoryPlotBordersDrawn() {
+        return (
+            <div className="test-story-plot-borders">
+                {useAuthorFileEditorCellParagraphsInStoryPlots().length}
+            </div>
+        );
+    }
+
+    async function mountStoryPlots(storyPlotsAreShown: boolean) {
+        await mountCanvas({
+            cells: [markdownCell("The door.", "m1")],
+            cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
+            storyPlotsAreShown,
+            storyPlots: [THE_QUEST],
+            paragraphsInStoryPlots: [THE_DOOR],
+        });
+    }
+
+    function storyPlotsPanel(): Element | null {
+        return document.querySelector(".author-file-editor-story-plots");
+    }
+
+    it("draws neither the panel nor the borders until they are shown", async () => {
+        await mountStoryPlots(false);
+
+        expect(storyPlotsPanel()).toBeNull();
+        expect(
+            document.querySelector(".test-story-plot-borders")?.textContent,
+        ).toBe("0");
+    });
+
+    it("lists every plot with its summary and borders its paragraphs", async () => {
+        await mountStoryPlots(true);
+
+        expect(
+            storyPlotsPanel()?.querySelector("summary")?.textContent,
+        ).toBe("The quest");
+        expect(storyPlotsPanel()?.querySelector("p")?.textContent).toBe(
+            "Someone goes looking.",
+        );
+        expect(
+            document.querySelector(".test-story-plot-borders")?.textContent,
+        ).toBe("1");
+    });
+
+    it("asks for the plots to be identified", async () => {
+        await mountStoryPlots(true);
+
+        await click(
+            storyPlotsPanel()!.querySelector(
+                ".author-file-editor-story-plots-identify",
+            )!,
+        );
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "identifyStoryPlots",
+                commandArguments: {},
+            },
+        ]);
     });
 });

@@ -8,10 +8,15 @@ body {
 }
 
 .author-file-editor-canvas {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     height: 100vh;
     overflow: hidden;
+}
+
+.author-file-editor-canvas > .author-file-editor-main-menu {
+    grid-column: 1 / -1;
 }
 
 .author-file-editor-canvas ul {
@@ -21,7 +26,6 @@ body {
 }
 
 .author-file-editor-canvas > ul {
-    flex: 1 1 auto;
     overflow-y: auto;
     padding: 6px 12px 40vh;
 }

@@ -216,6 +216,10 @@ export function markedUp(html: string): string {
         .replace(STRAY, "");
 }
 
+export function unfenced(text: string): string {
+    return text.replace(STRAY, "");
+}
+
 /**
  * The fenced text broken into its marked and unmarked runs.
  *

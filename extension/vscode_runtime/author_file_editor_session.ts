@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./commands/check_prose";
 import type {
+    ParagraphInStoryPlots,
+    StoryPlot,
+} from "./commands/identify_story_plots";
+import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
@@ -18,8 +22,12 @@ export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
 {
     private readonly proseErrors: ProseCheckError[] = [];
+    private storyPlots: StoryPlot[] = [];
+    private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
+    private storyPlotsAreShown = false;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
-    private readonly synchronizer: AuthorDocSynchronizer<ProseCheckError>;
+    private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
+    private readonly paragraphsInStoryPlotsSynchronizer: AuthorDocSynchronizer<ParagraphInStoryPlots>;
     private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
 
@@ -38,7 +46,12 @@ export class AuthorFileEditorSession
             vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
         >,
     ) {
-        this.synchronizer = new AuthorDocSynchronizer(this.proseErrors);
+        this.proseErrorsSynchronizer = new AuthorDocSynchronizer(
+            this.proseErrors,
+        );
+        this.paragraphsInStoryPlotsSynchronizer = new AuthorDocSynchronizer(
+            this.paragraphsInStoryPlots,
+        );
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
         this.wordCounter.synchronize(this.documentAsItStands);
     }
@@ -180,6 +193,24 @@ export class AuthorFileEditorSession
         this.sendProseErrors();
     }
 
+    showStoryPlots(
+        storyPlots: StoryPlot[],
+        paragraphsInStoryPlots: ParagraphInStoryPlots[],
+    ): void {
+        this.storyPlots = storyPlots;
+        this.paragraphsInStoryPlots.splice(
+            0,
+            this.paragraphsInStoryPlots.length,
+            ...paragraphsInStoryPlots,
+        );
+        this.sendStoryPlots();
+    }
+
+    toggleStoryPlots(): void {
+        this.storyPlotsAreShown = !this.storyPlotsAreShown;
+        this.sendStoryPlots();
+    }
+
     writingCell(cellId: string, howFarAlong: number): void {
         this.howFarEachCellHasBeenWritten.set(cellId, howFarAlong);
         this.sendCellsBeingWritten();
@@ -191,7 +222,11 @@ export class AuthorFileEditorSession
     }
 
     private synchronizeTheRepresentations(): void {
-        this.synchronizer.synchronize(
+        this.proseErrorsSynchronizer.synchronize(
+            this.documentAsTheLastSynchronizationLeftIt,
+            this.documentAsItStands,
+        );
+        this.paragraphsInStoryPlotsSynchronizer.synchronize(
             this.documentAsTheLastSynchronizationLeftIt,
             this.documentAsItStands,
         );
@@ -223,6 +258,15 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendStoryPlots(): void {
+        void this.panel?.webview.postMessage({
+            type: "storyPlots",
+            storyPlotsAreShown: this.storyPlotsAreShown,
+            storyPlots: this.storyPlots,
+            paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],
+        });
+    }
+
     sendDocument(): void {
         this.synchronizeTheRepresentations();
         void this.panel?.webview.postMessage({
@@ -230,6 +274,7 @@ export class AuthorFileEditorSession
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
+        this.sendStoryPlots();
         this.sendWordCounts();
     }
 
@@ -270,6 +315,7 @@ export class AuthorFileEditorSession
             });
         }
         this.sendProseErrors();
+        this.sendStoryPlots();
         this.sendWordCounts();
     }
 }

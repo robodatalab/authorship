@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
+import { AuthorFileEditorStoryPlots } from "./AuthorFileEditorStoryPlots";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -14,6 +15,10 @@ import type { AuthorFileEditorFindMatch } from "./AuthorFileEditorFind";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type {
+    ParagraphInStoryPlots,
+    StoryPlot,
+} from "../../vscode_runtime/commands/identify_story_plots";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
@@ -107,6 +112,9 @@ interface AuthorFileEditorCanvasProps {
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
+    storyPlotsAreShown?: boolean;
+    storyPlots?: StoryPlot[];
+    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
     wordsInEverySection?: Readonly<Record<string, number>>;
     wordsInTheDocument?: number;
@@ -119,6 +127,9 @@ export function AuthorFileEditorCanvas({
     sendMessagesToVscode,
     cellRenderers,
     proseErrors = [],
+    storyPlotsAreShown = false,
+    storyPlots = [],
+    paragraphsInStoryPlots = [],
     cellsBeingWritten = {},
     wordsInEverySection = {},
     wordsInTheDocument = 0,
@@ -271,6 +282,16 @@ export function AuthorFileEditorCanvas({
                                         proseError.cellId === cell.attrs.id &&
                                         proseError.isVisible,
                                 )}
+                                paragraphsInStoryPlots={
+                                    storyPlotsAreShown
+                                        ? paragraphsInStoryPlots.filter(
+                                              (paragraph) =>
+                                                  paragraph.cellId ===
+                                                      cell.attrs.id &&
+                                                  paragraph.isVisible,
+                                          )
+                                        : []
+                                }
                                 findMatches={findMatchesByCellId.get(
                                     cell.attrs.id,
                                 )}
@@ -338,6 +359,18 @@ export function AuthorFileEditorCanvas({
             >
                 {cellsInScope(sections, null)}
             </MarkdownEditorMediator>
+            {storyPlotsAreShown && (
+                <AuthorFileEditorStoryPlots
+                    storyPlots={storyPlots}
+                    onIdentifyStoryPlotsAsked={() =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "identifyStoryPlots",
+                            {},
+                        )
+                    }
+                />
+            )}
         </div>
     );
 }

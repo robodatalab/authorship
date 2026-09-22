@@ -6,6 +6,7 @@ import {
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellParagraphsInStoryPlots,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -30,6 +31,8 @@ export function MarkdownCell({
 }: MarkdownCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const paragraphsInStoryPlots =
+        useAuthorFileEditorCellParagraphsInStoryPlots();
 
     return (
         <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
@@ -38,6 +41,7 @@ export function MarkdownCell({
                 <MarkdownEditor
                     cellId={cellId}
                     highlights={findHighlights}
+                    paragraphsInStoryPlots={paragraphsInStoryPlots}
                     markdown={cell.source}
                     timesTheHostWroteIt={cell.timesTheHostWroteIt}
                     errors={proseErrors}

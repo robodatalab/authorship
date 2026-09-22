@@ -10,6 +10,10 @@ import {
     authorDocumentCellTypes,
 } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
+import type {
+    ParagraphInStoryPlots,
+    StoryPlot,
+} from "../vscode_runtime/commands/identify_story_plots";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -32,6 +36,9 @@ interface WhatTheWebviewDraws {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
+    storyPlotsAreShown: boolean;
+    storyPlots: StoryPlot[];
+    paragraphsInStoryPlots: ParagraphInStoryPlots[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
     wordsInTheDocument: number;
@@ -71,6 +78,11 @@ function processMessageFromVscode(
             .commands as WebviewAuthorDocumentCommandCard[];
     } else if (message.data?.type === "proseErrors") {
         drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
+    } else if (message.data?.type === "storyPlots") {
+        drawn.storyPlotsAreShown = message.data.storyPlotsAreShown as boolean;
+        drawn.storyPlots = message.data.storyPlots as StoryPlot[];
+        drawn.paragraphsInStoryPlots = message.data
+            .paragraphsInStoryPlots as ParagraphInStoryPlots[];
     } else if (message.data?.type === "cellsBeingWritten") {
         drawn.cellsBeingWritten = message.data.cellsBeingWritten as Record<
             string,
@@ -98,6 +110,9 @@ function openTheAuthorFileEditor(): void {
         cells: [],
         commands: [],
         proseErrors: [],
+        storyPlotsAreShown: false,
+        storyPlots: [],
+        paragraphsInStoryPlots: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
         wordsInTheDocument: 0,
@@ -112,6 +127,9 @@ function openTheAuthorFileEditor(): void {
                 sendMessagesToVscode={sendMessagesToVscode}
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
+                storyPlotsAreShown={drawn.storyPlotsAreShown}
+                storyPlots={drawn.storyPlots}
+                paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
