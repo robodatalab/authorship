@@ -1,10 +1,19 @@
 import unittest
+from unittest import mock
 
+import cortexgrid
 import torch
 from transformers import Qwen3Config, Qwen3ForCausalLM
 
+from server.models import cluster
 from server.story_analysis.story_plot_classifier import (
+    BASE_MODEL_PARAM,
+    STORY_PLOT_CLASSIFIER_BASE_MODEL,
+    STORY_PLOT_CLASSIFIER_FAMILY,
+    STORY_PLOT_CLASSIFIER_SUFFIX,
+    StoryPlotClassifier,
     answer_logits_after_the_story,
+    deploy_story_plot_classifier,
     probability_of_yes,
     read_the_story,
 )
@@ -72,6 +81,55 @@ class ProbabilityOfYes(unittest.TestCase):
             0.75,
             places=5,
         )
+
+
+class DeployingTheClassifier(unittest.TestCase):
+    def setUp(self) -> None:
+        patched = mock.patch.multiple(
+            "server.story_analysis.story_plot_classifier.cortexgrid",
+            Experiment=mock.DEFAULT,
+            remote=mock.DEFAULT,
+            register_model=mock.DEFAULT,
+            deploy_model=mock.DEFAULT,
+        )
+        self.cortexgrid = patched.start()
+        self.addCleanup(patched.stop)
+        self.cortexgrid["deploy_model"].return_value = mock.Mock(
+            url="http://serve/Authorship/storyplotclassifier"
+        )
+
+    def test_stages_the_base_model_it_is_built_on(self) -> None:
+        deploy_story_plot_classifier()
+
+        job, *arguments = self.cortexgrid["remote"].call_args.args
+        self.assertIs(job, cluster.import_weights)
+        self.assertEqual(arguments[0].model_id, STORY_PLOT_CLASSIFIER_BASE_MODEL)
+        self.cortexgrid["remote"].return_value.result.assert_called_once()
+
+    def test_is_registered_under_its_own_name_with_no_weights_of_its_own(self) -> None:
+        deploy_story_plot_classifier()
+
+        self.cortexgrid["register_model"].assert_called_once_with(
+            StoryPlotClassifier,
+            family=STORY_PLOT_CLASSIFIER_FAMILY,
+            suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
+            requirements=StoryPlotClassifier.requirements(),
+        )
+
+    def test_is_deployed_from_the_registry_on_the_base_model_it_was_built_on(
+        self,
+    ) -> None:
+        deployment = deploy_story_plot_classifier()
+
+        self.cortexgrid["deploy_model"].assert_called_once_with(
+            family=STORY_PLOT_CLASSIFIER_FAMILY,
+            suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
+            run_name=cortexgrid.IMPORTED,
+            wait=True,
+            timeout=cluster.DEPLOY_TIMEOUT_S,
+            config={BASE_MODEL_PARAM: STORY_PLOT_CLASSIFIER_BASE_MODEL},
+        )
+        self.assertIs(deployment, self.cortexgrid["deploy_model"].return_value)
 
 
 if __name__ == "__main__":

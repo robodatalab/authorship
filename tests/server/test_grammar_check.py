@@ -1,7 +1,12 @@
+import asyncio
 import unittest
 from unittest import mock
 
 from server.writing_tools import grammar_check
+
+
+def checked(*arguments: object, **named: object) -> list:
+    return asyncio.run(grammar_check.check(*arguments, **named))
 from server.writing_tools.prose_check import Passage
 
 
@@ -316,26 +321,26 @@ class Renaming(unittest.TestCase):
     def test_check_does_not_report_a_renamed_character(self) -> None:
         written = "Henry was the CEO of their fintech arm."
         model = build_fake_model({written: "Avenue was the CEO of their fintech arm."})
-        self.assertEqual(grammar_check.check(model, lines(written), []), [])
+        self.assertEqual(checked(model, lines(written), []), [])
 
     def test_check_does_not_report_a_renamed_character_mid_sentence(self) -> None:
         written = "She could not see Kaelith among the folk at the back."
         model = build_fake_model(
             {written: "She could not see Kenneth among the folk at the back."}
         )
-        self.assertEqual(grammar_check.check(model, lines(written), []), [])
+        self.assertEqual(checked(model, lines(written), []), [])
 
     def test_check_still_reports_a_misspelling_beside_a_name(self) -> None:
         written = "Kendra leaned back in resopnse to the noise."
         model = build_fake_model({written: "Kendra leaned back in response to the noise."})
-        found = grammar_check.check(model, lines(written), [])
+        found = checked(model, lines(written), [])
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].replacements, ("response",))
 
     def test_check_still_reports_a_correction_that_keeps_the_name(self) -> None:
         written = "Diane leaned towards him, genuine curious."
         model = build_fake_model({written: "Diane leaned towards him, genuinely curious."})
-        found = grammar_check.check(model, lines(written), [])
+        found = checked(model, lines(written), [])
         self.assertEqual(len(found), 1)
         self.assertIn("genuinely", found[0].replacements[0])
 
@@ -360,14 +365,14 @@ class Names(unittest.TestCase):
 class Check(unittest.TestCase):
     def test_reports_a_real_correction(self) -> None:
         model = build_fake_model({"I like to swimming.": "I like swimming."})
-        found = grammar_check.check(model, lines("I like to swimming."), [])
+        found = checked(model, lines("I like to swimming."), [])
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].kind, "grammar")
         self.assertEqual(found[0].replacements, ("",))
 
     def test_says_nothing_when_the_model_says_nothing(self) -> None:
         model = build_fake_model({})
-        self.assertEqual(grammar_check.check(model, lines("Nothing wrong here."), []), [])
+        self.assertEqual(checked(model, lines("Nothing wrong here."), []), [])
 
     def test_does_not_report_a_closed_up_dash(self) -> None:
         model = build_fake_model(
@@ -377,13 +382,13 @@ class Check(unittest.TestCase):
             }
         )
         self.assertEqual(
-            grammar_check.check(model, lines("What came after - complete silence."), []),
+            checked(model, lines("What came after - complete silence."), []),
             [],
         )
 
     def test_never_shows_the_model_a_quotation_mark(self) -> None:
         model = build_fake_model({})
-        grammar_check.check(
+        checked(
             model,
             lines('"Hello everyone, nice to see you again" she said in a voice.'),
             [],
@@ -396,14 +401,14 @@ class Check(unittest.TestCase):
     def test_reports_the_segment_the_fault_is_in(self) -> None:
         written = '"Hello everyone, nice to see you again" she said in a voice.'
         model = build_fake_model({"she said in a voice.": "she said in a loud voice."})
-        found = grammar_check.check(model, lines(written), [])
+        found = checked(model, lines(written), [])
         self.assertEqual(len(found), 1)
         self.assertIn("she said in a voice.", found[0].detail)
         self.assertIn("she said in a loud voice.", found[0].detail)
 
     def test_does_not_ask_about_a_quote_the_sentence_before_left_behind(self) -> None:
         model = build_fake_model({})
-        grammar_check.check(
+        checked(
             model,
             lines('"That is all."\nShe was expecting the room to start whispering.'),
             [],
@@ -415,20 +420,20 @@ class Check(unittest.TestCase):
 
     def test_hides_the_names_from_the_model(self) -> None:
         model = build_fake_model({})
-        grammar_check.check(model, lines("The door opened. Then Kaelith ran home."), ["Kaelith"])
+        checked(model, lines("The door opened. Then Kaelith ran home."), ["Kaelith"])
         asked = " ".join(call.args[0] for call in model.rewrite.call_args_list)
         self.assertNotIn("Kaelith", asked)
 
     def test_puts_the_names_back_before_reporting(self) -> None:
         model = build_fake_model({"Then John ran home fast.": "Then John ran home."})
-        found = grammar_check.check(model, lines("Then Kaelith ran home fast."), ["Kaelith"])
+        found = checked(model, lines("Then Kaelith ran home fast."), ["Kaelith"])
         self.assertEqual(len(found), 1)
         self.assertNotIn("John", found[0].detail)
         self.assertIn("Kaelith", found[0].detail)
 
     def test_places_a_finding_on_the_line_it_is_on(self) -> None:
         model = build_fake_model({"I like to swimming.": "I like swimming."})
-        found = grammar_check.check(
+        found = checked(
             model, lines("Nothing wrong here.\nI like to swimming."), []
         )
         self.assertEqual(len(found), 1)
@@ -436,7 +441,7 @@ class Check(unittest.TestCase):
 
     def test_a_finding_spans_the_words_it_is_about(self) -> None:
         model = build_fake_model({"I like to swimming.": "I like swimming."})
-        found = grammar_check.check(model, lines("I like to swimming."), [])
+        found = checked(model, lines("I like to swimming."), [])
         said = "I like to swimming."
         self.assertEqual(said[found[0].at.character : found[0].end.character], "to ")
 

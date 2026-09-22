@@ -18,7 +18,6 @@ from collections.abc import Callable
 
 from cortexgrid_infer import ServedCompletingModel
 
-from server.models import causal_model
 from server.storydoc import Document
 
 # A blurb that runs longer than this has stopped being a blurb.
@@ -34,7 +33,7 @@ BLURB_INSTRUCTION = (
 )
 
 
-def write_blurb(
+async def write_blurb(
     model: ServedCompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
@@ -63,11 +62,21 @@ def write_blurb(
     for written, (title, prose) in enumerate(chapters, start=1):
         if cancelled():
             return ""
-        blurb = causal_model.complete(
-            model,
-            BLURB_INSTRUCTION,
-            _reading(document.title, blurb, title, prose),
-            max_new_tokens=BLURB_TOKENS,
+        blurb = "".join(
+            [
+                chunk.content
+                async for chunk in model.complete(
+                    [
+                        {"role": "system", "content": BLURB_INSTRUCTION},
+                        {
+                            "role": "user",
+                            "content": _reading(document.title, blurb, title, prose),
+                        },
+                    ],
+                    max_new_tokens=BLURB_TOKENS,
+                    temperature=0.0,
+                )
+            ]
         ).strip()
         progress(written, len(chapters))
     return blurb

@@ -10,8 +10,8 @@ import numpy as np
 
 from server import storydoc
 from server.jobs import Job
-from server.models.gemini import Gemini, GeminiError
 from server.storydoc import CHAPTER, MARKDOWN, PART, Document
+from server.story_analysis.story_plot_classifier import ServedStoryPlotClassifier
 
 _PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
 
@@ -104,7 +104,7 @@ def _fake_story_plot_indices(part_or_chapter: int, paragraph: int) -> list[int]:
 
 
 def identify_story_plots(
-    model: Gemini,
+    model: ServedStoryPlotClassifier,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda identified, sections: None,
@@ -154,7 +154,7 @@ def identify_story_plots(
 class StoryPlotsJob(Job):
     kind = "identify plots"
 
-    def __init__(self, model: Gemini, document: Document) -> None:
+    def __init__(self, model: ServedStoryPlotClassifier, document: Document) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
         self._model = model
@@ -163,23 +163,16 @@ class StoryPlotsJob(Job):
         self.paragraphs_in_story_plots: list[dict[str, Any]] = []
         self.identified = 0
         self.to_identify = 0
-        self.unauthorized = False
-        self.no_quota = False
 
-    def execute(self) -> None:
-        try:
-            identify_story_plots(
-                self._model,
-                self._document,
-                lambda: self.cancelled,
-                self._reached,
-                self._named,
-                self.paragraphs_in_story_plots.append,
-            )
-        except GeminiError as err:
-            self.unauthorized = err.unauthorized
-            self.no_quota = err.no_quota
-            raise
+    async def execute(self) -> None:
+        identify_story_plots(
+            self._model,
+            self._document,
+            lambda: self.cancelled,
+            self._reached,
+            self._named,
+            self.paragraphs_in_story_plots.append,
+        )
 
     def _reached(self, identified: int, sections: int) -> None:
         self.identified, self.to_identify = identified, sections

@@ -4,7 +4,6 @@ import {
     dialogs,
     files,
     executedCommands,
-    geminiKeyInTheKeychain,
     settings,
     shownMessages,
 } from "../vscode";
@@ -53,5 +52,4 @@ export function forgetWhatTheEditorDid(): void {
     dialogs.filesTheAuthorChose = [];
     dialogs.answerToTheWarning = undefined;
     settings.clear();
-    geminiKeyInTheKeychain.key = undefined;
 }

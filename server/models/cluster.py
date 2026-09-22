@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import cortexgrid
-from cortexgrid_infer import DeployedModel, Importer
+from cortexgrid_infer import Importer
 
 EXPERIMENT_NAME = "authorship"
 IMPORT_TIMEOUT_S = 3600.0
@@ -24,21 +24,20 @@ def import_weights(
         )
 
 
-def deploy(importer: Importer, **settings: str) -> DeployedModel:
-    cortexgrid.Experiment.init(EXPERIMENT_NAME)
+def deploy(importer: Importer, **settings: str) -> cortexgrid.Deployment:
     cortexgrid.remote(
         import_weights,
         importer,
         importer.requirements(),
-        {**importer.config(), **settings},
+        importer.config(),
         num_gpus=0,
         num_cpus=2,
     ).result(timeout=IMPORT_TIMEOUT_S)
-    deployment = cortexgrid.deploy_model(
-        importer.family,
-        importer.suffix,
-        cortexgrid.IMPORTED,
+    return cortexgrid.deploy_model(
+        family=importer.family,
+        suffix=importer.suffix,
+        run_name=cortexgrid.IMPORTED,
         wait=True,
         timeout=DEPLOY_TIMEOUT_S,
+        config=dict(settings),
     )
-    return importer.client(deployment.url)

@@ -1,13 +1,9 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 
+import * as vscode from "vscode";
+
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { configuredModel, geminiAccount } from "../gemini/account";
-import {
-    confirmSendingToGemini,
-    sayWhyTheGeminiServerJobStopped,
-    type GeminiServerJob,
-} from "../gemini/gemini_server_job";
-import { awaitServerJob, startServerJob } from "../server/jobs";
+import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 
 const STORY_PLOTS_STATUS = "/analyze/plots/status";
@@ -21,7 +17,7 @@ export interface ParagraphInStoryPlots extends SynchronizedRepresentation {
     storyPlotIndices: number[];
 }
 
-interface StoryPlotsJob extends GeminiServerJob {
+interface StoryPlotsJob extends ServerJob {
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
 }
@@ -33,20 +29,10 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
     readonly tooltip = "";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
-        const apiKey = await geminiAccount()?.require();
-        if (!apiKey) {
-            return;
-        }
-        if (!(await confirmSendingToGemini(session))) {
-            return;
-        }
-        let jobId: string | undefined;
         try {
-            jobId = await startServerJob("/analyze/plots", {
+            const jobId = await startServerJob("/analyze/plots", {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
-                key: apiKey,
-                model: configuredModel(),
             });
             const identified = await awaitServerJob<StoryPlotsJob>(
                 STORY_PLOTS_STATUS,
@@ -62,11 +48,8 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 identified.paragraphsInStoryPlots,
             );
         } catch (failure) {
-            await sayWhyTheGeminiServerJobStopped(
-                STORY_PLOTS_STATUS,
-                jobId,
-                failure,
-                "identify the plots",
+            void vscode.window.showErrorMessage(
+                `Cannot identify the plots — ${failure instanceof Error ? failure.message : String(failure)}`,
             );
         }
     }

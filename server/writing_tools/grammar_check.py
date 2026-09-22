@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import re
 from difflib import SequenceMatcher
 
@@ -170,7 +169,7 @@ def _fault_named(was: str, now: str) -> tuple[str, str]:
     return "wording", f"“{was.strip()}” should be “{now.strip()}”"
 
 
-def check(
+async def check(
     model: ServedRewritingModel, prose: list[tuple[int, str]], names_to_protect: list[str]
 ) -> list[Finding]:
     passage = Passage(prose)
@@ -187,11 +186,9 @@ def check(
     for at, end in asking_about:
         original = passage.text[at:end]
         quotes_blanked = _QUOTES.sub(" ", original)
-        answered = asyncio.run(
-            model.rewrite(
-                f"{GEC_PREFIX}{_with_words_swapped(quotes_blanked, as_stand_ins)}",
-                max_new_tokens=CORRECTION_TOKENS,
-            )
+        answered = await model.rewrite(
+            f"{GEC_PREFIX}{_with_words_swapped(quotes_blanked, as_stand_ins)}",
+            max_new_tokens=CORRECTION_TOKENS,
         )
         corrected = _with_words_swapped(answered.strip(), as_names)
         if not corrected or corrected == quotes_blanked:

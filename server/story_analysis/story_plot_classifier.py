@@ -9,7 +9,12 @@ import cortexgrid
 import httpx
 import torch
 from cortexgrid import serve
-from cortexgrid_infer import DeployedModel, LocalModel, detect_device
+from cortexgrid_infer import (
+    DeployedModel,
+    HuggingFaceImporter,
+    Text2Text,
+    detect_device,
+)
 from fastapi import FastAPI
 from transformers import (
     AutoConfig,
@@ -19,7 +24,17 @@ from transformers import (
     PreTrainedModel,
 )
 
+from server.models import cluster
+
 _app = FastAPI()
+
+STORY_PLOT_CLASSIFIER_FAMILY = "Authorship"
+STORY_PLOT_CLASSIFIER_SUFFIX = "storyplotclassifier"
+STORY_PLOT_CLASSIFIER_NAME = (
+    f"{STORY_PLOT_CLASSIFIER_FAMILY}-{STORY_PLOT_CLASSIFIER_SUFFIX}"
+)
+STORY_PLOT_CLASSIFIER_BASE_MODEL = "Qwen/Qwen3-8B"
+BASE_MODEL_PARAM = "base_model"
 
 STORY_PLOT_CLASSIFIER_INSTRUCTION = (
     "You read a whole novel, then one plot of it and one paragraph of it. A plot "
@@ -31,7 +46,7 @@ STORY_PLOT_CLASSIFIER_INSTRUCTION = (
     "or no."
 )
 
-_WHERE_THE_STORY_ENDS = ""
+_WHERE_THE_STORY_ENDS = "\ue010"
 _ANSWERS_THAT_MEAN_YES = ("yes", "Yes", " yes", " Yes")
 _ANSWERS_THAT_MEAN_NO = ("no", "No", " no", " No")
 _NATIVE_CONTEXT_OF_QWEN3 = 32768
@@ -104,16 +119,53 @@ def probability_of_yes(
     return float(torch.sigmoid(yes - no))
 
 
+def base_model_importer(model_id: str) -> HuggingFaceImporter:
+    return HuggingFaceImporter(model_id, Text2Text)
+
+
+def deploy_story_plot_classifier() -> cortexgrid.Deployment:
+    base_model = base_model_importer(STORY_PLOT_CLASSIFIER_BASE_MODEL)
+    cortexgrid.remote(
+        cluster.import_weights,
+        base_model,
+        base_model.requirements(),
+        base_model.config(),
+        num_gpus=0,
+        num_cpus=2,
+    ).result(timeout=cluster.IMPORT_TIMEOUT_S)
+    cortexgrid.register_model(
+        StoryPlotClassifier,
+        family=STORY_PLOT_CLASSIFIER_FAMILY,
+        suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
+        requirements=StoryPlotClassifier.requirements(),
+    )
+    return cortexgrid.deploy_model(
+        family=STORY_PLOT_CLASSIFIER_FAMILY,
+        suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
+        run_name=cortexgrid.IMPORTED,
+        wait=True,
+        timeout=cluster.DEPLOY_TIMEOUT_S,
+        config={BASE_MODEL_PARAM: STORY_PLOT_CLASSIFIER_BASE_MODEL},
+    )
+
+
 @serve.ingress(_app)
-class StoryPlotClassifier(LocalModel):
-    min_vram_gb = 32.0
+class StoryPlotClassifier:
+    @classmethod
+    def requirements(cls) -> cortexgrid.ModelRequirements:
+        return cortexgrid.ModelRequirements(num_gpus=1, ram_gb=20.0, vram_gb=32.0)
 
     @classmethod
     def client(cls, url: str, name: str) -> ServedStoryPlotClassifier:
         return ServedStoryPlotClassifier(url=url, model_id=name)
 
-    def __init__(self, family: str, suffix: str, run_name: str) -> None:
-        path = cortexgrid.load_model(family, suffix, run_name)
+    def __init__(self, deployment: cortexgrid.DeploymentKey) -> None:
+        base_model = base_model_importer(
+            cortexgrid.model_config(deployment)[BASE_MODEL_PARAM]
+        )
+        path = cortexgrid.load_model(
+            base_model.family, base_model.suffix, cortexgrid.IMPORTED
+        )
         self._device = detect_device()
         self._tokenizer = AutoTokenizer.from_pretrained(path)
         stretched = AutoConfig.from_pretrained(path)

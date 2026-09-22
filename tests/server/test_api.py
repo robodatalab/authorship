@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
-import os
 from pathlib import Path
 import tempfile
+import asyncio
 import threading
 import time
 import unittest
@@ -13,7 +13,6 @@ from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from server.models.gemini import GeminiError
 from server import storydoc
 
 
@@ -40,15 +39,17 @@ class Health(unittest.TestCase):
 
 class Models(unittest.TestCase):
     def test_lists_each_model_with_its_serving_phase_on_the_cluster(self) -> None:
-        app.state.inference_models = [
-            mock.Mock(model_id="Qwen/Qwen3-8B", family="Qwen3", suffix="8B"),
-            mock.Mock(model_id="Unbabel/gec-t5_small", family="gec", suffix="t5_small"),
-        ]
-        phases = {"Qwen3": "running", "gec": "deploying"}
+        serving = cortexgrid.DeploymentKey("Qwen3", "8B", cortexgrid.IMPORTED)
+        deploying = cortexgrid.DeploymentKey("gec", "t5_small", cortexgrid.IMPORTED)
+        app.state.inference_models = {
+            "Qwen/Qwen3-8B": serving,
+            "Unbabel/gec-t5_small": deploying,
+        }
+        phases = {serving: "running", deploying: "deploying"}
 
         with mock.patch(
             "server.api.cortexgrid.model_serving_status",
-            side_effect=lambda family, suffix, run_name: mock.Mock(phase=phases[family]),
+            side_effect=lambda key: mock.Mock(phase=phases[key]),
         ) as serving_status:
             response = TestClient(app).get("/models")
 
@@ -62,8 +63,8 @@ class Models(unittest.TestCase):
                 ]
             },
         )
-        serving_status.assert_any_call("Qwen3", "8B", cortexgrid.IMPORTED)
-        serving_status.assert_any_call("gec", "t5_small", cortexgrid.IMPORTED)
+        serving_status.assert_any_call(serving)
+        serving_status.assert_any_call(deploying)
 
 
 def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
@@ -102,10 +103,10 @@ class Jobs(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("the cat.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="the cat.")
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
@@ -144,10 +145,10 @@ class Jobs(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("the cat.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="the cat.")
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
@@ -267,10 +268,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("A woman loses her name.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -299,10 +300,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("A woman loses her name.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -330,10 +331,10 @@ class GenerateBlurb(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("A woman loses her name.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="A woman loses her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -476,10 +477,10 @@ class GenerateRecap(unittest.TestCase):
         entered = threading.Semaphore(0)
         release = threading.Event()
 
-        def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
+        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
             entered.release()
-            release.wait(timeout=5)
-            return streamed("She has lost her name.")
+            await asyncio.to_thread(release.wait, 5)
+            yield CompletionChunk(content="She has lost her name.")
 
         app.state.causal_model.complete.side_effect = complete
         client = TestClient(app)
@@ -605,7 +606,7 @@ class ExportEpub(unittest.TestCase):
         self.assertTrue(zipfile.is_zipfile(written))
 
 
-# What the stubbed Gemini answers with: a plausible correction of the sections
+# What the stubbed model answers with: a plausible correction of the sections
 # in the document below, rather than a token that the length check refuses.
 CORRECTED = "The door had swung open."
 
@@ -621,11 +622,10 @@ def wait_for_style(client: TestClient, job_id: str, timeout: float = 5.0) -> dic
 
 
 class FixStyle(unittest.TestCase):
-    """The pass that goes to Gemini rather than to a model on this machine.
+    """The pass over the manuscript, against a model stood in for here.
 
-    Gemini itself is stood in for: what is under test is the job around it — that
-    the key is required, that the corrected sections come back named by the cell
-    they belong to, and that the file is not written.
+    What is under test is the job around it: that the corrected sections come
+    back named by the cell they belong to, and that the file is not written.
     """
 
     def setUp(self) -> None:
@@ -645,22 +645,11 @@ class FixStyle(unittest.TestCase):
         self.document.write_text(self.written, encoding="utf-8")
         app.state.jobs = ParallelJobsManager()
 
-        self.model = mock.MagicMock()
         # About as long as the sections it replaces, and ending where a sentence
         # ends. A stub any shorter is refused by the checks that keep a chapter
         # cut off mid-answer out of the document, which is as it should be.
-        self.model.complete.return_value = CORRECTED
-        patched = mock.patch(
-            "server.api.Gemini", return_value=self.model
-        )
-        self.gemini = patched.start()
-        self.addCleanup(patched.stop)
-        # A key in the environment would answer for a request that carried none,
-        # which is the case these tests are about.
-        cleared = mock.patch.dict(os.environ, {}, clear=False)
-        cleared.start()
-        os.environ.pop("GEMINI_API_KEY", None)
-        self.addCleanup(cleared.stop)
+        self.model = build_fake_completion_model(CORRECTED)
+        app.state.style_model = self.model
 
     def start(self, **asked: object) -> dict:
         client = TestClient(app)
@@ -669,7 +658,6 @@ class FixStyle(unittest.TestCase):
             json={
                 "path": str(self.document),
                 "text": self.document.read_text(),
-                "key": "k",
                 **asked,
             },
         )
@@ -692,37 +680,12 @@ class FixStyle(unittest.TestCase):
         self.start()
         self.assertEqual(self.document.read_text(), self.written)
 
-    def test_opens_gemini_with_the_key_and_model_the_editor_sent(self) -> None:
-        self.start(model="gemini-flash")
-        self.assertEqual(self.gemini.call_args.args[:2], ("k", "gemini-flash"))
-
-    def test_a_request_with_no_key_anywhere_asks_the_author_to_sign_in(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/fix/style",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        self.assertEqual(response.status_code, 401)
-
-    def test_the_environment_answers_for_a_server_somebody_started(self) -> None:
-        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "from-the-shell"}):
-            client = TestClient(app)
-            started = client.post(
-            "/fix/style",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        self.assertEqual(started.status_code, 202)
-        wait_for_style(client, started.json()["id"])
-        self.assertEqual(self.gemini.call_args.args[0], "from-the-shell")
-
     def test_names_the_sections_it_left_as_the_author_wrote_them(self) -> None:
         # A section the pass could not use an answer for is left alone, which is
         # right and is invisible — the document looks as it would if the section
         # had needed nothing. The editor is told so it can say so.
-        self.model.complete.side_effect = [
-            'She reached for it and said, "Come closer',
-            CORRECTED,
-        ]
+        answers = iter(['She reached for it and said, "Come closer', CORRECTED])
+        self.model.complete.side_effect = lambda messages, **_: streamed(next(answers))
         status = self.start()
         self.assertEqual(status["sections"], [{"cellId": "door", "source": CORRECTED}])
         self.assertEqual(len(status["leftAlone"]), 1)
@@ -743,21 +706,6 @@ class FixStyle(unittest.TestCase):
         status = self.start()
         self.assertIn("no prose", status["error"])
 
-    def test_a_signed_in_key_is_checked_before_it_is_used(self) -> None:
-        client = TestClient(app)
-        self.assertEqual(
-            client.post("/auth/gemini", json={"key": "k"}).json(),
-            {"ok": True, "detail": None},
-        )
-        self.model.health_check.assert_called_once()
-
-    def test_a_key_gemini_refuses_is_reported_rather_than_raised(self) -> None:
-        self.model.health_check.side_effect = GeminiError("Gemini refused (400)")
-        client = TestClient(app)
-        answer = client.post("/auth/gemini", json={"key": "no"}).json()
-        self.assertFalse(answer["ok"])
-        self.assertIn("refused", answer["detail"])
-
 
 def wait_for_story_plots(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
     deadline = time.monotonic() + timeout
@@ -773,32 +721,16 @@ class IdentifyStoryPlots(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         app.state.jobs = ParallelJobsManager()
-        patched = mock.patch("server.api.Gemini")
-        self.gemini = patched.start()
-        self.addCleanup(patched.stop)
-        cleared = mock.patch.dict(os.environ, {}, clear=False)
-        cleared.start()
-        os.environ.pop("GEMINI_API_KEY", None)
-        self.addCleanup(cleared.stop)
+        app.state.story_plot_classifier = mock.MagicMock()
 
     def identify(self, cells: list[storydoc.Cell]) -> dict:
         client = TestClient(app)
         started = client.post(
             "/analyze/plots",
-            json={
-                "path": "/stories/story.author",
-                "text": storydoc.dumps(cells),
-                "key": "k",
-                "model": "gemini-flash",
-            },
+            json={"path": "/stories/story.author", "text": storydoc.dumps(cells)},
         )
         self.assertEqual(started.status_code, 202)
         return wait_for_story_plots(client, started.json()["id"])
-
-    def test_asks_gemini_with_the_authors_own_key_and_model(self) -> None:
-        self.identify([storydoc.Cell(storydoc.MARKDOWN, "The door.", {"id": "door"})])
-
-        self.gemini.assert_called_once_with("k", "gemini-flash")
 
     def test_names_every_paragraph_of_the_prose_by_where_it_stands_in_its_cell(
         self,
@@ -851,26 +783,6 @@ class IdentifyStoryPlots(unittest.TestCase):
         identified = self.identify([storydoc.chapter("One")])
 
         self.assertIn("no prose", identified["error"])
-
-    def test_says_when_gemini_would_not_take_the_key(self) -> None:
-        with mock.patch(
-            "server.story_analysis.plots.identify_story_plots",
-            side_effect=GeminiError("Gemini refused the key.", unauthorized=True),
-        ):
-            identified = self.identify(
-                [storydoc.Cell(storydoc.MARKDOWN, "The door.", {"id": "door"})]
-            )
-
-        self.assertTrue(identified["unauthorized"])
-        self.assertFalse(identified["noQuota"])
-
-    def test_refuses_an_author_who_has_not_signed_in(self) -> None:
-        response = TestClient(app).post(
-            "/analyze/plots",
-            json={"path": "/stories/story.author", "text": ""},
-        )
-
-        self.assertEqual(response.status_code, 401)
 
     def test_refuses_to_report_on_a_job_it_never_started(self) -> None:
         response = TestClient(app).get("/analyze/plots/status", params={"id": "nothing"})

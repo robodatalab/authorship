@@ -1,9 +1,12 @@
+import asyncio
+from collections.abc import AsyncIterator
 import unittest
 from unittest import mock
 
+from cortexgrid_infer import CompletionChunk
+
 from server import storydoc
 from server.storydoc import Document
-from server.models.gemini import GeminiError
 from server.writing_tools.style import (
     FIX_REQUEST,
     STYLE_INSTRUCTION,
@@ -36,10 +39,19 @@ ALL_FIXED = {
 }
 
 
+async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
+    yield CompletionChunk(content=reply)
+
+
 def build_model(*replies: str) -> mock.MagicMock:
+    answers = iter(replies or FIXED)
     model = mock.MagicMock()
-    model.complete.side_effect = replies or FIXED
+    model.complete.side_effect = lambda messages, **_: streamed(next(answers))
     return model
+
+
+def styled(*arguments: object, **named: object) -> None:
+    asyncio.run(fix_style(*arguments, **named))
 
 
 def markdown(source: str, cell_id: str) -> storydoc.Cell:
@@ -63,7 +75,7 @@ STORY = storydoc.dumps(
 
 def collect(model: mock.MagicMock) -> dict[str, str]:
     revised: dict[str, str] = {}
-    fix_style(
+    styled(
         model,
         Document(STORY),
         revised=lambda cell_id, source: revised.update({cell_id: source}),
@@ -73,7 +85,7 @@ def collect(model: mock.MagicMock) -> dict[str, str]:
 
 def left_alone_by(model: mock.MagicMock) -> list[tuple[str, str]]:
     told: list[tuple[str, str]] = []
-    fix_style(
+    styled(
         model,
         Document(STORY),
         left_alone=lambda opening, why: told.append((opening, why)),
@@ -84,22 +96,24 @@ def left_alone_by(model: mock.MagicMock) -> list[tuple[str, str]]:
 class FixStyle(unittest.TestCase):
     def test_corrects_one_section_at_a_time(self) -> None:
         model = build_model()
-        fix_style(model, Document(STORY))
+        styled(model, Document(STORY))
         self.assertEqual(model.complete.call_count, 4)
 
     def test_asks_as_the_instruction_and_names_what_it_wants_in_the_turn(self) -> None:
         model = build_model()
-        fix_style(model, Document(STORY))
-        instruction, said, _ceiling = model.complete.call_args_list[1].args
+        styled(model, Document(STORY))
+        instruction, said = (
+            turn["content"] for turn in model.complete.call_args_list[1].args[0]
+        )
         self.assertEqual(instruction, STYLE_INSTRUCTION)
         self.assertIn(FIX_REQUEST, said)
         self.assertIn(FIRST, said)
 
     def test_every_section_after_the_first_is_read_with_the_corrected_ones(self) -> None:
         model = build_model()
-        fix_style(model, Document(STORY))
+        styled(model, Document(STORY))
         first, second, third, _fourth = (
-            call.args[1] for call in model.complete.call_args_list
+            call.args[0][1]["content"] for call in model.complete.call_args_list
         )
         self.assertNotIn(FRONT_FIXED, first)
         self.assertIn(FRONT_FIXED, second)
@@ -108,10 +122,10 @@ class FixStyle(unittest.TestCase):
 
     def test_the_notes_and_the_built_sections_are_never_read(self) -> None:
         model = build_model()
-        fix_style(model, Document(STORY))
+        styled(model, Document(STORY))
         for call in model.complete.call_args_list:
-            self.assertNotIn("Ask Mara", call.args[1])
-            self.assertNotIn("1. The First Night", call.args[1])
+            self.assertNotIn("Ask Mara", call.args[0][1]["content"])
+            self.assertNotIn("1. The First Night", call.args[0][1]["content"])
 
     def test_hands_back_each_corrected_section_against_its_own_cell(self) -> None:
         self.assertEqual(collect(build_model()), ALL_FIXED)
@@ -135,9 +149,9 @@ class FixStyle(unittest.TestCase):
 
     def test_gives_the_model_the_token_ceiling_it_cannot_generate_without(self) -> None:
         model = build_model()
-        fix_style(model, Document(STORY))
+        styled(model, Document(STORY))
         for call in model.complete.call_args_list:
-            self.assertGreaterEqual(call.args[2], THINKING_HEADROOM)
+            self.assertGreaterEqual(call.kwargs["max_new_tokens"], THINKING_HEADROOM)
 
     def test_a_section_cut_off_mid_sentence_never_reaches_the_document(self) -> None:
         model = build_model(
@@ -174,8 +188,8 @@ class FixStyle(unittest.TestCase):
         model = build_model(
             FRONT_FIXED, "Dark.", SECOND_FIXED, THIRD_FIXED
         )
-        fix_style(model, Document(STORY))
-        third = model.complete.call_args_list[2].args[1]
+        styled(model, Document(STORY))
+        third = model.complete.call_args_list[2].args[0][1]["content"]
         self.assertIn(FIRST, third)
         self.assertNotIn("Dark.", third)
 
@@ -183,7 +197,7 @@ class FixStyle(unittest.TestCase):
         self,
     ) -> None:
         seen: list[tuple[int, int]] = []
-        fix_style(
+        styled(
             build_model(), Document(STORY), progress=lambda *reached: seen.append(reached)
         )
         self.assertEqual(seen, [(0, 4), (1, 4), (2, 4), (3, 4), (4, 4)])
@@ -192,7 +206,7 @@ class FixStyle(unittest.TestCase):
         model = build_model()
         stop = [False]
         revised: dict[str, str] = {}
-        fix_style(
+        styled(
             model,
             Document(STORY),
             cancelled=lambda: stop[0],
@@ -202,45 +216,11 @@ class FixStyle(unittest.TestCase):
         self.assertEqual(model.complete.call_count, 0)
         self.assertEqual(revised, {})
 
-    def test_an_answer_the_model_could_not_finish_costs_one_section_not_the_pass(
-        self,
-    ) -> None:
-        model = build_model()
-        model.complete.side_effect = [
-            FRONT_FIXED,
-            GeminiError("ran out of room", truncated=True),
-            SECOND_FIXED,
-            THIRD_FIXED,
-        ]
-        told: list[tuple[str, str]] = []
-        revised: dict[str, str] = {}
-        fix_style(
-            model,
-            Document(STORY),
-            revised=lambda cell_id, source: revised.update({cell_id: source}),
-            left_alone=lambda opening, why: told.append((opening, why)),
-        )
-        self.assertNotIn(FIRST_CELL_ID, revised)
-        self.assertEqual(told, [("The lantern had gone out", "ran out of room")])
-
-    def test_a_section_the_model_would_not_read_costs_one_section_too(self) -> None:
-        model = build_model()
-        model.complete.side_effect = [
-            FRONT_FIXED,
-            GeminiError("Google would not read this", refused=True),
-            SECOND_FIXED,
-            THIRD_FIXED,
-        ]
-        self.assertEqual(
-            left_alone_by(model),
-            [("The lantern had gone out", "Google would not read this")],
-        )
-
     def test_a_failure_that_is_not_about_the_section_ends_the_pass(self) -> None:
         model = build_model()
-        model.complete.side_effect = RuntimeError("Gemini refused (401)")
+        model.complete.side_effect = RuntimeError("the model is not serving")
         with self.assertRaises(RuntimeError):
-            fix_style(model, Document(STORY))
+            styled(model, Document(STORY))
 
     def test_says_which_sections_it_left_alone_and_why(self) -> None:
         model = build_model(
@@ -256,7 +236,7 @@ class FixStyle(unittest.TestCase):
 
     def test_a_document_with_no_prose_is_refused(self) -> None:
         with self.assertRaises(ValueError):
-            fix_style(build_model(), Document(storydoc.dumps([storydoc.chapter("One")])))
+            styled(build_model(), Document(storydoc.dumps([storydoc.chapter("One")])))
 
 
 if __name__ == "__main__":

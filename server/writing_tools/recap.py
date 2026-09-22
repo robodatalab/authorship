@@ -9,7 +9,6 @@ from typing import Any
 
 from cortexgrid_infer import ServedCompletingModel
 
-from server.models import causal_model
 from server.storydoc import Document
 
 
@@ -24,7 +23,7 @@ Return the summary that combines the overall text, without adding any tokens.
 """
 
 
-def write_recap(
+async def write_recap(
     model: ServedCompletingModel,
     documents: list[Document],
     cancelled: Callable[[], bool] = lambda: False,
@@ -46,8 +45,18 @@ def write_recap(
 
         to_summarize = f"<summary_so_far>\n{running_summary}\n</sumary_so_far><new_part>\n{prose}\n</new_part>"
 
-        new_running_summary = causal_model.complete(
-            model, SUMMARY_INSTRUCTION, to_summarize, max_new_tokens=SUMMARY_TOKENS,
+        new_running_summary = "".join(
+            [
+                chunk.content
+                async for chunk in model.complete(
+                    [
+                        {"role": "system", "content": SUMMARY_INSTRUCTION},
+                        {"role": "user", "content": to_summarize},
+                    ],
+                    max_new_tokens=SUMMARY_TOKENS,
+                    temperature=0.0,
+                )
+            ]
         ).strip()
         running_summary = new_running_summary
         progress(read, len(chapters))

@@ -2,17 +2,7 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import {
-    configuredModel,
-    geminiAccount,
-    styleFixEnabled,
-} from "../gemini/account";
-import {
-    confirmSendingToGemini,
-    sayWhyTheGeminiServerJobStopped,
-    type GeminiServerJob,
-} from "../gemini/gemini_server_job";
-import { awaitServerJob, startServerJob } from "../server/jobs";
+import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import { MARKDOWN, type ImmutableAuthorDocument } from "../storydoc/model";
 
 const STYLE_FIX_STATUS = "/fix/style/status";
@@ -27,7 +17,7 @@ interface SectionLeftAlone {
     why: string;
 }
 
-interface StyleFixJob extends GeminiServerJob {
+interface StyleFixJob extends ServerJob {
     leftAlone: SectionLeftAlone[];
     sections: CorrectedSection[];
 }
@@ -68,31 +58,15 @@ function sayWhichSectionsWereLeftAlone(leftAlone: SectionLeftAlone[]): void {
 export class FixStyleCommand implements AuthorDocumentCommand {
     readonly commandName = "fixStyle";
     readonly buttonGroup = "check";
+    readonly iconClassName = "codicon codicon-sparkle";
     readonly tooltip =
-        "Fix Style and Grammar — send every section to Google Gemini to be copy-edited";
-
-    get iconClassName(): string {
-        return styleFixEnabled() ? "codicon codicon-sparkle" : "";
-    }
+        "Fix Style and Grammar — send every section to be copy-edited";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
-        if (!styleFixEnabled()) {
-            return;
-        }
-        const apiKey = await geminiAccount()?.require();
-        if (!apiKey) {
-            return;
-        }
-        if (!(await confirmSendingToGemini(session))) {
-            return;
-        }
-        let jobId: string | undefined;
         try {
-            jobId = await startServerJob("/fix/style", {
+            const jobId = await startServerJob("/fix/style", {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
-                key: apiKey,
-                model: configuredModel(),
             });
             const pass = await awaitServerJob<StyleFixJob>(
                 STYLE_FIX_STATUS,
@@ -102,11 +76,8 @@ export class FixStyleCommand implements AuthorDocumentCommand {
             putCorrectedSectionsIn(session, pass.sections);
             sayWhichSectionsWereLeftAlone(pass.leftAlone);
         } catch (failure) {
-            await sayWhyTheGeminiServerJobStopped(
-                STYLE_FIX_STATUS,
-                jobId,
-                failure,
-                "fix the style",
+            void vscode.window.showErrorMessage(
+                `Cannot fix the style — ${failure instanceof Error ? failure.message : String(failure)}`,
             );
         }
     }
