@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable, Collection, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from itertools import combinations
 from typing import Any
 
 import numpy as np
@@ -11,13 +12,18 @@ import numpy as np
 from server import storydoc
 from server.jobs import Job
 from server.storydoc import CHAPTER, MARKDOWN, PART, Document
-from server.story_analysis.story_plot_classifier import ServedStoryPlotClassifier
+from server.story_analysis.story_plot_classifier import (
+    ServedStoryPlotClassifier,
+    StoryPlotQuestion,
+)
 
 _PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
 
 _CLOSEST_TO_CERTAIN = 1e-6
 _LOWEST_PROBABILITY_THAT_PASSES = 0.5
 _ALREADY_IN_A_PLOT = "[in a plot]"
+_SEPARATION_A_REAL_PLOT_SHOWS = 4.0
+_OVERLAP_THAT_MAKES_ONE_PLOT = 0.7
 
 
 def _log_odds(probability: float) -> float:
@@ -123,6 +129,111 @@ def story_plot_summary(
             "What has happened along it: "
             + ("; ".join(happened) if happened else "nothing recorded yet"),
         ]
+    )
+
+
+@dataclass(frozen=True)
+class StoryPlotClaim:
+    plot: StoryPlot
+    paragraphs: frozenset[int]
+    separation: float
+
+
+async def story_plot_probabilities(
+    classifier: ServedStoryPlotClassifier,
+    story: str,
+    paragraphs: Sequence[StoryParagraph],
+    plot: StoryPlot,
+) -> list[float]:
+    return await classifier.probabilities(
+        story,
+        [
+            StoryPlotQuestion(
+                plot=f"{plot.title}\n"
+                f"{story_plot_summary(plot, except_events_found_in=index)}",
+                paragraph=paragraph.words,
+            )
+            for index, paragraph in enumerate(paragraphs)
+        ],
+    )
+
+
+async def one_pass(
+    classifier: ServedStoryPlotClassifier,
+    story: str,
+    paragraphs: Sequence[StoryParagraph],
+    plots: Sequence[StoryPlot],
+    cancelled: Callable[[], bool] = lambda: False,
+    progress: Callable[[int, int], None] = lambda scored, of_plots: None,
+) -> list[StoryPlotClaim]:
+    claims: list[StoryPlotClaim] = []
+    progress(0, len(plots))
+    for plot in plots:
+        if cancelled():
+            return []
+        probabilities = await story_plot_probabilities(
+            classifier, story, paragraphs, plot
+        )
+        pass_level = story_plot_pass_level(probabilities)
+        claims.append(
+            StoryPlotClaim(
+                plot=plot,
+                paragraphs=frozenset(
+                    index
+                    for index, probability in enumerate(probabilities)
+                    if pass_level.admits(probability)
+                ),
+                separation=pass_level.separation,
+            )
+        )
+        progress(len(claims), len(plots))
+    return united(
+        [
+            claim
+            for claim in claims
+            if claim.paragraphs and claim.separation >= _SEPARATION_A_REAL_PLOT_SHOWS
+        ]
+    )
+
+
+def united(claims: Sequence[StoryPlotClaim]) -> list[StoryPlotClaim]:
+    plots = list(claims)
+    uniting = True
+    while uniting:
+        uniting = False
+        for one, another in combinations(range(len(plots)), 2):
+            if (
+                _overlap(plots[one].paragraphs, plots[another].paragraphs)
+                > _OVERLAP_THAT_MAKES_ONE_PLOT
+            ):
+                plots[one] = _one_plot_of(plots[one], plots[another])
+                del plots[another]
+                uniting = True
+                break
+    return plots
+
+
+def _overlap(one: frozenset[int], another: frozenset[int]) -> float:
+    told_apart = one | another
+    return len(one & another) / len(told_apart) if told_apart else 0.0
+
+
+def _one_plot_of(one: StoryPlotClaim, another: StoryPlotClaim) -> StoryPlotClaim:
+    told, absorbed = sorted(
+        [one, another], key=lambda claim: claim.separation, reverse=True
+    )
+    return StoryPlotClaim(
+        plot=replace(
+            told.plot,
+            characters=tuple(
+                dict.fromkeys(told.plot.characters + absorbed.plot.characters)
+            ),
+            key_events=tuple(
+                dict.fromkeys(told.plot.key_events + absorbed.plot.key_events)
+            ),
+        ),
+        paragraphs=told.paragraphs | absorbed.paragraphs,
+        separation=told.separation,
     )
 
 
