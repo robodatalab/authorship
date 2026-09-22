@@ -62,12 +62,12 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
+    new ToggleStoryPlotsCommand(),
+    new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),
     new WriteStorySoFarCommand(),
     new WriteTableOfContentsCommand(),
-    new ToggleStoryPlotsCommand(),
-    new IdentifyStoryPlotsCommand(),
 ];
 
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {

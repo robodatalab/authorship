@@ -396,12 +396,20 @@ def check_errors_status(id: str) -> dict[str, Any]:
 class StoryPlotsRequest(BaseModel):
     path: str
     text: str
+    key: str | None = None
+    model: str | None = None
 
 
 @app.post("/analyze/plots", status_code=202)
 def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
+    key = configured_key(request.key)
+    if not key:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in to Gemini to identify the plots of a manuscript.",
+        )
     document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(document)
+    job = StoryPlotsJob(Gemini(key, configured_model(request.model)), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -415,6 +423,9 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "running": not job.done,
         "cancelled": job.cancelled,
         "error": job.error,
+        "unauthorized": job.unauthorized,
+        "noQuota": job.no_quota,
         "storyPlots": job.story_plots,
         "paragraphsInStoryPlots": job.paragraphs_in_story_plots,
+        "progress": {"identified": job.identified, "sections": job.to_identify},
     }

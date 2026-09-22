@@ -814,15 +814,32 @@ class IdentifyStoryPlots(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         app.state.jobs = ParallelJobsManager()
+        patched = mock.patch("server.api.Gemini")
+        self.gemini = patched.start()
+        self.addCleanup(patched.stop)
+        cleared = mock.patch.dict(os.environ, {}, clear=False)
+        cleared.start()
+        os.environ.pop("GEMINI_API_KEY", None)
+        self.addCleanup(cleared.stop)
 
     def identify(self, cells: list[storydoc.Cell]) -> dict:
         client = TestClient(app)
         started = client.post(
             "/analyze/plots",
-            json={"path": "/stories/story.author", "text": storydoc.dumps(cells)},
+            json={
+                "path": "/stories/story.author",
+                "text": storydoc.dumps(cells),
+                "key": "k",
+                "model": "gemini-flash",
+            },
         )
         self.assertEqual(started.status_code, 202)
         return wait_for_story_plots(client, started.json()["id"])
+
+    def test_asks_gemini_with_the_authors_own_key_and_model(self) -> None:
+        self.identify([storydoc.Cell(storydoc.MARKDOWN, "The door.", {"id": "door"})])
+
+        self.gemini.assert_called_once_with("k", "gemini-flash")
 
     def test_names_every_paragraph_of_the_prose_by_where_it_stands_in_its_cell(
         self,
@@ -839,6 +856,7 @@ class IdentifyStoryPlots(unittest.TestCase):
         )
 
         self.assertIsNone(identified["error"])
+        self.assertEqual(identified["progress"], {"identified": 1, "sections": 1})
         self.assertEqual(
             [
                 (
@@ -868,10 +886,36 @@ class IdentifyStoryPlots(unittest.TestCase):
             ["door"],
         )
 
+    def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(
+        self,
+    ) -> None:
+        identified = self.identify([storydoc.chapter("One")])
+
+        self.assertIn("no prose", identified["error"])
+
+    def test_says_when_gemini_would_not_take_the_key(self) -> None:
+        with mock.patch(
+            "server.story_analysis.plots.identify_story_plots",
+            side_effect=GeminiError("Gemini refused the key.", unauthorized=True),
+        ):
+            identified = self.identify(
+                [storydoc.Cell(storydoc.MARKDOWN, "The door.", {"id": "door"})]
+            )
+
+        self.assertTrue(identified["unauthorized"])
+        self.assertFalse(identified["noQuota"])
+
+    def test_refuses_an_author_who_has_not_signed_in(self) -> None:
+        response = TestClient(app).post(
+            "/analyze/plots",
+            json={"path": "/stories/story.author", "text": ""},
+        )
+
+        self.assertEqual(response.status_code, 401)
+
     def test_refuses_to_report_on_a_job_it_never_started(self) -> None:
         response = TestClient(app).get("/analyze/plots/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
-
 
 if __name__ == "__main__":
     unittest.main()

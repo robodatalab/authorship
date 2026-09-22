@@ -3,7 +3,7 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class ToggleStoryPlotsCommand implements AuthorDocumentCommand {
     readonly commandName = "toggleStoryPlots";
-    readonly buttonGroup = "analysis";
+    readonly buttonGroup = "check";
     readonly iconClassName = "codicon codicon-layers";
     readonly tooltip = "Show or hide the plots the story weaves";
 

@@ -59,7 +59,7 @@ export function AuthorshipPanelGeminiAccount({
             </div>
             <div className="authorship-panel-account-why">
                 {label
-                    ? "Fixing style and grammar sends chapters to Google. Everything else runs on this machine."
+                    ? "Fixing style and identifying plots send chapters to Google. Everything else runs on this machine."
                     : "Only needed to fix style and grammar, which is the one tool that does not run on this machine."}
             </div>
             {label && (
