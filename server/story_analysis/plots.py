@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,6 +17,7 @@ _PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
 
 _CLOSEST_TO_CERTAIN = 1e-6
 _LOWEST_PROBABILITY_THAT_PASSES = 0.5
+_ALREADY_IN_A_PLOT = "[in a plot]"
 
 
 def _log_odds(probability: float) -> float:
@@ -61,6 +62,67 @@ def story_plot_pass_level(probabilities: Sequence[float]) -> StoryPlotPassLevel:
     return StoryPlotPassLevel(
         log_odds=float((below_the_cut[-1] + above_the_cut[0]) / 2),
         separation=_ashman_separation(below_the_cut, above_the_cut),
+    )
+
+
+@dataclass(frozen=True)
+class StoryParagraph:
+    cell_id: str
+    at: int
+    end: int
+    words: str
+
+
+@dataclass(frozen=True)
+class StoryPlotKeyEvent:
+    what_happened: str
+    found_in: int
+
+
+@dataclass(frozen=True)
+class StoryPlot:
+    title: str
+    characters: tuple[str, ...]
+    origin: str
+    goal: str
+    key_events: tuple[StoryPlotKeyEvent, ...] = ()
+
+
+def story_paragraphs(document: Document) -> list[StoryParagraph]:
+    return [
+        StoryParagraph(cell.unique_id, found.start(), found.end(), found.group())
+        for cell in storydoc.cells_of(document.cells, MARKDOWN)
+        for found in _PARAGRAPH.finditer(cell.source)
+    ]
+
+
+def the_story(
+    paragraphs: Sequence[StoryParagraph], in_a_plot: Collection[int] = ()
+) -> str:
+    return "\n\n".join(
+        f"{_ALREADY_IN_A_PLOT} {paragraph.words}"
+        if index in in_a_plot
+        else paragraph.words
+        for index, paragraph in enumerate(paragraphs)
+    )
+
+
+def story_plot_summary(
+    plot: StoryPlot, except_events_found_in: int | None = None
+) -> str:
+    happened = [
+        event.what_happened
+        for event in plot.key_events
+        if event.found_in != except_events_found_in
+    ]
+    return "\n".join(
+        [
+            f"Who is in it: {', '.join(plot.characters)}",
+            f"How it began: {plot.origin}",
+            f"Where it is heading: {plot.goal}",
+            "What has happened along it: "
+            + ("; ".join(happened) if happened else "nothing recorded yet"),
+        ]
     )
 
 
