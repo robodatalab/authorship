@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import math
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
+
+import numpy as np
 
 from server import storydoc
 from server.jobs import Job
@@ -10,6 +14,55 @@ from server.models.gemini import Gemini, GeminiError
 from server.storydoc import CHAPTER, MARKDOWN, PART, Document
 
 _PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
+
+_CLOSEST_TO_CERTAIN = 1e-6
+_LOWEST_PROBABILITY_THAT_PASSES = 0.5
+
+
+def _log_odds(probability: float) -> float:
+    clipped = min(max(probability, _CLOSEST_TO_CERTAIN), 1 - _CLOSEST_TO_CERTAIN)
+    return math.log(clipped / (1 - clipped))
+
+
+@dataclass(frozen=True)
+class StoryPlotPassLevel:
+    log_odds: float
+    separation: float
+
+    def admits(self, probability: float) -> bool:
+        return (
+            probability >= _LOWEST_PROBABILITY_THAT_PASSES
+            and _log_odds(probability) > self.log_odds
+        )
+
+
+def _ashman_separation(below_the_cut: np.ndarray, above_the_cut: np.ndarray) -> float:
+    spread = math.sqrt(below_the_cut.var() + above_the_cut.var())
+    if spread == 0:
+        return math.inf
+    return math.sqrt(2) * (above_the_cut.mean() - below_the_cut.mean()) / spread
+
+
+def story_plot_pass_level(probabilities: Sequence[float]) -> StoryPlotPassLevel:
+    scores = np.sort(np.array([_log_odds(probability) for probability in probabilities]))
+    if len(scores) < 2 or scores[0] == scores[-1]:
+        return StoryPlotPassLevel(math.inf, 0.0)
+    counted_below = np.arange(1, len(scores))
+    counted_above = len(scores) - counted_below
+    summed_below = np.cumsum(scores)[:-1]
+    summed_above = scores.sum() - summed_below
+    variance_between_the_sides = (
+        counted_below
+        * counted_above
+        * (summed_below / counted_below - summed_above / counted_above) ** 2
+    )
+    split = int(np.argmax(variance_between_the_sides)) + 1
+    below_the_cut, above_the_cut = scores[:split], scores[split:]
+    return StoryPlotPassLevel(
+        log_odds=float((below_the_cut[-1] + above_the_cut[0]) / 2),
+        separation=_ashman_separation(below_the_cut, above_the_cut),
+    )
+
 
 _FAKE_STORY_PLOTS = [
     {

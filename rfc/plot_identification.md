@@ -122,12 +122,17 @@ Stop when the last three rₖ are low — to begin with, about 2% of the story's
 barely differ from one another, or after 10 passes. Steady, low churn counts as settled: a
 few borderline paragraphs changing sides every pass is a steady state, not a reason to go on.
 
-## 9. Open
+## 9. Progress
+
+A run is many passes, each of them long, so the author has to be able to see where it is. The
+Plots panel shows the status of every pass and how far the current one has got.
+
+## 10. Open
 
 How to tell that every paragraph still outside a plot is filler, and not a plot we have yet
 to discover.
 
-## 10. Where it runs
+## 11. Where it runs
 
 The extension starts `/analyze/plots` with the document and the author's Gemini key and model,
 and polls `/analyze/plots/status`, which answers with the plots and the paragraphs in them as
