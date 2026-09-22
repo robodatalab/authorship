@@ -1,5 +1,6 @@
 """Backend API."""
 
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -39,8 +40,7 @@ GEC_MODEL = "Unbabel/gec-t5_small"
 CAUSAL_MODEL = "Qwen/Qwen3-8B"
 STYLE_MODEL = "gemini-3.1-pro-preview"
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+def deploy_inference_models(app: FastAPI) -> None:
     _log.info("Starting the completion models")
     cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
     causal_model = HuggingFaceImporter(CAUSAL_MODEL, Text2Text)
@@ -63,7 +63,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         family=style_model.family,
         suffix=style_model.suffix,
         run_name=cortexgrid.IMPORTED,
-        wait=True,
         timeout=cluster.DEPLOY_TIMEOUT_S,
     )
     app.state.style_model = style_model.client(style_deployment.url)
@@ -77,9 +76,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         STYLE_MODEL: style_deployment.key,
         STORY_PLOT_CLASSIFIER_NAME: story_plot_classifier_deployment.key,
     }
-    app.state.jobs = ParallelJobsManager()
     _log.info("Completion models created")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    app.state.inference_models = {}
+    app.state.jobs = ParallelJobsManager()
+    threading.Thread(target=deploy_inference_models, args=(app,), daemon=True).start()
     _log.info("Yielding control to FastAPI server")
     yield
     _log.info("FastAPI server terminated")

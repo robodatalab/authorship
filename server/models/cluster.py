@@ -37,7 +37,6 @@ def deploy(importer: Importer, **settings: str) -> cortexgrid.Deployment:
         family=importer.family,
         suffix=importer.suffix,
         run_name=cortexgrid.IMPORTED,
-        wait=True,
         timeout=DEPLOY_TIMEOUT_S,
         config=dict(settings),
     )

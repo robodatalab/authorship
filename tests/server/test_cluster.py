@@ -42,7 +42,6 @@ class Deploy(unittest.TestCase):
             family="Qwen3",
             suffix="8B",
             run_name=cortexgrid.IMPORTED,
-            wait=True,
             timeout=cluster.DEPLOY_TIMEOUT_S,
             config={},
         )
