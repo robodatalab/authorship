@@ -32,29 +32,34 @@ last.
 
 ## 3. Models
 
+Both stages run on open-weight models served from a backend we host ourselves. It is private —
+the story goes to hardware we run and no further — but it is not local, because the models need
+more memory than most authors' machines have. Running everything on the author's machine stays
+the aim.
+
 Two stages, two models.
 
-**Discovery** — summarising chapters, proposing plots, extracting key events — is prompting
-Gemini. It is open-ended generation, where a frontier model is at its best.
+**Discovery** — summarising chapters, proposing plots, extracting key events — is prompting a
+larger open-weight model. It is open-ended generation, where the most capable model we can host
+earns its cost.
 
-**Classification** runs on a local model from the start: Qwen3-8B, zero-shot, which the server
-already serves. Gemini is ruled out here for three reasons:
+**Classification** runs on a smaller model read for its logits: Qwen3-8B, zero-shot to begin
+with. Asking a model for its verdict, the way discovery does, would not do here:
 
-- The pass level (§5) needs real probabilities. Gemini exposes log-probabilities on some models
-  only, and a score it is asked to state bunches at 0.7, 0.8, 0.9 — a threshold on that is a
-  guess.
-- The same story and the same paragraph must give the same answer. Gemini at temperature 0 is
-  not guaranteed to; a forward pass is.
-- Every question needs the whole story. Locally the story is read once and its KV cache is
-  kept as a prefix, so each question is a few hundred tokens of suffix.
+- The pass level (§5) needs real probabilities. A score a model is asked to state bunches at
+  0.7, 0.8, 0.9 — a threshold on that is a guess.
+- The same story and the same paragraph must give the same answer. Sampling is not guaranteed
+  to; a forward pass is.
+- Every question needs the whole story. Serving the classifier ourselves lets the story be read
+  once and its KV cache kept as a prefix, so each question is a few hundred tokens of suffix.
 
 A 33k-word story is about 45k tokens, past Qwen3-8B's native 32k window, so it runs with YaRN
 extended to 128k.
 
 This is also the model we will fine-tune. The zero-shot classifier already has the final
 interface — story, plot and paragraph in, one probability out — so fine-tuning (LoRA, on
-labels from Gemini or from the author's corrections in the editor) changes the weights and
-nothing else.
+labels from the discovery model or from the author's corrections in the editor) changes the
+weights and nothing else.
 
 ## 4. The classifier
 
@@ -137,4 +142,5 @@ to discover.
 The extension starts `/analyze/plots` with the document and the author's Gemini key and model,
 and polls `/analyze/plots/status`, which answers with the plots and the paragraphs in them as
 they are found. The job is `StoryPlotsJob` in `server/story_analysis/plots.py`; until this
-algorithm is in, it returns fake plots.
+algorithm is in, it returns fake plots. The key and the model are Gemini's for now; they go when the job
+moves to the hosted backend.
