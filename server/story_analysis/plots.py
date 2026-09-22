@@ -13,7 +13,7 @@ from cortexgrid_infer import ServedCompletingModel
 
 from server import storydoc
 from server.jobs import Job
-from server.storydoc import CHAPTER, MARKDOWN, PART, Document
+from server.storydoc import MARKDOWN, Document
 from server.story_analysis.story_plot_classifier import (
     ServedStoryPlotClassifier,
     StoryPlotQuestion,
@@ -367,118 +367,177 @@ def _story_plots_named(answered: Any) -> list[StoryPlot]:
     ]
 
 
-_FAKE_STORY_PLOTS = [
-    {
-        "title": "The fall of the numbers",
-        "summary": "Fake data. A slow decline that nobody wants to own, "
-        "reported upwards one meeting at a time until it can no longer be "
-        "explained away.",
-    },
-    {
-        "title": "The rivalry at the top",
-        "summary": "Fake data. Two people who need each other and trust "
-        "each other less with every chapter, each waiting for the other to "
-        "make the first mistake.",
-    },
-    {
-        "title": "The thing in the servers",
-        "summary": "Fake data. Something is changing the platform from the "
-        "inside, and the only people who notice are the ones nobody listens to.",
-    },
-    {
-        "title": "The way home",
-        "summary": "Fake data. A private life kept at arm's length, which "
-        "keeps finding its way back into the working day.",
-    },
-]
+_PASSES_AT_MOST = 10
+_REASSIGNMENTS_OF_A_SETTLED_STORY = 0.02
+_PASSES_THAT_MUST_AGREE = 3
 
 
-def _fake_story_plot_indices(part_or_chapter: int, paragraph: int) -> list[int]:
-    beat = paragraph % 12
-    if beat == 11:
-        return []
-    leading = part_or_chapter % len(_FAKE_STORY_PLOTS)
-    indices = [leading]
-    if 4 <= beat <= 7:
-        indices.append((leading + 1) % len(_FAKE_STORY_PLOTS))
-    if beat in (6, 7):
-        indices.append((leading + 2) % len(_FAKE_STORY_PLOTS))
-    return indices
-
-
-def identify_story_plots(
-    model: ServedStoryPlotClassifier,
+async def identify_story_plots(
+    discovery_model: ServedCompletingModel,
+    classifier: ServedStoryPlotClassifier,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
-    progress: Callable[[int, int], None] = lambda identified, sections: None,
-    plots_named: Callable[[list[dict[str, Any]]], None] = lambda story_plots: None,
-    paragraph_placed: Callable[[dict[str, Any]], None] = lambda paragraph: None,
+    progress: Callable[[int, int, int], None] = lambda passes, scored, plots: None,
+    identified: Callable[
+        [list[dict[str, Any]], list[dict[str, Any]]], None
+    ] = lambda story_plots, paragraphs: None,
 ) -> None:
-    sections = [
-        cell
-        for cell in storydoc.cells_of(document.cells, MARKDOWN)
-        if cell.source.strip()
-    ]
-    if not sections:
+    paragraphs = story_paragraphs(document)
+    if not paragraphs:
         raise ValueError("There is no prose there to find the plots in.")
 
-    plots_named(list(_FAKE_STORY_PLOTS))
-    progress(0, len(sections))
-    identified = 0
-    part_or_chapter = 0
-    paragraph = 0
-    for cell in document.cells:
-        if cell.kind in (PART, CHAPTER):
-            part_or_chapter += 1
-            paragraph = 0
-            continue
-        if cell.kind != MARKDOWN or not cell.source.strip():
-            continue
+    story = the_story(paragraphs)
+    plots = await story_plots_in_the_chapters(discovery_model, document, cancelled)
+    claims: list[StoryPlotClaim] = []
+    reassignments: list[int] = []
+    for passes in range(1, _PASSES_AT_MOST + 1):
         if cancelled():
             return
-        for found in _PARAGRAPH.finditer(cell.source):
-            story_plot_indices = _fake_story_plot_indices(part_or_chapter, paragraph)
-            paragraph += 1
-            if story_plot_indices:
-                paragraph_placed(
-                    {
-                        "cellId": cell.unique_id,
-                        "startCharacterOffsetInCell": found.start(),
-                        "endCharacterOffsetInCell": found.end(),
-                        "wordsInTheCell": found.group(),
-                        "isVisible": True,
-                        "storyPlotIndices": story_plot_indices,
-                    }
-                )
-        identified += 1
-        progress(identified, len(sections))
+        scored = await one_pass(
+            classifier,
+            story,
+            paragraphs,
+            plots,
+            cancelled,
+            lambda of_the_plots, plots_to_score: progress(
+                passes, of_the_plots, plots_to_score
+            ),
+        )
+        if cancelled():
+            return
+        reassignments.append(_reassignments(claims, scored))
+        claims = [
+            replace(
+                claim,
+                plot=replace(
+                    claim.plot,
+                    key_events=_key_events_of(
+                        claim,
+                        await story_plot_key_events(
+                            discovery_model, claim.plot, paragraphs, claim.paragraphs
+                        ),
+                    ),
+                ),
+            )
+            for claim in scored
+        ]
+        identified(
+            _story_plots_told(claims),
+            _paragraphs_in_story_plots(claims, paragraphs),
+        )
+        if _settled(reassignments, len(paragraphs)):
+            return
+        found = await story_plots_in_what_no_plot_claims(
+            discovery_model, paragraphs, _claimed(claims)
+        )
+        plots = [claim.plot for claim in claims] + found
+
+
+def _key_events_of(
+    claim: StoryPlotClaim, found: tuple[StoryPlotKeyEvent, ...]
+) -> tuple[StoryPlotKeyEvent, ...]:
+    return tuple(
+        dict.fromkeys(
+            tuple(
+                event
+                for event in claim.plot.key_events
+                if event.found_in in claim.paragraphs
+            )
+            + found
+        )
+    )
+
+
+def _claimed(claims: Sequence[StoryPlotClaim]) -> set[int]:
+    return {paragraph for claim in claims for paragraph in claim.paragraphs}
+
+
+def _reassignments(
+    before: Sequence[StoryPlotClaim], after: Sequence[StoryPlotClaim]
+) -> int:
+    was = {
+        (claim.plot.title, paragraph)
+        for claim in before
+        for paragraph in claim.paragraphs
+    }
+    now = {
+        (claim.plot.title, paragraph)
+        for claim in after
+        for paragraph in claim.paragraphs
+    }
+    return len(was ^ now)
+
+
+def _settled(reassignments: Sequence[int], paragraphs: int) -> bool:
+    if len(reassignments) < _PASSES_THAT_MUST_AGREE:
+        return False
+    return (
+        max(reassignments[-_PASSES_THAT_MUST_AGREE:])
+        <= paragraphs * _REASSIGNMENTS_OF_A_SETTLED_STORY
+    )
+
+
+def _story_plots_told(claims: Sequence[StoryPlotClaim]) -> list[dict[str, Any]]:
+    return [
+        {"title": claim.plot.title, "summary": story_plot_summary(claim.plot)}
+        for claim in claims
+    ]
+
+
+def _paragraphs_in_story_plots(
+    claims: Sequence[StoryPlotClaim], paragraphs: Sequence[StoryParagraph]
+) -> list[dict[str, Any]]:
+    in_story_plots: dict[int, list[int]] = {}
+    for index, claim in enumerate(claims):
+        for paragraph in sorted(claim.paragraphs):
+            in_story_plots.setdefault(paragraph, []).append(index)
+    return [
+        {
+            "cellId": paragraphs[paragraph].cell_id,
+            "startCharacterOffsetInCell": paragraphs[paragraph].at,
+            "endCharacterOffsetInCell": paragraphs[paragraph].end,
+            "wordsInTheCell": paragraphs[paragraph].words,
+            "isVisible": True,
+            "storyPlotIndices": story_plot_indices,
+        }
+        for paragraph, story_plot_indices in sorted(in_story_plots.items())
+    ]
 
 
 class StoryPlotsJob(Job):
     kind = "identify plots"
 
-    def __init__(self, model: ServedStoryPlotClassifier, document: Document) -> None:
+    def __init__(
+        self,
+        discovery_model: ServedCompletingModel,
+        classifier: ServedStoryPlotClassifier,
+        document: Document,
+    ) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
-        self._model = model
+        self._discovery_model = discovery_model
+        self._classifier = classifier
         self._document = document
         self.story_plots: list[dict[str, Any]] = []
         self.paragraphs_in_story_plots: list[dict[str, Any]] = []
-        self.identified = 0
-        self.to_identify = 0
+        self.passes = 0
+        self.scored = 0
+        self.to_score = 0
 
     async def execute(self) -> None:
-        identify_story_plots(
-            self._model,
+        await identify_story_plots(
+            self._discovery_model,
+            self._classifier,
             self._document,
             lambda: self.cancelled,
             self._reached,
-            self._named,
-            self.paragraphs_in_story_plots.append,
+            self._identified,
         )
 
-    def _reached(self, identified: int, sections: int) -> None:
-        self.identified, self.to_identify = identified, sections
+    def _reached(self, passes: int, scored: int, plots: int) -> None:
+        self.passes, self.scored, self.to_score = passes, scored, plots
 
-    def _named(self, story_plots: list[dict[str, Any]]) -> None:
-        self.story_plots = story_plots
+    def _identified(
+        self, story_plots: list[dict[str, Any]], paragraphs: list[dict[str, Any]]
+    ) -> None:
+        self.story_plots, self.paragraphs_in_story_plots = story_plots, paragraphs

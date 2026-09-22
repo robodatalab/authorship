@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
+from server.story_analysis.plots import STORY_PLOT_KEY_EVENTS_INSTRUCTION
 
 
 DEFAULT_REPLY = (
@@ -731,11 +732,49 @@ def wait_for_story_plots(client: TestClient, job_id: str, timeout: float = 5.0) 
     raise AssertionError(f"plot identification {job_id} did not finish within {timeout}s")
 
 
+A_STORY_PLOT = (
+    '[{"title": "The crush", "characters": ["Bob", "Alice"], '
+    '"origin": "Bob has a crush on Alice", "goal": "Bob gets a date"}]'
+)
+
+THE_SCENE = "\n\n".join(
+    [
+        "The lantern had gone out.",
+        "The door stood open.\nNobody came.",
+        "Bob waited for Alice.",
+        "Alice came down the stairs.",
+    ]
+)
+
+
+def build_fake_story_plot_discovery_model() -> mock.MagicMock:
+    model = mock.MagicMock()
+    model.complete.side_effect = lambda messages, **_: streamed(
+        "[]"
+        if messages[0]["content"] == STORY_PLOT_KEY_EVENTS_INSTRUCTION
+        else A_STORY_PLOT
+    )
+    return model
+
+
+def build_fake_story_plot_classifier(*probabilities: float) -> mock.MagicMock:
+    classifier = mock.MagicMock()
+
+    async def scored(story: str, questions: list[object]) -> list[float]:
+        return list(probabilities)
+
+    classifier.probabilities.side_effect = scored
+    return classifier
+
+
 class IdentifyStoryPlots(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         app.state.jobs = ParallelJobsManager()
-        app.state.story_plot_classifier = mock.MagicMock()
+        app.state.style_model = build_fake_story_plot_discovery_model()
+        app.state.story_plot_classifier = build_fake_story_plot_classifier(
+            0.02, 0.03, 0.9, 0.95
+        )
 
     def identify(self, cells: list[storydoc.Cell]) -> dict:
         client = TestClient(app)
@@ -746,22 +785,31 @@ class IdentifyStoryPlots(unittest.TestCase):
         self.assertEqual(started.status_code, 202)
         return wait_for_story_plots(client, started.json()["id"])
 
-    def test_names_every_paragraph_of_the_prose_by_where_it_stands_in_its_cell(
+    def test_names_the_plots_it_found_and_what_they_are_about(self) -> None:
+        identified = self.identify(
+            [
+                storydoc.chapter("One"),
+                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "lantern"}),
+            ]
+        )
+
+        self.assertIsNone(identified["error"])
+        self.assertEqual(
+            [plot["title"] for plot in identified["storyPlots"]], ["The crush"]
+        )
+        self.assertIn("Bob has a crush on Alice", identified["storyPlots"][0]["summary"])
+        self.assertEqual(identified["progress"], {"passes": 4, "scored": 2, "plots": 2})
+
+    def test_places_the_paragraphs_a_plot_claims_by_where_they_stand_in_the_cell(
         self,
     ) -> None:
         identified = self.identify(
             [
                 storydoc.chapter("One"),
-                storydoc.Cell(
-                    storydoc.MARKDOWN,
-                    "The lantern had gone out.\n\nThe door stood open.\nNobody came.",
-                    {"id": "lantern"},
-                ),
+                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "lantern"}),
             ]
         )
 
-        self.assertIsNone(identified["error"])
-        self.assertEqual(identified["progress"], {"identified": 1, "sections": 1})
         self.assertEqual(
             [
                 (
@@ -769,12 +817,13 @@ class IdentifyStoryPlots(unittest.TestCase):
                     paragraph["startCharacterOffsetInCell"],
                     paragraph["endCharacterOffsetInCell"],
                     paragraph["wordsInTheCell"],
+                    paragraph["storyPlotIndices"],
                 )
                 for paragraph in identified["paragraphsInStoryPlots"]
             ],
             [
-                ("lantern", 0, 25, "The lantern had gone out."),
-                ("lantern", 27, 60, "The door stood open.\nNobody came."),
+                ("lantern", 62, 83, "Bob waited for Alice.", [0]),
+                ("lantern", 85, 112, "Alice came down the stairs.", [0]),
             ],
         )
 
@@ -782,13 +831,13 @@ class IdentifyStoryPlots(unittest.TestCase):
         identified = self.identify(
             [
                 storydoc.Cell(storydoc.NOTE, "Remember the lantern.", {"id": "note"}),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
+                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "door"}),
             ]
         )
 
         self.assertEqual(
-            [paragraph["cellId"] for paragraph in identified["paragraphsInStoryPlots"]],
-            ["door"],
+            {paragraph["cellId"] for paragraph in identified["paragraphsInStoryPlots"]},
+            {"door"},
         )
 
     def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(

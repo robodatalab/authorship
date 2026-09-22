@@ -11,9 +11,12 @@ from cortexgrid_infer import CompletionChunk
 from server import storydoc
 from server.storydoc import Document
 from server.story_analysis.plots import (
+    STORY_PLOT_KEY_EVENTS_INSTRUCTION,
+    UNCLAIMED_PLOTS_REQUEST,
     StoryParagraph,
     StoryPlot,
     StoryPlotKeyEvent,
+    identify_story_plots,
     one_pass,
     story_paragraphs,
     story_plot_key_events,
@@ -40,7 +43,7 @@ def a_story_plot(title: str, **told: Any) -> StoryPlot:
 
 
 def build_classifier(*answers: list[float]) -> mock.MagicMock:
-    scored = iter(answers)
+    scored = itertools.cycle(answers)
 
     async def probabilities(story: str, questions: list[Any]) -> list[float]:
         return list(next(scored))
@@ -85,6 +88,47 @@ A_CHAPTER_PLOT = """[
         "goal": "Bob gets a date with Alice"
     }
 ]"""
+
+ANOTHER_PLOT = """[
+    {
+        "title": "The rivalry",
+        "characters": ["Bob", "Mara"],
+        "origin": "Mara wants what Bob has",
+        "goal": "one of them leaves"
+    }
+]"""
+
+STORY = storydoc.dumps(
+    [
+        storydoc.chapter("One"),
+        storydoc.Cell(
+            storydoc.MARKDOWN,
+            "\n\n".join(f"Paragraph {index}" for index in range(6)),
+            {"id": "scene"},
+        ),
+    ]
+)
+
+
+def build_discovery_model(
+    chapters: str = A_CHAPTER_PLOT,
+    key_events: str = "[]",
+    unclaimed: str = "[]",
+) -> mock.MagicMock:
+    def answer(messages: list[dict[str, str]], **_: Any) -> AsyncIterator[Any]:
+        if messages[0]["content"] == STORY_PLOT_KEY_EVENTS_INSTRUCTION:
+            return streamed(key_events)
+        if UNCLAIMED_PLOTS_REQUEST in messages[1]["content"]:
+            return streamed(unclaimed)
+        return streamed(chapters)
+
+    model = mock.MagicMock()
+    model.complete.side_effect = answer
+    return model
+
+
+def ran(*arguments: Any, **named: Any) -> None:
+    asyncio.run(identify_story_plots(*arguments, **named))
 
 
 class StoryPlotPassLevel(unittest.TestCase):
@@ -357,6 +401,109 @@ class KeyEventsOfAStoryPlot(unittest.TestCase):
         )
 
         self.assertEqual(events, (StoryPlotKeyEvent("Bob approached Alice", 1),))
+
+
+class IdentifyingTheStoryPlots(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.identified: list[tuple[list[Any], list[Any]]] = []
+
+    def test_hands_over_the_plots_and_the_paragraphs_in_them(self) -> None:
+        classifier = build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95])
+
+        ran(
+            build_discovery_model(),
+            classifier,
+            Document(STORY),
+            identified=lambda plots, paragraphs: self.identified.append(
+                (plots, paragraphs)
+            ),
+        )
+
+        plots, paragraphs = self.identified[-1]
+        self.assertEqual([plot["title"] for plot in plots], ["The crush"])
+        self.assertIn("Bob has a crush on Alice", plots[0]["summary"])
+        self.assertEqual(
+            paragraphs,
+            [
+                {
+                    "cellId": "scene",
+                    "startCharacterOffsetInCell": 52,
+                    "endCharacterOffsetInCell": 63,
+                    "wordsInTheCell": "Paragraph 4",
+                    "isVisible": True,
+                    "storyPlotIndices": [0],
+                },
+                {
+                    "cellId": "scene",
+                    "startCharacterOffsetInCell": 65,
+                    "endCharacterOffsetInCell": 76,
+                    "wordsInTheCell": "Paragraph 5",
+                    "isVisible": True,
+                    "storyPlotIndices": [0],
+                },
+            ],
+        )
+
+    def test_passes_until_the_assignments_stop_changing(self) -> None:
+        classifier = build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95])
+
+        ran(build_discovery_model(), classifier, Document(STORY))
+
+        self.assertEqual(classifier.probabilities.call_count, 4)
+
+    def test_gives_up_on_a_story_that_never_settles(self) -> None:
+        classifier = build_classifier(
+            [0.02, 0.03, 0.05, 0.04, 0.9, 0.95],
+            [0.9, 0.95, 0.05, 0.04, 0.02, 0.03],
+        )
+
+        ran(build_discovery_model(), classifier, Document(STORY))
+
+        self.assertEqual(classifier.probabilities.call_count, 10)
+
+    def test_a_plot_found_in_what_no_plot_claimed_is_scored_in_the_next_pass(
+        self,
+    ) -> None:
+        classifier = build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95])
+
+        ran(
+            build_discovery_model(unclaimed=ANOTHER_PLOT),
+            classifier,
+            Document(STORY),
+        )
+
+        self.assertEqual(
+            [
+                asked_about(classifier, scored)[0].plot.splitlines()[0]
+                for scored in range(3)
+            ],
+            ["The crush", "The crush", "The rivalry"],
+        )
+
+    def test_the_key_events_a_pass_found_are_told_to_the_next_one(self) -> None:
+        classifier = build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95])
+
+        ran(
+            build_discovery_model(
+                key_events='[{"paragraph": 4, "what_happened": "Bob asked Alice out"}]'
+            ),
+            classifier,
+            Document(STORY),
+        )
+
+        first, second = asked_about(classifier, 0), asked_about(classifier, 1)
+        self.assertNotIn("Bob asked Alice out", first[5].plot)
+        self.assertIn("Bob asked Alice out", second[5].plot)
+        self.assertNotIn("Bob asked Alice out", second[4].plot)
+
+    def test_a_document_with_no_prose_is_an_error(self) -> None:
+        with self.assertRaises(ValueError):
+            ran(
+                build_discovery_model(),
+                build_classifier([]),
+                Document(storydoc.dumps([storydoc.chapter("One")])),
+            )
 
 
 if __name__ == "__main__":
