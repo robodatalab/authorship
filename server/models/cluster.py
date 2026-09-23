@@ -24,7 +24,13 @@ def import_weights(
         )
 
 
-def deploy(importer: Importer, **settings: str) -> cortexgrid.Deployment:
+def ensure_weights_imported(importer: Importer) -> None:
+    imported = cortexgrid.model_registry_status(
+        importer.family, importer.suffix, cortexgrid.IMPORTED
+    )
+    if imported is not None and imported.phase == "ready":
+        import_weights(importer, importer.requirements(), importer.config())
+        return
     cortexgrid.remote(
         import_weights,
         importer,
@@ -33,6 +39,9 @@ def deploy(importer: Importer, **settings: str) -> cortexgrid.Deployment:
         num_gpus=0,
         num_cpus=2,
     ).result(timeout=IMPORT_TIMEOUT_S)
+
+
+def deploy(importer: Importer, **settings: str) -> cortexgrid.Deployment:
     return cortexgrid.deploy_model(
         family=importer.family,
         suffix=importer.suffix,

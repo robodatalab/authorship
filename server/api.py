@@ -13,71 +13,16 @@ from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.story_analysis.plots import StoryPlotsJob
-from server.story_analysis.story_plot_classifier import (
-    STORY_PLOT_CLASSIFIER_NAME,
-    StoryPlotClassifier,
-    deploy_story_plot_classifier,
-)
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
-from server.models import cluster
+from server.models.inference_models import deploy_inference_models
 import cortexgrid
-from cortexgrid_infer import (
-    GeminiText2Text,
-    Hosted,
-    HuggingFaceImporter,
-    ServedCompletingModel,
-    Text2Text,
-    TextRewriter,
-)
+from cortexgrid_infer import ServedCompletingModel
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
 from server.storydoc import Document
 
 _log = log.logger(__name__)
-
-GEC_MODEL = "Unbabel/gec-t5_small"
-CAUSAL_MODEL = "Qwen/Qwen3-8B"
-STYLE_MODEL = "gemini-3.1-pro-preview"
-
-def deploy_inference_models(app: FastAPI) -> None:
-    _log.info("Starting the completion models")
-    cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
-    causal_model = HuggingFaceImporter(CAUSAL_MODEL, Text2Text)
-    causal_deployment = cluster.deploy(
-        causal_model, enable_thinking="false", max_total_tokens="16384"
-    )
-    app.state.causal_model = causal_model.client(causal_deployment.url)
-    app.state.inference_models[CAUSAL_MODEL] = causal_deployment.key
-    gec_model = HuggingFaceImporter(GEC_MODEL, TextRewriter)
-    gec_deployment = cluster.deploy(gec_model)
-    app.state.gec_model = gec_model.client(gec_deployment.url)
-    app.state.inference_models[GEC_MODEL] = gec_deployment.key
-    style_model = Hosted(STYLE_MODEL, GeminiText2Text)
-    cortexgrid.register_model(
-        style_model.serve_app,
-        family=style_model.family,
-        suffix=style_model.suffix,
-        requirements=style_model.requirements(),
-        config=style_model.config(),
-    )
-    style_deployment = cortexgrid.deploy_model(
-        family=style_model.family,
-        suffix=style_model.suffix,
-        run_name=cortexgrid.IMPORTED,
-        timeout=cluster.DEPLOY_TIMEOUT_S,
-    )
-    app.state.style_model = style_model.client(style_deployment.url)
-    app.state.inference_models[STYLE_MODEL] = style_deployment.key
-    story_plot_classifier_deployment = deploy_story_plot_classifier()
-    app.state.story_plot_classifier = StoryPlotClassifier.client(
-        story_plot_classifier_deployment.url, STORY_PLOT_CLASSIFIER_NAME
-    )
-    app.state.inference_models[STORY_PLOT_CLASSIFIER_NAME] = (
-        story_plot_classifier_deployment.key
-    )
-    _log.info("Completion models created")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:

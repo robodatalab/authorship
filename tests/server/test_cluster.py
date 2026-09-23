@@ -12,11 +12,53 @@ def build_fake_importer() -> mock.MagicMock:
     return importer
 
 
+class EnsureWeightsImported(unittest.TestCase):
+    def setUp(self) -> None:
+        patched = mock.patch.multiple(
+            "server.models.cluster.cortexgrid",
+            remote=mock.DEFAULT,
+            model_registry_status=mock.DEFAULT,
+        )
+        self.cortexgrid = patched.start()
+        self.addCleanup(patched.stop)
+
+    def test_a_model_not_yet_imported_is_imported_on_the_cluster(self) -> None:
+        self.cortexgrid["model_registry_status"].return_value = None
+        importer = build_fake_importer()
+
+        cluster.ensure_weights_imported(importer)
+
+        job, *arguments = self.cortexgrid["remote"].call_args.args
+        self.assertIs(job, cluster.import_weights)
+        self.assertEqual(arguments[0], importer)
+        self.assertEqual(arguments[1], importer.requirements.return_value)
+        self.assertEqual(arguments[2], importer.config.return_value)
+        self.assertEqual(self.cortexgrid["remote"].call_args.kwargs["num_gpus"], 0)
+        self.cortexgrid["remote"].return_value.result.assert_called_once()
+
+    def test_an_imported_model_is_refreshed_here_without_a_job_on_the_cluster(
+        self,
+    ) -> None:
+        self.cortexgrid["model_registry_status"].return_value = mock.Mock(
+            phase="ready"
+        )
+        importer = build_fake_importer()
+
+        with mock.patch("server.models.cluster.import_weights") as import_weights:
+            cluster.ensure_weights_imported(importer)
+
+        self.cortexgrid["remote"].assert_not_called()
+        import_weights.assert_called_once_with(
+            importer,
+            importer.requirements.return_value,
+            importer.config.return_value,
+        )
+
+
 class Deploy(unittest.TestCase):
     def setUp(self) -> None:
         patched = mock.patch.multiple(
             "server.models.cluster.cortexgrid",
-            Experiment=mock.DEFAULT,
             remote=mock.DEFAULT,
             deploy_model=mock.DEFAULT,
         )
@@ -26,18 +68,10 @@ class Deploy(unittest.TestCase):
             url="http://serve/Qwen3/8B"
         )
 
-    def test_imports_the_weights_on_the_cluster_before_deploying(self) -> None:
-        importer = build_fake_importer()
+    def test_deploys_the_imported_model_without_importing_it(self) -> None:
+        cluster.deploy(build_fake_importer())
 
-        cluster.deploy(importer)
-
-        job, *arguments = self.cortexgrid["remote"].call_args.args
-        self.assertIs(job, cluster.import_weights)
-        self.assertEqual(arguments[0], importer)
-        self.assertEqual(arguments[1], importer.requirements.return_value)
-        self.assertEqual(arguments[2], importer.config.return_value)
-        self.assertEqual(self.cortexgrid["remote"].call_args.kwargs["num_gpus"], 0)
-        self.cortexgrid["remote"].return_value.result.assert_called_once()
+        self.cortexgrid["remote"].assert_not_called()
         self.cortexgrid["deploy_model"].assert_called_once_with(
             family="Qwen3",
             suffix="8B",

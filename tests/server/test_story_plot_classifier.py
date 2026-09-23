@@ -88,7 +88,6 @@ class DeployingTheClassifier(unittest.TestCase):
         patched = mock.patch.multiple(
             "server.story_analysis.story_plot_classifier.cortexgrid",
             Experiment=mock.DEFAULT,
-            remote=mock.DEFAULT,
             register_model=mock.DEFAULT,
             deploy_model=mock.DEFAULT,
         )
@@ -97,14 +96,6 @@ class DeployingTheClassifier(unittest.TestCase):
         self.cortexgrid["deploy_model"].return_value = mock.Mock(
             url="http://serve/Authorship/storyplotclassifier"
         )
-
-    def test_stages_the_base_model_it_is_built_on(self) -> None:
-        deploy_story_plot_classifier()
-
-        job, *arguments = self.cortexgrid["remote"].call_args.args
-        self.assertIs(job, cluster.import_weights)
-        self.assertEqual(arguments[0].model_id, STORY_PLOT_CLASSIFIER_BASE_MODEL)
-        self.cortexgrid["remote"].return_value.result.assert_called_once()
 
     def test_is_registered_under_its_own_name_with_no_weights_of_its_own(self) -> None:
         deploy_story_plot_classifier()

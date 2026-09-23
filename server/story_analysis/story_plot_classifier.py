@@ -124,15 +124,6 @@ def base_model_importer(model_id: str) -> HuggingFaceImporter:
 
 
 def deploy_story_plot_classifier() -> cortexgrid.Deployment:
-    base_model = base_model_importer(STORY_PLOT_CLASSIFIER_BASE_MODEL)
-    cortexgrid.remote(
-        cluster.import_weights,
-        base_model,
-        base_model.requirements(),
-        base_model.config(),
-        num_gpus=0,
-        num_cpus=2,
-    ).result(timeout=cluster.IMPORT_TIMEOUT_S)
     cortexgrid.register_model(
         StoryPlotClassifier,
         family=STORY_PLOT_CLASSIFIER_FAMILY,
