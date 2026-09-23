@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import re
+import time
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -31,6 +33,8 @@ _FENCED = re.compile(r"```[a-zA-Z]*\n(.*?)\n```", re.DOTALL)
 THINKING_HEADROOM = 8192
 STORY_PLOTS_TOKENS = 1024
 PARAGRAPHS_READ_FOR_KEY_EVENTS = 40
+PARAGRAPHS_SCORED_AT_A_TIME = 25
+CHAPTERS_READ_AT_A_TIME = 8
 STORY_PLOT_KEY_EVENTS_TOKENS = 1200
 
 
@@ -152,18 +156,30 @@ async def story_plot_probabilities(
     story: str,
     paragraphs: Sequence[StoryParagraph],
     plot: StoryPlot,
+    scored: Callable[[int], None] = lambda paragraphs: None,
 ) -> list[float]:
-    return await classifier.probabilities(
-        story,
-        [
-            StoryPlotQuestion(
-                plot=f"{plot.title}\n"
-                f"{story_plot_summary(plot, except_events_found_in=index)}",
-                paragraph=paragraph.words,
+    probabilities: list[float] = []
+    for first in range(0, len(paragraphs), PARAGRAPHS_SCORED_AT_A_TIME):
+        asked_now = list(
+            enumerate(
+                paragraphs[first : first + PARAGRAPHS_SCORED_AT_A_TIME], start=first
             )
-            for index, paragraph in enumerate(paragraphs)
-        ],
-    )
+        )
+        probabilities.extend(
+            await classifier.probabilities(
+                story,
+                [
+                    StoryPlotQuestion(
+                        plot=f"{plot.title}\n"
+                        f"{story_plot_summary(plot, except_events_found_in=index)}",
+                        paragraph=paragraph.words,
+                    )
+                    for index, paragraph in asked_now
+                ],
+            )
+        )
+        scored(len(asked_now))
+    return probabilities
 
 
 async def one_pass(
@@ -172,15 +188,23 @@ async def one_pass(
     paragraphs: Sequence[StoryParagraph],
     plots: Sequence[StoryPlot],
     cancelled: Callable[[], bool] = lambda: False,
-    progress: Callable[[int, int], None] = lambda scored, of_plots: None,
+    progress: Callable[[int, int], None] = lambda scored, to_score: None,
 ) -> list[StoryPlotClaim]:
     claims: list[StoryPlotClaim] = []
-    progress(0, len(plots))
+    to_score = len(paragraphs) * len(plots)
+    scored_so_far = 0
+    progress(0, to_score)
+
+    def scored(paragraphs_now: int) -> None:
+        nonlocal scored_so_far
+        scored_so_far += paragraphs_now
+        progress(scored_so_far, to_score)
+
     for plot in plots:
         if cancelled():
             return []
         probabilities = await story_plot_probabilities(
-            classifier, story, paragraphs, plot
+            classifier, story, paragraphs, plot, scored
         )
         pass_level = story_plot_pass_level(probabilities)
         claims.append(
@@ -194,7 +218,6 @@ async def one_pass(
                 separation=pass_level.separation,
             )
         )
-        progress(len(claims), len(plots))
     return united(
         [
             claim
@@ -282,13 +305,19 @@ async def story_plots_in_the_chapters(
     model: ServedCompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
+    read: Callable[[int, int], None] = lambda chapters_read, chapters: None,
 ) -> list[StoryPlot]:
-    named: list[StoryPlot] = []
-    for title, prose in document.chapters:
-        if cancelled():
-            return []
-        named.extend(
-            _story_plots_named(
+    chapters = document.chapters
+    read(0, len(chapters))
+    one_at_a_time = asyncio.Semaphore(CHAPTERS_READ_AT_A_TIME)
+    chapters_read = 0
+
+    async def plots_in(title: str, prose: str) -> list[StoryPlot]:
+        nonlocal chapters_read
+        async with one_at_a_time:
+            if cancelled():
+                return []
+            named = _story_plots_named(
                 await _answered(
                     model,
                     STORY_PLOT_DISCOVERY_INSTRUCTION,
@@ -296,8 +325,17 @@ async def story_plots_in_the_chapters(
                     STORY_PLOTS_TOKENS,
                 )
             )
+        chapters_read += 1
+        read(chapters_read, len(chapters))
+        return named
+
+    return [
+        plot
+        for named in await asyncio.gather(
+            *(plots_in(title, prose) for title, prose in chapters)
         )
-    return named
+        for plot in named
+    ]
 
 
 async def story_plots_in_what_no_plot_claims(
@@ -390,6 +428,43 @@ def _story_plots_named(answered: Any) -> list[StoryPlot]:
     ]
 
 
+FINDING_THE_PLOTS = "plots"
+ATTRIBUTING_THE_PASSAGES = "paragraphs"
+UPDATING_THE_PLOTS = "events"
+
+
+@dataclass(frozen=True)
+class StoryPlotsStep:
+    passes: int
+    doing: str
+    done: int
+    of: int
+    running: bool = True
+
+
+@dataclass
+class StoryPlotsStepTaken:
+    step: StoryPlotsStep
+    began: float | None = None
+    ended: float | None = None
+
+    def how_far_along(self, now: float) -> dict[str, Any]:
+        return {
+            "passes": self.step.passes,
+            "doing": self.step.doing,
+            "done": self.step.done,
+            "of": self.step.of,
+            "seconds": 0.0
+            if self.began is None
+            else round((self.ended if self.ended is not None else now) - self.began, 1),
+            "state": "waiting"
+            if self.began is None
+            else "running"
+            if self.ended is None
+            else "done",
+        }
+
+
 _PASSES_AT_MOST = 10
 _REASSIGNMENTS_OF_A_SETTLED_STORY = 0.02
 _PASSES_THAT_MUST_AGREE = 3
@@ -400,7 +475,7 @@ async def identify_story_plots(
     classifier: ServedStoryPlotClassifier,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
-    progress: Callable[[int, int, int], None] = lambda passes, scored, plots: None,
+    progress: Callable[[StoryPlotsStep], None] = lambda step: None,
     identified: Callable[
         [list[dict[str, Any]], list[dict[str, Any]]], None
     ] = lambda story_plots, paragraphs: None,
@@ -410,50 +485,76 @@ async def identify_story_plots(
         raise ValueError("There is no prose there to find the plots in.")
 
     story = the_story(paragraphs)
-    plots = await story_plots_in_the_chapters(discovery_model, document, cancelled)
+    plots = await story_plots_in_the_chapters(
+        discovery_model,
+        document,
+        cancelled,
+        lambda chapters_read, chapters: progress(
+            StoryPlotsStep(1, FINDING_THE_PLOTS, chapters_read, chapters)
+        ),
+    )
     claims: list[StoryPlotClaim] = []
     reassignments: list[int] = []
     for passes in range(1, _PASSES_AT_MOST + 1):
         if cancelled():
             return
+        progress(
+            StoryPlotsStep(
+                passes,
+                ATTRIBUTING_THE_PASSAGES,
+                0,
+                len(paragraphs) * len(plots),
+                running=False,
+            )
+        )
+        progress(
+            StoryPlotsStep(passes, UPDATING_THE_PLOTS, 0, len(plots), running=False)
+        )
         scored = await one_pass(
             classifier,
             story,
             paragraphs,
             plots,
             cancelled,
-            lambda of_the_plots, plots_to_score: progress(
-                passes, of_the_plots, plots_to_score
+            lambda read, to_read: progress(
+                StoryPlotsStep(passes, ATTRIBUTING_THE_PASSAGES, read, to_read)
             ),
         )
         if cancelled():
             return
         reassignments.append(_reassignments(claims, scored))
-        claims = [
-            replace(
-                claim,
-                plot=replace(
-                    claim.plot,
-                    key_events=_key_events_of(
-                        claim,
-                        await story_plot_key_events(
-                            discovery_model, claim.plot, paragraphs, claim.paragraphs
+        claims = []
+        progress(StoryPlotsStep(passes, UPDATING_THE_PLOTS, 0, len(scored)))
+        for claim in scored:
+            claims.append(
+                replace(
+                    claim,
+                    plot=replace(
+                        claim.plot,
+                        key_events=_key_events_of(
+                            claim,
+                            await story_plot_key_events(
+                                discovery_model, claim.plot, paragraphs, claim.paragraphs
+                            ),
                         ),
                     ),
-                ),
+                )
             )
-            for claim in scored
-        ]
+            progress(
+                StoryPlotsStep(passes, UPDATING_THE_PLOTS, len(claims), len(scored))
+            )
         identified(
             _story_plots_told(claims),
             _paragraphs_in_story_plots(claims, paragraphs),
         )
         if _settled(reassignments, len(paragraphs)):
             return
+        progress(StoryPlotsStep(passes + 1, FINDING_THE_PLOTS, 0, 1))
         found = await story_plots_in_what_no_plot_claims(
             discovery_model, paragraphs, _claimed(claims)
         )
         plots = [claim.plot for claim in claims] + found
+        progress(StoryPlotsStep(passes + 1, FINDING_THE_PLOTS, 1, 1))
 
 
 def _key_events_of(
@@ -543,22 +644,41 @@ class StoryPlotsJob(Job):
         self._document = document
         self.story_plots: list[dict[str, Any]] = []
         self.paragraphs_in_story_plots: list[dict[str, Any]] = []
-        self.passes = 0
-        self.scored = 0
-        self.to_score = 0
+        self._taken: dict[tuple[int, str], StoryPlotsStepTaken] = {}
+        self._running: StoryPlotsStepTaken | None = None
 
     async def execute(self) -> None:
-        await identify_story_plots(
-            self._discovery_model,
-            self._classifier,
-            self._document,
-            lambda: self.cancelled,
-            self._reached,
-            self._identified,
-        )
+        try:
+            await identify_story_plots(
+                self._discovery_model,
+                self._classifier,
+                self._document,
+                lambda: self.cancelled,
+                self._reached,
+                self._identified,
+            )
+        finally:
+            self._stopped_working()
 
-    def _reached(self, passes: int, scored: int, plots: int) -> None:
-        self.passes, self.scored, self.to_score = passes, scored, plots
+    def how_far_along(self) -> list[dict[str, Any]]:
+        now = time.monotonic()
+        return [taken.how_far_along(now) for taken in self._taken.values()]
+
+    def _reached(self, step: StoryPlotsStep) -> None:
+        taken = self._taken.setdefault(
+            (step.passes, step.doing), StoryPlotsStepTaken(step)
+        )
+        taken.step = step
+        if not step.running or taken is self._running:
+            return
+        self._stopped_working()
+        taken.began, taken.ended = time.monotonic(), None
+        self._running = taken
+
+    def _stopped_working(self) -> None:
+        if self._running is not None:
+            self._running.ended = time.monotonic()
+            self._running = None
 
     def _identified(
         self, story_plots: list[dict[str, Any]], paragraphs: list[dict[str, Any]]

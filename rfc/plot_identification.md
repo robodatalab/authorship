@@ -116,7 +116,9 @@ paragraph's result depend on the order the paragraphs were read in.
 
 **First**, go through the story chapter by chapter and have the discovery model summarise the
 main theme of each as a plot — characters, origin, goal. It answers in JSON, which is the
-only place in this design where a model is asked for a structure rather than for prose.
+only place in this design where a model is asked for a structure rather than for prose. The
+chapters do not depend on one another, so several are read at once; read one at a time, a
+novel's worth of chapters is minutes of waiting before the first pass can start.
 
 **Then**, after each pass, look at the paragraphs no plot claimed. The model sees the whole
 story, with the paragraphs already in plots marked `[in a plot]` rather than removed — a plot
@@ -133,10 +135,23 @@ few borderline paragraphs changing sides every pass is a steady state, not a rea
 
 ## 9. Progress
 
-A run is many passes, each of them long, so the author has to be able to see where it is. The
-Plots panel says which pass is being read and how many of its plots have been scored, and the
-plots and their paragraphs are redrawn at the end of every pass rather than kept until the
-run settles.
+A run is many passes, each of them long, so the author has to be able to see where it is.
+
+The job reports a step at a time — which pass, what it is doing, how far through it is — and
+the Plots panel draws them as a bar each: reading the chapters, then a drawer per pass
+holding the three things a pass does. **Finding plots** is the discovery that fed the pass,
+**attributing passages** is the scoring, and **updating plots** is the key events being read.
+The pass being worked on is the open drawer.
+
+A pass announces what each of its steps will cost before it starts them, so a pass's own bar
+is the work done over the work there is rather than the steps finished over three — and the
+scoring, which is nearly all of the work, is nearly all of the bar. The job times each step
+and the panel shows that time, running or finished, because a step that is waiting on a model
+looks exactly like a step that has hung.
+
+Paragraphs are scored in batches rather than a plot at a time, so that count moves while a
+plot is still being read. The plots and their paragraphs are redrawn at the end of every pass
+rather than kept until the run settles.
 
 ## 10. Open
 

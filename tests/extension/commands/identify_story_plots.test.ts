@@ -20,9 +20,12 @@ const THE_DOOR = {
 
 const THE_QUEST = { title: "The quest", summary: "Someone goes looking." };
 
-const NO_PASSES_YET = { passes: 0, scored: 0, plots: 0 };
+const NOTHING_READ_YET: unknown[] = [];
 
-const A_SECOND_PASS = { passes: 2, scored: 1, plots: 3 };
+const A_SECOND_PASS = [
+    { passes: 0, doing: "chapters", done: 24, of: 24 },
+    { passes: 2, doing: "paragraphs", done: 120, of: 400 },
+];
 
 function serverAnswers(...jobs: Record<string, unknown>[]): {
     url: string;
@@ -44,7 +47,7 @@ function serverAnswers(...jobs: Record<string, unknown>[]): {
                               noQuota: false,
                               storyPlots: [],
                               paragraphsInStoryPlots: [],
-                              progress: NO_PASSES_YET,
+                              progress: NOTHING_READ_YET,
                               ...(answers.length > 1
                                   ? answers.shift()
                                   : answers[0]),
@@ -86,14 +89,14 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [],
-                storyPlotsProgress: NO_PASSES_YET,
+                storyPlotsProgress: NOTHING_READ_YET,
                 paragraphsInStoryPlots: [],
             },
             {
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [THE_QUEST],
-                storyPlotsProgress: NO_PASSES_YET,
+                storyPlotsProgress: NOTHING_READ_YET,
                 paragraphsInStoryPlots: [THE_DOOR],
             },
             {

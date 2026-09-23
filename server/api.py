@@ -334,9 +334,5 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "error": job.error,
         "storyPlots": job.story_plots,
         "paragraphsInStoryPlots": job.paragraphs_in_story_plots,
-        "progress": {
-            "passes": job.passes,
-            "scored": job.scored,
-            "plots": job.to_score,
-        },
+        "progress": job.how_far_along(),
     }

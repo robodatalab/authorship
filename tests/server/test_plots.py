@@ -3,6 +3,7 @@ import itertools
 import math
 import unittest
 from collections.abc import AsyncIterator
+from pathlib import PurePath
 from typing import Any
 from unittest import mock
 
@@ -10,8 +11,12 @@ from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
 from server.storydoc import Document
+from server.story_analysis.plots import StoryPlotsJob
 from server.story_analysis.plots import (
+    ATTRIBUTING_THE_PASSAGES,
+    FINDING_THE_PLOTS,
     PARAGRAPHS_READ_FOR_KEY_EVENTS,
+    UPDATING_THE_PLOTS,
     STORY_PLOTS_TOKENS,
     STORY_PLOT_KEY_EVENTS_INSTRUCTION,
     THINKING_HEADROOM,
@@ -389,7 +394,7 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
             STORY_PLOTS_TOKENS + THINKING_HEADROOM,
         )
 
-    def test_cancelling_stops_before_the_next_chapter_is_read(self) -> None:
+    def test_cancelling_leaves_the_chapters_that_were_not_read(self) -> None:
         model = build_model(A_CHAPTER_PLOT, A_CHAPTER_PLOT)
         document = Document(
             storydoc.dumps(
@@ -404,8 +409,35 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
 
         plots = discovered(model, document, lambda: model.complete.call_count > 0)
 
-        self.assertEqual(plots, [])
+        self.assertEqual([plot.title for plot in plots], ["The crush"])
         self.assertEqual(model.complete.call_count, 1)
+
+    def test_the_chapters_are_read_side_by_side(self) -> None:
+        model = build_model(*[A_CHAPTER_PLOT] * 3)
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("One"),
+                    storydoc.markdown("The lantern had gone out."),
+                    storydoc.chapter("Two"),
+                    storydoc.markdown("The door stood open."),
+                    storydoc.chapter("Three"),
+                    storydoc.markdown("Nobody came."),
+                ]
+            )
+        )
+        read: list[tuple[int, int]] = []
+
+        plots = discovered(
+            model,
+            document,
+            read=lambda chapters_read, chapters: read.append(
+                (chapters_read, chapters)
+            ),
+        )
+
+        self.assertEqual(len(plots), 3)
+        self.assertEqual(read, [(0, 3), (1, 3), (2, 3), (3, 3)])
 
     def test_what_no_plot_claims_is_read_with_the_claimed_paragraphs_marked(
         self,
@@ -482,6 +514,66 @@ class KeyEventsOfAStoryPlot(unittest.TestCase):
         )
 
         self.assertEqual(events, (StoryPlotKeyEvent("Bob approached Alice", 1),))
+
+
+class TheStepsAJobSays(unittest.TestCase):
+    def build_job(self, classifier: mock.MagicMock) -> StoryPlotsJob:
+        return StoryPlotsJob(
+            build_discovery_model(),
+            classifier,
+            Document(STORY, PurePath("/stories/story.author")),
+        )
+
+    def test_names_every_step_of_the_run_in_the_order_it_was_worked_on(self) -> None:
+        job = self.build_job(build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95]))
+
+        asyncio.run(job.execute())
+
+        self.assertEqual(
+            [(step["passes"], step["doing"]) for step in job.how_far_along()][:4],
+            [
+                (1, FINDING_THE_PLOTS),
+                (1, ATTRIBUTING_THE_PASSAGES),
+                (1, UPDATING_THE_PLOTS),
+                (2, FINDING_THE_PLOTS),
+            ],
+        )
+        self.assertTrue(
+            all(step["state"] == "done" for step in job.how_far_along()),
+            job.how_far_along(),
+        )
+
+    def test_says_what_is_running_and_what_is_still_to_come(self) -> None:
+        seen: list[list[dict[str, Any]]] = []
+        classifier = mock.MagicMock()
+
+        async def probabilities(story: str, questions: list[Any]) -> list[float]:
+            seen.append(job.how_far_along())
+            return [0.02, 0.03, 0.05, 0.04, 0.9, 0.95]
+
+        classifier.probabilities.side_effect = probabilities
+        job = self.build_job(classifier)
+
+        asyncio.run(job.execute())
+
+        self.assertEqual(
+            [(step["doing"], step["state"], step["of"]) for step in seen[0]],
+            [
+                (FINDING_THE_PLOTS, "done", 1),
+                (ATTRIBUTING_THE_PASSAGES, "running", 6),
+                (UPDATING_THE_PLOTS, "waiting", 1),
+            ],
+        )
+
+    def test_times_every_step_it_has_worked_on(self) -> None:
+        job = self.build_job(build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95]))
+
+        asyncio.run(job.execute())
+
+        self.assertTrue(
+            all(step["seconds"] >= 0 for step in job.how_far_along()),
+            job.how_far_along(),
+        )
 
 
 class IdentifyingTheStoryPlots(unittest.TestCase):

@@ -10,7 +10,7 @@ import {
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
     ParagraphInStoryPlots,
-    StoryPlotsProgress,
+    StoryPlotsStep,
     StoryPlot,
 } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
@@ -71,7 +71,7 @@ async function mountCanvas(options: {
     cellRenderers?: AuthorDocumentCellRenderers;
     storyPlotsAreShown?: boolean;
     storyPlots?: StoryPlot[];
-    storyPlotsProgress?: StoryPlotsProgress | null;
+    storyPlotsProgress?: StoryPlotsStep[] | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
 }): Promise<void> {
     posted = [];
@@ -944,7 +944,7 @@ describe("the plots the story weaves", () => {
 
     async function mountStoryPlots(
         storyPlotsAreShown: boolean,
-        storyPlotsProgress: StoryPlotsProgress | null = null,
+        storyPlotsProgress: StoryPlotsStep[] | null = null,
     ) {
         await mountCanvas({
             cells: [markdownCell("The door.", "m1")],
@@ -960,12 +960,36 @@ describe("the plots the story weaves", () => {
         return document.querySelector(".author-file-editor-story-plots");
     }
 
-    function howFarAlong(): string | undefined {
-        return (
-            storyPlotsPanel()?.querySelector(
-                ".author-file-editor-story-plots-progress",
-            )?.textContent ?? undefined
+    function aStep(
+        passes: number,
+        doing: StoryPlotsStep["doing"],
+        done: number,
+        of: number,
+        state: StoryPlotsStep["state"] = "done",
+        seconds = 0,
+    ): StoryPlotsStep {
+        return { passes, doing, done, of, seconds, state };
+    }
+
+    function stepsShown(): string[] {
+        return [
+            ...(storyPlotsPanel()?.querySelectorAll(
+                ".author-file-editor-story-plots-step-says",
+            ) ?? []),
+        ].map((says) =>
+            [...says.childNodes]
+                .map((said) => said.textContent?.trim())
+                .filter(Boolean)
+                .join(" "),
         );
+    }
+
+    function countsShown(): string[] {
+        return [
+            ...(storyPlotsPanel()?.querySelectorAll(
+                ".author-file-editor-story-plots-step-counted:not(.author-file-editor-story-plots-step-counted-filled)",
+            ) ?? []),
+        ].map((counted) => counted.textContent ?? "");
     }
 
     it("draws neither the panel nor the borders until they are shown", async () => {
@@ -991,26 +1015,93 @@ describe("the plots the story weaves", () => {
         ).toBe("1");
     });
 
-    it("says which pass is being read while the plots are identified", async () => {
-        await mountStoryPlots(true, { passes: 2, scored: 1, plots: 3 });
+    it("gives every pass a drawer saying what it does and for how long", async () => {
+        await mountStoryPlots(true, [
+            aStep(1, "plots", 24, 24, "done", 31),
+            aStep(1, "paragraphs", 100, 400, "running", 80),
+        ]);
 
-        expect(howFarAlong()).toBe("Pass 2 — 1 of 3 plots read");
-    });
-
-    it("says it is reading the chapters before the first pass", async () => {
-        await mountCanvas({
-            cells: [markdownCell("The door.", "m1")],
-            storyPlotsAreShown: true,
-            storyPlots: [],
-            storyPlotsProgress: { passes: 0, scored: 0, plots: 0 },
-        });
-
-        expect(howFarAlong()).toBe("Reading the chapters\u2026");
+        expect(stepsShown()).toEqual([
+            "Pass 1 1:51",
+            "finding plots 0:31",
+            "attributing passages 1:20 / 5:20",
+            "updating plots",
+        ]);
+        expect(countsShown()).toEqual(["", "24 of 24", "100 of 400", ""]);
         expect(
             storyPlotsPanel()?.querySelector(
                 ".author-file-editor-story-plots-none",
             ),
         ).toBeNull();
+    });
+
+    it("fills a pass by the work done, not by the steps finished", async () => {
+        await mountStoryPlots(true, [
+            aStep(1, "plots", 1, 1, "done"),
+            aStep(1, "paragraphs", 100, 400, "running"),
+            aStep(1, "events", 0, 4, "waiting"),
+        ]);
+
+        expect(
+            storyPlotsPanel()!.querySelector<HTMLElement>(
+                "summary .author-file-editor-story-plots-step-bar > span",
+            )!.style.width,
+        ).toBe("25%");
+    });
+
+    it("opens the pass it is on and closes the ones behind it", async () => {
+        await mountStoryPlots(true, [
+            aStep(1, "events", 2, 2, "done"),
+            aStep(2, "paragraphs", 40, 800, "running"),
+        ]);
+
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plots-pass",
+                ),
+            ].map((pass) => (pass as HTMLDetailsElement).open),
+        ).toEqual([false, true]);
+    });
+
+    it("can be dragged wider by its edge", async () => {
+        await mountStoryPlots(true);
+        const panel = storyPlotsPanel() as HTMLElement;
+        const edge = panel.querySelector(
+            ".author-file-editor-story-plots-edge",
+        )!;
+
+        await act(async () => {
+            edge.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    clientX: 500,
+                    bubbles: true,
+                }),
+            );
+            window.dispatchEvent(
+                new PointerEvent("pointermove", { clientX: 420 }),
+            );
+        });
+
+        expect(panel.style.width).toBe("360px");
+    });
+
+    it("says which step is running and which is still to come", async () => {
+        await mountStoryPlots(true, [
+            aStep(1, "plots", 3, 3, "done"),
+            aStep(1, "paragraphs", 120, 400, "running"),
+        ]);
+
+        const inThePass = [
+            ...storyPlotsPanel()!
+                .querySelector(".author-file-editor-story-plots-pass")!
+                .querySelectorAll(
+                    ":scope > .author-file-editor-story-plots-step",
+                ),
+        ].map((step) => step.className);
+        expect(inThePass[0]).toContain("step-done");
+        expect(inThePass[1]).toContain("step-running");
+        expect(inThePass[2]).toContain("step-waiting");
     });
 
     it("asks for the plots to be identified", async () => {

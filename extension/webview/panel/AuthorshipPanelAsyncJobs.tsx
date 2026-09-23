@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
+import { timeItHasTaken } from "../elapsed_time";
 import "./AuthorshipPanelAsyncJobs.css";
 
 export interface AsyncJobStatus {
@@ -11,19 +12,6 @@ export interface AsyncJobStatus {
     status: string;
     cancelled: boolean;
     secondsRunning: number;
-}
-
-function timeTheJobHasRun(secondsRunning: number): string {
-    const seconds = Math.max(0, Math.round(secondsRunning));
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    if (hours > 0) {
-        return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
-    }
-    if (minutes > 0) {
-        return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
-    }
-    return `${seconds}s`;
 }
 
 interface AuthorshipPanelAsyncJobsProps {
@@ -77,7 +65,7 @@ export function AuthorshipPanelAsyncJobs({
                         }
                         title={job.cancelled ? "stopping" : job.status}
                     >
-                        {timeTheJobHasRun(job.secondsRunning)}
+                        {timeItHasTaken(job.secondsRunning)}
                     </span>
                     {/* Only a job nobody has stopped yet: pressing it twice asks
                         the server for something it is already doing. The one

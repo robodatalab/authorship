@@ -13,7 +13,7 @@ import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
-    StoryPlotsProgress,
+    StoryPlotsStep,
 } from "../vscode_runtime/commands/identify_story_plots";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -39,7 +39,7 @@ interface WhatTheWebviewDraws {
     proseErrors: ProseCheckError[];
     storyPlotsAreShown: boolean;
     storyPlots: StoryPlot[];
-    storyPlotsProgress: StoryPlotsProgress | null;
+    storyPlotsProgress: StoryPlotsStep[] | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -83,8 +83,8 @@ function processMessageFromVscode(
     } else if (message.data?.type === "storyPlots") {
         drawn.storyPlotsAreShown = message.data.storyPlotsAreShown as boolean;
         drawn.storyPlots = message.data.storyPlots as StoryPlot[];
-        drawn.storyPlotsProgress = message.data
-            .storyPlotsProgress as StoryPlotsProgress | null;
+        drawn.storyPlotsProgress = message.data.storyPlotsProgress as
+            StoryPlotsStep[] | null;
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
     } else if (message.data?.type === "cellsBeingWritten") {

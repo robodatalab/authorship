@@ -17,22 +17,21 @@ export interface ParagraphInStoryPlots extends SynchronizedRepresentation {
     storyPlotIndices: number[];
 }
 
-export interface StoryPlotsProgress {
+export interface StoryPlotsStep {
     passes: number;
-    scored: number;
-    plots: number;
+    doing: "plots" | "paragraphs" | "events";
+    done: number;
+    of: number;
+    seconds: number;
+    state: "waiting" | "running" | "done";
 }
 
-const BEFORE_THE_FIRST_PASS: StoryPlotsProgress = {
-    passes: 0,
-    scored: 0,
-    plots: 0,
-};
+const NOTHING_READ_YET: StoryPlotsStep[] = [];
 
 interface StoryPlotsJob extends ServerJob {
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
-    progress: StoryPlotsProgress;
+    progress: StoryPlotsStep[];
 }
 
 export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
@@ -47,7 +46,7 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
             });
-            session.identifyingStoryPlots(BEFORE_THE_FIRST_PASS);
+            session.identifyingStoryPlots(NOTHING_READ_YET);
             const identified = await awaitServerJob<StoryPlotsJob>(
                 STORY_PLOTS_STATUS,
                 jobId,

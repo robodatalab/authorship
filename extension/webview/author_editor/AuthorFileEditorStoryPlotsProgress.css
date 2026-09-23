@@ -1,0 +1,100 @@
+.author-file-editor-story-plots-progress {
+    margin-bottom: 12px;
+}
+
+.author-file-editor-story-plots-step {
+    display: grid;
+    grid-template-columns: 10px 1fr;
+    column-gap: 8px;
+    align-items: center;
+    margin: 6px 0;
+}
+
+.author-file-editor-story-plots-step-dot {
+    width: 9px;
+    height: 9px;
+    border: 1px solid var(--vscode-descriptionForeground);
+    border-radius: 50%;
+}
+
+.author-file-editor-story-plots-step-running
+    .author-file-editor-story-plots-step-dot {
+    border-color: var(--vscode-progressBar-background);
+}
+
+.author-file-editor-story-plots-step-done
+    .author-file-editor-story-plots-step-dot {
+    background: var(--vscode-progressBar-background);
+    border-color: var(--vscode-progressBar-background);
+}
+
+.author-file-editor-story-plots-step-bar {
+    position: relative;
+    display: block;
+    height: 16px;
+    overflow: hidden;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+    border-radius: 8px;
+}
+
+.author-file-editor-story-plots-step-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    background: var(--vscode-progressBar-background);
+}
+
+.author-file-editor-story-plots-step-counted {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.author-file-editor-story-plots-step-counted-filled {
+    color: var(--vscode-editor-background);
+}
+
+.author-file-editor-story-plots-step-says {
+    display: flex;
+    grid-column: 2;
+    gap: 8px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-plots-step-says > :first-child {
+    flex: 1;
+}
+
+.author-file-editor-story-plots-step-running
+    .author-file-editor-story-plots-step-says {
+    color: var(--vscode-foreground);
+}
+
+.author-file-editor-story-plots-step-took {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.author-file-editor-story-plots-pass > summary {
+    cursor: pointer;
+}
+
+.author-file-editor-story-plots-pass
+    > summary
+    .author-file-editor-story-plots-step {
+    display: inline-grid;
+    width: calc(100% - 20px);
+    vertical-align: middle;
+}
+
+.author-file-editor-story-plots-pass > .author-file-editor-story-plots-step {
+    margin-left: 18px;
+}

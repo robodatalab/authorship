@@ -798,7 +798,16 @@ class IdentifyStoryPlots(unittest.TestCase):
             [plot["title"] for plot in identified["storyPlots"]], ["The crush"]
         )
         self.assertIn("Bob has a crush on Alice", identified["storyPlots"][0]["summary"])
-        self.assertEqual(identified["progress"], {"passes": 4, "scored": 2, "plots": 2})
+        self.assertEqual(
+            [
+                (step["passes"], step["doing"], step["state"])
+                for step in identified["progress"][:3]
+            ],
+            [(1, "plots", "done"), (1, "paragraphs", "done"), (1, "events", "done")],
+        )
+        self.assertEqual(
+            identified["progress"][-1]["passes"], 4
+        )
 
     def test_places_the_paragraphs_a_plot_claims_by_where_they_stand_in_the_cell(
         self,
