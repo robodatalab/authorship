@@ -1,52 +1,11 @@
 from __future__ import annotations
 
-import logging
-
 import cortexgrid
-import httpx
 from cortexgrid_infer import Importer
-from tenacity import (
-    RetryCallState,
-    before_sleep_log,
-    retry,
-    retry_if_exception,
-    wait_fixed,
-)
-
-from server import log
-from server.jobs import the_job_in_hand
-
-_log = log.logger(__name__)
 
 EXPERIMENT_NAME = "authorship"
 IMPORT_TIMEOUT_S = 3600.0
 DEPLOY_TIMEOUT_S = 3600.0
-
-WHILE_A_MODEL_IS_NOT_THERE = frozenset({502, 503, 504})
-WAIT_BETWEEN_TRIES_S = 10.0
-
-
-def a_model_that_is_not_there_yet(failure: BaseException) -> bool:
-    if isinstance(failure, httpx.TransportError):
-        return True
-    return (
-        isinstance(failure, httpx.HTTPStatusError)
-        and failure.response.status_code in WHILE_A_MODEL_IS_NOT_THERE
-    )
-
-
-def the_job_was_stopped(asking_again: RetryCallState) -> bool:
-    job = the_job_in_hand.get()
-    return job is not None and job.cancelled
-
-
-waiting_for_the_model = retry(
-    retry=retry_if_exception(a_model_that_is_not_there_yet),
-    stop=the_job_was_stopped,
-    wait=wait_fixed(WAIT_BETWEEN_TRIES_S),
-    before_sleep=before_sleep_log(_log, logging.WARNING),
-    reraise=True,
-)
 
 
 def import_weights(

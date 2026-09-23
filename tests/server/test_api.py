@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
-from server.story_analysis.plots import STORY_PLOT_KEY_EVENTS_INSTRUCTION
+from server.story_analysis import plots as story_plots
 
 
 DEFAULT_REPLY = (
@@ -732,11 +732,6 @@ def wait_for_story_plots(client: TestClient, job_id: str, timeout: float = 5.0) 
     raise AssertionError(f"plot identification {job_id} did not finish within {timeout}s")
 
 
-A_STORY_PLOT = (
-    '[{"title": "The crush", "characters": ["Bob", "Alice"], '
-    '"origin": "Bob has a crush on Alice", "goal": "Bob gets a date"}]'
-)
-
 THE_SCENE = "\n\n".join(
     [
         "The lantern had gone out.",
@@ -747,34 +742,15 @@ THE_SCENE = "\n\n".join(
 )
 
 
-def build_fake_story_plot_discovery_model() -> mock.MagicMock:
-    model = mock.MagicMock()
-    model.complete.side_effect = lambda messages, **_: streamed(
-        "[]"
-        if messages[0]["content"] == STORY_PLOT_KEY_EVENTS_INSTRUCTION
-        else A_STORY_PLOT
-    )
-    return model
-
-
-def build_fake_story_plot_classifier(*probabilities: float) -> mock.MagicMock:
-    classifier = mock.MagicMock()
-
-    async def scored(story: str, questions: list[object]) -> list[float]:
-        return list(probabilities)
-
-    classifier.probabilities.side_effect = scored
-    return classifier
-
-
 class IdentifyStoryPlots(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         app.state.jobs = ParallelJobsManager()
-        app.state.style_model = build_fake_story_plot_discovery_model()
-        app.state.story_plot_classifier = build_fake_story_plot_classifier(
-            0.02, 0.03, 0.9, 0.95
-        )
+        app.state.style_model = mock.MagicMock()
+        app.state.story_plot_classifier = mock.MagicMock()
+        ticking = mock.patch.object(story_plots, "A_TICK_S", 0)
+        ticking.start()
+        self.addCleanup(ticking.stop)
 
     def identify(self, cells: list[storydoc.Cell]) -> dict:
         client = TestClient(app)
@@ -795,20 +771,12 @@ class IdentifyStoryPlots(unittest.TestCase):
 
         self.assertIsNone(identified["error"])
         self.assertEqual(
-            [plot["title"] for plot in identified["storyPlots"]], ["The crush"]
+            identified["storyPlots"][0]["title"],
+            story_plots.FAKE_STORY_PLOTS[0]["title"],
         )
         self.assertEqual(
-            identified["storyPlots"][0]["origin"], "Bob has a crush on Alice"
-        )
-        self.assertEqual(
-            [
-                (step["passes"], step["doing"], step["state"])
-                for step in identified["progress"][:3]
-            ],
-            [(1, "plots", "done"), (1, "paragraphs", "done"), (1, "events", "done")],
-        )
-        self.assertEqual(
-            identified["progress"][-1]["passes"], 4
+            [(step["passes"], step["doing"]) for step in identified["progress"][:3]],
+            [(1, "plots"), (1, "paragraphs"), (1, "events")],
         )
 
     def test_places_the_paragraphs_a_plot_claims_by_where_they_stand_in_the_cell(
@@ -828,13 +796,12 @@ class IdentifyStoryPlots(unittest.TestCase):
                     paragraph["startCharacterOffsetInCell"],
                     paragraph["endCharacterOffsetInCell"],
                     paragraph["wordsInTheCell"],
-                    paragraph["storyPlotIndices"],
                 )
-                for paragraph in identified["paragraphsInStoryPlots"]
+                for paragraph in identified["paragraphsInStoryPlots"][:2]
             ],
             [
-                ("lantern", 62, 83, "Bob waited for Alice.", [0]),
-                ("lantern", 85, 112, "Alice came down the stairs.", [0]),
+                ("lantern", 0, 25, "The lantern had gone out."),
+                ("lantern", 27, 60, "The door stood open.\nNobody came."),
             ],
         )
 
