@@ -498,6 +498,26 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
         self.assertEqual(len(plots), 3)
         self.assertEqual(read, [(0, 3), (1, 3), (2, 3), (3, 3)])
 
+    def test_names_the_plots_of_each_chapter_as_it_is_read(self) -> None:
+        model = build_model(*[A_CHAPTER_PLOT] * 3)
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("One"),
+                    storydoc.markdown("The lantern had gone out."),
+                    storydoc.chapter("Two"),
+                    storydoc.markdown("The door stood open."),
+                    storydoc.chapter("Three"),
+                    storydoc.markdown("Nobody came."),
+                ]
+            )
+        )
+        named: list[int] = []
+
+        discovered(model, document, named=lambda sofar: named.append(len(sofar)))
+
+        self.assertEqual(named, [1, 2, 3])
+
     def test_what_no_plot_claims_is_read_with_the_claimed_paragraphs_marked(
         self,
     ) -> None:

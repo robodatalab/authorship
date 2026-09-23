@@ -328,18 +328,20 @@ async def story_plots_in_the_chapters(
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     read: Callable[[int, int], None] = lambda chapters_read, chapters: None,
+    named: Callable[[list[StoryPlot]], None] = lambda plots_so_far: None,
 ) -> list[StoryPlot]:
     chapters = document.chapters
     read(0, len(chapters))
     one_at_a_time = asyncio.Semaphore(CHAPTERS_READ_AT_A_TIME)
     chapters_read = 0
+    found: list[StoryPlot] = []
 
-    async def plots_in(title: str, prose: str) -> list[StoryPlot]:
+    async def plots_in(title: str, prose: str) -> None:
         nonlocal chapters_read
         async with one_at_a_time:
             if cancelled():
-                return []
-            named = _story_plots_named(
+                return
+            in_this_chapter = _story_plots_named(
                 await _answered(
                     model,
                     STORY_PLOT_DISCOVERY_INSTRUCTION,
@@ -348,16 +350,12 @@ async def story_plots_in_the_chapters(
                 )
             )
         chapters_read += 1
+        found.extend(in_this_chapter)
         read(chapters_read, len(chapters))
-        return named
+        named(list(found))
 
-    return [
-        plot
-        for named in await asyncio.gather(
-            *(plots_in(title, prose) for title, prose in chapters)
-        )
-        for plot in named
-    ]
+    await asyncio.gather(*(plots_in(title, prose) for title, prose in chapters))
+    return found
 
 
 async def story_plots_pooled(
@@ -536,6 +534,7 @@ async def identify_story_plots(
         lambda chapters_read, chapters: progress(
             StoryPlotsStep(1, FINDING_THE_PLOTS, chapters_read, chapters)
         ),
+        lambda sofar: identified(_story_plots_told(sofar), []),
     )
     _log.info("%d plots proposed by the chapters of %s", len(plots), document.path)
     plots = await story_plots_pooled(discovery_model, plots, MOST_PLOTS_A_STORY_HAS)
