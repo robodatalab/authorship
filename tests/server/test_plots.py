@@ -11,6 +11,7 @@ from cortexgrid_infer import CompletionChunk
 from server import storydoc
 from server.storydoc import Document
 from server.story_analysis.plots import (
+    PARAGRAPHS_READ_FOR_KEY_EVENTS,
     STORY_PLOT_KEY_EVENTS_INSTRUCTION,
     UNCLAIMED_PLOTS_REQUEST,
     StoryParagraph,
@@ -29,6 +30,12 @@ from server.story_analysis.plots import (
 PARAGRAPHS = [
     StoryParagraph("scene", at, at + 10, f"Paragraph {at // 10}")
     for at in range(0, 60, 10)
+]
+
+
+PARAGRAPHS_OF_A_LONG_PLOT = [
+    StoryParagraph("scene", at * 10, at * 10 + 10, f"Paragraph {at}")
+    for at in range(PARAGRAPHS_READ_FOR_KEY_EVENTS + 1)
 ]
 
 
@@ -385,6 +392,26 @@ class KeyEventsOfAStoryPlot(unittest.TestCase):
             ),
         )
         self.assertIn("1. Paragraph 1\n\n4. Paragraph 4", read_by(model))
+
+    def test_are_read_a_batch_of_paragraphs_at_a_time(self) -> None:
+        last = PARAGRAPHS_READ_FOR_KEY_EVENTS
+        model = build_model(
+            '[{"paragraph": 0, "what_happened": "Bob approached Alice"}]',
+            f'[{{"paragraph": {last}, "what_happened": "Bob asked Alice out"}}]',
+        )
+
+        events = asyncio.run(
+            story_plot_key_events(
+                model,
+                a_story_plot("The crush"),
+                PARAGRAPHS_OF_A_LONG_PLOT,
+                set(range(last + 1)),
+            )
+        )
+
+        self.assertEqual(model.complete.call_count, 2)
+        self.assertEqual([event.found_in for event in events], [0, last])
+        self.assertNotIn(f"{last}. Paragraph {last}", read_by(model, 0))
 
     def test_an_event_put_in_a_paragraph_the_plot_does_not_claim_is_dropped(
         self,

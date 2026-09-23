@@ -29,6 +29,7 @@ _OVERLAP_THAT_MAKES_ONE_PLOT = 0.7
 _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(.*)\n```\s*\Z", re.DOTALL)
 
 STORY_PLOTS_TOKENS = 640
+PARAGRAPHS_READ_FOR_KEY_EVENTS = 40
 STORY_PLOT_KEY_EVENTS_TOKENS = 1200
 
 
@@ -319,21 +320,26 @@ async def story_plot_key_events(
     paragraphs: Sequence[StoryParagraph],
     claimed: Collection[int],
 ) -> tuple[StoryPlotKeyEvent, ...]:
-    read = "\n\n".join(
-        f"{index}. {paragraphs[index].words}" for index in sorted(claimed)
-    )
-    happened = await _answered(
-        model,
-        STORY_PLOT_KEY_EVENTS_INSTRUCTION,
-        f"The plot:\n{plot.title}\n{story_plot_summary(plot)}\n\n"
-        f"Its paragraphs:\n\n{read}",
-        STORY_PLOT_KEY_EVENTS_TOKENS,
-    )
-    return tuple(
-        StoryPlotKeyEvent(str(event["what_happened"]), int(event["paragraph"]))
-        for event in happened
-        if int(event["paragraph"]) in claimed
-    )
+    in_the_plot = sorted(claimed)
+    found: list[StoryPlotKeyEvent] = []
+    for first in range(0, len(in_the_plot), PARAGRAPHS_READ_FOR_KEY_EVENTS):
+        read_now = set(in_the_plot[first : first + PARAGRAPHS_READ_FOR_KEY_EVENTS])
+        read = "\n\n".join(
+            f"{index}. {paragraphs[index].words}" for index in sorted(read_now)
+        )
+        happened = await _answered(
+            model,
+            STORY_PLOT_KEY_EVENTS_INSTRUCTION,
+            f"The plot:\n{plot.title}\n{story_plot_summary(plot)}\n\n"
+            f"Its paragraphs:\n\n{read}",
+            STORY_PLOT_KEY_EVENTS_TOKENS,
+        )
+        found.extend(
+            StoryPlotKeyEvent(str(event["what_happened"]), int(event["paragraph"]))
+            for event in happened
+            if int(event["paragraph"]) in read_now
+        )
+    return tuple(found)
 
 
 async def _answered(
