@@ -12,7 +12,9 @@ from server import storydoc
 from server.storydoc import Document
 from server.story_analysis.plots import (
     PARAGRAPHS_READ_FOR_KEY_EVENTS,
+    STORY_PLOTS_TOKENS,
     STORY_PLOT_KEY_EVENTS_INSTRUCTION,
+    THINKING_HEADROOM,
     UNCLAIMED_PLOTS_REQUEST,
     StoryParagraph,
     StoryPlot,
@@ -334,6 +336,58 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
         plots = discovered(model, document)
 
         self.assertEqual([plot.title for plot in plots], ["The crush"])
+
+    def test_the_json_is_read_out_of_whatever_the_model_says_around_it(self) -> None:
+        model = build_model(
+            f"Here are the plots I found.\n\n```json\n{A_CHAPTER_PLOT}\n```\n\n"
+            "Let me know if you would like more."
+        )
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [plot.title for plot in discovered(model, document)], ["The crush"]
+        )
+
+    def test_an_answer_with_no_json_in_it_says_what_came_back(self) -> None:
+        model = build_model("I would rather not.")
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                ]
+            )
+        )
+
+        with self.assertRaises(ValueError) as refused:
+            discovered(model, document)
+
+        self.assertIn("I would rather not.", str(refused.exception))
+
+    def test_the_model_is_left_room_to_think_before_it_answers(self) -> None:
+        model = build_model(A_CHAPTER_PLOT)
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                ]
+            )
+        )
+
+        discovered(model, document)
+
+        self.assertEqual(
+            model.complete.call_args.kwargs["max_new_tokens"],
+            STORY_PLOTS_TOKENS + THINKING_HEADROOM,
+        )
 
     def test_cancelling_stops_before_the_next_chapter_is_read(self) -> None:
         model = build_model(A_CHAPTER_PLOT, A_CHAPTER_PLOT)

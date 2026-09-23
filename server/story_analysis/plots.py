@@ -26,9 +26,10 @@ _LOWEST_PROBABILITY_THAT_PASSES = 0.5
 _ALREADY_IN_A_PLOT = "[in a plot]"
 _SEPARATION_A_REAL_PLOT_SHOWS = 4.0
 _OVERLAP_THAT_MAKES_ONE_PLOT = 0.7
-_FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(.*)\n```\s*\Z", re.DOTALL)
+_FENCED = re.compile(r"```[a-zA-Z]*\n(.*?)\n```", re.DOTALL)
 
-STORY_PLOTS_TOKENS = 640
+THINKING_HEADROOM = 8192
+STORY_PLOTS_TOKENS = 1024
 PARAGRAPHS_READ_FOR_KEY_EVENTS = 40
 STORY_PLOT_KEY_EVENTS_TOKENS = 1200
 
@@ -353,12 +354,28 @@ async def _answered(
                     {"role": "system", "content": instruction},
                     {"role": "user", "content": read},
                 ],
-                max_new_tokens=tokens,
+                max_new_tokens=tokens + THINKING_HEADROOM,
                 temperature=0.0,
             )
         ]
     ).strip()
-    return json.loads(_FENCED.sub(r"\1", answer))
+    return _json_in(answer)
+
+
+def _json_in(answer: str) -> Any:
+    fenced = _FENCED.search(answer)
+    written = fenced.group(1) if fenced else answer
+    begins = [where for where in (written.find("["), written.find("{")) if where != -1]
+    if begins:
+        try:
+            found, _ = json.JSONDecoder().raw_decode(written[min(begins) :])
+            return found
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(
+        "The model answered with no JSON in it: "
+        f"{answer[:200] if answer else 'nothing at all'}"
+    )
 
 
 def _story_plots_named(answered: Any) -> list[StoryPlot]:
