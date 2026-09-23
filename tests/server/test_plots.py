@@ -7,16 +7,20 @@ from pathlib import PurePath
 from typing import Any
 from unittest import mock
 
+import httpx
 from cortexgrid_infer import CompletionChunk
+from tenacity import wait_none
 
 from server import storydoc
 from server.storydoc import Document
 from server.story_analysis.plots import StoryPlotsJob
+from server.story_analysis import plots as story_plots
 from server.story_analysis.plots import (
     ATTRIBUTING_THE_PASSAGES,
     FINDING_THE_PLOTS,
     PARAGRAPHS_READ_FOR_KEY_EVENTS,
     UPDATING_THE_PLOTS,
+    MOST_PLOTS_A_STORY_HAS,
     STORY_PLOTS_TOKENS,
     STORY_PLOT_KEY_EVENTS_INSTRUCTION,
     THINKING_HEADROOM,
@@ -31,6 +35,7 @@ from server.story_analysis.plots import (
     story_plot_pass_level,
     story_plots_in_the_chapters,
     story_plots_in_what_no_plot_claims,
+    story_plots_pooled,
     the_story,
 )
 
@@ -360,6 +365,37 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
             [plot.title for plot in discovered(model, document)], ["The crush"]
         )
 
+    def test_a_dropped_connection_is_asked_again(self) -> None:
+        self.addCleanup(
+            setattr,
+            story_plots._answered.retry,
+            "wait",
+            story_plots._answered.retry.wait,
+        )
+        story_plots._answered.retry.wait = wait_none()
+        answers = iter([A_CHAPTER_PLOT])
+
+        def answer(messages: list[dict[str, str]], **_: Any) -> Any:
+            if model.complete.call_count == 1:
+                raise httpx.RemoteProtocolError("peer closed connection")
+            return streamed(next(answers))
+
+        model = mock.MagicMock()
+        model.complete.side_effect = answer
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown("The lantern had gone out."),
+                ]
+            )
+        )
+
+        plots = discovered(model, document)
+
+        self.assertEqual([plot.title for plot in plots], ["The crush"])
+        self.assertEqual(model.complete.call_count, 2)
+
     def test_an_answer_with_no_json_in_it_says_what_came_back(self) -> None:
         model = build_model("I would rather not.")
         document = Document(
@@ -453,6 +489,42 @@ class DiscoveringTheStoryPlots(unittest.TestCase):
             read_by(model),
         )
         self.assertEqual([plot.title for plot in plots], ["The crush"])
+
+
+class PoolingTheStoryPlots(unittest.TestCase):
+    def test_a_story_proposed_more_threads_than_it_can_have_is_pooled(
+        self,
+    ) -> None:
+        model = build_model(A_CHAPTER_PLOT)
+        proposed = [
+            a_story_plot(f"The crush, said again {again}")
+            for again in range(MOST_PLOTS_A_STORY_HAS + 2)
+        ]
+
+        pooled = asyncio.run(
+            story_plots_pooled(model, proposed, MOST_PLOTS_A_STORY_HAS)
+        )
+
+        self.assertEqual([plot.title for plot in pooled], ["The crush"])
+        self.assertIn("The crush, said again 11", read_by(model))
+        self.assertIn(f"at most {MOST_PLOTS_A_STORY_HAS} plots", read_by(model))
+
+    def test_a_story_within_its_threads_is_left_as_it_was_proposed(self) -> None:
+        model = build_model(A_CHAPTER_PLOT)
+        proposed = [a_story_plot("The crush"), a_story_plot("The rivalry")]
+
+        pooled = asyncio.run(story_plots_pooled(model, proposed, 2))
+
+        self.assertEqual(pooled, proposed)
+        model.complete.assert_not_called()
+
+    def test_no_room_for_another_plot_asks_for_none(self) -> None:
+        model = build_model(A_CHAPTER_PLOT)
+
+        pooled = asyncio.run(story_plots_pooled(model, [a_story_plot("One")], 0))
+
+        self.assertEqual(pooled, [])
+        model.complete.assert_not_called()
 
 
 class KeyEventsOfAStoryPlot(unittest.TestCase):

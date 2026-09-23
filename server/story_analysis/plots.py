@@ -13,13 +13,16 @@ from typing import Any
 import numpy as np
 from cortexgrid_infer import ServedCompletingModel
 
-from server import storydoc
+from server import log, storydoc
 from server.jobs import Job
+from server.models import cluster
 from server.storydoc import MARKDOWN, Document
 from server.story_analysis.story_plot_classifier import (
     ServedStoryPlotClassifier,
     StoryPlotQuestion,
 )
+
+_log = log.logger(__name__)
 
 _PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
 
@@ -32,6 +35,8 @@ _FENCED = re.compile(r"```[a-zA-Z]*\n(.*?)\n```", re.DOTALL)
 
 THINKING_HEADROOM = 8192
 STORY_PLOTS_TOKENS = 1024
+POOLED_STORY_PLOTS_TOKENS = 3072
+MOST_PLOTS_A_STORY_HAS = 10
 PARAGRAPHS_READ_FOR_KEY_EVENTS = 40
 PARAGRAPHS_SCORED_AT_A_TIME = 25
 CHAPTERS_READ_AT_A_TIME = 8
@@ -189,6 +194,7 @@ async def one_pass(
     plots: Sequence[StoryPlot],
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda scored, to_score: None,
+    claimed: Callable[[list[StoryPlotClaim]], None] = lambda sofar: None,
 ) -> list[StoryPlotClaim]:
     claims: list[StoryPlotClaim] = []
     to_score = len(paragraphs) * len(plots)
@@ -218,6 +224,7 @@ async def one_pass(
                 separation=pass_level.separation,
             )
         )
+        claimed(list(claims))
     return united(
         [
             claim
@@ -291,6 +298,17 @@ UNCLAIMED_PLOTS_REQUEST = (
     "no plot naming them."
 )
 
+STORY_PLOT_POOLING_INSTRUCTION = (
+    "You are given the plots proposed for one novel, chapter by chapter, so the "
+    "same thread is proposed many times over in different words. Pool them into "
+    "the threads the book actually has, each said once: unite the characters, "
+    "take the origin from the earliest proposal of that thread and the goal "
+    "from the furthest, and keep a thread that is proposed only once if nothing "
+    "else is that thread under another name. No novel runs more threads than a "
+    "reader can hold. Answer with JSON and nothing else: a list of objects with "
+    'the keys "title", "characters", "origin" and "goal".'
+)
+
 STORY_PLOT_KEY_EVENTS_INSTRUCTION = (
     "You read one plot of a novel and the numbered paragraphs that belong to it. "
     "Say what happens along the plot in them: one sentence for each paragraph "
@@ -338,6 +356,27 @@ async def story_plots_in_the_chapters(
     ]
 
 
+async def story_plots_pooled(
+    model: ServedCompletingModel, plots: Sequence[StoryPlot], at_most: int
+) -> list[StoryPlot]:
+    if at_most <= 0:
+        return []
+    if len(plots) <= at_most:
+        return list(plots)
+    written = "\n\n".join(
+        f"{plot.title}\n{story_plot_summary(plot)}" for plot in plots
+    )
+    return _story_plots_named(
+        await _answered(
+            model,
+            STORY_PLOT_POOLING_INSTRUCTION,
+            f"The plots proposed:\n\n{written}\n\n"
+            f"Pool them into at most {at_most} plots.",
+            POOLED_STORY_PLOTS_TOKENS,
+        )
+    )
+
+
 async def story_plots_in_what_no_plot_claims(
     model: ServedCompletingModel,
     paragraphs: Sequence[StoryParagraph],
@@ -381,6 +420,7 @@ async def story_plot_key_events(
     return tuple(found)
 
 
+@cluster.waiting_for_the_model
 async def _answered(
     model: ServedCompletingModel, instruction: str, read: str, tokens: int
 ) -> Any:
@@ -493,11 +533,21 @@ async def identify_story_plots(
             StoryPlotsStep(1, FINDING_THE_PLOTS, chapters_read, chapters)
         ),
     )
+    _log.info("%d plots proposed by the chapters of %s", len(plots), document.path)
+    plots = await story_plots_pooled(discovery_model, plots, MOST_PLOTS_A_STORY_HAS)
+    _log.info("pooled into %d plots", len(plots))
+    identified(_story_plots_told(plots), [])
     claims: list[StoryPlotClaim] = []
     reassignments: list[int] = []
     for passes in range(1, _PASSES_AT_MOST + 1):
         if cancelled():
             return
+        _log.info(
+            "pass %d scoring %d paragraphs against %d plots",
+            passes,
+            len(paragraphs),
+            len(plots),
+        )
         progress(
             StoryPlotsStep(
                 passes,
@@ -519,10 +569,21 @@ async def identify_story_plots(
             lambda read, to_read: progress(
                 StoryPlotsStep(passes, ATTRIBUTING_THE_PASSAGES, read, to_read)
             ),
+            lambda sofar: identified(
+                _story_plots_told(plots),
+                _paragraphs_in_story_plots(sofar, paragraphs),
+            ),
         )
         if cancelled():
             return
         reassignments.append(_reassignments(claims, scored))
+        _log.info(
+            "pass %d kept %d of %d plots, with %d reassignments",
+            passes,
+            len(scored),
+            len(plots),
+            reassignments[-1],
+        )
         claims = []
         progress(StoryPlotsStep(passes, UPDATING_THE_PLOTS, 0, len(scored)))
         for claim in scored:
@@ -544,7 +605,7 @@ async def identify_story_plots(
                 StoryPlotsStep(passes, UPDATING_THE_PLOTS, len(claims), len(scored))
             )
         identified(
-            _story_plots_told(claims),
+            _story_plots_told([claim.plot for claim in claims]),
             _paragraphs_in_story_plots(claims, paragraphs),
         )
         if _settled(reassignments, len(paragraphs)):
@@ -553,8 +614,14 @@ async def identify_story_plots(
         found = await story_plots_in_what_no_plot_claims(
             discovery_model, paragraphs, _claimed(claims)
         )
-        plots = [claim.plot for claim in claims] + found
+        plots = [claim.plot for claim in claims] + await story_plots_pooled(
+            discovery_model, found, MOST_PLOTS_A_STORY_HAS - len(claims)
+        )
         progress(StoryPlotsStep(passes + 1, FINDING_THE_PLOTS, 1, 1))
+        identified(
+            _story_plots_told(plots),
+            _paragraphs_in_story_plots(claims, paragraphs),
+        )
 
 
 def _key_events_of(
@@ -601,10 +668,9 @@ def _settled(reassignments: Sequence[int], paragraphs: int) -> bool:
     )
 
 
-def _story_plots_told(claims: Sequence[StoryPlotClaim]) -> list[dict[str, Any]]:
+def _story_plots_told(plots: Sequence[StoryPlot]) -> list[dict[str, Any]]:
     return [
-        {"title": claim.plot.title, "summary": story_plot_summary(claim.plot)}
-        for claim in claims
+        {"title": plot.title, "summary": story_plot_summary(plot)} for plot in plots
     ]
 
 

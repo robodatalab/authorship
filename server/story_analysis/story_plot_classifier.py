@@ -220,6 +220,7 @@ class ServedStoryPlotClassifier(DeployedModel):
     def name(self) -> str:
         return self.model_id
 
+    @cluster.waiting_for_the_model
     async def probabilities(
         self, story: str, questions: list[StoryPlotQuestion]
     ) -> list[float]:

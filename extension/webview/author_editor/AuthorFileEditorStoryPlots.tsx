@@ -64,32 +64,37 @@ export function AuthorFileEditorStoryPlots({
                     <i className="codicon codicon-play" />
                 </button>
             </header>
+            <details className="author-file-editor-story-plots-drawer" open>
+                <summary>Plots</summary>
+                {storyPlots.length === 0 ? (
+                    <p className="author-file-editor-story-plots-none">
+                        No plots identified yet.
+                    </p>
+                ) : (
+                    <ul>
+                        {storyPlots.map((storyPlot, storyPlotIndex) => (
+                            <li key={storyPlotIndex}>
+                                <details className="author-file-editor-story-plot">
+                                    <summary>
+                                        <span
+                                            className={`author-file-editor-story-plot-swatch ${storyPlotColorClassName(storyPlotIndex)}`}
+                                        />
+                                        {storyPlot.title}
+                                    </summary>
+                                    <p>{storyPlot.summary}</p>
+                                </details>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </details>
             {storyPlotsProgress && (
-                <AuthorFileEditorStoryPlotsProgress
-                    steps={storyPlotsProgress}
-                />
-            )}
-            {storyPlots.length === 0 && !storyPlotsProgress && (
-                <p className="author-file-editor-story-plots-none">
-                    No plots identified yet.
-                </p>
-            )}
-            {storyPlots.length > 0 && (
-                <ul>
-                    {storyPlots.map((storyPlot, storyPlotIndex) => (
-                        <li key={storyPlotIndex}>
-                            <details className="author-file-editor-story-plot">
-                                <summary>
-                                    <span
-                                        className={`author-file-editor-story-plot-swatch ${storyPlotColorClassName(storyPlotIndex)}`}
-                                    />
-                                    {storyPlot.title}
-                                </summary>
-                                <p>{storyPlot.summary}</p>
-                            </details>
-                        </li>
-                    ))}
-                </ul>
+                <details className="author-file-editor-story-plots-drawer" open>
+                    <summary>Progress</summary>
+                    <AuthorFileEditorStoryPlotsProgress
+                        steps={storyPlotsProgress}
+                    />
+                </details>
             )}
         </aside>
     );

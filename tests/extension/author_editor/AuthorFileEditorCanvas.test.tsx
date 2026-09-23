@@ -1004,12 +1004,15 @@ describe("the plots the story weaves", () => {
     it("lists every plot with its summary and borders its paragraphs", async () => {
         await mountStoryPlots(true);
 
-        expect(storyPlotsPanel()?.querySelector("summary")?.textContent).toBe(
-            "The quest",
-        );
-        expect(storyPlotsPanel()?.querySelector("p")?.textContent).toBe(
-            "Someone goes looking.",
-        );
+        expect(
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-plot summary",
+            )?.textContent,
+        ).toBe("The quest");
+        expect(
+            storyPlotsPanel()?.querySelector(".author-file-editor-story-plot p")
+                ?.textContent,
+        ).toBe("Someone goes looking.");
         expect(
             document.querySelector(".test-story-plot-borders")?.textContent,
         ).toBe("1");
@@ -1062,6 +1065,30 @@ describe("the plots the story weaves", () => {
                 ),
             ].map((pass) => (pass as HTMLDetailsElement).open),
         ).toEqual([false, true]);
+    });
+
+    it("keeps the plots above the progress, each in its own drawer", async () => {
+        await mountStoryPlots(true, [aStep(1, "plots", 3, 24, "running", 20)]);
+
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plots-drawer > summary",
+                ),
+            ].map((drawer) => drawer.textContent),
+        ).toEqual(["Plots", "Progress"]);
+    });
+
+    it("draws no progress drawer when nothing is running", async () => {
+        await mountStoryPlots(true);
+
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plots-drawer > summary",
+                ),
+            ].map((drawer) => drawer.textContent),
+        ).toEqual(["Plots"]);
     });
 
     it("can be dragged wider by its edge", async () => {

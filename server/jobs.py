@@ -1,6 +1,14 @@
 import abc
 import asyncio
 import threading
+from contextvars import ContextVar
+
+from server import log
+
+_log = log.logger(__name__)
+
+
+the_job_in_hand: ContextVar["Job | None"] = ContextVar("the_job_in_hand", default=None)
 
 
 class Job(abc.ABC):
@@ -77,10 +85,19 @@ class ParallelJobsManager:
         return [job for job in self._by_target.values() if not job.done]
 
     async def _run(self, job: Job) -> None:
+        the_job_in_hand.set(job)
         job.begin()
+        _log.info("%s started for %s", job.kind, job.target)
         try:
             await job.execute()
         except Exception as err:
             job.error = str(err)
+            _log.exception("%s failed for %s", job.kind, job.target)
         finally:
             job.finish()
+            _log.info(
+                "%s %s for %s",
+                job.kind,
+                "cancelled" if job.cancelled else "finished",
+                job.target,
+            )

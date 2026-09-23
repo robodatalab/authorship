@@ -120,10 +120,20 @@ only place in this design where a model is asked for a structure rather than for
 chapters do not depend on one another, so several are read at once; read one at a time, a
 novel's worth of chapters is minutes of waiting before the first pass can start.
 
-**Then**, after each pass, look at the paragraphs no plot claimed. The model sees the whole
+**Then pool them.** A chapter at a time proposes the same thread over and over — 36 chapters
+gave 36 plots, most of them one story said 36 ways. No novel runs more than about ten
+threads, however long or tangled it is, so the proposals go back to the model to be pooled
+into at most ten, uniting characters and taking each thread's origin from its earliest
+proposal. This is the model comparing summaries, which §6 rules out for *merging* — the
+difference is that nothing has been classified yet: the cost of not pooling is paid by the
+classifier, at paragraphs × plots questions a pass. Merging after a pass stays the
+classifier's to decide.
+
+**And again**, after each pass, look at the paragraphs no plot claimed. The model sees the whole
 story, with the paragraphs already in plots marked `[in a plot]` rather than removed — a plot
 may span both kinds — and proposes plots that account for the unmarked ones. The new plots
 join the next pass, and every paragraph is scored against them, not only the unclaimed ones.
+They are pooled too, into whatever room is left under the ten.
 
 ## 8. Stopping
 
