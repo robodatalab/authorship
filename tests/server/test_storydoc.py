@@ -48,7 +48,7 @@ class StoryLines(unittest.TestCase):
         document = self.build_document()
 
         for index, said in document.story_lines():
-            self.assertEqual(document.lines[index].strip(), said)
+            self.assertEqual(document.lines[index], said)
 
     def test_can_be_asked_for_one_stretch_of_the_document(self) -> None:
         document = self.build_document()
@@ -127,12 +127,28 @@ class Writing(unittest.TestCase):
 
 
 class Asking(unittest.TestCase):
-    def test_cells_of_returns_every_cell_of_a_kind_in_order(self) -> None:
-        cells = [storydoc.chapter("One"), storydoc.table_of_contents(), storydoc.chapter("Two")]
-        self.assertEqual(
-            [cell.title for cell in storydoc.cells_of(cells, storydoc.CHAPTER)],
-            ["One", "Two"],
+    def test_a_document_says_which_of_its_cells_are_prose(self) -> None:
+        document = Document(
+            storydoc.dumps(
+                [
+                    storydoc.chapter("One"),
+                    storydoc.markdown("The lantern had gone out."),
+                    storydoc.table_of_contents(),
+                    storydoc.markdown("The door stood open."),
+                ]
+            )
         )
+
+        self.assertEqual(
+            [cell.source for cell in document.markdown_cells()],
+            ["The lantern had gone out.", "The door stood open."],
+        )
+
+    def test_a_document_with_no_title_page_says_it_is_anonymous(self) -> None:
+        document = Document(storydoc.dumps([storydoc.chapter("One")]))
+
+        self.assertEqual(document.title_page.attrs, {})
+        self.assertEqual(document.title, "Anonymous")
 
 
 class Preparing(unittest.TestCase):

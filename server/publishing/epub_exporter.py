@@ -132,9 +132,7 @@ class Imprint:
 
 
 def imprint_of(document: Document) -> Imprint:
-    said = next(
-        (cell.attrs for cell in document.cells if cell.kind == TITLE_PAGE), {}
-    )
+    said = document.title_page.attrs
     return Imprint(
         title=document.title,
         subtitle=said.get("subtitle", ""),

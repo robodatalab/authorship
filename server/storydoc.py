@@ -148,10 +148,6 @@ def save(path: Path, cells: list[Cell]) -> None:
     path.write_text(dumps(cells), encoding="utf-8")
 
 
-def cells_of(cells: list[Cell], kind: str) -> list[Cell]:
-    return [cell for cell in cells if cell.kind == kind]
-
-
 def add_missing(cells: list[Cell], wanted: list[Cell]) -> list[Cell]:
     added_cells = list(cells)
     for cell in wanted:
@@ -263,12 +259,18 @@ class Document:
         return cls(path.read_text(encoding="utf-8"), path)
 
     @property
+    def title_page(self) -> Cell:
+        """What the book says of itself, blank in a document that says nothing."""
+        return next(
+            (cell for cell in self.cells if cell.kind == TITLE_PAGE), Cell(TITLE_PAGE)
+        )
+
+    @property
     def title(self) -> str:
-        """What the book is called, which only the title page says."""
-        for cell in self.cells:
-            if cell.kind == TITLE_PAGE and cell.title:
-                return cell.title
-        return "Anonymous"
+        return self.title_page.title or "Anonymous"
+
+    def markdown_cells(self) -> list[Cell]:
+        return [cell for cell in self.cells if cell.kind == MARKDOWN]
 
     def story_lines(
         self, start: int = 0, end: int | None = None
@@ -287,9 +289,8 @@ class Document:
                 [self.lines[i] for i in covered], covered
             ):
                 for index in range(max(kept_first, start), min(kept_last, last) + 1):
-                    said = self.lines[index].strip()
-                    if said:
-                        yield index, said
+                    if self.lines[index].strip():
+                        yield index, self.lines[index]
 
     @property
     def chapters(self) -> list[tuple[str, str]]:

@@ -43,11 +43,7 @@ async def fix_style(
     revised: Callable[[str, str], None] = lambda cell_id, source: None,
     left_alone: Callable[[str, str], None] = lambda opening, why: None,
 ) -> None:
-    sections = [
-        cell
-        for cell in storydoc.cells_of(document.cells, storydoc.MARKDOWN)
-        if cell.source.strip()
-    ]
+    sections = [cell for cell in document.markdown_cells() if cell.source.strip()]
     if not sections:
         raise ValueError("There is no prose there to correct.")
 

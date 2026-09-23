@@ -19,13 +19,6 @@ def _check_target(path: Path, selection: tuple[int, int] | None) -> str:
     return f"{path}#{where}"
 
 
-def _story_lines(document: Document, start: int, end: int) -> list[tuple[int, str]]:
-    return [
-        (index, document.lines[index])
-        for index, _ in document.story_lines(start, end)
-    ]
-
-
 def _errors_of(
     document: Document, finding: prose_check.Finding
 ) -> list[dict[str, Any]]:
@@ -82,15 +75,13 @@ class CheckErrorsJob(Job):
     async def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
         crutches = (
-            prose_check.crutch_lemmas(
-                _story_lines(self._document, 0, len(self._document.lines) - 1)
-            )
+            prose_check.crutch_lemmas(list(self._document.story_lines()))
             if self._selection is None
             else frozenset()
         )
         if self.cancelled:
             return
-        passage = _story_lines(self._document, start, end)
+        passage = list(self._document.story_lines(start, end))
         by_the_rules = [
             error
             for finding in await asyncio.to_thread(prose_check.check, passage, crutches)
