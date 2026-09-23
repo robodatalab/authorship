@@ -66,7 +66,7 @@ STORY = storydoc.dumps(
         markdown(FIRST, FIRST_CELL_ID),
         markdown(SECOND, SECOND_CELL_ID),
         storydoc.Cell(storydoc.NOTE, "Ask Mara whether this is the third time.", {}),
-        storydoc.Cell(storydoc.CONTENTS, "1. The First Night", {}),
+        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
         storydoc.chapter("The Second"),
         markdown(THIRD, THIRD_CELL_ID),
     ]

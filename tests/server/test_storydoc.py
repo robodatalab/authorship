@@ -11,6 +11,56 @@ CORPUS = json.loads(
 )
 
 
+class StoryLines(unittest.TestCase):
+    def build_document(self) -> Document:
+        return Document(
+            storydoc.dumps(
+                [
+                    Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
+                    storydoc.chapter("The First Night"),
+                    storydoc.markdown(
+                        "The lantern had gone out.\n"
+                        "<!-- ask Mara whether this is the third time -->\n"
+                        "She did not light it."
+                    ),
+                    Cell(storydoc.NOTE, "Remember the lantern.", {}),
+                    Cell(storydoc.BLURB, "A woman loses her name.", {}),
+                    Cell(storydoc.RECAP, "What happened before.", {}),
+                    Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
+                    storydoc.markdown("The door stood open."),
+                ]
+            )
+        )
+
+    def test_are_the_prose_of_the_markdown_cells_and_nothing_else(self) -> None:
+        said = [line for _, line in self.build_document().story_lines()]
+
+        self.assertEqual(
+            said,
+            [
+                "The lantern had gone out.",
+                "She did not light it.",
+                "The door stood open.",
+            ],
+        )
+
+    def test_say_which_line_of_the_document_each_is_written_on(self) -> None:
+        document = self.build_document()
+
+        for index, said in document.story_lines():
+            self.assertEqual(document.lines[index].strip(), said)
+
+    def test_can_be_asked_for_one_stretch_of_the_document(self) -> None:
+        document = self.build_document()
+        lantern = document.cells[2]
+        assert lantern.at is not None
+
+        self.assertEqual(
+            [line for _, line in document.story_lines(*lantern.at)],
+            ["The lantern had gone out.", "She did not light it."],
+        )
+
+
 class Corpus(unittest.TestCase):
     def test_every_document_reads_as_the_corpus_says(self) -> None:
         # The same file drives the TypeScript tests, so a rule added in one
@@ -65,7 +115,7 @@ class Writing(unittest.TestCase):
         self.assertEqual(back[0].kind, storydoc.DIVIDER)
 
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
-        self.assertEqual(storydoc.dumps([storydoc.contents()]), "<!-- cell: contents -->\n")
+        self.assertEqual(storydoc.dumps([storydoc.table_of_contents()]), "<!-- cell: contents -->\n")
 
     def test_an_unknown_kind_is_written_back_as_it_was_read(self) -> None:
         text = '<!-- cell: epigraph attribution="Anon" -->\n\nA line.\n'
@@ -78,7 +128,7 @@ class Writing(unittest.TestCase):
 
 class Asking(unittest.TestCase):
     def test_cells_of_returns_every_cell_of_a_kind_in_order(self) -> None:
-        cells = [storydoc.chapter("One"), storydoc.contents(), storydoc.chapter("Two")]
+        cells = [storydoc.chapter("One"), storydoc.table_of_contents(), storydoc.chapter("Two")]
         self.assertEqual(
             [cell.title for cell in storydoc.cells_of(cells, storydoc.CHAPTER)],
             ["One", "Two"],
@@ -88,21 +138,21 @@ class Asking(unittest.TestCase):
 class Preparing(unittest.TestCase):
     def test_missing_cells_are_added_in_order(self) -> None:
         prepared = storydoc.add_missing(
-            [storydoc.chapter("One")], [storydoc.contents(), storydoc.image("c.jpg")]
+            [storydoc.chapter("One")], [storydoc.table_of_contents(), storydoc.image("c.jpg")]
         )
         self.assertEqual(
             [cell.kind for cell in prepared], ["chapter", "contents", "image"]
         )
 
     def test_preparing_twice_adds_nothing_the_second_time(self) -> None:
-        wanted = [storydoc.contents(), storydoc.image("c.jpg")]
+        wanted = [storydoc.table_of_contents(), storydoc.image("c.jpg")]
         once = storydoc.add_missing([storydoc.chapter("One")], wanted)
         twice = storydoc.add_missing(once, wanted)
         self.assertEqual(once, twice)
 
     def test_a_cell_the_author_has_edited_is_left_alone(self) -> None:
-        mine = Cell(storydoc.CONTENTS, "My own contents.")
-        prepared = storydoc.add_missing([mine], [storydoc.contents()])
+        mine = Cell(storydoc.TABLE_OF_CONTENTS, "My own contents.")
+        prepared = storydoc.add_missing([mine], [storydoc.table_of_contents()])
         self.assertEqual(prepared, [mine])
 
 

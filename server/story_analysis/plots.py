@@ -1,89 +1,27 @@
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from cortexgrid_infer import ServedCompletingModel
-
-from server import log, storydoc
+from server import log
 from server.jobs import Job
-from server.storydoc import MARKDOWN, Document
-from server.story_analysis.story_plot_classifier import ServedStoryPlotClassifier
+from server.story_analysis import fake_story_plots
+from server.story_analysis.story_plot import StoryPlot
+from server.storydoc import Document
 
 _log = log.logger(__name__)
-
-_PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
 
 FINDING_THE_PLOTS = "plots"
 ATTRIBUTING_THE_PASSAGES = "paragraphs"
 UPDATING_THE_PLOTS = "events"
+WHAT_A_PASS_DOES = (FINDING_THE_PLOTS, ATTRIBUTING_THE_PASSAGES, UPDATING_THE_PLOTS)
 
-A_TICK_S = 1.0
-TICKS_IN_A_STEP = 12
 PASSES = 3
-
-FAKE_STORY_PLOTS: list[dict[str, Any]] = [
-    {
-        "title": "The fall of the numbers",
-        "characters": ["Diane", "Josh"],
-        "origin": "Fake data. A decline nobody wants to own",
-        "goal": "Someone is made to answer for it",
-        "keyEvents": [],
-    },
-    {
-        "title": "The rivalry at the top",
-        "characters": ["Diane", "Geoffrey"],
-        "origin": "Fake data. Two people who need each other",
-        "goal": "One of them is left holding the company",
-        "keyEvents": [],
-    },
-    {
-        "title": "The thing in the servers",
-        "characters": ["Josh", "Mara"],
-        "origin": "Fake data. Something is changing the platform",
-        "goal": "The people nobody listens to are believed",
-        "keyEvents": [],
-    },
-    {
-        "title": "The way home",
-        "characters": ["Diane"],
-        "origin": "Fake data. A private life kept at arm's length",
-        "goal": "It stops being kept there",
-        "keyEvents": [],
-    },
-    {
-        "title": "The bill and the Senate",
-        "characters": ["Geoffrey", "Carlile"],
-        "origin": "Fake data. A law written for one company",
-        "goal": "It passes, or the man who wrote it falls",
-        "keyEvents": [],
-    },
-    {
-        "title": "The week the world changed",
-        "characters": ["The narrator"],
-        "origin": "Fake data. Seven days nobody can account for",
-        "goal": "The story of them is written down",
-        "keyEvents": [],
-    },
-]
-
-FAKE_KEY_EVENTS = [
-    "Fake data. The meeting where it was first said out loud",
-    "Fake data. The night it could no longer be explained away",
-    "Fake data. The call that made it somebody's fault",
-]
-
-
-@dataclass(frozen=True)
-class StoryParagraph:
-    cell_id: str
-    at: int
-    end: int
-    words: str
+A_TICK_S = 1.0
+TICKS_A_STEP_TAKES = 12
 
 
 @dataclass(frozen=True)
@@ -118,50 +56,117 @@ class StoryPlotsStepTaken:
         }
 
 
-def story_paragraphs(document: Document) -> list[StoryParagraph]:
+def story_plots_told(story_plots: Sequence[StoryPlot]) -> list[dict[str, Any]]:
     return [
-        StoryParagraph(cell.unique_id, found.start(), found.end(), found.group())
-        for cell in storydoc.cells_of(document.cells, MARKDOWN)
-        for found in _PARAGRAPH.finditer(cell.source)
+        {
+            "title": story_plot.title,
+            "characters": list(story_plot.characters),
+            "origin": story_plot.origin,
+            "goal": story_plot.goal,
+            "keyEvents": list(story_plot.key_events),
+        }
+        for story_plot in story_plots
     ]
 
 
-def story_plot_indices(paragraph: int, plots: int) -> list[int]:
-    if plots == 0:
-        return []
-    beat = paragraph % 12
-    if beat == 11:
-        return []
-    leading = (paragraph // 12) % plots
-    if 4 <= beat <= 7:
-        return sorted({leading, (leading + 1) % plots})
-    return [leading]
-
-
 def paragraphs_in_story_plots(
-    paragraphs: Sequence[StoryParagraph], attributed: int, plots: int
+    document: Document, story_plots: Sequence[StoryPlot]
 ) -> list[dict[str, Any]]:
-    told: list[dict[str, Any]] = []
-    for index, paragraph in enumerate(paragraphs[:attributed]):
-        indices = story_plot_indices(index, plots)
-        if not indices:
+    the_plots_a_line_is_in: dict[int, list[int]] = {}
+    for index, story_plot in enumerate(story_plots):
+        for line in story_plot.lines:
+            the_plots_a_line_is_in.setdefault(line, []).append(index)
+    placed: list[dict[str, Any]] = []
+    for line, story_plot_indices in sorted(the_plots_a_line_is_in.items()):
+        cell = document.cell_at(line)
+        if cell is None:
             continue
-        told.append(
+        at = cell.offset_of(line, 0)
+        placed.append(
             {
-                "cellId": paragraph.cell_id,
-                "startCharacterOffsetInCell": paragraph.at,
-                "endCharacterOffsetInCell": paragraph.end,
-                "wordsInTheCell": paragraph.words,
+                "cellId": cell.unique_id,
+                "startCharacterOffsetInCell": at,
+                "endCharacterOffsetInCell": at + len(document.lines[line]),
+                "wordsInTheCell": document.lines[line],
                 "isVisible": True,
-                "storyPlotIndices": indices,
+                "storyPlotIndices": story_plot_indices,
             }
         )
-    return told
+    return placed
+
+
+class StoryPlotsRun:
+    """One run of the algorithm in rfc/plot_identification.md, faked.
+
+    The three methods are the three things a pass does — discovery over the
+    chapters, attribution of every passage, and the key events each surviving
+    plot has gathered. What each of them would ask a model, it asks
+    `fake_story_plots` instead, a tick at a time so the page has something to
+    draw."""
+
+    def __init__(
+        self,
+        document: Document,
+        cancelled: Callable[[], bool],
+        progress: Callable[[StoryPlotsStep], None],
+        identified: Callable[[list[dict[str, Any]], list[dict[str, Any]]], None],
+    ) -> None:
+        self.document = document
+        self.chapters = document.chapters
+        self.story_lines = list(document.story_lines())
+        self.story_plots: list[StoryPlot] = []
+        self._cancelled = cancelled
+        self._progress = progress
+        self._identified = identified
+
+    def says_which_passes_are_to_come(self) -> None:
+        for pass_to_come in range(1, PASSES + 1):
+            for doing in WHAT_A_PASS_DOES:
+                self._progress(StoryPlotsStep(pass_to_come, doing, 0, 0, running=False))
+
+    async def find_the_plots_in_the_chapters(self, this_pass: int) -> None:
+        for chapters_read, (title, prose) in enumerate(self.chapters, start=1):
+            if self._cancelled():
+                return
+            fake_story_plots.found_in_a_chapter(self.story_plots, chapters_read)
+            await self._tick(
+                this_pass, FINDING_THE_PLOTS, chapters_read, len(self.chapters)
+            )
+
+    async def attribute_the_passages(self, this_pass: int) -> None:
+        between_ticks = max(1, len(self.story_lines) // TICKS_A_STEP_TAKES)
+        for lines_read, (line, written) in enumerate(self.story_lines, start=1):
+            if self._cancelled():
+                return
+            fake_story_plots.attributed(self.story_plots, line, lines_read)
+            if lines_read % between_ticks and lines_read != len(self.story_lines):
+                continue
+            await self._tick(
+                this_pass,
+                ATTRIBUTING_THE_PASSAGES,
+                lines_read,
+                len(self.story_lines),
+            )
+
+    async def update_the_plots_with_what_happened(self, this_pass: int) -> None:
+        for plots_updated, story_plot in enumerate(self.story_plots, start=1):
+            if self._cancelled():
+                return
+            story_plot.key_events.append(fake_story_plots.key_event(this_pass))
+            await self._tick(
+                this_pass, UPDATING_THE_PLOTS, plots_updated, len(self.story_plots)
+            )
+
+    async def _tick(self, this_pass: int, doing: str, done: int, of: int) -> None:
+        self._progress(StoryPlotsStep(this_pass, doing, done, of))
+        self._identified(
+            story_plots_told(self.story_plots),
+            paragraphs_in_story_plots(self.document, self.story_plots),
+        )
+        await asyncio.sleep(A_TICK_S)
 
 
 async def identify_story_plots(
-    discovery_model: ServedCompletingModel,
-    classifier: ServedStoryPlotClassifier,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[StoryPlotsStep], None] = lambda step: None,
@@ -169,82 +174,24 @@ async def identify_story_plots(
         [list[dict[str, Any]], list[dict[str, Any]]], None
     ] = lambda story_plots, paragraphs: None,
 ) -> None:
-    paragraphs = story_paragraphs(document)
-    if not paragraphs:
+    run = StoryPlotsRun(document, cancelled, progress, identified)
+    if not run.story_lines:
         raise ValueError("There is no prose there to find the plots in.")
-
     _log.info("faking the plots of %s", document.path)
-    plots: list[dict[str, Any]] = []
-    for passes in range(1, PASSES + 1):
-        chapters = max(len(document.chapters), TICKS_IN_A_STEP) if passes == 1 else 2
-        for read in range(1, chapters + 1):
-            if cancelled():
-                return
-            progress(StoryPlotsStep(passes, FINDING_THE_PLOTS, read, chapters))
-            named = len(FAKE_STORY_PLOTS) * read // chapters if passes == 1 else 0
-            while len(plots) < named:
-                plots.append(dict(FAKE_STORY_PLOTS[len(plots)]))
-            if passes > 1 and read == chapters and len(plots) > 1:
-                plots.pop()
-            identified(list(plots), paragraphs_in_story_plots(paragraphs, 0, len(plots)))
-            await asyncio.sleep(A_TICK_S)
 
-        to_attribute = len(paragraphs) * len(plots)
-        progress(
-            StoryPlotsStep(
-                passes, ATTRIBUTING_THE_PASSAGES, 0, to_attribute, running=False
-            )
-        )
-        progress(
-            StoryPlotsStep(passes, UPDATING_THE_PLOTS, 0, len(plots), running=False)
-        )
-        for tick in range(1, TICKS_IN_A_STEP + 1):
-            if cancelled():
-                return
-            attributed = to_attribute * tick // TICKS_IN_A_STEP
-            progress(
-                StoryPlotsStep(
-                    passes, ATTRIBUTING_THE_PASSAGES, attributed, to_attribute
-                )
-            )
-            identified(
-                list(plots),
-                paragraphs_in_story_plots(
-                    paragraphs, len(paragraphs) * tick // TICKS_IN_A_STEP, len(plots)
-                ),
-            )
-            await asyncio.sleep(A_TICK_S)
-
-        for updated, plot in enumerate(plots, start=1):
-            if cancelled():
-                return
-            plot["keyEvents"] = [
-                *plot["keyEvents"],
-                FAKE_KEY_EVENTS[(passes - 1) % len(FAKE_KEY_EVENTS)],
-            ]
-            progress(
-                StoryPlotsStep(passes, UPDATING_THE_PLOTS, updated, len(plots))
-            )
-            identified(
-                list(plots),
-                paragraphs_in_story_plots(paragraphs, len(paragraphs), len(plots)),
-            )
-            await asyncio.sleep(A_TICK_S)
+    run.says_which_passes_are_to_come()
+    for this_pass in range(1, PASSES + 1):
+        await run.find_the_plots_in_the_chapters(this_pass)
+        await run.attribute_the_passages(this_pass)
+        await run.update_the_plots_with_what_happened(this_pass)
 
 
 class StoryPlotsJob(Job):
     kind = "identify plots"
 
-    def __init__(
-        self,
-        discovery_model: ServedCompletingModel,
-        classifier: ServedStoryPlotClassifier,
-        document: Document,
-    ) -> None:
+    def __init__(self, document: Document) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
-        self._discovery_model = discovery_model
-        self._classifier = classifier
         self._document = document
         self.story_plots: list[dict[str, Any]] = []
         self.paragraphs_in_story_plots: list[dict[str, Any]] = []
@@ -254,12 +201,7 @@ class StoryPlotsJob(Job):
     async def execute(self) -> None:
         try:
             await identify_story_plots(
-                self._discovery_model,
-                self._classifier,
-                self._document,
-                lambda: self.cancelled,
-                self._reached,
-                self._identified,
+                self._document, lambda: self.cancelled, self._reached, self._identified
             )
         finally:
             self._stopped_working()

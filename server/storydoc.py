@@ -45,7 +45,7 @@ PART = "part"
 DIVIDER = "divider"
 TITLE_PAGE = "title-page"
 IMAGE = "image"
-CONTENTS = "contents"
+TABLE_OF_CONTENTS = "contents"
 DISCLAIMER = "disclaimer"
 ABOUT = "about"
 BLURB = "blurb"
@@ -184,8 +184,8 @@ def is_full_page(cell: Cell) -> bool:
     return cell.attrs.get(FULL_PAGE, "") != NO
 
 
-def contents() -> Cell:
-    return Cell(CONTENTS)
+def table_of_contents() -> Cell:
+    return Cell(TABLE_OF_CONTENTS)
 
 
 def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
@@ -231,8 +231,8 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 
     return ranges
 
-BUILT_KINDS = frozenset({CONTENTS})
-PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
+GENERATED_CELLS = frozenset({TABLE_OF_CONTENTS})
+PUBLISHING_METADATA_CELLS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
 
 
 def _prose_of(lines: list[tuple[int, str]]) -> str:
@@ -273,9 +273,11 @@ class Document:
     def story_lines(
         self, start: int = 0, end: int | None = None
     ) -> Iterator[tuple[int, str]]:
+        """The story itself, line by line: the prose of the markdown cells,
+        by the line of the document each is written on."""
         last = len(self.lines) - 1 if end is None else end
         for cell in self.cells:
-            if cell.at is None or cell.kind in BUILT_KINDS:
+            if cell.at is None or cell.kind != MARKDOWN:
                 continue
             first, final = cell.at
             covered = list(range(first, final + 1))
@@ -296,7 +298,7 @@ class Document:
         for cell in self.cells:
             if cell.kind == CHAPTER:
                 found.append((cell.title or f"Chapter {len(found) + 1}", []))
-            elif found and cell.at and cell.kind not in PRIVATE_KINDS:
+            elif found and cell.at:
                 found[-1][1].extend(self.story_lines(*cell.at))
         return [(title, _prose_of(lines)) for title, lines in found if lines]
 

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
+from server.story_analysis import fake_story_plots
 from server.story_analysis import plots as story_plots
 
 
@@ -547,7 +548,7 @@ class ExportEpub(unittest.TestCase):
                         "date": "2026-09-02",
                     },
                 ),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 storydoc.Cell(storydoc.BLURB, "A lantern, and a stair."),
                 storydoc.chapter("One"),
                 storydoc.markdown("prose"),
@@ -592,7 +593,7 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
-            said["added"], [storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+            said["added"], [storydoc.TABLE_OF_CONTENTS, storydoc.BLURB, storydoc.ABOUT]
         )
         wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
         # The title page is there, in place, and still not filled in — which is
@@ -772,7 +773,7 @@ class IdentifyStoryPlots(unittest.TestCase):
         self.assertIsNone(identified["error"])
         self.assertEqual(
             identified["storyPlots"][0]["title"],
-            story_plots.FAKE_STORY_PLOTS[0]["title"],
+            fake_story_plots.FAKE_STORY_PLOTS[0][0],
         )
         self.assertEqual(
             [(step["passes"], step["doing"]) for step in identified["progress"][:3]],
@@ -801,13 +802,14 @@ class IdentifyStoryPlots(unittest.TestCase):
             ],
             [
                 ("lantern", 0, 25, "The lantern had gone out."),
-                ("lantern", 27, 60, "The door stood open.\nNobody came."),
+                ("lantern", 27, 47, "The door stood open."),
             ],
         )
 
     def test_reads_no_cell_but_the_prose(self) -> None:
         identified = self.identify(
             [
+                storydoc.chapter("One"),
                 storydoc.Cell(storydoc.NOTE, "Remember the lantern.", {"id": "note"}),
                 storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "door"}),
             ]

@@ -15,13 +15,13 @@ from pathlib import Path
 from server.storydoc import (
     ABOUT,
     BLURB,
-    BUILT_KINDS,
+    GENERATED_CELLS,
     CHAPTER,
-    CONTENTS,
+    TABLE_OF_CONTENTS,
     DISCLAIMER,
     IMAGE,
     PART,
-    PRIVATE_KINDS,
+    PUBLISHING_METADATA_CELLS,
     TITLE_PAGE,
     Cell,
     Document,
@@ -30,13 +30,13 @@ from server.storydoc import (
 
 # A cell whose text is neither a page of the book nor part of one: built from the
 # document, or kept beside it and published nowhere.
-UNPRINTED = BUILT_KINDS | PRIVATE_KINDS
+UNPRINTED = GENERATED_CELLS | PUBLISHING_METADATA_CELLS
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is
 # never touched — but a reader does not choose where they meet the title, the
 # list of chapters or the author's own page, so these do not float.
-OPENING = (TITLE_PAGE, CONTENTS, BLURB)
+OPENING = (TITLE_PAGE, TABLE_OF_CONTENTS, BLURB)
 CLOSING = (ABOUT,)
 REQUIRED = OPENING + CLOSING
 
@@ -293,7 +293,7 @@ def read_book(document: Document) -> Book:
                 documents.append(build_cover_page(picture, imprint.title))
             else:
                 documents.append(build_image_page(picture))
-        elif cell.kind == CONTENTS:
+        elif cell.kind == TABLE_OF_CONTENTS:
             # Built here rather than taken from the cell: on the page a table of
             # contents is a list of names, in a book it is a list of links.
             listing = Page("contents", "Contents", "")
@@ -366,7 +366,7 @@ def _wants(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
     everything its kind wants — a missing section and one nobody has filled in
     are the same fault to a reader, and are reported the same way.
     """
-    if kind == CONTENTS:
+    if kind == TABLE_OF_CONTENTS:
         # Built from the chapters whatever the cell holds, so never a gap.
         return ()
     if kind == TITLE_PAGE:

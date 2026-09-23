@@ -450,7 +450,7 @@ class BuildEpub(unittest.TestCase):
     def test_the_contents_cell_prints_a_page_linking_every_chapter(self) -> None:
         out = written(
             self.root,
-            storydoc.contents(),
+            storydoc.table_of_contents(),
             storydoc.chapter("One"),
             storydoc.markdown("a"),
             storydoc.chapter("Two"),
@@ -652,7 +652,7 @@ class BuildEpub(unittest.TestCase):
         out = written(
             self.root,
             title_page(title="Book"),
-            storydoc.contents(),
+            storydoc.table_of_contents(),
             storydoc.part("Book One"),
             storydoc.chapter("One"),
             storydoc.markdown("a"),
@@ -678,7 +678,7 @@ class BuildEpub(unittest.TestCase):
         out = written(
             self.root,
             title_page(title="Book"),
-            storydoc.contents(),
+            storydoc.table_of_contents(),
             storydoc.chapter("One"),
             storydoc.markdown("a"),
         )
@@ -694,7 +694,7 @@ class BuildEpub(unittest.TestCase):
         out = written(
             self.root,
             title_page(title="Book"),
-            storydoc.contents(),
+            storydoc.table_of_contents(),
             storydoc.divider(),
             storydoc.chapter("One"),
             storydoc.markdown("a"),
@@ -888,7 +888,7 @@ class BuildEpub(unittest.TestCase):
             self.root,
             storydoc.image("art.png"),
             title_page(title="Book"),
-            storydoc.contents(),
+            storydoc.table_of_contents(),
             Cell(storydoc.DISCLAIMER, "All fiction.", {"title": "Disclaimer"}),
             storydoc.chapter("One"),
             storydoc.markdown("prose"),
@@ -1104,8 +1104,8 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
 
     def test_the_table_of_contents_is_never_wanting(self) -> None:
         # It is built from the chapters whatever the cell holds.
-        said = self.wanting(storydoc.contents())
-        self.assertNotIn(storydoc.CONTENTS, said)
+        said = self.wanting(storydoc.table_of_contents())
+        self.assertNotIn(storydoc.TABLE_OF_CONTENTS, said)
 
     def test_a_section_that_is_not_there_wants_everything(self) -> None:
         said = self.wanting(storydoc.chapter("One"))
@@ -1155,9 +1155,9 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
 
     def test_a_section_that_passed_the_story_has_moved(self) -> None:
         found = report_of(
-            placed(self.root, storydoc.chapter("One"), storydoc.contents())
+            placed(self.root, storydoc.chapter("One"), storydoc.table_of_contents())
         )
-        self.assertIn(storydoc.CONTENTS, found.moved)
+        self.assertIn(storydoc.TABLE_OF_CONTENTS, found.moved)
 
     def test_writing_a_section_in_moves_nothing(self) -> None:
         # The about page is last before and last after; only its index changed.
@@ -1176,7 +1176,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 self.root,
                 Cell(storydoc.ABOUT, "I live by the sea."),
                 Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 filled_title_page(),
                 storydoc.chapter("One"),
             )
@@ -1190,7 +1190,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 self.root,
                 storydoc.image("art.png"),
                 filled_title_page(),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 Cell(storydoc.BLURB, "A lantern, and a stair."),
                 storydoc.chapter("One"),
                 Cell(storydoc.ABOUT, "I live by the sea."),
@@ -1217,8 +1217,8 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             placed(
                 self.root,
                 storydoc.chapter("One"),
-                storydoc.contents(),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
+                storydoc.table_of_contents(),
             )
         )
         self.assertEqual(found.plan[1].at, 1)
@@ -1229,7 +1229,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             placed(
                 self.root,
                 filled_title_page(),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 Cell(storydoc.BLURB, ""),  # written in, never filled
                 storydoc.chapter("One"),
                 Cell(storydoc.ABOUT, "I live by the sea."),
@@ -1244,7 +1244,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             placed(
                 self.root,
                 filled_title_page(),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 Cell(storydoc.BLURB, "A lantern, and a stair."),
                 storydoc.chapter("One"),
                 Cell(storydoc.ABOUT, "I live by the sea."),

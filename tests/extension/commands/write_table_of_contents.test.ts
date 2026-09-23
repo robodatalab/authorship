@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { WriteTableOfContentsCommand } from "../../../extension/vscode_runtime/commands/write_table_of_contents";
 import { forgetWhatTheEditorDid, openStory } from "./open_story";
 
-const A_STORY_WITH_A_CONTENTS_CELL = `
+const A_STORY_WITH_A_TABLE_OF_CONTENTS_CELL = `
 <!-- cell: contents id="toc" -->
 
 <!-- cell: chapter title="The Door" id="c1" -->
@@ -19,7 +19,7 @@ beforeEach(forgetWhatTheEditorDid);
 
 describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("lists the chapters, in the order they stand in", () => {
-        const session = openStory(A_STORY_WITH_A_CONTENTS_CELL);
+        const session = openStory(A_STORY_WITH_A_TABLE_OF_CONTENTS_CELL);
 
         new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
 
@@ -85,7 +85,7 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     });
 
     it("writes nothing when there is no cell at that index", () => {
-        const session = openStory(A_STORY_WITH_A_CONTENTS_CELL);
+        const session = openStory(A_STORY_WITH_A_TABLE_OF_CONTENTS_CELL);
         new WriteTableOfContentsCommand().invoke(session, {
             cellId: "nowhere",
         });

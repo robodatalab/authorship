@@ -8,7 +8,7 @@ export const PART = "part";
 export const DIVIDER = "divider";
 export const TITLE_PAGE = "title-page";
 export const IMAGE = "image";
-export const CONTENTS = "contents";
+export const TABLE_OF_CONTENTS = "contents";
 export const DISCLAIMER = "disclaimer";
 export const ABOUT = "about";
 export const BLURB = "blurb";
@@ -36,7 +36,7 @@ const KNOWN_CELL_KINDS = new Map(
         DIVIDER,
         TITLE_PAGE,
         IMAGE,
-        CONTENTS,
+        TABLE_OF_CONTENTS,
         DISCLAIMER,
         ABOUT,
         BLURB,

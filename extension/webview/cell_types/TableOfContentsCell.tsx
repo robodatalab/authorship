@@ -14,19 +14,19 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { CONTENTS } from "../../vscode_runtime/storydoc/model";
+import { TABLE_OF_CONTENTS } from "../../vscode_runtime/storydoc/model";
 
-interface ContentsCellProps {
+interface TableOfContentsCellProps {
     cell: WebviewCell;
     cellId: string;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function ContentsCell({
+export function TableOfContentsCell({
     cell,
     cellId,
     sendMessagesToVscode,
-}: ContentsCellProps) {
+}: TableOfContentsCellProps) {
     const findHighlights = useAuthorFileEditorCellFindHighlights();
 
     return (
@@ -55,11 +55,11 @@ export function ContentsCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: CONTENTS,
+    cellKind: TABLE_OF_CONTENTS,
     menuLabel: "Table of Contents",
     insertMenuGroup: "secondary",
     render: (cell, cellId, sendMessagesToVscode) => (
-        <ContentsCell
+        <TableOfContentsCell
             cell={cell}
             cellId={cellId}
             sendMessagesToVscode={sendMessagesToVscode}

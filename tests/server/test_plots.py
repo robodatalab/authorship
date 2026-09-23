@@ -6,15 +6,15 @@ from unittest import mock
 
 from server import storydoc
 from server.storydoc import Document
+from server.story_analysis import fake_story_plots
 from server.story_analysis import plots as story_plots
 from server.story_analysis.plots import (
     ATTRIBUTING_THE_PASSAGES,
     FINDING_THE_PLOTS,
+    PASSES,
     UPDATING_THE_PLOTS,
     StoryPlotsJob,
     identify_story_plots,
-    story_paragraphs,
-    story_plot_indices,
 )
 
 STORY = storydoc.dumps(
@@ -25,153 +25,116 @@ STORY = storydoc.dumps(
             "\n\n".join(f"Paragraph {index}" for index in range(24)),
             {"id": "scene"},
         ),
+        storydoc.chapter("Two"),
+        storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
     ]
 )
 
 
-def ran(*arguments: Any, **named: Any) -> None:
+def ran(**named: Any) -> None:
     with mock.patch.object(story_plots, "A_TICK_S", 0):
-        asyncio.run(identify_story_plots(*arguments, **named))
+        asyncio.run(identify_story_plots(Document(STORY), **named))
 
 
-class ParagraphsOfTheStory(unittest.TestCase):
-    def test_are_the_prose_cells_broken_on_blank_lines(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [
-                    storydoc.chapter("The First Night"),
-                    storydoc.markdown(
-                        "The lantern had gone out.\n\nShe did not light it."
-                    ),
-                    storydoc.Cell(storydoc.NOTE, "Ask Mara about this", {}),
-                ]
-            )
-        )
+def plots_as_they_were_told() -> list[list[dict[str, Any]]]:
+    told: list[list[dict[str, Any]]] = []
+    ran(identified=lambda plots, paragraphs: told.append(plots))
+    return told
 
-        paragraphs = story_paragraphs(document)
 
+class TheRun(unittest.TestCase):
+    def test_says_up_front_how_many_passes_there_are_to_come(self) -> None:
+        steps: list[Any] = []
+
+        ran(progress=steps.append)
+
+        planned = steps[: PASSES * 3]
         self.assertEqual(
-            [paragraph.words for paragraph in paragraphs],
-            ["The lantern had gone out.", "She did not light it."],
+            [(step.passes, step.doing) for step in planned],
+            [
+                (passes, doing)
+                for passes in range(1, PASSES + 1)
+                for doing in (
+                    FINDING_THE_PLOTS,
+                    ATTRIBUTING_THE_PASSAGES,
+                    UPDATING_THE_PLOTS,
+                )
+            ],
         )
-        self.assertEqual([paragraph.at for paragraph in paragraphs], [0, 27])
+        self.assertFalse(any(step.running for step in planned))
 
-    def test_a_paragraph_belongs_to_the_plots_the_beat_gives_it(self) -> None:
-        self.assertEqual(story_plot_indices(0, 6), [0])
-        self.assertEqual(story_plot_indices(5, 6), [0, 1])
-        self.assertEqual(story_plot_indices(11, 6), [])
-        self.assertEqual(story_plot_indices(12, 6), [1])
-        self.assertEqual(story_plot_indices(0, 0), [])
+    def test_the_first_chapter_read_already_names_a_plot(self) -> None:
+        self.assertEqual(len(plots_as_they_were_told()[0]), 1)
 
+    def test_every_chapter_after_it_adds_a_plot_or_changes_one(self) -> None:
+        told = plots_as_they_were_told()
 
-class TheFakeRun(unittest.TestCase):
-    def build_job(self) -> StoryPlotsJob:
-        return StoryPlotsJob(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY, PurePath("/stories/story.author")),
-        )
+        chapters = len(Document(STORY).chapters)
+        while_finding = told[:chapters]
+        for before, after in zip(while_finding, while_finding[1:]):
+            self.assertNotEqual(before, after)
 
-    def test_names_a_plot_at_a_time_before_it_attributes_anything(self) -> None:
-        identified: list[tuple[int, int]] = []
+    def test_attributes_lines_to_the_plots_as_it_reads_the_story(self) -> None:
+        attributed: list[int] = []
+
+        ran(identified=lambda plots, paragraphs: attributed.append(len(paragraphs)))
+
+        self.assertEqual(attributed[0], 0)
+        self.assertGreater(max(attributed), 0)
+
+    def test_the_plots_gather_what_happened_along_them_pass_by_pass(self) -> None:
+        told = plots_as_they_were_told()
+
+        self.assertEqual(len(told[-1][0]["keyEvents"]), PASSES)
+
+    def test_stops_when_it_is_told_to(self) -> None:
+        told: list[int] = []
+        stop = [False]
 
         ran(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY),
-            identified=lambda plots, paragraphs: identified.append(
-                (len(plots), len(paragraphs))
-            ),
+            cancelled=lambda: stop[0],
+            progress=lambda step: stop.__setitem__(0, len(told) > 3),
+            identified=lambda plots, paragraphs: told.append(len(plots)),
         )
 
-        named = [plots for plots, _ in identified[:12]]
-        self.assertEqual(named, sorted(named))
-        self.assertEqual(named[-1], len(story_plots.FAKE_STORY_PLOTS))
-        self.assertTrue(all(paragraphs == 0 for _, paragraphs in identified[:12]))
+        self.assertLess(len(told), 10)
 
-    def test_attributes_more_paragraphs_as_a_pass_goes_on(self) -> None:
-        identified: list[int] = []
+    def test_a_document_with_no_prose_is_an_error(self) -> None:
+        with self.assertRaises(ValueError):
+            with mock.patch.object(story_plots, "A_TICK_S", 0):
+                asyncio.run(
+                    identify_story_plots(
+                        Document(storydoc.dumps([storydoc.chapter("One")]))
+                    )
+                )
 
-        ran(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY),
-            identified=lambda plots, paragraphs: identified.append(len(paragraphs)),
-        )
 
-        in_the_first_pass = identified[: identified.index(0, 1) or None]
-        self.assertEqual(sorted(in_the_first_pass), in_the_first_pass)
-        self.assertGreater(max(identified), 0)
+class WhatTheJobSays(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.job = StoryPlotsJob(Document(STORY, PurePath("/stories/story.author")))
+        with mock.patch.object(story_plots, "A_TICK_S", 0):
+            asyncio.run(self.job.execute())
 
     def test_works_through_the_steps_of_every_pass(self) -> None:
-        job = self.build_job()
-
-        with mock.patch.object(story_plots, "A_TICK_S", 0):
-            asyncio.run(job.execute())
-
         self.assertEqual(
-            [(step["passes"], step["doing"]) for step in job.how_far_along()],
+            [(step["passes"], step["doing"]) for step in self.job.how_far_along()[:4]],
             [
                 (1, FINDING_THE_PLOTS),
                 (1, ATTRIBUTING_THE_PASSAGES),
                 (1, UPDATING_THE_PLOTS),
                 (2, FINDING_THE_PLOTS),
-                (2, ATTRIBUTING_THE_PASSAGES),
-                (2, UPDATING_THE_PLOTS),
-                (3, FINDING_THE_PLOTS),
-                (3, ATTRIBUTING_THE_PASSAGES),
-                (3, UPDATING_THE_PLOTS),
             ],
         )
-        self.assertTrue(all(step["state"] == "done" for step in job.how_far_along()))
 
-    def test_the_plots_change_as_the_passes_go_by(self) -> None:
-        told: list[int] = []
-
-        ran(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY),
-            identified=lambda plots, paragraphs: told.append(len(plots)),
+    def test_names_the_plots_and_where_their_lines_stand_in_their_cells(self) -> None:
+        self.assertEqual(
+            self.job.story_plots[0]["title"], fake_story_plots.FAKE_STORY_PLOTS[0][0]
         )
-
-        self.assertEqual(max(told), len(story_plots.FAKE_STORY_PLOTS))
-        self.assertEqual(told[-1], len(story_plots.FAKE_STORY_PLOTS) - 2)
-
-    def test_the_plots_gather_what_happened_along_them(self) -> None:
-        told: list[list[dict[str, Any]]] = []
-
-        ran(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY),
-            identified=lambda plots, paragraphs: told.append(plots),
-        )
-
-        self.assertEqual(len(told[-1][0]["keyEvents"]), 3)
-
-    def test_stops_when_it_is_told_to(self) -> None:
-        identified: list[int] = []
-        stop = [False]
-
-        ran(
-            mock.MagicMock(),
-            mock.MagicMock(),
-            Document(STORY),
-            lambda: stop[0],
-            lambda step: stop.__setitem__(0, len(identified) > 3),
-            lambda plots, paragraphs: identified.append(len(plots)),
-        )
-
-        self.assertLess(len(identified), 10)
-
-    def test_a_document_with_no_prose_is_an_error(self) -> None:
-        with self.assertRaises(ValueError):
-            ran(
-                mock.MagicMock(),
-                mock.MagicMock(),
-                Document(storydoc.dumps([storydoc.chapter("One")])),
-            )
+        placed = self.job.paragraphs_in_story_plots[0]
+        self.assertEqual(placed["cellId"], "scene")
+        self.assertEqual(placed["startCharacterOffsetInCell"], 0)
+        self.assertEqual(placed["wordsInTheCell"], "Paragraph 0")
 
 
 if __name__ == "__main__":

@@ -1063,6 +1063,29 @@ describe("the plots the story weaves", () => {
         ).toBe("25%");
     });
 
+    it("shows the passes still to come, waiting and closed", async () => {
+        await mountStoryPlots(true, [
+            aStep(1, "paragraphs", 40, 800, "running", 20),
+            aStep(2, "plots", 0, 0, "waiting"),
+            aStep(2, "paragraphs", 0, 0, "waiting"),
+            aStep(2, "events", 0, 0, "waiting"),
+        ]);
+
+        const drawers = [
+            ...storyPlotsPanel()!.querySelectorAll(
+                ".author-file-editor-story-plots-pass",
+            ),
+        ];
+        expect(
+            drawers.map((pass) => (pass as HTMLDetailsElement).open),
+        ).toEqual([true, false]);
+        expect(
+            drawers[1].querySelector(
+                "summary .author-file-editor-story-plots-step",
+            )?.className,
+        ).toContain("step-waiting");
+    });
+
     it("opens the pass it is on and closes the ones behind it", async () => {
         await mountStoryPlots(true, [
             aStep(1, "events", 2, 2, "done"),

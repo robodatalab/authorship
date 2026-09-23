@@ -41,7 +41,10 @@ function stateOf(
     if (steps.every((step) => step?.state === "done")) {
         return "done";
     }
-    return steps.some((step) => step !== undefined) ? "running" : "waiting";
+    if (steps.every((step) => step === undefined || step.state === "waiting")) {
+        return "waiting";
+    }
+    return "running";
 }
 
 function timeOnTheStep(
@@ -155,7 +158,10 @@ export function AuthorFileEditorStoryPlotsProgress({
     }
 
     const passes = [...new Set(steps.map((step) => step.passes))];
-    const running = passes.length > 0 ? Math.max(...passes) : 0;
+    const started = passes.filter((pass) =>
+        steps.some((step) => step.passes === pass && step.state !== "waiting"),
+    );
+    const running = started.length > 0 ? Math.max(...started) : passes[0];
     return (
         <div className="author-file-editor-story-plots-progress">
             {passes.map((pass) => {
