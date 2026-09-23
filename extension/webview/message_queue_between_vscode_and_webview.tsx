@@ -13,6 +13,7 @@ import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryPlotsProgress,
 } from "../vscode_runtime/commands/identify_story_plots";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -38,6 +39,7 @@ interface WhatTheWebviewDraws {
     proseErrors: ProseCheckError[];
     storyPlotsAreShown: boolean;
     storyPlots: StoryPlot[];
+    storyPlotsProgress: StoryPlotsProgress | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -81,6 +83,8 @@ function processMessageFromVscode(
     } else if (message.data?.type === "storyPlots") {
         drawn.storyPlotsAreShown = message.data.storyPlotsAreShown as boolean;
         drawn.storyPlots = message.data.storyPlots as StoryPlot[];
+        drawn.storyPlotsProgress = message.data
+            .storyPlotsProgress as StoryPlotsProgress | null;
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
     } else if (message.data?.type === "cellsBeingWritten") {
@@ -112,6 +116,7 @@ function openTheAuthorFileEditor(): void {
         proseErrors: [],
         storyPlotsAreShown: false,
         storyPlots: [],
+        storyPlotsProgress: null,
         paragraphsInStoryPlots: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
@@ -129,6 +134,7 @@ function openTheAuthorFileEditor(): void {
                 proseErrors={drawn.proseErrors}
                 storyPlotsAreShown={drawn.storyPlotsAreShown}
                 storyPlots={drawn.storyPlots}
+                storyPlotsProgress={drawn.storyPlotsProgress}
                 paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}

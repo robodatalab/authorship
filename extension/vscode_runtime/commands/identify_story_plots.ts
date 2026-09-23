@@ -17,9 +17,22 @@ export interface ParagraphInStoryPlots extends SynchronizedRepresentation {
     storyPlotIndices: number[];
 }
 
+export interface StoryPlotsProgress {
+    passes: number;
+    scored: number;
+    plots: number;
+}
+
+const BEFORE_THE_FIRST_PASS: StoryPlotsProgress = {
+    passes: 0,
+    scored: 0,
+    plots: 0,
+};
+
 interface StoryPlotsJob extends ServerJob {
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    progress: StoryPlotsProgress;
 }
 
 export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
@@ -34,14 +47,17 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
             });
+            session.identifyingStoryPlots(BEFORE_THE_FIRST_PASS);
             const identified = await awaitServerJob<StoryPlotsJob>(
                 STORY_PLOTS_STATUS,
                 jobId,
-                (sofar) =>
+                (running) => {
+                    session.identifyingStoryPlots(running.progress);
                     session.showStoryPlots(
-                        sofar.storyPlots,
-                        sofar.paragraphsInStoryPlots,
-                    ),
+                        running.storyPlots,
+                        running.paragraphsInStoryPlots,
+                    );
+                },
             );
             session.showStoryPlots(
                 identified.storyPlots,
@@ -51,6 +67,8 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
             void vscode.window.showErrorMessage(
                 `Cannot identify the plots — ${failure instanceof Error ? failure.message : String(failure)}`,
             );
+        } finally {
+            session.identifyingStoryPlots(null);
         }
     }
 }

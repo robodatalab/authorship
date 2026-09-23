@@ -4,6 +4,7 @@ import type { ProseCheckError } from "./commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryPlotsProgress,
 } from "./commands/identify_story_plots";
 import type {
     AuthorFileEditorMessage,
@@ -25,6 +26,7 @@ export class AuthorFileEditorSession
     private storyPlots: StoryPlot[] = [];
     private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
     private storyPlotsAreShown = false;
+    private storyPlotsProgress: StoryPlotsProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private readonly paragraphsInStoryPlotsSynchronizer: AuthorDocSynchronizer<ParagraphInStoryPlots>;
@@ -206,6 +208,11 @@ export class AuthorFileEditorSession
         this.sendStoryPlots();
     }
 
+    identifyingStoryPlots(howFarAlong: StoryPlotsProgress | null): void {
+        this.storyPlotsProgress = howFarAlong;
+        this.sendStoryPlots();
+    }
+
     toggleStoryPlots(): void {
         this.storyPlotsAreShown = !this.storyPlotsAreShown;
         this.sendStoryPlots();
@@ -263,6 +270,7 @@ export class AuthorFileEditorSession
             type: "storyPlots",
             storyPlotsAreShown: this.storyPlotsAreShown,
             storyPlots: this.storyPlots,
+            storyPlotsProgress: this.storyPlotsProgress,
             paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],
         });
     }

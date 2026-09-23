@@ -10,6 +10,7 @@ import {
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
     ParagraphInStoryPlots,
+    StoryPlotsProgress,
     StoryPlot,
 } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
@@ -70,6 +71,7 @@ async function mountCanvas(options: {
     cellRenderers?: AuthorDocumentCellRenderers;
     storyPlotsAreShown?: boolean;
     storyPlots?: StoryPlot[];
+    storyPlotsProgress?: StoryPlotsProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
 }): Promise<void> {
     posted = [];
@@ -90,6 +92,7 @@ async function mountCanvas(options: {
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 storyPlotsAreShown={options.storyPlotsAreShown}
                 storyPlots={options.storyPlots}
+                storyPlotsProgress={options.storyPlotsProgress}
                 paragraphsInStoryPlots={options.paragraphsInStoryPlots}
             />,
         );
@@ -741,7 +744,11 @@ describe("the part and the chapter the author is looking at", () => {
             ObserverTheTestDrives;
         await mountCanvas({
             cells: [
-                { kind: "part", source: "", attrs: { id: "p1", title: "Book One" } },
+                {
+                    kind: "part",
+                    source: "",
+                    attrs: { id: "p1", title: "Book One" },
+                },
                 {
                     kind: "chapter",
                     source: "",
@@ -935,18 +942,30 @@ describe("the plots the story weaves", () => {
         );
     }
 
-    async function mountStoryPlots(storyPlotsAreShown: boolean) {
+    async function mountStoryPlots(
+        storyPlotsAreShown: boolean,
+        storyPlotsProgress: StoryPlotsProgress | null = null,
+    ) {
         await mountCanvas({
             cells: [markdownCell("The door.", "m1")],
             cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
             storyPlotsAreShown,
             storyPlots: [THE_QUEST],
+            storyPlotsProgress,
             paragraphsInStoryPlots: [THE_DOOR],
         });
     }
 
     function storyPlotsPanel(): Element | null {
         return document.querySelector(".author-file-editor-story-plots");
+    }
+
+    function howFarAlong(): string | undefined {
+        return (
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-plots-progress",
+            )?.textContent ?? undefined
+        );
     }
 
     it("draws neither the panel nor the borders until they are shown", async () => {
@@ -961,15 +980,37 @@ describe("the plots the story weaves", () => {
     it("lists every plot with its summary and borders its paragraphs", async () => {
         await mountStoryPlots(true);
 
-        expect(
-            storyPlotsPanel()?.querySelector("summary")?.textContent,
-        ).toBe("The quest");
+        expect(storyPlotsPanel()?.querySelector("summary")?.textContent).toBe(
+            "The quest",
+        );
         expect(storyPlotsPanel()?.querySelector("p")?.textContent).toBe(
             "Someone goes looking.",
         );
         expect(
             document.querySelector(".test-story-plot-borders")?.textContent,
         ).toBe("1");
+    });
+
+    it("says which pass is being read while the plots are identified", async () => {
+        await mountStoryPlots(true, { passes: 2, scored: 1, plots: 3 });
+
+        expect(howFarAlong()).toBe("Pass 2 — 1 of 3 plots read");
+    });
+
+    it("says it is reading the chapters before the first pass", async () => {
+        await mountCanvas({
+            cells: [markdownCell("The door.", "m1")],
+            storyPlotsAreShown: true,
+            storyPlots: [],
+            storyPlotsProgress: { passes: 0, scored: 0, plots: 0 },
+        });
+
+        expect(howFarAlong()).toBe("Reading the chapters\u2026");
+        expect(
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-plots-none",
+            ),
+        ).toBeNull();
     });
 
     it("asks for the plots to be identified", async () => {

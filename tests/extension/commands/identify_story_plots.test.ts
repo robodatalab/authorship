@@ -20,11 +20,16 @@ const THE_DOOR = {
 
 const THE_QUEST = { title: "The quest", summary: "Someone goes looking." };
 
-function serverAnswers(job: Record<string, unknown>): {
+const NO_PASSES_YET = { passes: 0, scored: 0, plots: 0 };
+
+const A_SECOND_PASS = { passes: 2, scored: 1, plots: 3 };
+
+function serverAnswers(...jobs: Record<string, unknown>[]): {
     url: string;
     body: unknown;
 }[] {
     const asked: { url: string; body: unknown }[] = [];
+    const answers = [...jobs];
     vi.stubGlobal("fetch", (url: string, sent?: { body: string }) => {
         asked.push({ url, body: sent?.body && JSON.parse(sent.body) });
         return Promise.resolve({
@@ -39,13 +44,22 @@ function serverAnswers(job: Record<string, unknown>): {
                               noQuota: false,
                               storyPlots: [],
                               paragraphsInStoryPlots: [],
-                              ...job,
+                              progress: NO_PASSES_YET,
+                              ...(answers.length > 1
+                                  ? answers.shift()
+                                  : answers[0]),
                           }
                         : { id: "job-1" },
                 ),
         });
     });
     return asked;
+}
+
+function progressSentToThePage(): unknown[] {
+    return sentToThePage.map(
+        (sent) => (sent as { storyPlotsProgress: unknown }).storyPlotsProgress,
+    );
 }
 
 beforeEach(forgetWhatTheEditorDid);
@@ -71,10 +85,42 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
             {
                 type: "storyPlots",
                 storyPlotsAreShown: false,
+                storyPlots: [],
+                storyPlotsProgress: NO_PASSES_YET,
+                paragraphsInStoryPlots: [],
+            },
+            {
+                type: "storyPlots",
+                storyPlotsAreShown: false,
                 storyPlots: [THE_QUEST],
+                storyPlotsProgress: NO_PASSES_YET,
+                paragraphsInStoryPlots: [THE_DOOR],
+            },
+            {
+                type: "storyPlots",
+                storyPlotsAreShown: false,
+                storyPlots: [THE_QUEST],
+                storyPlotsProgress: null,
                 paragraphsInStoryPlots: [THE_DOOR],
             },
         ]);
+    });
+
+    it("says how far the passes have got while it runs", async () => {
+        serverAnswers(
+            {
+                running: true,
+                progress: A_SECOND_PASS,
+                storyPlots: [THE_QUEST],
+                paragraphsInStoryPlots: [THE_DOOR],
+            },
+            { storyPlots: [THE_QUEST], paragraphsInStoryPlots: [THE_DOOR] },
+        );
+
+        await new IdentifyStoryPlotsCommand().invoke(storyOfThreeCells());
+
+        expect(progressSentToThePage()).toContainEqual(A_SECOND_PASS);
+        expect(progressSentToThePage().at(-1)).toBeNull();
     });
 
     it("says why it could not identify the plots", async () => {
@@ -83,5 +129,6 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
         await new IdentifyStoryPlotsCommand().invoke(storyOfThreeCells());
 
         expect(shownMessages.at(-1)).toContain("Cannot identify the plots");
+        expect(progressSentToThePage().at(-1)).toBeNull();
     });
 });
