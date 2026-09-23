@@ -48,9 +48,11 @@ def deploy_inference_models(app: FastAPI) -> None:
         causal_model, enable_thinking="false", max_total_tokens="16384"
     )
     app.state.causal_model = causal_model.client(causal_deployment.url)
+    app.state.inference_models[CAUSAL_MODEL] = causal_deployment.key
     gec_model = HuggingFaceImporter(GEC_MODEL, TextRewriter)
     gec_deployment = cluster.deploy(gec_model)
     app.state.gec_model = gec_model.client(gec_deployment.url)
+    app.state.inference_models[GEC_MODEL] = gec_deployment.key
     style_model = Hosted(STYLE_MODEL, GeminiText2Text)
     cortexgrid.register_model(
         style_model.serve_app,
@@ -66,16 +68,14 @@ def deploy_inference_models(app: FastAPI) -> None:
         timeout=cluster.DEPLOY_TIMEOUT_S,
     )
     app.state.style_model = style_model.client(style_deployment.url)
+    app.state.inference_models[STYLE_MODEL] = style_deployment.key
     story_plot_classifier_deployment = deploy_story_plot_classifier()
     app.state.story_plot_classifier = StoryPlotClassifier.client(
         story_plot_classifier_deployment.url, STORY_PLOT_CLASSIFIER_NAME
     )
-    app.state.inference_models = {
-        CAUSAL_MODEL: causal_deployment.key,
-        GEC_MODEL: gec_deployment.key,
-        STYLE_MODEL: style_deployment.key,
-        STORY_PLOT_CLASSIFIER_NAME: story_plot_classifier_deployment.key,
-    }
+    app.state.inference_models[STORY_PLOT_CLASSIFIER_NAME] = (
+        story_plot_classifier_deployment.key
+    )
     _log.info("Completion models created")
 
 
@@ -102,7 +102,7 @@ def models() -> dict[str, Any]:
     return {
         "models": [
             {"model": name, "status": cortexgrid.model_serving_status(key).phase}
-            for name, key in app.state.inference_models.items()
+            for name, key in list(app.state.inference_models.items())
         ]
     }
 
