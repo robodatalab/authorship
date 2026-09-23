@@ -160,8 +160,11 @@ and the panel shows that time, running or finished, because a step that is waiti
 looks exactly like a step that has hung.
 
 Paragraphs are scored in batches rather than a plot at a time, so that count moves while a
-plot is still being read. The plots and their paragraphs are redrawn at the end of every pass
-rather than kept until the run settles.
+plot is still being read, and each batch cuts the plot at the pass level of the scores in
+hand and sends what it claims so far. That preview moves as the distribution fills out and is
+overwritten by the real cut when the plot is done: §6's rule is about what the algorithm
+decides, not about what the author is allowed to watch. The plots and their paragraphs are
+redrawn at the end of every pass rather than kept until the run settles.
 
 ## 10. Open
 

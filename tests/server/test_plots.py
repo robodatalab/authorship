@@ -295,6 +295,29 @@ class OnePass(unittest.TestCase):
         )
         self.assertEqual(claims[0].paragraphs, frozenset({4, 5}))
 
+    def test_says_what_a_plot_claims_before_it_has_read_the_whole_story(
+        self,
+    ) -> None:
+        claimed: list[list[Any]] = []
+
+        with mock.patch.object(story_plots, "PARAGRAPHS_SCORED_AT_A_TIME", 3):
+            passed(
+                build_classifier([0.02, 0.03, 0.9], [0.95, 0.04, 0.05]),
+                "the story",
+                PARAGRAPHS,
+                [a_story_plot("The crush")],
+                lambda: False,
+                lambda read, to_read: None,
+                lambda sofar: claimed.append(
+                    [claim.paragraphs for claim in sofar]
+                ),
+            )
+
+        self.assertEqual(
+            claimed,
+            [[frozenset({2})], [frozenset({2, 3})], [frozenset({2, 3})]],
+        )
+
     def test_a_cancelled_pass_stops_scoring(self) -> None:
         classifier = build_classifier([0.02, 0.03, 0.05, 0.04, 0.9, 0.95])
 

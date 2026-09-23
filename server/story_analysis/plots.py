@@ -161,7 +161,7 @@ async def story_plot_probabilities(
     story: str,
     paragraphs: Sequence[StoryParagraph],
     plot: StoryPlot,
-    scored: Callable[[int], None] = lambda paragraphs: None,
+    scored: Callable[[list[float]], None] = lambda probabilities: None,
 ) -> list[float]:
     probabilities: list[float] = []
     for first in range(0, len(paragraphs), PARAGRAPHS_SCORED_AT_A_TIME):
@@ -183,8 +183,23 @@ async def story_plot_probabilities(
                 ],
             )
         )
-        scored(len(asked_now))
+        scored(probabilities)
     return probabilities
+
+
+def story_plot_claim(
+    plot: StoryPlot, probabilities: Sequence[float]
+) -> StoryPlotClaim:
+    pass_level = story_plot_pass_level(probabilities)
+    return StoryPlotClaim(
+        plot=plot,
+        paragraphs=frozenset(
+            index
+            for index, probability in enumerate(probabilities)
+            if pass_level.admits(probability)
+        ),
+        separation=pass_level.separation,
+    )
 
 
 async def one_pass(
@@ -198,32 +213,21 @@ async def one_pass(
 ) -> list[StoryPlotClaim]:
     claims: list[StoryPlotClaim] = []
     to_score = len(paragraphs) * len(plots)
-    scored_so_far = 0
     progress(0, to_score)
-
-    def scored(paragraphs_now: int) -> None:
-        nonlocal scored_so_far
-        scored_so_far += paragraphs_now
-        progress(scored_so_far, to_score)
 
     for plot in plots:
         if cancelled():
             return []
+        scored_before = len(claims) * len(paragraphs)
+
+        def sofar(probabilities: list[float]) -> None:
+            progress(scored_before + len(probabilities), to_score)
+            claimed([*claims, story_plot_claim(plot, probabilities)])
+
         probabilities = await story_plot_probabilities(
-            classifier, story, paragraphs, plot, scored
+            classifier, story, paragraphs, plot, sofar
         )
-        pass_level = story_plot_pass_level(probabilities)
-        claims.append(
-            StoryPlotClaim(
-                plot=plot,
-                paragraphs=frozenset(
-                    index
-                    for index, probability in enumerate(probabilities)
-                    if pass_level.admits(probability)
-                ),
-                separation=pass_level.separation,
-            )
-        )
+        claims.append(story_plot_claim(plot, probabilities))
         claimed(list(claims))
     return united(
         [
