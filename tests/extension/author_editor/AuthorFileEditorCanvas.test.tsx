@@ -1038,7 +1038,7 @@ describe("the plots the story weaves", () => {
         expect(stepsShown()).toEqual([
             "Pass 1 1:51",
             "finding plots 0:31",
-            "attributing passages 1:20 / 5:20",
+            "attributing passages 1:20",
             "updating plots",
         ]);
         expect(countsShown()).toEqual(["", "24 of 24", "100 of 400", ""]);

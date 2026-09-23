@@ -1,9 +1,16 @@
+import { useRef } from "react";
+
 import type { StoryPlotsStep } from "../../vscode_runtime/commands/identify_story_plots";
 import { onTheClock } from "../elapsed_time";
 import "./AuthorFileEditorStoryPlotsProgress.css";
 
 interface AuthorFileEditorStoryPlotsProgressProps {
     steps: StoryPlotsStep[];
+}
+
+interface WhenItGotGoing {
+    done: number;
+    seconds: number;
 }
 
 const WHAT_A_PASS_DOES: { doing: StoryPlotsStep["doing"]; says: string }[] = [
@@ -23,22 +30,6 @@ function howFarAlong(steps: (StoryPlotsStep | undefined)[]): number {
         counted.reduce((sofar, step) => sofar + step.done, 0) /
         counted.reduce((sofar, step) => sofar + step.of, 0)
     );
-}
-
-function secondsLeft(steps: (StoryPlotsStep | undefined)[]): number | null {
-    let left = 0;
-    for (const step of steps) {
-        if (step === undefined || step.state === "waiting") {
-            return null;
-        }
-        if (step.state === "running") {
-            if (step.done === 0) {
-                return null;
-            }
-            left += (step.seconds / step.done) * (step.of - step.done);
-        }
-    }
-    return left;
 }
 
 function stateOf(
@@ -70,10 +61,12 @@ function timeOnTheStep(
 function AuthorFileEditorStoryPlotsStep({
     says,
     steps,
+    left,
     counted,
 }: {
     says: string;
     steps: (StoryPlotsStep | undefined)[];
+    left: number | null;
     counted?: StoryPlotsStep;
 }) {
     const state = stateOf(steps);
@@ -108,7 +101,7 @@ function AuthorFileEditorStoryPlotsStep({
             <span className="author-file-editor-story-plots-step-says">
                 <span>{says}</span>
                 <span className="author-file-editor-story-plots-step-took">
-                    {timeOnTheStep(state, seconds, secondsLeft(steps))}
+                    {timeOnTheStep(state, seconds, left)}
                 </span>
             </span>
         </div>
@@ -118,6 +111,49 @@ function AuthorFileEditorStoryPlotsStep({
 export function AuthorFileEditorStoryPlotsProgress({
     steps,
 }: AuthorFileEditorStoryPlotsProgressProps) {
+    const whenEachStepGotGoing = useRef(new Map<string, WhenItGotGoing>());
+
+    function leftOf(step: StoryPlotsStep | undefined): number | null {
+        if (step === undefined) {
+            return null;
+        }
+        if (step.state !== "running") {
+            return 0;
+        }
+        if (step.done === 0) {
+            return null;
+        }
+        const named = `${step.passes} ${step.doing}`;
+        const gotGoing = whenEachStepGotGoing.current.get(named);
+        if (gotGoing === undefined) {
+            whenEachStepGotGoing.current.set(named, {
+                done: step.done,
+                seconds: step.seconds,
+            });
+            return null;
+        }
+        const done = step.done - gotGoing.done;
+        const seconds = step.seconds - gotGoing.seconds;
+        if (done <= 0 || seconds <= 0) {
+            return null;
+        }
+        return (seconds / done) * (step.of - step.done);
+    }
+
+    function leftOfThemAll(
+        inThePass: (StoryPlotsStep | undefined)[],
+    ): number | null {
+        let left = 0;
+        for (const step of inThePass) {
+            const ofThisOne = leftOf(step);
+            if (ofThisOne === null) {
+                return null;
+            }
+            left += ofThisOne;
+        }
+        return left;
+    }
+
     const passes = [...new Set(steps.map((step) => step.passes))];
     const running = passes.length > 0 ? Math.max(...passes) : 0;
     return (
@@ -139,6 +175,9 @@ export function AuthorFileEditorStoryPlotsProgress({
                             <AuthorFileEditorStoryPlotsStep
                                 says={`Pass ${pass}`}
                                 steps={inThisPass.map(({ step }) => step)}
+                                left={leftOfThemAll(
+                                    inThisPass.map(({ step }) => step),
+                                )}
                             />
                         </summary>
                         {inThisPass.map(({ says, step }) => (
@@ -146,6 +185,7 @@ export function AuthorFileEditorStoryPlotsProgress({
                                 key={says}
                                 says={says}
                                 steps={[step]}
+                                left={leftOf(step)}
                                 counted={step}
                             />
                         ))}
