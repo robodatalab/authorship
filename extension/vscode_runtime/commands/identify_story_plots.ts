@@ -10,7 +10,10 @@ const STORY_PLOTS_STATUS = "/analyze/plots/status";
 
 export interface StoryPlot {
     title: string;
-    summary: string;
+    characters: string[];
+    origin: string;
+    goal: string;
+    keyEvents: string[];
 }
 
 export interface ParagraphInStoryPlots extends SynchronizedRepresentation {

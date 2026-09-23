@@ -797,7 +797,9 @@ class IdentifyStoryPlots(unittest.TestCase):
         self.assertEqual(
             [plot["title"] for plot in identified["storyPlots"]], ["The crush"]
         )
-        self.assertIn("Bob has a crush on Alice", identified["storyPlots"][0]["summary"])
+        self.assertEqual(
+            identified["storyPlots"][0]["origin"], "Bob has a crush on Alice"
+        )
         self.assertEqual(
             [
                 (step["passes"], step["doing"], step["state"])

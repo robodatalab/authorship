@@ -670,7 +670,14 @@ def _settled(reassignments: Sequence[int], paragraphs: int) -> bool:
 
 def _story_plots_told(plots: Sequence[StoryPlot]) -> list[dict[str, Any]]:
     return [
-        {"title": plot.title, "summary": story_plot_summary(plot)} for plot in plots
+        {
+            "title": plot.title,
+            "characters": list(plot.characters),
+            "origin": plot.origin,
+            "goal": plot.goal,
+            "keyEvents": [event.what_happened for event in plot.key_events],
+        }
+        for plot in plots
     ]
 
 

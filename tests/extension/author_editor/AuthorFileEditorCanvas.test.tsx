@@ -922,7 +922,10 @@ describe("a folded cell", () => {
 describe("the plots the story weaves", () => {
     const THE_QUEST: StoryPlot = {
         title: "The quest",
-        summary: "Someone goes looking.",
+        characters: ["Bob", "Alice"],
+        origin: "Bob loses his ring",
+        goal: "Bob finds his ring",
+        keyEvents: ["Bob asked Alice for help"],
     };
 
     const THE_DOOR: ParagraphInStoryPlots = {
@@ -1010,9 +1013,17 @@ describe("the plots the story weaves", () => {
             )?.textContent,
         ).toBe("The quest");
         expect(
-            storyPlotsPanel()?.querySelector(".author-file-editor-story-plot p")
-                ?.textContent,
-        ).toBe("Someone goes looking.");
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plot dd",
+                ),
+            ].map((said) => said.textContent),
+        ).toEqual([
+            "Bob, Alice",
+            "Bob loses his ring",
+            "Bob finds his ring",
+            "Bob asked Alice for help",
+        ]);
         expect(
             document.querySelector(".test-story-plot-borders")?.textContent,
         ).toBe("1");

@@ -81,7 +81,33 @@ export function AuthorFileEditorStoryPlots({
                                         />
                                         {storyPlot.title}
                                     </summary>
-                                    <p>{storyPlot.summary}</p>
+                                    <dl>
+                                        <dt>Who</dt>
+                                        <dd>
+                                            {storyPlot.characters.join(", ")}
+                                        </dd>
+                                        <dt>Began</dt>
+                                        <dd>{storyPlot.origin}</dd>
+                                        <dt>Heading for</dt>
+                                        <dd>{storyPlot.goal}</dd>
+                                        <dt>So far</dt>
+                                        <dd>
+                                            {storyPlot.keyEvents.length ===
+                                            0 ? (
+                                                "nothing recorded yet"
+                                            ) : (
+                                                <ul>
+                                                    {storyPlot.keyEvents.map(
+                                                        (happened, when) => (
+                                                            <li key={when}>
+                                                                {happened}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </dd>
+                                    </dl>
                                 </details>
                             </li>
                         ))}

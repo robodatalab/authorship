@@ -18,7 +18,13 @@ const THE_DOOR = {
     storyPlotIndices: [0],
 };
 
-const THE_QUEST = { title: "The quest", summary: "Someone goes looking." };
+const THE_QUEST = {
+    title: "The quest",
+    characters: ["Bob"],
+    origin: "Bob loses his ring",
+    goal: "Bob finds his ring",
+    keyEvents: [],
+};
 
 const NOTHING_READ_YET: unknown[] = [];
 
