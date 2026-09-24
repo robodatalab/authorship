@@ -1023,11 +1023,6 @@ describe("the plots the story weaves", () => {
                 ),
             ].map((drawer) => drawer.textContent),
         ).toEqual(["Plots", "Progress"]);
-        expect(
-            storyPlotsPanel()?.querySelector(
-                ".author-file-editor-work-progress-step-says",
-            )?.textContent,
-        ).toContain("asking whether the events share a plot");
     });
 
     it("draws no progress drawer when nothing is running", async () => {

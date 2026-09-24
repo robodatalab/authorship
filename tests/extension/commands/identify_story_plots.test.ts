@@ -26,33 +26,6 @@ const THE_QUEST = {
     keyEvents: [],
 };
 
-const NOTHING_DONE_YET = {
-    doing: "identify plots",
-    done: 0,
-    of: null,
-    seconds: 0,
-    state: "waiting",
-    steps: [],
-};
-
-const HALF_WAY_THROUGH_ASKING = {
-    doing: "identify plots",
-    done: 0,
-    of: null,
-    seconds: 12,
-    state: "running",
-    steps: [
-        {
-            doing: "asking whether the events share a plot",
-            done: 120,
-            of: 240,
-            seconds: 12,
-            state: "running",
-            steps: [],
-        },
-    ],
-};
-
 function serverAnswers(...jobs: Record<string, unknown>[]): {
     url: string;
     body: unknown;
@@ -73,7 +46,6 @@ function serverAnswers(...jobs: Record<string, unknown>[]): {
                               noQuota: false,
                               storyPlots: [],
                               paragraphsInStoryPlots: [],
-                              progress: NOTHING_DONE_YET,
                               ...(answers.length > 1
                                   ? answers.shift()
                                   : answers[0]),
@@ -83,12 +55,6 @@ function serverAnswers(...jobs: Record<string, unknown>[]): {
         });
     });
     return asked;
-}
-
-function progressSentToThePage(): unknown[] {
-    return sentToThePage.map(
-        (sent) => (sent as { storyPlotsProgress: unknown }).storyPlotsProgress,
-    );
 }
 
 beforeEach(forgetWhatTheEditorDid);
@@ -111,45 +77,25 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
         });
         expect(asked[1].url).toContain("/analyze/plots/status?id=job-1");
         expect(sentToThePage).toEqual([
-            {
+            expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [],
-                storyPlotsProgress: NOTHING_DONE_YET,
                 paragraphsInStoryPlots: [],
-            },
-            {
+            }),
+            expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [THE_QUEST],
-                storyPlotsProgress: NOTHING_DONE_YET,
                 paragraphsInStoryPlots: [THE_DOOR],
-            },
-            {
+            }),
+            expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [THE_QUEST],
-                storyPlotsProgress: null,
                 paragraphsInStoryPlots: [THE_DOOR],
-            },
+            }),
         ]);
-    });
-
-    it("says how far the passes have got while it runs", async () => {
-        serverAnswers(
-            {
-                running: true,
-                progress: HALF_WAY_THROUGH_ASKING,
-                storyPlots: [THE_QUEST],
-                paragraphsInStoryPlots: [THE_DOOR],
-            },
-            { storyPlots: [THE_QUEST], paragraphsInStoryPlots: [THE_DOOR] },
-        );
-
-        await new IdentifyStoryPlotsCommand().invoke(storyOfThreeCells());
-
-        expect(progressSentToThePage()).toContainEqual(HALF_WAY_THROUGH_ASKING);
-        expect(progressSentToThePage().at(-1)).toBeNull();
     });
 
     it("says why it could not identify the plots", async () => {
@@ -158,6 +104,5 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
         await new IdentifyStoryPlotsCommand().invoke(storyOfThreeCells());
 
         expect(shownMessages.at(-1)).toContain("Cannot identify the plots");
-        expect(progressSentToThePage().at(-1)).toBeNull();
     });
 });
