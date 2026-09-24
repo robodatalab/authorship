@@ -49,11 +49,6 @@
     );
 }
 
-.author-file-editor-story-plots-progress {
-    margin: 0 0 8px;
-    color: var(--vscode-descriptionForeground);
-}
-
 .author-file-editor-story-plots-drawer > summary {
     margin: 8px 0 4px;
     font-weight: 600;

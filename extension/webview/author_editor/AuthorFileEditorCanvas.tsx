@@ -18,8 +18,8 @@ import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose"
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
-    StoryPlotsStep,
 } from "../../vscode_runtime/commands/identify_story_plots";
+import type { WorkProgress } from "../../vscode_runtime/server/jobs";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
@@ -115,7 +115,7 @@ interface AuthorFileEditorCanvasProps {
     proseErrors?: ProseCheckError[];
     storyPlotsAreShown?: boolean;
     storyPlots?: StoryPlot[];
-    storyPlotsProgress?: StoryPlotsStep[] | null;
+    storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
     wordsInEverySection?: Readonly<Record<string, number>>;

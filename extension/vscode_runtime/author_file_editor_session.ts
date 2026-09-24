@@ -4,12 +4,12 @@ import type { ProseCheckError } from "./commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
-    StoryPlotsStep,
 } from "./commands/identify_story_plots";
 import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
+import type { WorkProgress } from "./server/jobs";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocDiff } from "./storydoc/diff";
 import {
@@ -26,7 +26,7 @@ export class AuthorFileEditorSession
     private storyPlots: StoryPlot[] = [];
     private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
     private storyPlotsAreShown = false;
-    private storyPlotsProgress: StoryPlotsStep[] | null = null;
+    private storyPlotsProgress: WorkProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private readonly paragraphsInStoryPlotsSynchronizer: AuthorDocSynchronizer<ParagraphInStoryPlots>;
@@ -208,8 +208,8 @@ export class AuthorFileEditorSession
         this.sendStoryPlots();
     }
 
-    identifyingStoryPlots(steps: StoryPlotsStep[] | null): void {
-        this.storyPlotsProgress = steps;
+    identifyingStoryPlots(progress: WorkProgress | null): void {
+        this.storyPlotsProgress = progress;
         this.sendStoryPlots();
     }
 

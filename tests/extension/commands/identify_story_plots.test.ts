@@ -26,12 +26,32 @@ const THE_QUEST = {
     keyEvents: [],
 };
 
-const NOTHING_READ_YET: unknown[] = [];
+const NOTHING_DONE_YET = {
+    doing: "identify plots",
+    done: 0,
+    of: null,
+    seconds: 0,
+    state: "waiting",
+    steps: [],
+};
 
-const A_SECOND_PASS = [
-    { passes: 0, doing: "chapters", done: 24, of: 24 },
-    { passes: 2, doing: "paragraphs", done: 120, of: 400 },
-];
+const HALF_WAY_THROUGH_ASKING = {
+    doing: "identify plots",
+    done: 0,
+    of: null,
+    seconds: 12,
+    state: "running",
+    steps: [
+        {
+            doing: "asking whether the events share a plot",
+            done: 120,
+            of: 240,
+            seconds: 12,
+            state: "running",
+            steps: [],
+        },
+    ],
+};
 
 function serverAnswers(...jobs: Record<string, unknown>[]): {
     url: string;
@@ -53,7 +73,7 @@ function serverAnswers(...jobs: Record<string, unknown>[]): {
                               noQuota: false,
                               storyPlots: [],
                               paragraphsInStoryPlots: [],
-                              progress: NOTHING_READ_YET,
+                              progress: NOTHING_DONE_YET,
                               ...(answers.length > 1
                                   ? answers.shift()
                                   : answers[0]),
@@ -95,14 +115,14 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [],
-                storyPlotsProgress: NOTHING_READ_YET,
+                storyPlotsProgress: NOTHING_DONE_YET,
                 paragraphsInStoryPlots: [],
             },
             {
                 type: "storyPlots",
                 storyPlotsAreShown: false,
                 storyPlots: [THE_QUEST],
-                storyPlotsProgress: NOTHING_READ_YET,
+                storyPlotsProgress: NOTHING_DONE_YET,
                 paragraphsInStoryPlots: [THE_DOOR],
             },
             {
@@ -119,7 +139,7 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
         serverAnswers(
             {
                 running: true,
-                progress: A_SECOND_PASS,
+                progress: HALF_WAY_THROUGH_ASKING,
                 storyPlots: [THE_QUEST],
                 paragraphsInStoryPlots: [THE_DOOR],
             },
@@ -128,7 +148,7 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
 
         await new IdentifyStoryPlotsCommand().invoke(storyOfThreeCells());
 
-        expect(progressSentToThePage()).toContainEqual(A_SECOND_PASS);
+        expect(progressSentToThePage()).toContainEqual(HALF_WAY_THROUGH_ASKING);
         expect(progressSentToThePage().at(-1)).toBeNull();
     });
 

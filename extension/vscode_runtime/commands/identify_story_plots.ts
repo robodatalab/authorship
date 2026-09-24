@@ -3,7 +3,12 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
+import {
+    awaitServerJob,
+    startServerJob,
+    type ServerJob,
+    type WorkProgress,
+} from "../server/jobs";
 import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 
 const STORY_PLOTS_STATUS = "/analyze/plots/status";
@@ -20,21 +25,19 @@ export interface ParagraphInStoryPlots extends SynchronizedRepresentation {
     storyPlotIndices: number[];
 }
 
-export interface StoryPlotsStep {
-    passes: number;
-    doing: "plots" | "paragraphs" | "events";
-    done: number;
-    of: number;
-    seconds: number;
-    state: "waiting" | "running" | "done";
-}
-
-const NOTHING_READ_YET: StoryPlotsStep[] = [];
+const NOTHING_DONE_YET: WorkProgress = {
+    doing: "identify plots",
+    done: 0,
+    of: null,
+    seconds: 0,
+    state: "waiting",
+    steps: [],
+};
 
 interface StoryPlotsJob extends ServerJob {
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
-    progress: StoryPlotsStep[];
+    progress: WorkProgress;
 }
 
 export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
@@ -49,7 +52,7 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
             });
-            session.identifyingStoryPlots(NOTHING_READ_YET);
+            session.identifyingStoryPlots(NOTHING_DONE_YET);
             const identified = await awaitServerJob<StoryPlotsJob>(
                 STORY_PLOTS_STATUS,
                 jobId,

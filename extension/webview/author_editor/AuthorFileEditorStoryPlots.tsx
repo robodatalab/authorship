@@ -1,10 +1,8 @@
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import type {
-    StoryPlot,
-    StoryPlotsStep,
-} from "../../vscode_runtime/commands/identify_story_plots";
-import { AuthorFileEditorStoryPlotsProgress } from "./AuthorFileEditorStoryPlotsProgress";
+import type { StoryPlot } from "../../vscode_runtime/commands/identify_story_plots";
+import type { WorkProgress } from "../../vscode_runtime/server/jobs";
+import { AuthorFileEditorWorkProgress } from "./AuthorFileEditorWorkProgress";
 import { storyPlotColorClassName } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorStoryPlots.css";
 
@@ -13,7 +11,7 @@ const WIDEST = 720;
 
 interface AuthorFileEditorStoryPlotsProps {
     storyPlots: StoryPlot[];
-    storyPlotsProgress?: StoryPlotsStep[] | null;
+    storyPlotsProgress?: WorkProgress | null;
     onIdentifyStoryPlotsAsked: () => void;
 }
 
@@ -117,8 +115,8 @@ export function AuthorFileEditorStoryPlots({
             {storyPlotsProgress && (
                 <details className="author-file-editor-story-plots-drawer" open>
                     <summary>Progress</summary>
-                    <AuthorFileEditorStoryPlotsProgress
-                        steps={storyPlotsProgress}
+                    <AuthorFileEditorWorkProgress
+                        progress={storyPlotsProgress}
                     />
                 </details>
             )}
