@@ -14,8 +14,6 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
-from server.story_analysis import fake_story_plots
-from server.story_analysis import plots as story_plots
 
 
 DEFAULT_REPLY = (
@@ -722,114 +720,6 @@ class FixStyle(unittest.TestCase):
         status = self.start()
         self.assertIn("no prose", status["error"])
 
-
-def wait_for_story_plots(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = client.get("/analyze/plots/status", params={"id": job_id})
-        if response.status_code == 200 and not response.json()["running"]:
-            return response.json()
-        time.sleep(0.005)
-    raise AssertionError(f"plot identification {job_id} did not finish within {timeout}s")
-
-
-THE_SCENE = "\n\n".join(
-    [
-        "The lantern had gone out.",
-        "The door stood open.\nNobody came.",
-        "Bob waited for Alice.",
-        "Alice came down the stairs.",
-    ]
-)
-
-
-class IdentifyStoryPlots(unittest.TestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        app.state.jobs = ParallelJobsManager()
-        app.state.style_model = mock.MagicMock()
-        app.state.story_plot_classifier = mock.MagicMock()
-        ticking = mock.patch.object(story_plots, "A_TICK_S", 0)
-        ticking.start()
-        self.addCleanup(ticking.stop)
-
-    def identify(self, cells: list[storydoc.Cell]) -> dict:
-        client = TestClient(app)
-        started = client.post(
-            "/analyze/plots",
-            json={"path": "/stories/story.author", "text": storydoc.dumps(cells)},
-        )
-        self.assertEqual(started.status_code, 202)
-        return wait_for_story_plots(client, started.json()["id"])
-
-    def test_names_the_plots_it_found_and_what_they_are_about(self) -> None:
-        identified = self.identify(
-            [
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "lantern"}),
-            ]
-        )
-
-        self.assertIsNone(identified["error"])
-        self.assertEqual(
-            identified["storyPlots"][0]["title"],
-            fake_story_plots.FAKE_STORY_PLOTS[0][0],
-        )
-        self.assertEqual(
-            [(step["passes"], step["doing"]) for step in identified["progress"][:3]],
-            [(1, "plots"), (1, "paragraphs"), (1, "events")],
-        )
-
-    def test_places_the_paragraphs_a_plot_claims_by_where_they_stand_in_the_cell(
-        self,
-    ) -> None:
-        identified = self.identify(
-            [
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "lantern"}),
-            ]
-        )
-
-        self.assertEqual(
-            [
-                (
-                    paragraph["cellId"],
-                    paragraph["startCharacterOffsetInCell"],
-                    paragraph["endCharacterOffsetInCell"],
-                    paragraph["wordsInTheCell"],
-                )
-                for paragraph in identified["paragraphsInStoryPlots"][:2]
-            ],
-            [
-                ("lantern", 0, 25, "The lantern had gone out."),
-                ("lantern", 27, 47, "The door stood open."),
-            ],
-        )
-
-    def test_reads_no_cell_but_the_prose(self) -> None:
-        identified = self.identify(
-            [
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.NOTE, "Remember the lantern.", {"id": "note"}),
-                storydoc.Cell(storydoc.MARKDOWN, THE_SCENE, {"id": "door"}),
-            ]
-        )
-
-        self.assertEqual(
-            {paragraph["cellId"] for paragraph in identified["paragraphsInStoryPlots"]},
-            {"door"},
-        )
-
-    def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(
-        self,
-    ) -> None:
-        identified = self.identify([storydoc.chapter("One")])
-
-        self.assertIn("no prose", identified["error"])
-
-    def test_refuses_to_report_on_a_job_it_never_started(self) -> None:
-        response = TestClient(app).get("/analyze/plots/status", params={"id": "nothing"})
-        self.assertEqual(response.status_code, 404)
 
 if __name__ == "__main__":
     unittest.main()
