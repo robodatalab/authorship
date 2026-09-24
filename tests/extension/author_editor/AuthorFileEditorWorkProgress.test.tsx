@@ -42,6 +42,7 @@ describe("how far along a job is", () => {
             done: 0,
             of: null,
             seconds: 111,
+            secondsPerItem: null,
             state: "running",
             steps: [
                 {
@@ -49,6 +50,7 @@ describe("how far along a job is", () => {
                     done: 15,
                     of: 15,
                     seconds: 31,
+                    secondsPerItem: 2.0,
                     state: "done",
                     steps: [],
                 },
@@ -57,6 +59,7 @@ describe("how far along a job is", () => {
                     done: 3,
                     of: null,
                     seconds: 80,
+                    secondsPerItem: 0.25,
                     state: "running",
                     steps: [],
                 },
@@ -64,8 +67,8 @@ describe("how far along a job is", () => {
         });
 
         expect(stepsShown()).toEqual([
-            "asking whether the events share a plot 0:31",
-            "stitching the events into plots 1:20",
+            "asking whether the events share a plot 0:31 2.0 s/it",
+            "stitching the events into plots 1:20 4.0 it/s",
         ]);
         expect(countsShown()).toEqual(["15 of 15", "3"]);
         expect(
@@ -80,12 +83,13 @@ describe("how far along a job is", () => {
         ]);
     });
 
-    it("reckons the time left from the rate the step is going at", async () => {
+    it("reckons the time left from how long the recent items took", async () => {
         await drawn({
             doing: "identify plots",
             done: 0,
             of: null,
             seconds: 80,
+            secondsPerItem: null,
             state: "running",
             steps: [
                 {
@@ -93,6 +97,7 @@ describe("how far along a job is", () => {
                     done: 100,
                     of: 400,
                     seconds: 80,
+                    secondsPerItem: 0.5,
                     state: "running",
                     steps: [],
                 },
@@ -100,7 +105,7 @@ describe("how far along a job is", () => {
         });
 
         expect(stepsShown()).toEqual([
-            "asking whether the events share a plot 1:20 / 5:20",
+            "asking whether the events share a plot 1:20 / 3:50 2.0 it/s",
         ]);
     });
 
@@ -110,6 +115,7 @@ describe("how far along a job is", () => {
             done: 0,
             of: null,
             seconds: 10,
+            secondsPerItem: null,
             state: "running",
             steps: [
                 {
@@ -117,6 +123,7 @@ describe("how far along a job is", () => {
                     done: 1,
                     of: 2,
                     seconds: 10,
+                    secondsPerItem: 10,
                     state: "running",
                     steps: [
                         {
@@ -124,6 +131,7 @@ describe("how far along a job is", () => {
                             done: 24,
                             of: 24,
                             seconds: 4,
+                            secondsPerItem: 0.2,
                             state: "done",
                             steps: [],
                         },
@@ -134,6 +142,7 @@ describe("how far along a job is", () => {
                     done: 0,
                     of: 1,
                     seconds: 0,
+                    secondsPerItem: null,
                     state: "waiting",
                     steps: [],
                 },
@@ -152,8 +161,8 @@ describe("how far along a job is", () => {
             )?.textContent,
         ).toContain("reading the chapters");
         expect(stepsShown()).toEqual([
-            "passes 0:10 / 0:20",
-            "reading the chapters 0:04",
+            "passes 0:10 / 0:20 10.0 s/it",
+            "reading the chapters 0:04 5.0 it/s",
             "publishing",
         ]);
     });

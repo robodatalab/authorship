@@ -30,6 +30,7 @@ const NOTHING_DONE_YET: WorkProgress = {
     done: 0,
     of: null,
     seconds: 0,
+    secondsPerItem: null,
     state: "waiting",
     steps: [],
 };

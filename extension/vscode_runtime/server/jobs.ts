@@ -7,6 +7,7 @@ export interface WorkProgress {
     done: number;
     of: number | null;
     seconds: number;
+    secondsPerItem: number | null;
     state: "waiting" | "running" | "done";
     steps: WorkProgress[];
 }

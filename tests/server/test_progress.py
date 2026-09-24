@@ -29,6 +29,7 @@ class WithProgressTests(unittest.TestCase):
                 "done": 0,
                 "of": None,
                 "seconds": mock.ANY,
+                "secondsPerItem": mock.ANY,
                 "state": "running",
                 "steps": [
                     {
@@ -36,6 +37,7 @@ class WithProgressTests(unittest.TestCase):
                         "done": 1,
                         "of": 3,
                         "seconds": mock.ANY,
+                        "secondsPerItem": mock.ANY,
                         "state": "running",
                         "steps": [],
                     }
@@ -58,6 +60,7 @@ class WithProgressTests(unittest.TestCase):
                 "done": 0,
                 "of": None,
                 "seconds": mock.ANY,
+                "secondsPerItem": mock.ANY,
                 "state": "done",
                 "steps": [
                     {
@@ -65,6 +68,7 @@ class WithProgressTests(unittest.TestCase):
                         "done": 2,
                         "of": 2,
                         "seconds": mock.ANY,
+                        "secondsPerItem": mock.ANY,
                         "state": "done",
                         "steps": [
                             {
@@ -72,6 +76,7 @@ class WithProgressTests(unittest.TestCase):
                                 "done": 2,
                                 "of": 2,
                                 "seconds": mock.ANY,
+                                "secondsPerItem": mock.ANY,
                                 "state": "done",
                                 "steps": [],
                             },
@@ -80,6 +85,7 @@ class WithProgressTests(unittest.TestCase):
                                 "done": 2,
                                 "of": 2,
                                 "seconds": mock.ANY,
+                                "secondsPerItem": mock.ANY,
                                 "state": "done",
                                 "steps": [],
                             },
@@ -104,6 +110,36 @@ class WithProgressTests(unittest.TestCase):
                     "done": 2,
                     "of": None,
                     "seconds": mock.ANY,
+                    "secondsPerItem": mock.ANY,
+                    "state": "done",
+                    "steps": [],
+                }
+            ],
+        )
+
+
+class TimePerItemTests(unittest.TestCase):
+    def test_follows_the_recent_items_more_than_the_early_ones(self) -> None:
+        identifying_plots = WorkProgress("identifying plots")
+
+        with mock.patch(
+            "server.progress.time.monotonic",
+            side_effect=[0.0, 0.0, 1.0, 2.0, 5.0, 5.0, 5.0, 5.0, 5.0],
+        ):
+            with reporting_progress_to(identifying_plots):
+                for _ in with_progress(["One", "Two", "Three"], "reading the chapters"):
+                    pass
+            reported = identifying_plots.reported()
+
+        self.assertEqual(
+            reported["steps"],
+            [
+                {
+                    "doing": "reading the chapters",
+                    "done": 3,
+                    "of": 3,
+                    "seconds": 5.0,
+                    "secondsPerItem": 1.6,
                     "state": "done",
                     "steps": [],
                 }
@@ -135,6 +171,7 @@ class ReportingProgressOfAJobTests(unittest.IsolatedAsyncioTestCase):
                         "done": 3,
                         "of": 3,
                         "seconds": mock.ANY,
+                        "secondsPerItem": mock.ANY,
                         "state": "done",
                         "steps": [],
                     }
@@ -166,6 +203,7 @@ class ReportingProgressOfAJobTests(unittest.IsolatedAsyncioTestCase):
                         "done": 1,
                         "of": 1,
                         "seconds": mock.ANY,
+                        "secondsPerItem": mock.ANY,
                         "state": "done",
                         "steps": [],
                     }
@@ -176,6 +214,7 @@ class ReportingProgressOfAJobTests(unittest.IsolatedAsyncioTestCase):
                         "done": 2,
                         "of": 2,
                         "seconds": mock.ANY,
+                        "secondsPerItem": mock.ANY,
                         "state": "done",
                         "steps": [],
                     }

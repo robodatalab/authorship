@@ -1003,6 +1003,7 @@ describe("the plots the story weaves", () => {
             done: 0,
             of: null,
             seconds: 20,
+            secondsPerItem: null,
             state: "running",
             steps: [
                 {
@@ -1010,6 +1011,7 @@ describe("the plots the story weaves", () => {
                     done: 3,
                     of: 24,
                     seconds: 20,
+                    secondsPerItem: null,
                     state: "running",
                     steps: [],
                 },

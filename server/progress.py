@@ -9,6 +9,8 @@ from typing import Any, Generic, TypeVar
 
 WorkItem = TypeVar("WorkItem")
 
+ITEM_TIME_SMOOTHING = 0.3
+
 
 @dataclass
 class WorkProgress:
@@ -17,7 +19,23 @@ class WorkProgress:
     done: int = 0
     began: float | None = None
     ended: float | None = None
+    seconds_per_item: float | None = None
+    last_item_done: float | None = None
     steps: list[WorkProgress] = field(default_factory=list)
+
+    def finished_an_item(self) -> None:
+        now = time.monotonic()
+        since = self.last_item_done if self.last_item_done is not None else self.began
+        assert since is not None
+        took = now - since
+        self.seconds_per_item = (
+            took
+            if self.seconds_per_item is None
+            else ITEM_TIME_SMOOTHING * took
+            + (1 - ITEM_TIME_SMOOTHING) * self.seconds_per_item
+        )
+        self.last_item_done = now
+        self.done += 1
 
     def reported(self) -> dict[str, Any]:
         now = time.monotonic()
@@ -28,6 +46,9 @@ class WorkProgress:
             "seconds": 0.0
             if self.began is None
             else round((self.ended if self.ended is not None else now) - self.began, 1),
+            "secondsPerItem": None
+            if self.seconds_per_item is None
+            else round(self.seconds_per_item, 3),
             "state": "waiting"
             if self.began is None
             else "running"
@@ -70,7 +91,7 @@ class WorkItemsInProgress(Generic[WorkItem]):
         try:
             for item in self._items:
                 yield item
-                work.done += 1
+                work.finished_an_item()
         finally:
             self._end(work, part_of)
 
@@ -80,7 +101,7 @@ class WorkItemsInProgress(Generic[WorkItem]):
         try:
             async for item in self._items:
                 yield item
-                work.done += 1
+                work.finished_an_item()
         finally:
             self._end(work, part_of)
 

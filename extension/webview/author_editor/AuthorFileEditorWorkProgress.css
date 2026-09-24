@@ -78,7 +78,8 @@
     color: var(--vscode-foreground);
 }
 
-.author-file-editor-work-progress-step-took {
+.author-file-editor-work-progress-step-took,
+.author-file-editor-work-progress-step-rate {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }

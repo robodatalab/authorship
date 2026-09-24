@@ -25,10 +25,20 @@ function timeOnTheStep(step: WorkProgress): string {
         return "";
     }
     if (step.state === "running" && step.of !== null && step.done > 0) {
-        const left = (step.seconds / step.done) * (step.of - step.done);
+        const secondsPerItem = step.secondsPerItem ?? step.seconds / step.done;
+        const left = secondsPerItem * (step.of - step.done);
         return `${onTheClock(step.seconds)} / ${onTheClock(step.seconds + left)}`;
     }
     return onTheClock(step.seconds);
+}
+
+function howFast(step: WorkProgress): string {
+    if (step.secondsPerItem === null || step.secondsPerItem <= 0) {
+        return "";
+    }
+    return step.secondsPerItem >= 1
+        ? `${step.secondsPerItem.toFixed(1)} s/it`
+        : `${(1 / step.secondsPerItem).toFixed(1)} it/s`;
 }
 
 function AuthorFileEditorWorkProgressBar({ step }: { step: WorkProgress }) {
@@ -59,6 +69,9 @@ function AuthorFileEditorWorkProgressBar({ step }: { step: WorkProgress }) {
                 <span>{step.doing}</span>
                 <span className="author-file-editor-work-progress-step-took">
                     {timeOnTheStep(step)}
+                </span>
+                <span className="author-file-editor-work-progress-step-rate">
+                    {howFast(step)}
                 </span>
             </span>
         </div>
