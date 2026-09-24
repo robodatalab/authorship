@@ -26,14 +26,12 @@ class DeployingTheInferenceModels(unittest.TestCase):
             cluster=mock.DEFAULT,
             Hosted=mock.DEFAULT,
             HuggingFaceImporter=mock.DEFAULT,
-            base_model_importer=mock.DEFAULT,
             deploy_story_plot_classifier=mock.DEFAULT,
             StoryPlotClassifier=mock.DEFAULT,
         )
         self.patched = patched.start()
         self.addCleanup(patched.stop)
         self.patched["HuggingFaceImporter"].side_effect = build_fake_importer
-        self.patched["base_model_importer"].side_effect = build_fake_importer
         self.app = mock.MagicMock()
         self.app.state.inference_models = {}
 

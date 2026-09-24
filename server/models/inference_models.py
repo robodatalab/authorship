@@ -16,7 +16,6 @@ from server.story_analysis.story_plot_classifier import (
     STORY_PLOT_CLASSIFIER_BASE_MODEL,
     STORY_PLOT_CLASSIFIER_NAME,
     StoryPlotClassifier,
-    base_model_importer,
     deploy_story_plot_classifier,
 )
 
@@ -36,7 +35,7 @@ def deploy_inference_models(app: FastAPI) -> None:
         for importer in (
             causal_model,
             gec_model,
-            base_model_importer(STORY_PLOT_CLASSIFIER_BASE_MODEL),
+            HuggingFaceImporter(STORY_PLOT_CLASSIFIER_BASE_MODEL, Text2Text),
         )
     }
     with ThreadPoolExecutor() as importing:

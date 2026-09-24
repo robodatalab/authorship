@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from server.jobs import Job
+from server.story_analysis.story_plot_classifier import ServedStoryPlotClassifier
 from server.storydoc import Document
 
 # TODO: we'll be performing a lot of operations here on models - it's best if the
@@ -28,30 +29,22 @@ def merge_text(lhs: str, rhs: str) -> str:
     return ""
 
 
-def best_matches_of_events(
-    lhs_events: list[str], rhs_events: list[str]
-) -> list[float]:
+def similarity_of_events(lhs_events: list[str], rhs_events: list[str]) -> float:
     similarities = [
         [similarity_of_text(lhs_event, rhs_event) for rhs_event in rhs_events]
         for lhs_event in lhs_events
     ]
-    return [max(row, default=0.0) for row in similarities] + [
+    matches = [max(row, default=0.0) for row in similarities] + [
         max((row[rhs_index] for row in similarities), default=0.0)
         for rhs_index in range(len(rhs_events))
     ]
 
-
-def similarity_of_matches(matches: list[float]) -> float:
     if not matches:
         return 1.0
     matched = sum(matches) / len(matches)
     return math.log(
         1 + (SIMILARITY_LOGARITHM_BASE - 1) * matched, SIMILARITY_LOGARITHM_BASE
     )
-
-
-def similarity_of_events(lhs_events: list[str], rhs_events: list[str]) -> float:
-    return similarity_of_matches(best_matches_of_events(lhs_events, rhs_events))
 
 
 def stitch_events_into_plots(
@@ -78,6 +71,52 @@ def stitch_events_into_plots(
             plots[lhs_plot_index] + plots.pop(rhs_plot_index)
         )
     return [[events[event_index] for event_index in plot] for plot in plots]
+
+
+@dataclass(frozen=True)
+class StoryEvent:
+    what_happened: str
+    paragraph: str
+
+
+def question_whether_events_share_a_plot(
+    lhs_event: StoryEvent, rhs_event: StoryEvent
+) -> str:
+    return (
+        f"The first event happened in this paragraph:\n{lhs_event.paragraph}\n"
+        f"The first event: {lhs_event.what_happened}\n\n"
+        f"The second event happened in this paragraph:\n{rhs_event.paragraph}\n"
+        f"The second event: {rhs_event.what_happened}\n\n"
+        "Are the two events part of the same thread of the story?"
+    )
+
+
+async def probabilities_events_share_a_plot(
+    story_plot_classifier: ServedStoryPlotClassifier,
+    story: str,
+    events: list[StoryEvent],
+) -> list[list[float]]:
+    pairs_of_events = [
+        (lhs_event_index, rhs_event_index)
+        for lhs_event_index in range(len(events))
+        for rhs_event_index in range(lhs_event_index + 1, len(events))
+    ]
+    probabilities = await story_plot_classifier.probabilities(
+        story,
+        [
+            question_whether_events_share_a_plot(
+                events[lhs_event_index], events[rhs_event_index]
+            )
+            for lhs_event_index, rhs_event_index in pairs_of_events
+        ],
+    )
+    share_a_plot = [[1.0] * len(events) for _ in events]
+    for (lhs_event_index, rhs_event_index), probability in zip(
+        pairs_of_events, probabilities
+    ):
+        share_a_plot[lhs_event_index][rhs_event_index] = probability
+        share_a_plot[rhs_event_index][lhs_event_index] = probability
+    return share_a_plot
 
 
 @dataclass

@@ -6,8 +6,10 @@ from parameterized import parameterized
 from server.storydoc import Document
 from server.story_analysis import plots
 from server.story_analysis.plots import (
+    StoryEvent,
     StoryPlot,
     identify_story_plot_pass,
+    probabilities_events_share_a_plot,
     similarity_of_events,
     stitch_events_into_plots,
 )
@@ -111,6 +113,40 @@ class StitchEventsIntoPlotsTests(unittest.TestCase):
         self.assertEqual(result, expected_plots)
 
 
+
+
+class ProbabilitiesEventsShareAPlotTests(unittest.IsolatedAsyncioTestCase):
+    @parameterized.expand([
+        (
+            [StoryEvent("Bob waited", "Bob waited at the station.")],
+            [],
+            [[1.0]],
+        ),
+        (
+            [
+                StoryEvent("Bob waited", "Bob waited at the station."),
+                StoryEvent("Alice came", "Alice came down the stairs."),
+                StoryEvent("The mill burned", "The mill burned all night."),
+            ],
+            [0.9, 0.2, 0.3],
+            [
+                [1.0, 0.9, 0.2],
+                [0.9, 1.0, 0.3],
+                [0.2, 0.3, 1.0],
+            ],
+        ),
+    ])
+    async def test_fills_the_probabilities_from_the_classifiers_answers(
+        self, events, answers, expected_share_a_plot
+    ) -> None:
+        story_plot_classifier = mock.AsyncMock()
+        story_plot_classifier.probabilities.return_value = answers
+
+        result = await probabilities_events_share_a_plot(
+            story_plot_classifier, "The story.", events
+        )
+
+        self.assertEqual(result, expected_share_a_plot)
 
 
 if __name__ == "__main__":

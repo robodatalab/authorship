@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -37,12 +36,7 @@ STORY_PLOT_CLASSIFIER_BASE_MODEL = "Qwen/Qwen3-8B"
 BASE_MODEL_PARAM = "base_model"
 
 STORY_PLOT_CLASSIFIER_INSTRUCTION = (
-    "You read a whole novel, then one plot of it and one paragraph of it. A plot "
-    "is a thread the story follows: the characters in it, how it began, what it "
-    "is heading for, and what has happened along it so far. Say whether the "
-    "paragraph belongs to that plot - whether it moves the thread on, shows it, "
-    "or is shaped by it. A paragraph that belongs to no plot, such as a "
-    "description of the scenery, does not belong to this one either. Answer yes "
+    "You read a whole novel, then a question about it. Answer the question yes "
     "or no."
 )
 
@@ -53,24 +47,14 @@ _NATIVE_CONTEXT_OF_QWEN3 = 32768
 _YARN_STRETCH = 4.0
 
 
-@dataclass(frozen=True)
-class StoryPlotQuestion:
-    plot: str
-    paragraph: str
-
-
-def _asked_of_the_story(
-    tokenizer: Any, story: str, question: StoryPlotQuestion
-) -> tuple[str, str]:
+def _asked_of_the_story(tokenizer: Any, story: str, question: str) -> tuple[str, str]:
     rendered = tokenizer.apply_chat_template(
         [
             {"role": "system", "content": STORY_PLOT_CLASSIFIER_INSTRUCTION},
             {
                 "role": "user",
                 "content": f"<story>\n{story}\n</story>\n\n{_WHERE_THE_STORY_ENDS}"
-                f"<plot>\n{question.plot}\n</plot>\n\n"
-                f"<paragraph>\n{question.paragraph}\n</paragraph>\n\n"
-                "Does the paragraph belong to the plot?",
+                f"{question}",
             },
         ],
         tokenize=False,
@@ -119,10 +103,6 @@ def probability_of_yes(
     return float(torch.sigmoid(yes - no))
 
 
-def base_model_importer(model_id: str) -> HuggingFaceImporter:
-    return HuggingFaceImporter(model_id, Text2Text)
-
-
 def deploy_story_plot_classifier() -> cortexgrid.Deployment:
     cortexgrid.register_model(
         StoryPlotClassifier,
@@ -150,8 +130,8 @@ class StoryPlotClassifier:
         return ServedStoryPlotClassifier(url=url, model_id=name)
 
     def __init__(self, deployment: cortexgrid.DeploymentKey) -> None:
-        base_model = base_model_importer(
-            cortexgrid.model_config(deployment)[BASE_MODEL_PARAM]
+        base_model = HuggingFaceImporter(
+            cortexgrid.model_config(deployment)[BASE_MODEL_PARAM], Text2Text
         )
         path = cortexgrid.load_model(
             base_model.family, base_model.suffix, cortexgrid.IMPORTED
@@ -179,20 +159,18 @@ class StoryPlotClassifier:
         self._story_last_read: tuple[str, DynamicCache] | None = None
 
     def _story_read(self, the_story: str) -> DynamicCache:
-        fingerprint = hashlib.sha256(the_story.encode("utf-8")).hexdigest()
-        if self._story_last_read is None or self._story_last_read[0] != fingerprint:
+        if self._story_last_read is None or self._story_last_read[0] != the_story:
             story_ids = self._tokenizer(
                 the_story, return_tensors="pt", add_special_tokens=False
             ).input_ids.to(self._device)
-            self._story_last_read = (fingerprint, read_the_story(self._model, story_ids))
+            self._story_last_read = (the_story, read_the_story(self._model, story_ids))
         return self._story_last_read[1]
 
     @_app.post("/probabilities")
     def probabilities(self, body: dict[str, Any]) -> dict[str, list[float]]:
-        questions = [StoryPlotQuestion(**asked) for asked in body["questions"]]
         answers: list[float] = []
         with self._one_story_at_a_time:
-            for question in questions:
+            for question in body["questions"]:
                 the_story, the_question = _asked_of_the_story(
                     self._tokenizer, body["story"], question
                 )
@@ -220,19 +198,11 @@ class ServedStoryPlotClassifier(DeployedModel):
     def name(self) -> str:
         return self.model_id
 
-    async def probabilities(
-        self, story: str, questions: list[StoryPlotQuestion]
-    ) -> list[float]:
+    async def probabilities(self, story: str, questions: list[str]) -> list[float]:
         async with httpx.AsyncClient(timeout=None) as client:
             response = await client.post(
                 f"{self.url}/probabilities",
-                json={
-                    "story": story,
-                    "questions": [
-                        {"plot": question.plot, "paragraph": question.paragraph}
-                        for question in questions
-                    ],
-                },
+                json={"story": story, "questions": questions},
             )
             response.raise_for_status()
             return response.json()["probabilities"]
