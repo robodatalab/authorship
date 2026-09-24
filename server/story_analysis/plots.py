@@ -35,7 +35,7 @@ async def detect_events(document: Document, causal_model: ServedCompletingModel)
 
     all_events: list[str] = []
     for _, chapter in with_progress(document.chapters, "detecting events"):
-        lines = chapter.splitlines()
+        lines = [line for line in chapter.splitlines() if line]
         numbered_lines = "\n".join([f"{idx}. {line}" for idx, line in enumerate(lines)])
         events = [
             line.partition(". ")[2]
