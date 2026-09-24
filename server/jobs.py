@@ -3,6 +3,7 @@ import asyncio
 import threading
 
 from server import log
+from server.progress import WorkProgress, reporting_progress_to
 
 _log = log.logger(__name__)
 
@@ -18,6 +19,7 @@ class Job(abc.ABC):
         self._cancelled = False
         self._begun = False
         self._done = False
+        self.progress = WorkProgress(self.kind)
 
     @property
     def cancelled(self) -> bool:
@@ -84,7 +86,8 @@ class ParallelJobsManager:
         job.begin()
         _log.info("%s started for %s", job.kind, job.target)
         try:
-            await job.execute()
+            with reporting_progress_to(job.progress):
+                await job.execute()
         except Exception as err:
             job.error = str(err)
             _log.exception("%s failed for %s", job.kind, job.target)

@@ -316,7 +316,7 @@ class StoryPlotsRequest(BaseModel):
 @app.post("/analyze/plots", status_code=202)
 def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(document)
+    job = StoryPlotsJob(_deployed("story_plot_classifier"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -332,5 +332,5 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "error": job.error,
         "storyPlots": job.story_plots,
         "paragraphsInStoryPlots": job.paragraphs_in_story_plots,
-        "progress": list(job.progress.values()),
+        "progress": job.progress.reported(),
     }
