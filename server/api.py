@@ -316,7 +316,7 @@ class StoryPlotsRequest(BaseModel):
 @app.post("/analyze/plots", status_code=202)
 def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(_deployed("story_plot_classifier"), document)
+    job = StoryPlotsJob(document)
     app.state.jobs.start(job)
     return {"id": job.target}
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,7 @@ from cortexgrid_infer import (
     detect_device,
 )
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -167,26 +169,28 @@ class StoryPlotClassifier:
         return self._story_last_read[1]
 
     @_app.post("/probabilities")
-    def probabilities(self, body: dict[str, Any]) -> dict[str, list[float]]:
-        answers: list[float] = []
+    def probabilities(self, body: dict[str, Any]) -> StreamingResponse:
+        return StreamingResponse(
+            self._answered(body["story"], body["questions"]), media_type="text/plain"
+        )
+
+    def _answered(self, story: str, questions: list[str]) -> Iterator[str]:
         with self._one_story_at_a_time:
-            for question in body["questions"]:
+            for question in questions:
                 the_story, the_question = _asked_of_the_story(
-                    self._tokenizer, body["story"], question
+                    self._tokenizer, story, question
                 )
                 question_ids = self._tokenizer(
                     the_question, return_tensors="pt", add_special_tokens=False
                 ).input_ids.to(self._device)
-                answers.append(
-                    probability_of_yes(
-                        answer_logits_after_the_story(
-                            self._model, self._story_read(the_story), question_ids
-                        ),
-                        self._yes_ids,
-                        self._no_ids,
-                    )
+                probability = probability_of_yes(
+                    answer_logits_after_the_story(
+                        self._model, self._story_read(the_story), question_ids
+                    ),
+                    self._yes_ids,
+                    self._no_ids,
                 )
-        return {"probabilities": answers}
+                yield f"{probability}\n"
 
 
 @dataclass
@@ -198,11 +202,15 @@ class ServedStoryPlotClassifier(DeployedModel):
     def name(self) -> str:
         return self.model_id
 
-    async def probabilities(self, story: str, questions: list[str]) -> list[float]:
+    async def probabilities(
+        self, story: str, questions: list[str]
+    ) -> AsyncIterator[float]:
         async with httpx.AsyncClient(timeout=None) as client:
-            response = await client.post(
+            async with client.stream(
+                "POST",
                 f"{self.url}/probabilities",
                 json={"story": story, "questions": questions},
-            )
-            response.raise_for_status()
-            return response.json()["probabilities"]
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    yield float(line)
