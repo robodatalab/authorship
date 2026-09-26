@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 from cortexgrid_infer import CompletionChunk, ServedCompletingModel
 from server.jobs import Job
@@ -30,31 +31,44 @@ async def answered_lines(chunks: AsyncIterator[CompletionChunk]) -> AsyncIterato
         yield pending
 
 
-async def detect_events(document: Document, causal_model: ServedCompletingModel) -> list[str]:
+@dataclass
+class StoryEvent:
+    description: str
+    position_in_manuscript: int
+
+
+async def detect_events(document: Document, causal_model: ServedCompletingModel) -> list[StoryEvent]:
     max_chapter_length = max(estimate_num_tokens_in_text(chapter) for _, chapter in document.chapters)
 
-    all_events: list[str] = []
+    all_events: list[StoryEvent] = []
+    lines_before_chapter = 0
     for _, chapter in with_progress(document.chapters, "detecting events"):
         lines = [line for line in chapter.splitlines() if line]
         numbered_lines = "\n".join([f"{idx}. {line}" for idx, line in enumerate(lines)])
-        events = [
-            line.partition(". ")[2]
-            async for line in with_progress(
-                answered_lines(causal_model.complete(
-                    [
-                        {"role": "system", "content": EVENT_PROMPT},
-                        {"role": "user", "content": numbered_lines},
-                    ],
-                    max_new_tokens=max_chapter_length,
-                    temperature=0.0,
-                )),
-                "detecting the events in the chapter",
-                of=len(lines),
-            )
-        ]
-        all_events.extend(events)
+        async for answer in with_progress(
+            answered_lines(causal_model.complete(
+                [
+                    {"role": "system", "content": EVENT_PROMPT},
+                    {"role": "user", "content": numbered_lines},
+                ],
+                max_new_tokens=max_chapter_length,
+                temperature=0.0,
+            )),
+            "detecting the events in the chapter",
+            of=len(lines),
+        ):
+            index, _, description = answer.partition(". ")
+            all_events.append(StoryEvent(description, lines_before_chapter + int(index)))
+        lines_before_chapter += len(lines)
 
     return all_events
+
+
+Plot = list[str]
+
+async def stitch_events_into_causal_trajectory(events: list[StoryEvent]) -> list[Plot]:
+    """Takes a list of events and groups them into plots."""
+    return []
 
 
 class StoryPlotsJob(Job):
@@ -65,8 +79,8 @@ class StoryPlotsJob(Job):
         super().__init__(f"{document.path}#plots")
         self._causal_model = causal_model
         self._document = document
-        self.events: list[str] = []
+        self.plots: list[Plot] = []
 
     async def execute(self) -> None:
-        self.events = await detect_events(self._document, self._causal_model)
+        self.plots = await detect_events(self._document, self._causal_model)
 
