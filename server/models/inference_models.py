@@ -12,11 +12,11 @@ from fastapi import FastAPI
 
 from server import log
 from server.models import cluster
-from server.story_analysis.story_plot_classifier import (
-    STORY_PLOT_CLASSIFIER_BASE_MODEL,
-    STORY_PLOT_CLASSIFIER_NAME,
-    StoryPlotClassifier,
-    deploy_story_plot_classifier,
+from server.story_analysis.causal_event_trajectory_classifier import (
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME,
+    CausalEventTrajectoryClassifier,
+    deploy_causal_event_trajectory_classifier,
 )
 
 _log = log.logger(__name__)
@@ -35,7 +35,7 @@ def deploy_inference_models(app: FastAPI) -> None:
         for importer in (
             causal_model,
             gec_model,
-            HuggingFaceImporter(STORY_PLOT_CLASSIFIER_BASE_MODEL, Text2Text),
+            HuggingFaceImporter(CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL, Text2Text),
         )
     }
     with ThreadPoolExecutor() as importing:
@@ -69,12 +69,12 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.style_model = style_model.client(style_deployment.url)
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
-        imported[STORY_PLOT_CLASSIFIER_BASE_MODEL].result()
-        story_plot_classifier_deployment = deploy_story_plot_classifier()
-        app.state.story_plot_classifier = StoryPlotClassifier.client(
-            story_plot_classifier_deployment.url, STORY_PLOT_CLASSIFIER_NAME
+        imported[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL].result()
+        causal_event_trajectory_classifier_deployment = deploy_causal_event_trajectory_classifier()
+        app.state.causal_event_trajectory_classifier = CausalEventTrajectoryClassifier.client(
+            causal_event_trajectory_classifier_deployment.url, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME
         )
-        app.state.inference_models[STORY_PLOT_CLASSIFIER_NAME] = (
-            story_plot_classifier_deployment.key
+        app.state.inference_models[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME] = (
+            causal_event_trajectory_classifier_deployment.key
         )
     _log.info("Completion models created")

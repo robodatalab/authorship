@@ -6,15 +6,15 @@ import torch
 from transformers import Qwen3Config, Qwen3ForCausalLM
 
 from server.models import cluster
-from server.story_analysis.story_plot_classifier import (
+from server.story_analysis.causal_event_trajectory_classifier import (
     BASE_MODEL_PARAM,
-    STORY_PLOT_CLASSIFIER_BASE_MODEL,
-    STORY_PLOT_CLASSIFIER_FAMILY,
-    STORY_PLOT_CLASSIFIER_SUFFIX,
-    StoryPlotClassifier,
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY,
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_SUFFIX,
+    CausalEventTrajectoryClassifier,
     answer_logits_after_the_story,
-    deploy_story_plot_classifier,
-    probability_of_yes,
+    deploy_causal_event_trajectory_classifier,
+    probability_of_increase,
     read_the_story,
 )
 
@@ -70,15 +70,36 @@ class ReadingTheStoryOnce(unittest.TestCase):
         self.assertEqual(story_read.get_seq_length(), 40)
 
 
-class ProbabilityOfYes(unittest.TestCase):
-    def test_weighs_every_spelling_of_yes_against_every_spelling_of_no(self) -> None:
-        answer_logits = torch.full((10,), -20.0)
-        answer_logits[[1, 2]] = torch.log(torch.tensor([0.3, 0.3]))
-        answer_logits[[3, 4]] = torch.log(torch.tensor([0.1, 0.1]))
+class ProbabilityOfIncrease(unittest.TestCase):
+    def test_weighs_increase_against_decrease_in_both_orders_of_the_options(
+        self,
+    ) -> None:
+        increase_as_option_a = torch.full((10,), -30.0)
+        increase_as_option_a[[1, 2]] = torch.log(torch.tensor([0.375, 0.375]))
+        increase_as_option_a[[3, 4]] = torch.log(torch.tensor([0.125, 0.125]))
+        increase_as_option_b = torch.full((10,), -30.0)
+        increase_as_option_b[[1, 2, 3, 4]] = torch.log(torch.tensor(0.25))
 
         self.assertAlmostEqual(
-            probability_of_yes(answer_logits, yes_ids=[1, 2], no_ids=[3, 4]),
-            0.75,
+            probability_of_increase(
+                increase_as_option_a,
+                increase_as_option_b,
+                option_a_ids=[1, 2],
+                option_b_ids=[3, 4],
+            ),
+            0.625,
+            places=5,
+        )
+
+    def test_a_model_that_always_answers_a_does_not_lean_either_way(self) -> None:
+        always_a = torch.full((10,), -30.0)
+        always_a[1] = 0.0
+
+        self.assertAlmostEqual(
+            probability_of_increase(
+                always_a, always_a, option_a_ids=[1], option_b_ids=[3]
+            ),
+            0.5,
             places=5,
         )
 
@@ -86,7 +107,7 @@ class ProbabilityOfYes(unittest.TestCase):
 class DeployingTheClassifier(unittest.TestCase):
     def setUp(self) -> None:
         patched = mock.patch.multiple(
-            "server.story_analysis.story_plot_classifier.cortexgrid",
+            "server.story_analysis.causal_event_trajectory_classifier.cortexgrid",
             Experiment=mock.DEFAULT,
             register_model=mock.DEFAULT,
             deploy_model=mock.DEFAULT,
@@ -94,30 +115,30 @@ class DeployingTheClassifier(unittest.TestCase):
         self.cortexgrid = patched.start()
         self.addCleanup(patched.stop)
         self.cortexgrid["deploy_model"].return_value = mock.Mock(
-            url="http://serve/Authorship/storyplotclassifier"
+            url="http://serve/Authorship/causaleventtrajectoryclassifier"
         )
 
     def test_is_registered_under_its_own_name_with_no_weights_of_its_own(self) -> None:
-        deploy_story_plot_classifier()
+        deploy_causal_event_trajectory_classifier()
 
         self.cortexgrid["register_model"].assert_called_once_with(
-            StoryPlotClassifier,
-            family=STORY_PLOT_CLASSIFIER_FAMILY,
-            suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
-            requirements=StoryPlotClassifier.requirements(),
+            CausalEventTrajectoryClassifier,
+            family=CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY,
+            suffix=CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_SUFFIX,
+            requirements=CausalEventTrajectoryClassifier.requirements(),
         )
 
     def test_is_deployed_from_the_registry_on_the_base_model_it_was_built_on(
         self,
     ) -> None:
-        deployment = deploy_story_plot_classifier()
+        deployment = deploy_causal_event_trajectory_classifier()
 
         self.cortexgrid["deploy_model"].assert_called_once_with(
-            family=STORY_PLOT_CLASSIFIER_FAMILY,
-            suffix=STORY_PLOT_CLASSIFIER_SUFFIX,
+            family=CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY,
+            suffix=CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_SUFFIX,
             run_name=cortexgrid.IMPORTED,
             timeout=cluster.DEPLOY_TIMEOUT_S,
-            config={BASE_MODEL_PARAM: STORY_PLOT_CLASSIFIER_BASE_MODEL},
+            config={BASE_MODEL_PARAM: CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL},
         )
         self.assertIs(deployment, self.cortexgrid["deploy_model"].return_value)
 

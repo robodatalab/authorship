@@ -330,8 +330,7 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "running": not job.done,
         "cancelled": job.cancelled,
         "error": job.error,
-        "storyPlots": [],
+        "storyPlots": job.plots,
         "paragraphsInStoryPlots": [],
-        "events": job.events,
         "progress": job.progress.reported(),
     }

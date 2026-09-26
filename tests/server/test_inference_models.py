@@ -7,11 +7,11 @@ from server.models.inference_models import (
     GEC_MODEL,
     deploy_inference_models,
 )
-from server.story_analysis.story_plot_classifier import (
-    STORY_PLOT_CLASSIFIER_BASE_MODEL,
+from server.story_analysis.causal_event_trajectory_classifier import (
+    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
 )
 
-DISTINCT_MODELS_TO_IMPORT = {CAUSAL_MODEL, GEC_MODEL, STORY_PLOT_CLASSIFIER_BASE_MODEL}
+DISTINCT_MODELS_TO_IMPORT = {CAUSAL_MODEL, GEC_MODEL, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL}
 
 
 def build_fake_importer(model_id: str, *_: object) -> mock.MagicMock:
@@ -26,8 +26,8 @@ class DeployingTheInferenceModels(unittest.TestCase):
             cluster=mock.DEFAULT,
             Hosted=mock.DEFAULT,
             HuggingFaceImporter=mock.DEFAULT,
-            deploy_story_plot_classifier=mock.DEFAULT,
-            StoryPlotClassifier=mock.DEFAULT,
+            deploy_causal_event_trajectory_classifier=mock.DEFAULT,
+            CausalEventTrajectoryClassifier=mock.DEFAULT,
         )
         self.patched = patched.start()
         self.addCleanup(patched.stop)
