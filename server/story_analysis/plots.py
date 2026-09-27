@@ -155,22 +155,24 @@ async def stitch_events_into_causal_trajectory(
 class StoryPlotsJob(Job):
     kind = "identify plots"
 
-    def __init__(self, causal_model: ServedCompletingModel, document: Document) -> None:
+    def __init__(
+        self,
+        causal_model: ServedCompletingModel,
+        causal_event_trajectory_classifier: ServedCausalEventTrajectoryClassifier,
+        document: Document,
+    ) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
         self._causal_model = causal_model
+        self._causal_event_trajectory_classifier = causal_event_trajectory_classifier
         self._document = document
         self.plots: list[StoryPlot] = []
 
     async def execute(self) -> None:
         events = await detect_events(self._document, self._causal_model)
-        self.plots = [
-            StoryPlot(
-                title="",
-                characters=[],
-                origin="",
-                goal="",
-                key_events=[event.description for event in events],
-            )
-        ]
+        self.plots = await stitch_events_into_causal_trajectory(
+            events,
+            "\n\n".join(chapter for _, chapter in self._document.chapters),
+            self._causal_event_trajectory_classifier,
+        )
 

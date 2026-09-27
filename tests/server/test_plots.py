@@ -5,7 +5,11 @@ from unittest import mock
 from parameterized import parameterized
 from server.storydoc import Document
 from server.story_analysis import plots
-from server.story_analysis.plots import StoryEvent, stitch_events_into_causal_trajectory
+from server.story_analysis.plots import (
+    StoryEvent,
+    StoryPlot,
+    stitch_events_into_causal_trajectory,
+)
 
 
 class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
@@ -20,7 +24,7 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             [StoryEvent("A1", 0), StoryEvent("A2", 1), StoryEvent("A3", 2)],
             [0.6, 0.5],
             [],
-            [["A1", "A2", "A3"]],
+            [StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"])],
         ),
         (
             [
@@ -33,7 +37,10 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             ],
             [0.6, -0.1, 0.5, 0.0, -0.2],
             [-0.1, 0.7, -0.1, -0.1, -0.1, 0.6, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1],
-            [["A1", "A2", "A3"], ["B1", "B2", "B3"]],
+            [
+                StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"]),
+                StoryPlot(title="", characters=[], origin="", goal="", key_events=["B1", "B2", "B3"]),
+            ],
         ),
         (
             [
@@ -46,7 +53,9 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             ],
             [0.5, -0.1, 0.5, -0.1, 0.5],
             [-0.1, 0.2, 0.6, -0.1, -0.1, 0.7],
-            [["A1", "A2", "B1", "B2", "C1", "C2"]],
+            [
+                StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "B1", "B2", "C1", "C2"]),
+            ],
         ),
     ])
     async def test_stitches_the_events_of_each_plot_in_causal_order(
