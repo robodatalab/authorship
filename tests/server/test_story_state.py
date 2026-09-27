@@ -1,6 +1,6 @@
 import unittest
 
-from parameterized import parameterized
+from parameterized import parameterized  # type: ignore
 
 from server.story_analysis.story_state import StoryFact, StoryState
 
