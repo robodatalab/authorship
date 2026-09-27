@@ -4,6 +4,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from cortexgrid_infer import CompletionChunk, ServedCompletingModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 from server.jobs import Job
 from server.progress import with_progress
 from server.story_analysis.causal_event_trajectory_classifier import (
@@ -67,13 +69,21 @@ async def detect_events(document: Document, causal_model: ServedCompletingModel)
     return all_events
 
 
-Plot = list[str]
+class StoryPlot(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    title: str
+    characters: list[str]
+    origin: str
+    goal: str
+    key_events: list[str]
+
 
 async def stitch_events_into_causal_trajectory(
     events: list[StoryEvent],
     story: str,
     causal_event_trajectory_classifier: ServedCausalEventTrajectoryClassifier,
-) -> list[Plot]:
+) -> list[StoryPlot]:
     """Takes a list of events and groups them into plots."""
     effects_on_next_event = [
         causal_effect
@@ -127,16 +137,18 @@ async def stitch_events_into_causal_trajectory(
         run_after[from_run] = to_run
         run_before[to_run] = from_run
 
-    plots: list[Plot] = []
+    plots: list[StoryPlot] = []
     for first_run in range(len(runs)):
         if first_run in run_before:
             continue
-        plot: Plot = []
+        key_events: list[str] = []
         run: int | None = first_run
         while run is not None:
-            plot.extend(event.description for event in runs[run])
+            key_events.extend(event.description for event in runs[run])
             run = run_after.get(run)
-        plots.append(plot)
+        plots.append(
+            StoryPlot(title="", characters=[], origin="", goal="", key_events=key_events)
+        )
     return plots
 
 
@@ -148,8 +160,17 @@ class StoryPlotsJob(Job):
         super().__init__(f"{document.path}#plots")
         self._causal_model = causal_model
         self._document = document
-        self.plots: list[Plot] = []
+        self.plots: list[StoryPlot] = []
 
     async def execute(self) -> None:
-        self.plots = await detect_events(self._document, self._causal_model)
+        events = await detect_events(self._document, self._causal_model)
+        self.plots = [
+            StoryPlot(
+                title="",
+                characters=[],
+                origin="",
+                goal="",
+                key_events=[event.description for event in events],
+            )
+        ]
 
