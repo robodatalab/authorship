@@ -82,6 +82,9 @@ class StoryPlot(BaseModel):
     key_events: list[str]
 
 
+SAME_SITUATION_PROBABILITY = 0.5
+
+
 async def stitch_events_into_causal_trajectory(
     events: list[StoryEvent],
     story: str,
@@ -89,19 +92,22 @@ async def stitch_events_into_causal_trajectory(
 ) -> list[StoryPlot]:
     """Takes a list of events and groups them into plots."""
     pairs_of_next_events = [
-        (cause.description, effect.description) for cause, effect in zip(events, events[1:])
+        (previous.description, event.description) for previous, event in zip(events, events[1:])
     ]
-    effects_on_next_event = [
-        causal_effect
-        async for causal_effect in with_progress(
-            causal_event_trajectory_classifier.causal_effects(story, pairs_of_next_events),
-            "measuring how each event leads to the next",
+    probabilities_for_next_events = causal_event_trajectory_classifier.same_situation_probabilities(
+        story, pairs_of_next_events
+    )
+    same_situation_as_previous = [
+        probability
+        async for probability in with_progress(
+            probabilities_for_next_events,
+            "measuring whether each event continues the situation of the one before",
             of=len(pairs_of_next_events),
         )
     ]
     runs = [[event] for event in events[:1]]
-    for next_event, causal_effect in zip(events[1:], effects_on_next_event):
-        if causal_effect > 0:
+    for next_event, probability in zip(events[1:], same_situation_as_previous):
+        if probability > SAME_SITUATION_PROBABILITY:
             runs[-1].append(next_event)
         else:
             runs.append([next_event])
@@ -116,20 +122,23 @@ async def stitch_events_into_causal_trajectory(
         (runs[from_run][-1].description, runs[to_run][0].description)
         for from_run, to_run in links_between_runs
     ]
-    effects_between_runs = [
-        causal_effect
-        async for causal_effect in with_progress(
-            causal_event_trajectory_classifier.causal_effects(story, pairs_across_runs),
-            "measuring how each run of events leads to the others",
+    probabilities_across_runs = causal_event_trajectory_classifier.same_situation_probabilities(
+        story, pairs_across_runs
+    )
+    same_situation_across_runs = [
+        probability
+        async for probability in with_progress(
+            probabilities_across_runs,
+            "measuring whether each run of events continues the situation of the others",
             of=len(pairs_across_runs),
         )
     ]
     run_after: dict[int, int] = {}
     run_before: dict[int, int] = {}
-    for causal_effect, (from_run, to_run) in sorted(
-        zip(effects_between_runs, links_between_runs), key=lambda link: link[0], reverse=True
+    for probability, (from_run, to_run) in sorted(
+        zip(same_situation_across_runs, links_between_runs), key=lambda link: link[0], reverse=True
     ):
-        if causal_effect <= 0:
+        if probability <= SAME_SITUATION_PROBABILITY:
             break
         if from_run in run_after or to_run in run_before:
             continue
@@ -155,17 +164,17 @@ async def stitch_events_into_causal_trajectory(
         )
 
     scored_pairs = [
-        f"{causal_effect:+.2f}  {cause} → {effect}"
-        for (cause, effect), causal_effect in zip(
+        f"{probability:.2f}  {previous} → {event}"
+        for (previous, event), probability in zip(
             pairs_of_next_events + pairs_across_runs,
-            effects_on_next_event + effects_between_runs,
+            same_situation_as_previous + same_situation_across_runs,
         )
     ]
     for scored_pair in scored_pairs:
         _log.info(scored_pair)
     plots.append(
         StoryPlot(
-            title="Causal effects",
+            title="Same situation",
             characters=[],
             origin="",
             goal="",

@@ -27,25 +27,19 @@ CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME = (
 )
 
 CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_INSTRUCTION = (
-    "You read a whole novel, then a question about two of its events. Answer "
-    "with the letter of the option you choose."
+    "You read a story, then a question about two of its events. Answer Yes or No."
 )
 
-_QUESTION_ABOUT_CAUSE_AND_EFFECT = (
-    "Suppose the event '{cause}' {happening}.\n"
-    "Given the above information, will the chances of the occurrence of the "
-    "event '{effect}' increase or decrease?\n"
-    "A. {option_a}\n"
-    "B. {option_b}\n"
+_QUESTION_ABOUT_THE_SITUATION = (
+    "Event 1: {previous}\n"
+    "Event 2: {event}\n"
+    "Does event 2 continue the situation event 1 is part of: the same characters, "
+    "in the same place, busy with the same thing?\n"
     "Answer:"
 )
-_TOOK_PLACE = "took place"
-_DID_NOT_TAKE_PLACE = "did NOT take place"
-_INCREASE_AS_OPTION_A = {"option_a": "Increase", "option_b": "Decrease"}
-_INCREASE_AS_OPTION_B = {"option_a": "Decrease", "option_b": "Increase"}
 
-_ANSWERS_THAT_PICK_OPTION_A = ["A", " A"]
-_ANSWERS_THAT_PICK_OPTION_B = ["B", " B"]
+_ANSWERS_THAT_SAY_YES = ["Yes", " Yes"]
+_ANSWERS_THAT_SAY_NO = ["No", " No"]
 
 
 def _asked_of_the_story(story: str, question: str) -> list[Message]:
@@ -60,12 +54,10 @@ def probability_of_any(loglikelihoods: list[float]) -> float:
     return sum(probabilities)
 
 
-def probability_of_increase(
-    increase_as_option_a: list[float], increase_as_option_b: list[float]
-) -> float:
-    increase = increase_as_option_a[0] + increase_as_option_b[1]
-    decrease = increase_as_option_a[1] + increase_as_option_b[0]
-    return increase / (increase + decrease)
+def probability_of_yes(yes_loglikelihoods: list[float], no_loglikelihoods: list[float]) -> float:
+    yes = probability_of_any(yes_loglikelihoods)
+    no = probability_of_any(no_loglikelihoods)
+    return yes / (yes + no)
 
 
 def deploy_causal_event_trajectory_classifier() -> cortexgrid.Deployment:
@@ -101,49 +93,25 @@ class CausalEventTrajectoryClassifier:
             long_context_qwen.url, LONG_CONTEXT_QWEN.model_id
         )
 
-    @_app.post("/causal_effects")
-    async def causal_effects(self, body: dict[str, Any]) -> StreamingResponse:
-        return StreamingResponse(
-            self._causal_effects(body["story"], body["causes_and_effects"]),
-            media_type="text/plain",
-        )
+    @_app.post("/same_situation_probabilities")
+    async def same_situation_probabilities(self, body: dict[str, Any]) -> StreamingResponse:
+        probabilities = self._same_situation_probabilities(body["story"], body["pairs_of_events"])
+        return StreamingResponse(probabilities, media_type="text/plain")
 
-    async def _option_probabilities(self, story: str, question: str) -> list[float]:
-        asked = _asked_of_the_story(story, question)
-        loglikelihoods_of_each_option = [
-            await self._long_context_qwen.loglikelihoods(asked, answers)
-            for answers in (_ANSWERS_THAT_PICK_OPTION_A, _ANSWERS_THAT_PICK_OPTION_B)
-        ]
-        return [
-            probability_of_any(loglikelihoods) for loglikelihoods in loglikelihoods_of_each_option
-        ]
-
-    async def _probability_of_increase(
-        self, story: str, cause: str, happening: str, effect: str
-    ) -> float:
-        questions = [
-            _QUESTION_ABOUT_CAUSE_AND_EFFECT.format(
-                cause=cause, happening=happening, effect=effect, **options
-            )
-            for options in (_INCREASE_AS_OPTION_A, _INCREASE_AS_OPTION_B)
-        ]
-        increase_as_option_a, increase_as_option_b = [
-            await self._option_probabilities(story, question) for question in questions
-        ]
-        return probability_of_increase(increase_as_option_a, increase_as_option_b)
-
-    async def _causal_effects(
-        self, story: str, causes_and_effects: list[list[str]]
+    async def _same_situation_probabilities(
+        self, story: str, pairs_of_events: list[list[str]]
     ) -> AsyncIterator[str]:
-        for cause, effect in causes_and_effects:
-            if_it_took_place = await self._probability_of_increase(
-                story, cause, _TOOK_PLACE, effect
+        for previous, event in pairs_of_events:
+            question = _QUESTION_ABOUT_THE_SITUATION.format(previous=previous, event=event)
+            asked = _asked_of_the_story(story, question)
+            yes_loglikelihoods = await self._long_context_qwen.loglikelihoods(
+                asked, _ANSWERS_THAT_SAY_YES
             )
-            if_it_did_not_take_place = await self._probability_of_increase(
-                story, cause, _DID_NOT_TAKE_PLACE, effect
+            no_loglikelihoods = await self._long_context_qwen.loglikelihoods(
+                asked, _ANSWERS_THAT_SAY_NO
             )
-            causal_effect = if_it_took_place - if_it_did_not_take_place
-            yield f"{causal_effect}\n"
+            probability = probability_of_yes(yes_loglikelihoods, no_loglikelihoods)
+            yield f"{probability}\n"
 
 
 @dataclass
@@ -155,15 +123,14 @@ class ServedCausalEventTrajectoryClassifier(DeployedModel):
     def name(self) -> str:
         return self.model_id
 
-    async def causal_effects(
-        self, story: str, causes_and_effects: list[tuple[str, str]]
+    async def same_situation_probabilities(
+        self, story: str, pairs_of_events: list[tuple[str, str]]
     ) -> AsyncIterator[float]:
+        body = {"story": story, "pairs_of_events": pairs_of_events}
+        same_situation_probabilities_url = f"{self.url}/same_situation_probabilities"
         async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream(
-                "POST",
-                f"{self.url}/causal_effects",
-                json={"story": story, "causes_and_effects": causes_and_effects},
-            ) as response:
+            async with client.stream("POST", same_situation_probabilities_url, json=body) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
-                    yield float(line)
+                    probability = float(line)
+                    yield probability

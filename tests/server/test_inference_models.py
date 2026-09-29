@@ -3,15 +3,12 @@ import unittest
 from unittest import mock
 
 from server.models.inference_models import (
-    CAUSAL_MODEL,
     GEC_MODEL,
     deploy_inference_models,
 )
-from server.models.causal_event_trajectory_classifier import (
-    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
-)
+from server.models.long_context_qwen import LONG_CONTEXT_QWEN_ID
 
-DISTINCT_MODELS_TO_IMPORT = {CAUSAL_MODEL, GEC_MODEL, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL}
+DISTINCT_MODELS_TO_IMPORT = {LONG_CONTEXT_QWEN_ID, GEC_MODEL}
 
 
 def build_fake_importer(model_id: str, *_: object) -> mock.MagicMock:

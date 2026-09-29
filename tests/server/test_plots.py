@@ -19,21 +19,21 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             [],
             [],
             [
-                StoryPlot(title="Causal effects", characters=[], origin="", goal="", key_events=[]),
+                StoryPlot(title="Same situation", characters=[], origin="", goal="", key_events=[]),
             ],
         ),
         (
             [StoryEvent("A1", 0), StoryEvent("A2", 1), StoryEvent("A3", 2)],
-            [0.6, 0.5],
+            [0.8, 0.75],
             [],
             [
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"]),
                 StoryPlot(
-                    title="Causal effects",
+                    title="Same situation",
                     characters=[],
                     origin="",
                     goal="",
-                    key_events=["+0.60  A1 → A2", "+0.50  A2 → A3"],
+                    key_events=["0.80  A1 → A2", "0.75  A2 → A3"],
                 ),
             ],
         ),
@@ -46,34 +46,34 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
                 StoryEvent("A3", 4),
                 StoryEvent("B3", 5),
             ],
-            [0.6, -0.1, 0.5, 0.0, -0.2],
-            [-0.1, 0.7, -0.1, -0.1, -0.1, 0.6, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1],
+            [0.8, 0.45, 0.75, 0.5, 0.4],
+            [0.45, 0.85, 0.45, 0.45, 0.45, 0.8, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45],
             [
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"]),
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["B1", "B2", "B3"]),
                 StoryPlot(
-                    title="Causal effects",
+                    title="Same situation",
                     characters=[],
                     origin="",
                     goal="",
                     key_events=[
-                        "+0.60  A1 → A2",
-                        "-0.10  A2 → B1",
-                        "+0.50  B1 → B2",
-                        "+0.00  B2 → A3",
-                        "-0.20  A3 → B3",
-                        "-0.10  A2 → B1",
-                        "+0.70  A2 → A3",
-                        "-0.10  A2 → B3",
-                        "-0.10  B2 → A1",
-                        "-0.10  B2 → A3",
-                        "+0.60  B2 → B3",
-                        "-0.10  A3 → A1",
-                        "-0.10  A3 → B1",
-                        "-0.10  A3 → B3",
-                        "-0.10  B3 → A1",
-                        "-0.10  B3 → B1",
-                        "-0.10  B3 → A3",
+                        "0.80  A1 → A2",
+                        "0.45  A2 → B1",
+                        "0.75  B1 → B2",
+                        "0.50  B2 → A3",
+                        "0.40  A3 → B3",
+                        "0.45  A2 → B1",
+                        "0.85  A2 → A3",
+                        "0.45  A2 → B3",
+                        "0.45  B2 → A1",
+                        "0.45  B2 → A3",
+                        "0.80  B2 → B3",
+                        "0.45  A3 → A1",
+                        "0.45  A3 → B1",
+                        "0.45  A3 → B3",
+                        "0.45  B3 → A1",
+                        "0.45  B3 → B1",
+                        "0.45  B3 → A3",
                     ],
                 ),
             ],
@@ -87,39 +87,39 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
                 StoryEvent("A1", 4),
                 StoryEvent("A2", 5),
             ],
-            [0.5, -0.1, 0.5, -0.1, 0.5],
-            [-0.1, 0.2, 0.6, -0.1, -0.1, 0.7],
+            [0.75, 0.45, 0.75, 0.45, 0.75],
+            [0.45, 0.6, 0.8, 0.45, 0.45, 0.85],
             [
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "B1", "B2", "C1", "C2"]),
                 StoryPlot(
-                    title="Causal effects",
+                    title="Same situation",
                     characters=[],
                     origin="",
                     goal="",
                     key_events=[
-                        "+0.50  C1 → C2",
-                        "-0.10  C2 → B1",
-                        "+0.50  B1 → B2",
-                        "-0.10  B2 → A1",
-                        "+0.50  A1 → A2",
-                        "-0.10  C2 → B1",
-                        "+0.20  C2 → A1",
-                        "+0.60  B2 → C1",
-                        "-0.10  B2 → A1",
-                        "-0.10  A2 → C1",
-                        "+0.70  A2 → B1",
+                        "0.75  C1 → C2",
+                        "0.45  C2 → B1",
+                        "0.75  B1 → B2",
+                        "0.45  B2 → A1",
+                        "0.75  A1 → A2",
+                        "0.45  C2 → B1",
+                        "0.60  C2 → A1",
+                        "0.80  B2 → C1",
+                        "0.45  B2 → A1",
+                        "0.45  A2 → C1",
+                        "0.85  A2 → B1",
                     ],
                 ),
             ],
         ),
     ])
     async def test_stitches_the_events_of_each_plot_in_causal_order(
-        self, events, effects_on_next_event, effects_between_runs, expected_plots
+        self, events, same_situation_as_previous, same_situation_across_runs, expected_plots
     ) -> None:
         causal_event_trajectory_classifier = mock.MagicMock()
-        causal_event_trajectory_classifier.causal_effects.side_effect = [
-            mock.MagicMock(**{"__aiter__.return_value": effects_on_next_event}),
-            mock.MagicMock(**{"__aiter__.return_value": effects_between_runs}),
+        causal_event_trajectory_classifier.same_situation_probabilities.side_effect = [
+            mock.MagicMock(**{"__aiter__.return_value": same_situation_as_previous}),
+            mock.MagicMock(**{"__aiter__.return_value": same_situation_across_runs}),
         ]
 
         result = await stitch_events_into_causal_trajectory(
@@ -132,9 +132,9 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
         self,
     ) -> None:
         causal_event_trajectory_classifier = mock.MagicMock()
-        causal_event_trajectory_classifier.causal_effects.side_effect = [
-            mock.MagicMock(**{"__aiter__.return_value": [0.5, -0.1, 0.5, -0.1, 0.5]}),
-            mock.MagicMock(**{"__aiter__.return_value": [-0.1, 0.2, 0.6, -0.1, -0.1, 0.7]}),
+        causal_event_trajectory_classifier.same_situation_probabilities.side_effect = [
+            mock.MagicMock(**{"__aiter__.return_value": [0.75, 0.45, 0.75, 0.45, 0.75]}),
+            mock.MagicMock(**{"__aiter__.return_value": [0.45, 0.6, 0.8, 0.45, 0.45, 0.85]}),
         ]
 
         await stitch_events_into_causal_trajectory(
@@ -151,7 +151,7 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            causal_event_trajectory_classifier.causal_effects.call_args_list,
+            causal_event_trajectory_classifier.same_situation_probabilities.call_args_list,
             [
                 mock.call(
                     "The story.",

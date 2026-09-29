@@ -5,7 +5,6 @@ from cortexgrid_infer import (
     GeminiText2Text,
     Hosted,
     HuggingFaceImporter,
-    Text2Text,
     TextRewriter,
 )
 from fastapi import FastAPI
@@ -17,38 +16,31 @@ from server.models.causal_event_trajectory_classifier import (
     CausalEventTrajectoryClassifier,
     deploy_causal_event_trajectory_classifier,
 )
-from server.models.long_context_qwen import LONG_CONTEXT_QWEN_ID
+from server.models.long_context_qwen import (
+    LONG_CONTEXT_QWEN,
+    LONG_CONTEXT_QWEN_DEPLOYMENT,
+)
 
 _log = log.logger(__name__)
 
 GEC_MODEL = "Unbabel/gec-t5_small"
-CAUSAL_MODEL = "Qwen/Qwen3-8B"
 STYLE_MODEL = "gemini-3.1-pro-preview"
 
 def deploy_inference_models(app: FastAPI) -> None:
     _log.info("Starting the completion models")
     cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
-    causal_model = HuggingFaceImporter(CAUSAL_MODEL, Text2Text)
     gec_model = HuggingFaceImporter(GEC_MODEL, TextRewriter)
-    importers = {
-        importer.model_id: importer
-        for importer in (
-            causal_model,
-            gec_model,
-            HuggingFaceImporter(LONG_CONTEXT_QWEN_ID, Text2Text),
-        )
-    }
     with ThreadPoolExecutor() as importing:
         imported = {
-            model_id: importing.submit(cluster.ensure_weights_imported, importer)
-            for model_id, importer in importers.items()
+            importer.model_id: importing.submit(cluster.ensure_weights_imported, importer)
+            for importer in (LONG_CONTEXT_QWEN, gec_model)
         }
-        imported[CAUSAL_MODEL].result()
+        imported[LONG_CONTEXT_QWEN.model_id].result()
         causal_deployment = cluster.deploy(
-            causal_model, enable_thinking="false", max_total_tokens="16384"
+            LONG_CONTEXT_QWEN, **LONG_CONTEXT_QWEN_DEPLOYMENT.config
         )
-        app.state.causal_model = causal_model.client(causal_deployment.url)
-        app.state.inference_models[CAUSAL_MODEL] = causal_deployment.key
+        app.state.causal_model = LONG_CONTEXT_QWEN.client(causal_deployment.url)
+        app.state.inference_models[LONG_CONTEXT_QWEN.model_id] = causal_deployment.key
         imported[GEC_MODEL].result()
         gec_deployment = cluster.deploy(gec_model)
         app.state.gec_model = gec_model.client(gec_deployment.url)
@@ -69,7 +61,6 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.style_model = style_model.client(style_deployment.url)
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
-        imported[LONG_CONTEXT_QWEN_ID].result()
         causal_event_trajectory_classifier_deployment = deploy_causal_event_trajectory_classifier()
         app.state.causal_event_trajectory_classifier = CausalEventTrajectoryClassifier.client(
             causal_event_trajectory_classifier_deployment.url, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME
