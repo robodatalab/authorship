@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from cortexgrid_infer import CompletionChunk, ServedCompletingModel
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
+from server import log
 from server.jobs import Job
 from server.progress import with_progress
 from server.story_analysis.causal_event_trajectory_classifier import (
@@ -13,6 +14,8 @@ from server.story_analysis.causal_event_trajectory_classifier import (
 )
 from server.storydoc import Document
 from server.utils import estimate_num_tokens_in_text
+
+_log = log.logger(__name__)
 
 EVENT_PROMPT = """
 Given numbered lines in format <line index>.<line>, return an event that is described in that line.
@@ -85,15 +88,15 @@ async def stitch_events_into_causal_trajectory(
     causal_event_trajectory_classifier: ServedCausalEventTrajectoryClassifier,
 ) -> list[StoryPlot]:
     """Takes a list of events and groups them into plots."""
+    pairs_of_next_events = [
+        (cause.description, effect.description) for cause, effect in zip(events, events[1:])
+    ]
     effects_on_next_event = [
         causal_effect
         async for causal_effect in with_progress(
-            causal_event_trajectory_classifier.causal_effects(
-                story,
-                [(cause.description, effect.description) for cause, effect in zip(events, events[1:])],
-            ),
+            causal_event_trajectory_classifier.causal_effects(story, pairs_of_next_events),
             "measuring how each event leads to the next",
-            of=max(len(events) - 1, 0),
+            of=len(pairs_of_next_events),
         )
     ]
     runs = [[event] for event in events[:1]]
@@ -109,15 +112,16 @@ async def stitch_events_into_causal_trajectory(
         for to_run in range(len(runs))
         if from_run != to_run
     ]
+    pairs_across_runs = [
+        (runs[from_run][-1].description, runs[to_run][0].description)
+        for from_run, to_run in links_between_runs
+    ]
     effects_between_runs = [
         causal_effect
         async for causal_effect in with_progress(
-            causal_event_trajectory_classifier.causal_effects(
-                story,
-                [(runs[from_run][-1].description, runs[to_run][0].description) for from_run, to_run in links_between_runs],
-            ),
+            causal_event_trajectory_classifier.causal_effects(story, pairs_across_runs),
             "measuring how each run of events leads to the others",
-            of=len(links_between_runs),
+            of=len(pairs_across_runs),
         )
     ]
     run_after: dict[int, int] = {}
@@ -149,6 +153,25 @@ async def stitch_events_into_causal_trajectory(
         plots.append(
             StoryPlot(title="", characters=[], origin="", goal="", key_events=key_events)
         )
+
+    scored_pairs = [
+        f"{causal_effect:+.2f}  {cause} → {effect}"
+        for (cause, effect), causal_effect in zip(
+            pairs_of_next_events + pairs_across_runs,
+            effects_on_next_event + effects_between_runs,
+        )
+    ]
+    for scored_pair in scored_pairs:
+        _log.info(scored_pair)
+    plots.append(
+        StoryPlot(
+            title="Causal effects",
+            characters=[],
+            origin="",
+            goal="",
+            key_events=scored_pairs,
+        )
+    )
     return plots
 
 

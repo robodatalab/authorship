@@ -13,11 +13,11 @@ from fastapi import FastAPI
 from server import log
 from server.models import cluster
 from server.story_analysis.causal_event_trajectory_classifier import (
-    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME,
     CausalEventTrajectoryClassifier,
     deploy_causal_event_trajectory_classifier,
 )
+from server.story_analysis.long_context_qwen import LONG_CONTEXT_QWEN_ID
 
 _log = log.logger(__name__)
 
@@ -35,7 +35,7 @@ def deploy_inference_models(app: FastAPI) -> None:
         for importer in (
             causal_model,
             gec_model,
-            HuggingFaceImporter(CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL, Text2Text),
+            HuggingFaceImporter(LONG_CONTEXT_QWEN_ID, Text2Text),
         )
     }
     with ThreadPoolExecutor() as importing:
@@ -69,7 +69,7 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.style_model = style_model.client(style_deployment.url)
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
-        imported[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL].result()
+        imported[LONG_CONTEXT_QWEN_ID].result()
         causal_event_trajectory_classifier_deployment = deploy_causal_event_trajectory_classifier()
         app.state.causal_event_trajectory_classifier = CausalEventTrajectoryClassifier.client(
             causal_event_trajectory_classifier_deployment.url, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME

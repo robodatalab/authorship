@@ -18,13 +18,24 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             [],
             [],
             [],
-            [],
+            [
+                StoryPlot(title="Causal effects", characters=[], origin="", goal="", key_events=[]),
+            ],
         ),
         (
             [StoryEvent("A1", 0), StoryEvent("A2", 1), StoryEvent("A3", 2)],
             [0.6, 0.5],
             [],
-            [StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"])],
+            [
+                StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"]),
+                StoryPlot(
+                    title="Causal effects",
+                    characters=[],
+                    origin="",
+                    goal="",
+                    key_events=["+0.60  A1 → A2", "+0.50  A2 → A3"],
+                ),
+            ],
         ),
         (
             [
@@ -40,6 +51,31 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             [
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "A3"]),
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["B1", "B2", "B3"]),
+                StoryPlot(
+                    title="Causal effects",
+                    characters=[],
+                    origin="",
+                    goal="",
+                    key_events=[
+                        "+0.60  A1 → A2",
+                        "-0.10  A2 → B1",
+                        "+0.50  B1 → B2",
+                        "+0.00  B2 → A3",
+                        "-0.20  A3 → B3",
+                        "-0.10  A2 → B1",
+                        "+0.70  A2 → A3",
+                        "-0.10  A2 → B3",
+                        "-0.10  B2 → A1",
+                        "-0.10  B2 → A3",
+                        "+0.60  B2 → B3",
+                        "-0.10  A3 → A1",
+                        "-0.10  A3 → B1",
+                        "-0.10  A3 → B3",
+                        "-0.10  B3 → A1",
+                        "-0.10  B3 → B1",
+                        "-0.10  B3 → A3",
+                    ],
+                ),
             ],
         ),
         (
@@ -55,6 +91,25 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
             [-0.1, 0.2, 0.6, -0.1, -0.1, 0.7],
             [
                 StoryPlot(title="", characters=[], origin="", goal="", key_events=["A1", "A2", "B1", "B2", "C1", "C2"]),
+                StoryPlot(
+                    title="Causal effects",
+                    characters=[],
+                    origin="",
+                    goal="",
+                    key_events=[
+                        "+0.50  C1 → C2",
+                        "-0.10  C2 → B1",
+                        "+0.50  B1 → B2",
+                        "-0.10  B2 → A1",
+                        "+0.50  A1 → A2",
+                        "-0.10  C2 → B1",
+                        "+0.20  C2 → A1",
+                        "+0.60  B2 → C1",
+                        "-0.10  B2 → A1",
+                        "-0.10  A2 → C1",
+                        "+0.70  A2 → B1",
+                    ],
+                ),
             ],
         ),
     ])
