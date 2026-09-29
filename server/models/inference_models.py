@@ -12,12 +12,12 @@ from fastapi import FastAPI
 
 from server import log
 from server.models import cluster
-from server.story_analysis.causal_event_trajectory_classifier import (
+from server.models.causal_event_trajectory_classifier import (
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME,
     CausalEventTrajectoryClassifier,
     deploy_causal_event_trajectory_classifier,
 )
-from server.story_analysis.long_context_qwen import LONG_CONTEXT_QWEN_ID
+from server.models.long_context_qwen import LONG_CONTEXT_QWEN_ID
 
 _log = log.logger(__name__)
 

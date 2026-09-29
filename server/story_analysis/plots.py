@@ -9,7 +9,7 @@ from pydantic.alias_generators import to_camel
 from server import log
 from server.jobs import Job
 from server.progress import with_progress
-from server.story_analysis.causal_event_trajectory_classifier import (
+from server.models.causal_event_trajectory_classifier import (
     ServedCausalEventTrajectoryClassifier,
 )
 from server.storydoc import Document

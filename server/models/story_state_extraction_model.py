@@ -15,11 +15,11 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
 from server.models import cluster
-from server.story_analysis.long_context_qwen import (
+from server.models.long_context_qwen import (
     LONG_CONTEXT_QWEN,
     LONG_CONTEXT_QWEN_DEPLOYMENT,
 )
-from server.story_analysis.story_state import StoryFact, StoryState
+from server.models.story_state import StoryFact, StoryState
 
 _app = FastAPI()
 

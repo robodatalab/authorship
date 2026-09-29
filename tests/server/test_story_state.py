@@ -2,7 +2,7 @@ import unittest
 
 from parameterized import parameterized  # type: ignore
 
-from server.story_analysis.story_state import StoryFact, StoryState
+from server.models.story_state import StoryFact, StoryState
 
 
 class StoryStatesAlgebra(unittest.TestCase):

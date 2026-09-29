@@ -7,7 +7,7 @@ from server.models.inference_models import (
     GEC_MODEL,
     deploy_inference_models,
 )
-from server.story_analysis.causal_event_trajectory_classifier import (
+from server.models.causal_event_trajectory_classifier import (
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
 )
 

@@ -9,9 +9,9 @@ from parameterized import parameterized
 from transformers import DynamicCache, Qwen3Config, Qwen3ForCausalLM
 
 from server.models import cluster
-from server.story_analysis import story_state_extraction_model
-from server.story_analysis.story_state import StoryFact, StoryState
-from server.story_analysis.story_state_extraction_model import (
+from server.models import story_state_extraction_model
+from server.models.story_state import StoryFact, StoryState
+from server.models.story_state_extraction_model import (
     BASE_MODEL_PARAM,
     STORY_STATE_EXTRACTION_MODEL_BASE_MODEL,
     STORY_STATE_EXTRACTION_MODEL_FAMILY,

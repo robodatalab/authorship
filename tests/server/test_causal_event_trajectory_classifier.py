@@ -6,7 +6,7 @@ import torch
 from transformers import Qwen3Config, Qwen3ForCausalLM
 
 from server.models import cluster
-from server.story_analysis.causal_event_trajectory_classifier import (
+from server.models.causal_event_trajectory_classifier import (
     BASE_MODEL_PARAM,
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_BASE_MODEL,
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY,
