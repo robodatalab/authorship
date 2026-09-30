@@ -18,6 +18,20 @@ const THE_DOOR = {
     storyPlotIndices: [0],
 };
 
+const THE_SHOPPING = {
+    firstLine: 0,
+    lastLine: 1,
+    openingLine: "She moves like a cat on the prowl.",
+    storyState: {
+        madeTrue: [
+            { subject: "Kaitlyn", relation: "is in", object: "the dressing room" },
+            { subject: "Frank", relation: "is doing", object: "assisting Kaitlyn" },
+        ],
+        madeFalse: [{ subject: "Frank", relation: "is in", object: "the office" }],
+    },
+    events: ["She touches the fabric."],
+};
+
 const THE_QUEST = {
     title: "The quest",
     characters: ["Bob"],
@@ -44,6 +58,7 @@ function serverAnswers(...jobs: Record<string, unknown>[]): {
                               error: null,
                               unauthorized: false,
                               noQuota: false,
+                              storyScenes: [],
                               storyPlots: [],
                               paragraphsInStoryPlots: [],
                               ...(answers.length > 1
@@ -63,6 +78,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () => {
     it("sends the document with the key and hands the page what came back", async () => {
         const asked = serverAnswers({
+            storyScenes: [THE_SHOPPING],
             storyPlots: [THE_QUEST],
             paragraphsInStoryPlots: [THE_DOOR],
         });
@@ -80,18 +96,21 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
             expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
+                storyScenes: [],
                 storyPlots: [],
                 paragraphsInStoryPlots: [],
             }),
             expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
+                storyScenes: [THE_SHOPPING],
                 storyPlots: [THE_QUEST],
                 paragraphsInStoryPlots: [THE_DOOR],
             }),
             expect.objectContaining({
                 type: "storyPlots",
                 storyPlotsAreShown: false,
+                storyScenes: [THE_SHOPPING],
                 storyPlots: [THE_QUEST],
                 paragraphsInStoryPlots: [THE_DOOR],
             }),

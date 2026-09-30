@@ -8,6 +8,7 @@ from server.story_analysis import plots
 from server.story_analysis.plots import (
     StoryEvent,
     StoryPlot,
+    scene_spans,
     stitch_events_into_causal_trajectory,
 )
 
@@ -163,6 +164,21 @@ class StitchEventsIntoCausalTrajectoryTests(unittest.IsolatedAsyncioTestCase):
                 ),
             ],
         )
+
+
+class SceneSpansTests(unittest.TestCase):
+    @parameterized.expand([
+        ("no_lines", 0, [], []),
+        ("one_line", 1, [], [range(0, 1)]),
+        ("every_line_continues_the_scene", 3, [0.9, 0.8], [range(0, 3)]),
+        ("a_line_that_does_not_continue_begins_a_new_scene", 4, [0.9, 0.2, 0.7], [range(0, 2), range(2, 4)]),
+        ("even_odds_begin_a_new_scene", 2, [0.5], [range(0, 1), range(1, 2)]),
+        ("every_line_begins_a_new_scene", 3, [0.1, 0.3], [range(0, 1), range(1, 2), range(2, 3)]),
+    ])
+    def test_cuts_the_lines_where_a_line_does_not_continue_the_scene(
+        self, _, lines_count, continuation_probabilities, expected_spans
+    ) -> None:
+        self.assertEqual(scene_spans(lines_count, continuation_probabilities), expected_spans)
 
 
 if __name__ == "__main__":

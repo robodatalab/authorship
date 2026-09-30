@@ -4,6 +4,7 @@ import type { ProseCheckError } from "./commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "./commands/identify_story_plots";
 import type {
     AuthorFileEditorMessage,
@@ -23,6 +24,7 @@ export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
 {
     private readonly proseErrors: ProseCheckError[] = [];
+    private storyScenes: StoryScene[] = [];
     private storyPlots: StoryPlot[] = [];
     private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
     private storyPlotsAreShown = false;
@@ -196,9 +198,11 @@ export class AuthorFileEditorSession
     }
 
     showStoryPlots(
+        storyScenes: StoryScene[],
         storyPlots: StoryPlot[],
         paragraphsInStoryPlots: ParagraphInStoryPlots[],
     ): void {
+        this.storyScenes = storyScenes;
         this.storyPlots = storyPlots;
         this.paragraphsInStoryPlots.splice(
             0,
@@ -269,6 +273,7 @@ export class AuthorFileEditorSession
         void this.panel?.webview.postMessage({
             type: "storyPlots",
             storyPlotsAreShown: this.storyPlotsAreShown,
+            storyScenes: this.storyScenes,
             storyPlots: this.storyPlots,
             storyPlotsProgress: this.storyPlotsProgress,
             paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],

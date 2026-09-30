@@ -20,6 +20,11 @@ from server.models.long_context_qwen import (
     LONG_CONTEXT_QWEN,
     LONG_CONTEXT_QWEN_DEPLOYMENT,
 )
+from server.models.story_state_extraction_model import (
+    STORY_STATE_EXTRACTION_MODEL_NAME,
+    StoryStateExtractionModel,
+    deploy_story_state_extraction_model,
+)
 
 _log = log.logger(__name__)
 
@@ -67,5 +72,12 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.inference_models[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME] = (
             causal_event_trajectory_classifier_deployment.key
+        )
+        story_state_extraction_model_deployment = deploy_story_state_extraction_model()
+        app.state.story_state_extraction_model = StoryStateExtractionModel.client(
+            story_state_extraction_model_deployment.url, STORY_STATE_EXTRACTION_MODEL_NAME
+        )
+        app.state.inference_models[STORY_STATE_EXTRACTION_MODEL_NAME] = (
+            story_state_extraction_model_deployment.key
         )
     _log.info("Completion models created")

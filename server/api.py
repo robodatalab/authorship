@@ -319,6 +319,7 @@ def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
     job = StoryPlotsJob(
         _deployed("causal_model"),
         _deployed("causal_event_trajectory_classifier"),
+        _deployed("story_state_extraction_model"),
         document,
     )
     app.state.jobs.start(job)
@@ -334,6 +335,7 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "running": not job.done,
         "cancelled": job.cancelled,
         "error": job.error,
+        "storyScenes": job.scenes,
         "storyPlots": job.plots,
         "paragraphsInStoryPlots": [],
         "progress": job.progress.reported(),

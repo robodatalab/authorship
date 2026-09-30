@@ -18,6 +18,7 @@ import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose"
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "../../vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../../vscode_runtime/server/jobs";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
@@ -114,6 +115,7 @@ interface AuthorFileEditorCanvasProps {
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
     storyPlotsAreShown?: boolean;
+    storyScenes?: StoryScene[];
     storyPlots?: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
@@ -130,6 +132,7 @@ export function AuthorFileEditorCanvas({
     cellRenderers,
     proseErrors = [],
     storyPlotsAreShown = false,
+    storyScenes = [],
     storyPlots = [],
     storyPlotsProgress = null,
     paragraphsInStoryPlots = [],
@@ -364,6 +367,7 @@ export function AuthorFileEditorCanvas({
             </MarkdownEditorMediator>
             {storyPlotsAreShown && (
                 <AuthorFileEditorStoryPlots
+                    storyScenes={storyScenes}
                     storyPlots={storyPlots}
                     storyPlotsProgress={storyPlotsProgress}
                     onIdentifyStoryPlotsAsked={() =>

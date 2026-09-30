@@ -25,6 +25,8 @@ class DeployingTheInferenceModels(unittest.TestCase):
             HuggingFaceImporter=mock.DEFAULT,
             deploy_causal_event_trajectory_classifier=mock.DEFAULT,
             CausalEventTrajectoryClassifier=mock.DEFAULT,
+            deploy_story_state_extraction_model=mock.DEFAULT,
+            StoryStateExtractionModel=mock.DEFAULT,
         )
         self.patched = patched.start()
         self.addCleanup(patched.stop)

@@ -1,6 +1,10 @@
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import type { StoryPlot } from "../../vscode_runtime/commands/identify_story_plots";
+import type {
+    StoryFact,
+    StoryPlot,
+    StoryScene,
+} from "../../vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../../vscode_runtime/server/jobs";
 import { AuthorFileEditorWorkProgress } from "./AuthorFileEditorWorkProgress";
 import { storyPlotColorClassName } from "../markdown/MarkdownEditor";
@@ -10,12 +14,18 @@ const NARROWEST = 220;
 const WIDEST = 720;
 
 interface AuthorFileEditorStoryPlotsProps {
+    storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     onIdentifyStoryPlotsAsked: () => void;
 }
 
+function spokenFact(fact: StoryFact): string {
+    return `${fact.subject} ${fact.relation} ${fact.object}`;
+}
+
 export function AuthorFileEditorStoryPlots({
+    storyScenes,
     storyPlots,
     storyPlotsProgress = null,
     onIdentifyStoryPlotsAsked,
@@ -104,6 +114,54 @@ export function AuthorFileEditorStoryPlots({
                                                     )}
                                                 </ul>
                                             )}
+                                        </dd>
+                                    </dl>
+                                </details>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </details>
+            <details className="author-file-editor-story-plots-drawer" open>
+                <summary>Scenes</summary>
+                {storyScenes.length === 0 ? (
+                    <p className="author-file-editor-story-plots-none">
+                        No scenes identified yet.
+                    </p>
+                ) : (
+                    <ul>
+                        {storyScenes.map((storyScene, storySceneIndex) => (
+                            <li key={storySceneIndex}>
+                                <details className="author-file-editor-story-scene">
+                                    <summary>
+                                        Lines {storyScene.firstLine + 1}–
+                                        {storyScene.lastLine + 1}:{" "}
+                                        {storyScene.openingLine}
+                                    </summary>
+                                    <dl>
+                                        <dt>Holds</dt>
+                                        <dd>
+                                            <ul>
+                                                {storyScene.storyState.madeTrue.map(
+                                                    (fact, factIndex) => (
+                                                        <li key={factIndex}>
+                                                            {spokenFact(fact)}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </dd>
+                                        <dt>No longer holds</dt>
+                                        <dd>
+                                            <ul>
+                                                {storyScene.storyState.madeFalse.map(
+                                                    (fact, factIndex) => (
+                                                        <li key={factIndex}>
+                                                            {spokenFact(fact)}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
                                         </dd>
                                     </dl>
                                 </details>

@@ -99,3 +99,33 @@
     margin: 0;
     padding-left: 16px;
 }
+
+.author-file-editor-story-scene summary {
+    padding: 4px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.author-file-editor-story-scene dl {
+    margin: 2px 0 10px 16px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-scene dt {
+    margin-top: 6px;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+}
+
+.author-file-editor-story-scene dd {
+    margin: 0;
+}
+
+.author-file-editor-story-scene dd ul {
+    margin: 0;
+    padding-left: 16px;
+}

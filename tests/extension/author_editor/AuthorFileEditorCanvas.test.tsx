@@ -11,6 +11,7 @@ import {
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../../../extension/vscode_runtime/server/jobs";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
@@ -70,6 +71,7 @@ async function mountCanvas(options: {
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
     storyPlotsAreShown?: boolean;
+    storyScenes?: StoryScene[];
     storyPlots?: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
@@ -91,6 +93,7 @@ async function mountCanvas(options: {
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 storyPlotsAreShown={options.storyPlotsAreShown}
+                storyScenes={options.storyScenes}
                 storyPlots={options.storyPlots}
                 storyPlotsProgress={options.storyPlotsProgress}
                 paragraphsInStoryPlots={options.paragraphsInStoryPlots}
@@ -920,6 +923,20 @@ describe("a folded cell", () => {
 });
 
 describe("the plots the story weaves", () => {
+    const THE_SHOPPING: StoryScene = {
+        firstLine: 0,
+        lastLine: 1,
+        openingLine: "She moves like a cat on the prowl.",
+        storyState: {
+            madeTrue: [
+                { subject: "Kaitlyn", relation: "is in", object: "the dressing room" },
+                { subject: "Frank", relation: "is doing", object: "assisting Kaitlyn" },
+            ],
+            madeFalse: [{ subject: "Frank", relation: "is in", object: "the office" }],
+        },
+        events: ["She touches the fabric."],
+    };
+
     const THE_QUEST: StoryPlot = {
         title: "The quest",
         characters: ["Bob", "Alice"],
@@ -953,6 +970,7 @@ describe("the plots the story weaves", () => {
             cells: [markdownCell("The door.", "m1")],
             cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
             storyPlotsAreShown,
+            storyScenes: [THE_SHOPPING],
             storyPlots: [THE_QUEST],
             storyPlotsProgress,
             paragraphsInStoryPlots: [THE_DOOR],
@@ -997,6 +1015,26 @@ describe("the plots the story weaves", () => {
         ).toBe("1");
     });
 
+    it("lists every scene by the lines it spans, with what holds in it", async () => {
+        await mountStoryPlots(true);
+
+        expect(
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-scene summary",
+            )?.textContent,
+        ).toBe("Lines 1–2: She moves like a cat on the prowl.");
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-scene dd",
+                ),
+            ].map((said) => said.textContent),
+        ).toEqual([
+            "Kaitlyn is in the dressing roomFrank is doing assisting Kaitlyn",
+            "Frank is in the office",
+        ]);
+    });
+
     it("keeps the plots above the progress, each in its own drawer", async () => {
         await mountStoryPlots(true, {
             doing: "identify plots",
@@ -1024,7 +1062,7 @@ describe("the plots the story weaves", () => {
                     ".author-file-editor-story-plots-drawer > summary",
                 ),
             ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots", "Progress"]);
+        ).toEqual(["Plots", "Scenes", "Progress"]);
     });
 
     it("draws no progress drawer when nothing is running", async () => {
@@ -1036,7 +1074,7 @@ describe("the plots the story weaves", () => {
                     ".author-file-editor-story-plots-drawer > summary",
                 ),
             ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots"]);
+        ).toEqual(["Plots", "Scenes"]);
     });
 
     it("can be dragged wider by its edge", async () => {

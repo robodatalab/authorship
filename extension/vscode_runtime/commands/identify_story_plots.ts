@@ -13,6 +13,25 @@ import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 
 const STORY_PLOTS_STATUS = "/analyze/plots/status";
 
+export interface StoryFact {
+    subject: string;
+    relation: string;
+    object: string;
+}
+
+export interface StoryState {
+    madeTrue: StoryFact[];
+    madeFalse: StoryFact[];
+}
+
+export interface StoryScene {
+    firstLine: number;
+    lastLine: number;
+    openingLine: string;
+    storyState: StoryState;
+    events: string[];
+}
+
 export interface StoryPlot {
     title: string;
     characters: string[];
@@ -36,6 +55,7 @@ const NOTHING_DONE_YET: WorkProgress = {
 };
 
 interface StoryPlotsJob extends ServerJob {
+    storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
     progress: WorkProgress;
@@ -60,12 +80,14 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 (running) => {
                     session.identifyingStoryPlots(running.progress);
                     session.showStoryPlots(
+                        running.storyScenes,
                         running.storyPlots,
                         running.paragraphsInStoryPlots,
                     );
                 },
             );
             session.showStoryPlots(
+                identified.storyScenes,
                 identified.storyPlots,
                 identified.paragraphsInStoryPlots,
             );
