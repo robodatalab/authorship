@@ -41,6 +41,14 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "preLaunchTask": "uv sync"
+        },
+        {
+            "name": "Story State Extraction",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "experiments.story_state_extraction_experiment",
+            "preLaunchTask": "uv sync",
+            "justMyCode": false
         }
     ],
     "compounds": [
