@@ -70,9 +70,7 @@ class AnsweringWithTheStoryState(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(
             story_state_extraction_model.cortexgrid,
             "required_models",
-            return_value=[mock.Mock(url="http://serve/Qwen/Qwen3-8B")],
-        ), mock.patch.object(
-            story_state_extraction_model.Text2Text, "client", return_value=long_context_qwen
+            return_value=[mock.Mock(**{"client.return_value": long_context_qwen})],
         ):
             model = StoryStateExtractionModel(
                 cortexgrid.DeploymentKey("Authorship", "storystateextractionmodel", "imported")
@@ -112,9 +110,7 @@ class AskingWhetherEachLineContinuesTheScene(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(
             story_state_extraction_model.cortexgrid,
             "required_models",
-            return_value=[mock.Mock(url="http://serve/Qwen/Qwen3-8B")],
-        ), mock.patch.object(
-            story_state_extraction_model.Text2Text, "client", return_value=long_context_qwen
+            return_value=[mock.Mock(**{"client.return_value": long_context_qwen})],
         ):
             model = StoryStateExtractionModel(
                 cortexgrid.DeploymentKey("Authorship", "storystateextractionmodel", "imported")
@@ -165,8 +161,8 @@ class AskingTheServedModelWhereScenesEnd(unittest.IsolatedAsyncioTestCase):
     async def test_sends_the_lines_and_reads_back_a_probability_per_line_after_the_first(self) -> None:
         server = mock.Mock(return_value=httpx.Response(200, content=b"0.75\n0.25\n"))
         served_model = ServedStoryStateExtractionModel(
-            "http://serve/Authorship/storystateextractionmodel",
-            "Authorship-storystateextractionmodel",
+            key=cortexgrid.DeploymentKey("Authorship", "storystateextractionmodel", "imported"),
+            url="http://serve/Authorship/storystateextractionmodel",
         )
         with mock.patch.object(
             story_state_extraction_model.httpx,
@@ -198,8 +194,8 @@ class AskingTheServedModelForTheStoryState(unittest.IsolatedAsyncioTestCase):
             "made_false": [{"subject": "the door", "relation": "is", "object": "locked"}],
         }))
         served_model = ServedStoryStateExtractionModel(
-            "http://serve/Authorship/storystateextractionmodel",
-            "Authorship-storystateextractionmodel",
+            key=cortexgrid.DeploymentKey("Authorship", "storystateextractionmodel", "imported"),
+            url="http://serve/Authorship/storystateextractionmodel",
         )
         with mock.patch.object(
             story_state_extraction_model.httpx,

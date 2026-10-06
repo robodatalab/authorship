@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from typing import Any
 
 import cortexgrid
 import httpx
 from cortexgrid import serve
-from cortexgrid_infer import DeployedModel, Message, Text2Text
+from cortexgrid_infer import Message, ServedCompletingModel
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter
@@ -15,10 +14,7 @@ from pydantic import TypeAdapter
 from server import log
 from server.models import cluster
 from server.models.causal_event_trajectory_classifier import probability_of_yes
-from server.models.long_context_qwen import (
-    LONG_CONTEXT_QWEN,
-    LONG_CONTEXT_QWEN_DEPLOYMENT,
-)
+from server.models.long_context_qwen import LONG_CONTEXT_QWEN_DEPLOYMENT
 from server.models.story_state import StoryFact, StoryState
 
 _app = FastAPI()
@@ -111,7 +107,9 @@ def story_state_of(answer: str) -> StoryState:
     return story_state
 
 
-def deploy_story_state_extraction_model() -> cortexgrid.Deployment:
+def deploy_story_state_extraction_model() -> cortexgrid.Deployment[
+    ServedStoryStateExtractionModel
+]:
     cortexgrid.register_model(
         StoryStateExtractionModel,
         family=STORY_STATE_EXTRACTION_MODEL_FAMILY,
@@ -135,15 +133,15 @@ class StoryStateExtractionModel:
         )
 
     @classmethod
-    def client(cls, url: str, name: str) -> ServedStoryStateExtractionModel:
-        return ServedStoryStateExtractionModel(url=url, model_id=name)
+    def client(
+        cls, deployment: cortexgrid.Deployment[ServedStoryStateExtractionModel]
+    ) -> ServedStoryStateExtractionModel:
+        return ServedStoryStateExtractionModel(key=deployment.key, url=deployment.url)
 
     def __init__(self, deployment: cortexgrid.DeploymentKey) -> None:
         required_models = cortexgrid.required_models(deployment)
         long_context_qwen = required_models[0]
-        self._long_context_qwen = Text2Text.client(
-            long_context_qwen.url, LONG_CONTEXT_QWEN.model_id
-        )
+        self._long_context_qwen: ServedCompletingModel = long_context_qwen.client()
 
     @_app.post("/scene_continuation_probabilities")
     async def scene_continuation_probabilities(self, body: dict[str, Any]) -> StreamingResponse:
@@ -181,15 +179,7 @@ class StoryStateExtractionModel:
         return story_state
 
 
-@dataclass
-class ServedStoryStateExtractionModel(DeployedModel):
-    url: str
-    model_id: str
-
-    @property
-    def name(self) -> str:
-        return self.model_id
-
+class ServedStoryStateExtractionModel(cortexgrid.DeploymentClient):
     async def scene_continuation_probabilities(self, lines: list[str]) -> AsyncIterator[float]:
         body = {"lines": lines}
         scene_continuation_probabilities_url = f"{self.url}/scene_continuation_probabilities"

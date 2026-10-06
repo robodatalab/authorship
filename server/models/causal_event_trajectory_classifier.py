@@ -2,21 +2,17 @@ from __future__ import annotations
 
 import math
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from typing import Any
 
 import cortexgrid
 import httpx
 from cortexgrid import serve
-from cortexgrid_infer import DeployedModel, Message, Text2Text
+from cortexgrid_infer import Message, ServedCompletingModel
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
 from server.models import cluster
-from server.models.long_context_qwen import (
-    LONG_CONTEXT_QWEN,
-    LONG_CONTEXT_QWEN_DEPLOYMENT,
-)
+from server.models.long_context_qwen import LONG_CONTEXT_QWEN_DEPLOYMENT
 
 _app = FastAPI()
 
@@ -60,7 +56,9 @@ def probability_of_yes(yes_loglikelihoods: list[float], no_loglikelihoods: list[
     return yes / (yes + no)
 
 
-def deploy_causal_event_trajectory_classifier() -> cortexgrid.Deployment:
+def deploy_causal_event_trajectory_classifier() -> cortexgrid.Deployment[
+    ServedCausalEventTrajectoryClassifier
+]:
     cortexgrid.register_model(
         CausalEventTrajectoryClassifier,
         family=CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY,
@@ -84,14 +82,15 @@ class CausalEventTrajectoryClassifier:
         )
 
     @classmethod
-    def client(cls, url: str, name: str) -> ServedCausalEventTrajectoryClassifier:
-        return ServedCausalEventTrajectoryClassifier(url=url, model_id=name)
+    def client(
+        cls, deployment: cortexgrid.Deployment[ServedCausalEventTrajectoryClassifier]
+    ) -> ServedCausalEventTrajectoryClassifier:
+        return ServedCausalEventTrajectoryClassifier(key=deployment.key, url=deployment.url)
 
     def __init__(self, deployment: cortexgrid.DeploymentKey) -> None:
-        long_context_qwen = cortexgrid.required_models(deployment)[0]
-        self._long_context_qwen = Text2Text.client(
-            long_context_qwen.url, LONG_CONTEXT_QWEN.model_id
-        )
+        required_models = cortexgrid.required_models(deployment)
+        long_context_qwen = required_models[0]
+        self._long_context_qwen: ServedCompletingModel = long_context_qwen.client()
 
     @_app.post("/same_situation_probabilities")
     async def same_situation_probabilities(self, body: dict[str, Any]) -> StreamingResponse:
@@ -114,15 +113,7 @@ class CausalEventTrajectoryClassifier:
             yield f"{probability}\n"
 
 
-@dataclass
-class ServedCausalEventTrajectoryClassifier(DeployedModel):
-    url: str
-    model_id: str
-
-    @property
-    def name(self) -> str:
-        return self.model_id
-
+class ServedCausalEventTrajectoryClassifier(cortexgrid.DeploymentClient):
     async def same_situation_probabilities(
         self, story: str, pairs_of_events: list[tuple[str, str]]
     ) -> AsyncIterator[float]:

@@ -13,7 +13,6 @@ from server import log
 from server.models import cluster
 from server.models.causal_event_trajectory_classifier import (
     CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME,
-    CausalEventTrajectoryClassifier,
     deploy_causal_event_trajectory_classifier,
 )
 from server.models.long_context_qwen import (
@@ -22,7 +21,6 @@ from server.models.long_context_qwen import (
 )
 from server.models.story_state_extraction_model import (
     STORY_STATE_EXTRACTION_MODEL_NAME,
-    StoryStateExtractionModel,
     deploy_story_state_extraction_model,
 )
 
@@ -44,12 +42,12 @@ def deploy_inference_models(app: FastAPI) -> None:
         causal_deployment = cluster.deploy(
             LONG_CONTEXT_QWEN, **LONG_CONTEXT_QWEN_DEPLOYMENT.config
         )
-        app.state.causal_model = LONG_CONTEXT_QWEN.client(causal_deployment.url)
         app.state.inference_models[LONG_CONTEXT_QWEN.model_id] = causal_deployment.key
+        app.state.causal_model = causal_deployment.client()
         imported[GEC_MODEL].result()
         gec_deployment = cluster.deploy(gec_model)
-        app.state.gec_model = gec_model.client(gec_deployment.url)
         app.state.inference_models[GEC_MODEL] = gec_deployment.key
+        app.state.gec_model = gec_deployment.client()
         style_model = Hosted(STYLE_MODEL, GeminiText2Text)
         cortexgrid.register_model(
             style_model.serve_app,
@@ -64,20 +62,18 @@ def deploy_inference_models(app: FastAPI) -> None:
             run_name=cortexgrid.IMPORTED,
             timeout=cluster.DEPLOY_TIMEOUT_S,
         )
-        app.state.style_model = style_model.client(style_deployment.url)
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
+        app.state.style_model = style_deployment.client()
         causal_event_trajectory_classifier_deployment = deploy_causal_event_trajectory_classifier()
-        app.state.causal_event_trajectory_classifier = CausalEventTrajectoryClassifier.client(
-            causal_event_trajectory_classifier_deployment.url, CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME
-        )
         app.state.inference_models[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME] = (
             causal_event_trajectory_classifier_deployment.key
         )
-        story_state_extraction_model_deployment = deploy_story_state_extraction_model()
-        app.state.story_state_extraction_model = StoryStateExtractionModel.client(
-            story_state_extraction_model_deployment.url, STORY_STATE_EXTRACTION_MODEL_NAME
+        app.state.causal_event_trajectory_classifier = (
+            causal_event_trajectory_classifier_deployment.client()
         )
+        story_state_extraction_model_deployment = deploy_story_state_extraction_model()
         app.state.inference_models[STORY_STATE_EXTRACTION_MODEL_NAME] = (
             story_state_extraction_model_deployment.key
         )
+        app.state.story_state_extraction_model = story_state_extraction_model_deployment.client()
     _log.info("Completion models created")
