@@ -3,17 +3,17 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from cortexgrid_infer import CompletionChunk, ServedCompletingModel
+from cortexgrid_infer import CompletionChunk, CompletingModel
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 from server import log
 from server.jobs import Job
 from server.progress import with_progress
 from server.models.causal_event_trajectory_classifier import (
-    ServedCausalEventTrajectoryClassifier,
+    CausalEventTrajectoryClassifier,
 )
 from server.models.story_state import StoryState
-from server.models.story_state_extraction_model import ServedStoryStateExtractionModel
+from server.models.story_state_extraction_model import StoryStateExtractionModel
 from server.storydoc import Document
 from server.utils import estimate_num_tokens_in_text
 
@@ -47,7 +47,7 @@ class StoryEvent:
     position_in_manuscript: int
 
 
-async def detect_events(document: Document, causal_model: ServedCompletingModel) -> list[StoryEvent]:
+async def detect_events(document: Document, causal_model: CompletingModel) -> list[StoryEvent]:
     max_chapter_length = max(estimate_num_tokens_in_text(chapter) for _, chapter in document.chapters)
 
     all_events: list[StoryEvent] = []
@@ -90,7 +90,7 @@ SAME_SITUATION_PROBABILITY = 0.5
 async def stitch_events_into_causal_trajectory(
     events: list[StoryEvent],
     story: str,
-    causal_event_trajectory_classifier: ServedCausalEventTrajectoryClassifier,
+    causal_event_trajectory_classifier: CausalEventTrajectoryClassifier,
 ) -> list[StoryPlot]:
     """Takes a list of events and groups them into plots."""
     pairs_of_next_events = [
@@ -217,9 +217,9 @@ class StoryPlotsJob(Job):
 
     def __init__(
         self,
-        causal_model: ServedCompletingModel,
-        causal_event_trajectory_classifier: ServedCausalEventTrajectoryClassifier,
-        story_state_extraction_model: ServedStoryStateExtractionModel,
+        causal_model: CompletingModel,
+        causal_event_trajectory_classifier: CausalEventTrajectoryClassifier,
+        story_state_extraction_model: StoryStateExtractionModel,
         document: Document,
     ) -> None:
         assert document.path is not None

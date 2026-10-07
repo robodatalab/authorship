@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from cortexgrid_infer import ServedRewritingModel
+from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
 from server.storydoc import Document
@@ -61,7 +61,7 @@ class CheckErrorsJob(Job):
 
     def __init__(
         self,
-        model: ServedRewritingModel,
+        model: RewritingModel,
         document: Document,
         selection: tuple[int, int] | None,
     ) -> None:

@@ -17,7 +17,7 @@ from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
-from cortexgrid_infer import ServedCompletingModel
+from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
 from server.storydoc import Document
@@ -166,7 +166,7 @@ class BlurbRequest(BaseModel):
 class BlurbJob(WritingJob):
     kind = "blurb"
 
-    def __init__(self, model: ServedCompletingModel, document: Document) -> None:
+    def __init__(self, model: CompletingModel, document: Document) -> None:
         super().__init__(storydoc.BLURB, str(document.path))
         self._model = model
         self._document = document
@@ -186,7 +186,7 @@ class RecapRequest(BaseModel):
 class RecapJob(WritingJob):
     kind = "recap"
 
-    def __init__(self, model: ServedCompletingModel, document: Document, earlier: list[Document]) -> None:
+    def __init__(self, model: CompletingModel, document: Document, earlier: list[Document]) -> None:
         super().__init__(storydoc.RECAP, str(document.path))
         self._model = model
         self._earlier = earlier

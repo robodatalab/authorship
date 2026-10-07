@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from cortexgrid_infer import ServedCompletingModel
+from cortexgrid_infer import CompletingModel
 
 from server import storydoc
 from server.jobs import Job
@@ -36,7 +36,7 @@ FIX_REQUEST = "Fix the writing style and the grammar in the following section."
 
 
 async def fix_style(
-    model: ServedCompletingModel,
+    model: CompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, sections: None,
@@ -64,7 +64,7 @@ async def fix_style(
 
 
 async def _corrected(
-    model: ServedCompletingModel, corrected: list[str], section: Cell
+    model: CompletingModel, corrected: list[str], section: Cell
 ) -> tuple[str | None, str]:
     answer = "".join(
         [
@@ -134,7 +134,7 @@ def _opening(source: str) -> str:
 class StyleFixJob(Job):
     kind = "style fix"
 
-    def __init__(self, model: ServedCompletingModel, document: Document) -> None:
+    def __init__(self, model: CompletingModel, document: Document) -> None:
         super().__init__(str(document.path))
         self._model = model
         self._document = document

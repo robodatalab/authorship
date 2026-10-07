@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from cortexgrid_infer import ServedCompletingModel
+from cortexgrid_infer import CompletingModel
 
 from server.storydoc import Document
 
@@ -34,7 +34,7 @@ BLURB_INSTRUCTION = (
 
 
 async def write_blurb(
-    model: ServedCompletingModel,
+    model: CompletingModel,
     document: Document,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda written, chapters: None,

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from cortexgrid_infer import ServedCompletingModel
+from cortexgrid_infer import CompletingModel
 
 from server.storydoc import Document
 
@@ -24,7 +24,7 @@ Return the summary that combines the overall text, without adding any tokens.
 
 
 async def write_recap(
-    model: ServedCompletingModel,
+    model: CompletingModel,
     documents: list[Document],
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda read, chapters: None,

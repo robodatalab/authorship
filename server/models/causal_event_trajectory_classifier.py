@@ -2,19 +2,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import AsyncIterator
-from typing import Any
 
 import cortexgrid
-import httpx
 from cortexgrid import serve
-from cortexgrid_infer import Message, ServedCompletingModel
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from cortexgrid_infer import Message, Text2Text
 
 from server.models import cluster
 from server.models.long_context_qwen import LONG_CONTEXT_QWEN_DEPLOYMENT
-
-_app = FastAPI()
 
 CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_FAMILY = "Authorship"
 CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_SUFFIX = "causaleventtrajectoryclassifier"
@@ -57,7 +51,7 @@ def probability_of_yes(yes_loglikelihoods: list[float], no_loglikelihoods: list[
 
 
 def deploy_causal_event_trajectory_classifier() -> cortexgrid.Deployment[
-    ServedCausalEventTrajectoryClassifier
+    CausalEventTrajectoryClassifier
 ]:
     cortexgrid.register_model(
         CausalEventTrajectoryClassifier,
@@ -73,7 +67,7 @@ def deploy_causal_event_trajectory_classifier() -> cortexgrid.Deployment[
     )
 
 
-@serve.ingress(_app)
+@serve.ingress
 class CausalEventTrajectoryClassifier:
     @classmethod
     def requirements(cls) -> cortexgrid.ModelRequirements:
@@ -81,25 +75,15 @@ class CausalEventTrajectoryClassifier:
             ram_gb=1.0, models=[LONG_CONTEXT_QWEN_DEPLOYMENT]
         )
 
-    @classmethod
-    def client(
-        cls, deployment: cortexgrid.Deployment[ServedCausalEventTrajectoryClassifier]
-    ) -> ServedCausalEventTrajectoryClassifier:
-        return ServedCausalEventTrajectoryClassifier(key=deployment.key, url=deployment.url)
-
     def __init__(self, deployment: cortexgrid.DeploymentKey) -> None:
         required_models = cortexgrid.required_models(deployment)
         long_context_qwen = required_models[0]
-        self._long_context_qwen: ServedCompletingModel = long_context_qwen.client()
+        self._long_context_qwen: Text2Text = long_context_qwen.client()
 
-    @_app.post("/same_situation_probabilities")
-    async def same_situation_probabilities(self, body: dict[str, Any]) -> StreamingResponse:
-        probabilities = self._same_situation_probabilities(body["story"], body["pairs_of_events"])
-        return StreamingResponse(probabilities, media_type="text/plain")
-
-    async def _same_situation_probabilities(
-        self, story: str, pairs_of_events: list[list[str]]
-    ) -> AsyncIterator[str]:
+    @serve.endpoint
+    async def same_situation_probabilities(
+        self, story: str, pairs_of_events: list[tuple[str, str]]
+    ) -> AsyncIterator[float]:
         for previous, event in pairs_of_events:
             question = _QUESTION_ABOUT_THE_SITUATION.format(previous=previous, event=event)
             asked = _asked_of_the_story(story, question)
@@ -110,18 +94,4 @@ class CausalEventTrajectoryClassifier:
                 asked, _ANSWERS_THAT_SAY_NO
             )
             probability = probability_of_yes(yes_loglikelihoods, no_loglikelihoods)
-            yield f"{probability}\n"
-
-
-class ServedCausalEventTrajectoryClassifier(cortexgrid.DeploymentClient):
-    async def same_situation_probabilities(
-        self, story: str, pairs_of_events: list[tuple[str, str]]
-    ) -> AsyncIterator[float]:
-        body = {"story": story, "pairs_of_events": pairs_of_events}
-        same_situation_probabilities_url = f"{self.url}/same_situation_probabilities"
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", same_situation_probabilities_url, json=body) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    probability = float(line)
-                    yield probability
+            yield probability
