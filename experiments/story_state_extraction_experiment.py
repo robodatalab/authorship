@@ -59,7 +59,8 @@ async def run_test(model: StoryStateExtractionModel) -> None:
     basis = await model.encode_basis(SCENE_1)
     
     ref_expected_state = await model.encode_from_state(basis, EXPECTED_STATE)
-    ref_states = [model.encode_from_text(basis, text) for text in SCENES]
+    encoding_the_scenes = [model.encode_from_text(basis, text) for text in SCENES]
+    ref_states = await asyncio.gather(*encoding_the_scenes)
 
     similarity = [torch.dot(ref_expected_state, ref_state) for ref_state in ref_states]
 
