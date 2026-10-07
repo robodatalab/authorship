@@ -17,7 +17,6 @@ from server.models.story_state_extraction_model import (
     STORY_STATE_EXTRACTION_MODEL_SUFFIX,
     ServedStoryStateExtractionModel,
     StoryStateExtractionModel,
-    deploy_story_state_extraction_model,
     story_state_of,
 )
 
@@ -234,7 +233,7 @@ class DeployingTheStoryStateExtractionModel(unittest.TestCase):
         self.addCleanup(patched.stop)
 
     def test_is_registered_under_its_own_name_with_no_weights_of_its_own(self) -> None:
-        deploy_story_state_extraction_model()
+        StoryStateExtractionModel.deploy()
 
         self.cortexgrid["register_model"].assert_called_once_with(
             StoryStateExtractionModel,
@@ -244,7 +243,7 @@ class DeployingTheStoryStateExtractionModel(unittest.TestCase):
         )
 
     def test_is_deployed_from_the_registry(self) -> None:
-        deployment = deploy_story_state_extraction_model()
+        deployment = StoryStateExtractionModel.deploy()
 
         self.cortexgrid["deploy_model"].assert_called_once_with(
             family=STORY_STATE_EXTRACTION_MODEL_FAMILY,

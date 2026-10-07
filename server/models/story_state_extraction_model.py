@@ -107,25 +107,26 @@ def story_state_of(answer: str) -> StoryState:
     return story_state
 
 
-def deploy_story_state_extraction_model() -> cortexgrid.Deployment[
-    ServedStoryStateExtractionModel
-]:
-    cortexgrid.register_model(
-        StoryStateExtractionModel,
-        family=STORY_STATE_EXTRACTION_MODEL_FAMILY,
-        suffix=STORY_STATE_EXTRACTION_MODEL_SUFFIX,
-        requirements=StoryStateExtractionModel.requirements(),
-    )
-    return cortexgrid.deploy_model(
-        family=STORY_STATE_EXTRACTION_MODEL_FAMILY,
-        suffix=STORY_STATE_EXTRACTION_MODEL_SUFFIX,
-        run_name=cortexgrid.IMPORTED,
-        timeout=cluster.DEPLOY_TIMEOUT_S,
-    )
-
-
 @serve.ingress(_app)
 class StoryStateExtractionModel:
+
+    @classmethod
+    def deploy(cls) -> cortexgrid.Deployment[
+        ServedStoryStateExtractionModel
+    ]:
+        cortexgrid.register_model(
+            cls,
+            family=STORY_STATE_EXTRACTION_MODEL_FAMILY,
+            suffix=STORY_STATE_EXTRACTION_MODEL_SUFFIX,
+            requirements=cls.requirements(),
+        )
+        return cortexgrid.deploy_model(
+            family=STORY_STATE_EXTRACTION_MODEL_FAMILY,
+            suffix=STORY_STATE_EXTRACTION_MODEL_SUFFIX,
+            run_name=cortexgrid.IMPORTED,
+            timeout=cluster.DEPLOY_TIMEOUT_S,
+        )
+    
     @classmethod
     def requirements(cls) -> cortexgrid.ModelRequirements:
         return cortexgrid.ModelRequirements(

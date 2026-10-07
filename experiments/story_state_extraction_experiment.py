@@ -3,7 +3,7 @@ import asyncio
 import cortexgrid
 
 from server.models import cluster
-from server.models.story_state_extraction_model import deploy_story_state_extraction_model
+from server.models.story_state_extraction_model import StoryStateExtractionModel
 
 STORY_BEFORE_THE_SCENE = """It was a warm, sunny day.
 
@@ -20,8 +20,8 @@ But no answer came."""
 
 def main() -> None:
     cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
-    
-    deployment = deploy_story_state_extraction_model()
+
+    deployment = StoryStateExtractionModel.deploy()
     story_state_extraction_model = deployment.client()
 
 
