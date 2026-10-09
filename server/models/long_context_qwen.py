@@ -18,4 +18,6 @@ LONG_CONTEXT_QWEN_DEPLOYMENT = cortexgrid.DeploymentConfig(
         "dtype": "bfloat16",
         "enable_thinking": "false",
     },
+    serve_app=LONG_CONTEXT_QWEN.serve_app,
+    source=LONG_CONTEXT_QWEN.source,
 )
