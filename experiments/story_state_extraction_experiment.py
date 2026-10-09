@@ -6,6 +6,7 @@ import torch
 
 from server.models import cluster
 from server.models.story_state_extraction_model import (
+    SalientConcept,
     StoryStateExtractionModel, 
     StoryState
 )
@@ -61,7 +62,12 @@ EXPECTED_STATE = StoryState(
     event="knocking at the door",
     action="Michael Checks who knocks",
 )
-SCENE_SALIENT_CONCEPTS = ["Michael", "Sarah", "home", "surprise visitor"]
+SCENE_SALIENT_CONCEPTS = [
+    SalientConcept("Michael", [1, 2, 3]),
+    SalientConcept("Sarah", [1, 2, 3, 4]),
+    SalientConcept("home", [1, 2, 3]),
+    SalientConcept("surprise visitor", [1, 3, 4, 5]),
+]
 
 EXPECTED_STATE_DIFFERENT_SCENE = StoryState(
     characters=["Pierre", "Priest"],
@@ -69,7 +75,13 @@ EXPECTED_STATE_DIFFERENT_SCENE = StoryState(
     event="summoning a deamon",
     action="Pierre bursts into the church",
 )
-DIFFERENT_SCENE_SALIENT_CONCEPTS = ["Pierre", "Priest", "deamon", "church", "summoning"]
+DIFFERENT_SCENE_SALIENT_CONCEPTS = [
+    SalientConcept("Pierre", [0, 1, 3]),
+    SalientConcept("Priest", [1, 2, 3]),
+    SalientConcept("deamon", [2]),
+    SalientConcept("church", [0, 1, 3]),
+    SalientConcept("summoning", [1, 2]),
+]
 
 
 async def test_scene(
