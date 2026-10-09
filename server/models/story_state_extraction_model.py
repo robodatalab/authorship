@@ -50,6 +50,19 @@ def gaussian_weights_of_layers(layer_idxs: list[int]) -> torch.Tensor:
     return weights
 
 
+def state_embedding(state_description: str, model: Text2Text) -> StoryStateVector:
+    architecture = await model.architecture()
+    layer_idxs = list(range(1, architecture.layer_count + 1))
+    hidden_states = await model.hidden_states_at_layers(
+        state_description, layer_idxs
+    )
+    hidden_states_without_the_attention_sink = hidden_states[:, 1:]
+    meaning_at_each_layer = hidden_states_without_the_attention_sink.mean(dim=1)
+    layer_weights = gaussian_weights_of_layers(layer_idxs)
+    embedding_of_the_state = layer_weights @ meaning_at_each_layer
+
+    return embedding_of_the_state
+
 @serve.ingress
 class StoryStateExtractionModel:
 
@@ -93,21 +106,17 @@ class StoryStateExtractionModel:
         self, basis: StoryStateSpaceBasis, state: StoryState
     ) -> StoryStateVector:
         description = str(state)
-        architecture = await self._long_context_qwen.architecture()
-        layer_idxs = list(range(1, architecture.layer_count + 1))
-        hidden_states = await self._long_context_qwen.hidden_states_at_layers(
-            description, layer_idxs
-        )
-        hidden_states_without_the_attention_sink = hidden_states[:, 1:]
-        meaning_at_each_layer = hidden_states_without_the_attention_sink.mean(dim=1)
-        layer_weights = gaussian_weights_of_layers(layer_idxs)
-        meaning_of_the_state = layer_weights @ meaning_at_each_layer
-        story_state = basis @ meaning_of_the_state
+
+        embedding = state_embedding(description, self._long_context_qwen)
+        
+        story_state = basis @ embedding
         return story_state
 
     @serve.endpoint
     async def encode_from_text(
         self, basis: StoryStateSpaceBasis, text: str
     ) -> StoryStateVector:
-        story_state = torch.zeros((3,))
+        embedding = state_embedding(text, self._long_context_qwen)
+
+        story_state = basis @ embedding
         return story_state
