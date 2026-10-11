@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.28)  11 OCT 2026 18:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.28)  11 OCT 2026 18:38
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -468,45 +468,72 @@ Package pdftex.def Info: figures/abc_points_layer16.pdf  used on input line 183.
 <figures/abc_areas_by_layer.pdf, id=86, 516.53395pt x 463.666pt>
 File: figures/abc_areas_by_layer.pdf Graphic file (type pdf)
 <use figures/abc_areas_by_layer.pdf>
-Package pdftex.def Info: figures/abc_areas_by_layer.pdf  used on input line 258.
+Package pdftex.def Info: figures/abc_areas_by_layer.pdf  used on input line 264.
 (pdftex.def)             Requested size: 472.03123pt x 423.71252pt.
 <figures/separate_areas_by_layer.pdf, id=87, 518.2589pt x 897.28603pt>
 File: figures/separate_areas_by_layer.pdf Graphic file (type pdf)
 <use figures/separate_areas_by_layer.pdf>
-Package pdftex.def Info: figures/separate_areas_by_layer.pdf  used on input line 267.
+Package pdftex.def Info: figures/separate_areas_by_layer.pdf  used on input line 273.
 (pdftex.def)             Requested size: 301.60258pt x 522.17876pt.
  [5] [6] [7 <./figures/abc_areas_by_layer.pdf>] [8 <./figures/separate_areas_by_layer.pdf>]
-<figures/overlap_relations_1.pdf, id=242, 515.28508pt x 284.6115pt>
+<figures/overlap_relations_1.pdf, id=243, 515.28508pt x 284.6115pt>
 File: figures/overlap_relations_1.pdf Graphic file (type pdf)
 <use figures/overlap_relations_1.pdf>
-Package pdftex.def Info: figures/overlap_relations_1.pdf  used on input line 347.
+Package pdftex.def Info: figures/overlap_relations_1.pdf  used on input line 356.
 (pdftex.def)             Requested size: 472.03162pt x 260.72096pt.
-<figures/overlap_relations_2.pdf, id=243, 515.28508pt x 284.6115pt>
+<figures/overlap_relations_2.pdf, id=244, 515.28508pt x 284.6115pt>
 File: figures/overlap_relations_2.pdf Graphic file (type pdf)
 <use figures/overlap_relations_2.pdf>
-Package pdftex.def Info: figures/overlap_relations_2.pdf  used on input line 354.
+Package pdftex.def Info: figures/overlap_relations_2.pdf  used on input line 363.
 (pdftex.def)             Requested size: 472.03162pt x 260.72096pt.
  [9
 
-] [10 <./figures/overlap_relations_1.pdf>] [11 <./figures/overlap_relations_2.pdf>] (./story_space.aux)
+] [10 <./figures/overlap_relations_1.pdf>] [11 <./figures/overlap_relations_2.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 426--426
+[]|\OT1/cmr/m/n/10 a learned map from
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 427--427
+[]|\OT1/cmr/m/n/10 learned changes in-side
+ []
+
+
+Underfull \hbox (badness 4886) in paragraph at lines 427--427
+\OT1/cmr/m/n/10 Qwen's lay-ers, then a
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 429--429
+[]|\OT1/cmr/m/n/10 closed-form
+ []
+
+
+Underfull \hbox (badness 7344) in paragraph at lines 430--430
+[]|\OT1/cmr/m/n/10 all of Qwen's weights
+ []
+
+[12
+
+] [13] (./story_space.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 14771 strings out of 467525
- 304153 string characters out of 5418982
- 690215 words of memory out of 5000000
- 43423 multiletter control sequences out of 15000+600000
+ 14778 strings out of 467525
+ 304280 string characters out of 5418982
+ 692329 words of memory out of 5000000
+ 43430 multiletter control sequences out of 15000+600000
  637945 words of font info for 80 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,10n,104p,816b,743s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on story_space.pdf (11 pages, 328895 bytes).
+ 84i,12n,104p,816b,743s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on story_space.pdf (13 pages, 347425 bytes).
 PDF statistics:
- 454 PDF objects out of 1000 (max. 8388607)
- 133 compressed objects within 2 object streams
+ 466 PDF objects out of 1000 (max. 8388607)
+ 141 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  38 words of extra memory for PDF output out of 10000 (max. 10000000)
 

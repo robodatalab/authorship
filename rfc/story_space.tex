@@ -185,13 +185,18 @@ B adds Bob's motivation; C adds a detail that changes nothing important. Figure~
 \label{fig:abc}
 \end{figure}
 
-\paragraph{Salient information.} Write $I(t)$ for the salient information a text $t$ carries. We take as given:
+\paragraph{Salient information.} Write $I(t)$ for the salient information a text $t$ carries, and $V(t)$ for the volume that surrounds text $t$. We take as given:
 \begin{equation}
-I(A) \approx I(B), \qquad I(A) > I(C), \qquad I(A + B) \gg I(A + C), \qquad I(A) \approx I(A + C) .
+\begin{gathered}
+|V(A)| \approx |V(B)|, \qquad |V(A)| > |V(C)|, \\
+|V(A + B)| \gg |V(A + C)|, \qquad |V(A)| \approx |V(A + C)| .
+\end{gathered}
 \end{equation}
 What remains to be found is how Qwen encodes and represents this information.
 \begin{symbols}
 I(t) & the salient information text $t$ carries \\
+V(t) & the volume that surrounds text $t$ \\
+|V(t)| & the size of that volume \\
 \end{symbols}
 
 \paragraph{Shannon information.} The Shannon information of a text under Qwen is the number of bits Qwen needs to predict it, token by token:
@@ -225,13 +230,14 @@ C, after A: $H(C \mid A)$ & 48.6 \\
 
 \begin{table}[ht]
 \centering
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lll@{}}
 salient information & Shannon information & holds \\
 \hline
-$I(A) \approx I(B)$ & $H(A) = 63.4$, $H(B) = 50.8$ & no: A costs a quarter more \\
-$I(A) > I(C)$ & $H(A) = 63.4$, $H(C) = 72.6$ & no: C costs more \\
-$I(A + B) \gg I(A + C)$ & $H(A + B) = 92.1$, $H(A + C) = 111.9$ & no: the reverse \\
-$I(A) \approx I(A + C)$ & $H(A) = 63.4$, $H(A + C) = 111.9$ & no: A + C costs $76\%$ more \\
+$|V(A)| \approx |V(B)|$ & $H(A) = 63.4$, $H(B) = 50.8$ & no: A costs a quarter more \\
+$|V(A)| > |V(C)|$ & $H(A) = 63.4$, $H(C) = 72.6$ & no: C costs more \\
+$|V(A + B)| \gg |V(A + C)|$ & $H(A + B) = 92.1$, $H(A + C) = 111.9$ & no: the reverse \\
+$|V(A)| \approx |V(A + C)|$ & $H(A) = 63.4$, $H(A + C) = 111.9$ & no: A + C costs $76\%$ more \\
 \end{tabular}
 \caption{The relations of salient information, tested with Shannon information.}
 \label{tab:relations}
@@ -239,17 +245,17 @@ $I(A) \approx I(A + C)$ & $H(A) = 63.4$, $H(A + C) = 111.9$ & no: A + C costs $7
 
 None of the four relations holds for Shannon information (Tables~\ref{tab:shannon} to~\ref{tab:relations}). Every added token costs bits, so a longer text always carries more, and what costs most is what surprises Qwen: ``salmon'' costs $16.4$ bits, ``her'' in ``because he loves her'' $0.4$. Salient information is therefore not what Qwen's surprise measures.
 
-\subsection{Properties of the function that measures salient information}
+\subsection{Properties of the function that measures salient information}\label{sec:properties}
 
 The data give the function $I$ three properties:
 \begin{enumerate}
   \item \textbf{It is not surprise.} Shannon information breaks all four relations (Table~\ref{tab:relations}), so the function cannot be built from Qwen's token probabilities.
-  \item \textbf{It is not additive over tokens.} $I(A) \approx I(A + C)$ although A + C has five more tokens than A, so the function must give C's points almost nothing while giving B's a lot.
+  \item \textbf{It is not additive over tokens.} $|V(A)| \approx |V(A + C)|$ although A + C has five more tokens than A, so the function must give C's points almost nothing while giving B's a lot.
   \item \textbf{It is not distance.} B and C move the points by about the same amount: after layer $16$, the last points of A + B and A + C lie equally far from A's last point (cosine $0.34$ and $0.37$, distance $96$ and $95$). They move them in different directions (Figure~\ref{fig:abc}), so the function must tell directions apart.
 \end{enumerate}
 Together: the function is a projection onto a subspace of Qwen's latent space that keeps the directions B's points move in and discards the directions C's points move in.
 
-\subsection{Movement}
+\subsection{Movement}\label{sec:movement}
 
 Figure~\ref{fig:abc-areas} shows the points of A, B and C as areas with their centroids after layers $1$, $10$, $20$ and $36$.
 
@@ -285,7 +291,7 @@ Everything A + B means beyond A is therefore written into B's points. The areas 
 
 The areas do not measure salient information either:
 \begin{enumerate}
-  \item \textbf{Their size does not grow with salient information.} From layer $10$ on, A + C's points are more spread out than A + B's, although $I(A + B) \gg I(A + C)$.
+  \item \textbf{Their size does not grow with salient information.} From layer $10$ on, A + C's points are more spread out than A + B's, although $|V(A + B)| \gg |V(A + C)|$.
   \item \textbf{Their centroids do not tell B from C by distance.} A + B's and A + C's centroids lie equally far from A's centroid. They lie in different directions from it, as the last points do in the properties above, so the two centroids are as far from each other as from A's.
 \end{enumerate}
 
@@ -305,19 +311,22 @@ distance between A + B's and A + C's centroids & $3.7$ & $23.5$ & $30.3$ & $39.6
 \end{center}
 The spread of a text is the root mean square distance of its points from their centroid, measured in $\R^{4096}$, token $0$ left out.
 
-\FloatBarrier
+\begin{center}
+\fbox{\parbox{0.92\linewidth}{\vspace{0.6em}\large\textbf{Conclusion.} Nothing in Figures~\ref{fig:abc-areas} and~\ref{fig:separate-areas} or in these tables indicates that Qwen understands which information is salient.\vspace{0.6em}}}
+\end{center}
+
+\section{Transforming Qwen's output}\label{sec:transform}
+
 \subsection{Volumes that represent salient information}
 
-Figures~\ref{fig:abc-areas} and~\ref{fig:separate-areas} show the transformations Qwen applies to tokens: they project them into a generic latent space, shaped by the loss Qwen was trained with, next-token prediction. We want to fine-tune or adapt Qwen's output so that volumes begin to represent salient information. $V(t)$ is the volume of text $t$ in the adapted space.
+Figures~\ref{fig:abc-areas} and~\ref{fig:separate-areas} show the transformations Qwen applies to tokens: they project them into a generic latent space, shaped by the loss Qwen was trained with, next-token prediction. We want to fine-tune or adapt Qwen's output so that volumes begin to represent salient information. In the adapted space, $V(t)$ is the volume that surrounds text $t$.
 
 \begin{symbols}
-V(t) & the volume of text $t$ in the adapted space \\
-\vol V(t) & the size of that volume \\
 V(t) \cap V(t') & the overlap of the volumes of texts $t$ and $t'$ \\
 \end{symbols}
 
 \begin{requirement}[Size is salience]\label{req:size-is-salience}
-The larger the salient information, the larger the volume: $I(t) > I(t') \implies \vol V(t) > \vol V(t')$.
+The larger the salient information, the larger the volume: $I(t) > I(t') \implies |V(t)| > |V(t')|$.
 \end{requirement}
 
 \begin{requirement}[Overlap is shared salience]\label{req:overlap-is-shared}
@@ -356,5 +365,90 @@ Figures~\ref{fig:overlap-1} and~\ref{fig:overlap-2} illustrate how these relatio
 \label{fig:overlap-2}
 \end{figure}
 
+\FloatBarrier
+\subsection{Alternatives we considered}\label{sec:alternatives}
+
+\subsubsection{A deterministic transformation}
+
+Could the transformation be computed without learning anything? No. The only deterministic, untrained signal we know of is how much a span moves Qwen's points for the text that follows it. To test it, we put a span after A and a follow-up sentence after the span, and measured how far the follow-up's points move compared with A followed directly by the same follow-up: $1$ minus the mean cosine between the two sets of points, averaged over five follow-ups (``Alice smiled.'', ``She thanked him.'', ``Then they sat down.'', ``Alice looked at him.'', ``She took a sip.'').
+
+\begin{center}
+\begin{tabular}{llc}
+\hline
+ & span after A & $1 - \cos$ after layer $16$ \\
+\hline
+motives & ``, because he loves her'' & $0.14$ \\
+ & ``, since he misses her'' & $0.14$ \\
+ & ``, hoping to win her'' & $0.21$ \\
+\hline
+details & ``and bagels with salmon'' & $0.09$ \\
+ & ``with oat milk and sugar'' & $0.07$ \\
+ & ``and two glasses of water'' & $0.07$ \\
+ & ``, and he pays cash'' & $0.12$ \\
+ & ``, with his left hand'' & $0.14$ \\
+\hline
+\end{tabular}
+\end{center}
+
+The signal falls short in two ways:
+\begin{enumerate}
+  \item \textbf{It does not separate cleanly.} The motives move the follow-ups more than the food details do, but ``and he pays cash'' and ``with his left hand'' move them almost as much as the motives.
+  \item \textbf{It gives only a size.} It does not say which directions two texts share, and Requirement~\ref{req:overlap-is-shared} needs exactly that.
+\end{enumerate}
+Choosing the subspace that keeps B's directions and discards C's (Section~\ref{sec:properties}) needs examples of what is salient. That is learning, even when it is done in closed form rather than by gradient descent.
+
+\subsubsection{How to train}
+
+Qwen does not understand which information is salient (Section~\ref{sec:movement}), so every approach learns it from our labelled texts and maps it into a new space. They differ only in where the learned part sits. Qwen provides the text understanding; the learned part learns which information is salient. An approach can be used if its learned part is trained by minimising our loss, leaves Qwen's text understanding intact, and has few enough parameters for our few labelled examples. Among those that can, what the learned part sees decides how much it can learn:
+\begin{center}
+\small
+\begin{tabular}{@{}l c c r p{0.22\linewidth} c@{}}
+\hline
+approach & \shortstack{trained by\\our loss} & \shortstack{Qwen\\kept intact} & \shortstack{trained\\parameters} & \shortstack{learned\\part sees} & usable \\
+\hline
+LoRA adapter & yes & yes & $44$ million & every layer of Qwen & yes \\
+soft prompt & yes & yes & $82$ thousand & every layer, through its vectors & yes \\
+fully connected head & yes & yes & $262$ thousand & Qwen's finished points & yes \\
+closed-form head & no & yes & none & Qwen's finished points & no \\
+retraining all of Qwen & yes & no & $8.2$ billion & every layer of Qwen & no \\
+\hline
+\end{tabular}
+\end{center}
+The soft prompt is counted as $20$ vectors of $4096$ numbers. The closed-form head fails the first test; retraining all of Qwen fails the second and the third. The head sees only Qwen's finished points, so it can learn salience only if salience is a simple function of them, and nothing indicates that it is (the conclusion of Section~\ref{sec:movement}). LoRA works inside every layer of Qwen and has no such condition, so it comes first. The soft prompt also changes what every layer computes, through its vectors, so it comes before the head too.
+
+Sorted from the best option to start with:
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.14\linewidth} p{0.24\linewidth} c p{0.44\linewidth}@{}}
+\hline
+approach & mechanism & applicable & because \\
+\hline
+LoRA adapter & learned changes inside Qwen's layers, then a map into the new space & yes & it changes what Qwen's layers compute, so it does not depend on Qwen already computing what salience is judged from. \\
+soft prompt & learned vectors before the text steer Qwen's layers & yes & like LoRA, it changes what every layer of Qwen computes, so it does not depend on Qwen already computing what salience is judged from; but it is weaker, because it changes only what the layers read, not their weights. \\
+fully connected head & a learned map from Qwen's frozen points into the new space & yes & cheaper than LoRA and leaves Qwen untouched, but works only if salience is a simple function of Qwen's finished points, which nothing indicates (the conclusion of Section~\ref{sec:movement}). \\
+closed-form head & a map computed by a formula from labelled texts & no & a formula, such as a difference of means, cannot be fitted to the overlap relations; only minimising a loss can \\
+retraining all of Qwen & all of Qwen's weights learned anew & no & our few labelled examples cannot constrain $8.2$ billion parameters: it would overfit them and erase Qwen's knowledge of language, and costs about $130$\,GB to train and a second copy of Qwen to serve \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{To do: LoRA adapter}
+\begin{enumerate}
+  \item Train the adapter and a head on the labelled texts with the volume loss.
+  \item Serve with the adapter switched on per request.
+\end{enumerate}
+
+\subsubsection{To do: soft prompt}
+\begin{enumerate}
+  \item Train the vectors and a head on the labelled texts with the volume loss.
+  \item Add an endpoint that accepts vectors in place of tokens.
+\end{enumerate}
+
+\subsubsection{To do: fully connected head}
+\begin{enumerate}
+  \item Run every labelled text through Qwen once and store its points.
+  \item Train the head on them with the volume loss.
+  \item Test the relations on texts it was not trained on.
+\end{enumerate}
 
 \end{document}

@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1791738870.51894 "/Users/piotrtrochim/GitHub/authorship/rfc/story_space.tex" "story_space.pdf" "story_space" 1791738871.02885 0
-  "/Users/piotrtrochim/GitHub/authorship/rfc/story_space.tex" 1791738858.75942 19954 0b526f5341f6155925baf908b8c92586 ""
+["pdflatex"] 1791740307.28714 "/Users/piotrtrochim/GitHub/authorship/rfc/story_space.tex" "story_space.pdf" "story_space" 1791740307.82708 0
+  "/Users/piotrtrochim/GitHub/authorship/rfc/story_space.tex" 1791740289.32695 25600 61d0305fa11d53c5a0e5c09bd78a25e8 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1246382020 1004 54797486969f23fa377b128694d548df ""
   "/usr/local/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm" 1246382020 988 bdf658c3bfc2d96d3c8b02cfc1c94c20 ""
@@ -35,6 +35,7 @@
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb" 1248133631 36281 c355509802a035cadc5f15869451dcee ""
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb" 1248133631 35469 70d41d2b9ea31d5d813066df7c99281c ""
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
+  "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb" 1248133631 32722 d7379af29a190c3f453aba36302ff5a9 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb" 1248133631 32362 179c33bbf43f19adbb3825bb4e36e57a ""
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb" 1248133631 32762 224316ccc9ad3ca0423a14971cfa7fc1 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb" 1248133631 32726 0a1aea6fcd6468ee2cf64d891f5c43c8 ""
@@ -152,8 +153,8 @@
   "figures/overlap_relations_1.pdf" 1791738680.33042 20355 e0d9ee46f817bdaeaec3e3d5422280ef ""
   "figures/overlap_relations_2.pdf" 1791738680.50611 22783 9e7fc6f65b0f6ae1edffaca8d3ab69d9 ""
   "figures/separate_areas_by_layer.pdf" 1791737277.16587 37124 faff005210a300ffef6ed4d480aaf1d9 ""
-  "story_space.aux" 1791738870.97443 6154 d7a22d0d95bac2c6343cd060ce52f93e "pdflatex"
-  "story_space.tex" 1791738858.75942 19954 0b526f5341f6155925baf908b8c92586 ""
+  "story_space.aux" 1791740307.77048 6845 b98e23a0acbe28314bdbe3802d561bcb "pdflatex"
+  "story_space.tex" 1791740289.32695 25600 61d0305fa11d53c5a0e5c09bd78a25e8 ""
   (generated)
   "story_space.aux"
   "story_space.log"
