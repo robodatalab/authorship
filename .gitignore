@@ -9,3 +9,8 @@ __pycache__/
 .venv/
 *.pyc
 .mypy_cache/
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
