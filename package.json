@@ -2,7 +2,7 @@
     "name": "authorship",
     "displayName": "Authorship",
     "description": "Tools for creative writing",
-    "version": "0.1.10",
+    "version": "0.1.11",
     "publisher": "RoboDataLab",
     "repository": {
         "type": "git",
@@ -48,7 +48,7 @@
                         "type": "number",
                         "default": 8765,
                         "scope": "window",
-                        "markdownDescription": "The port the model server listens on. Every window that finds a server already answering there uses it rather than starting a second one, so one server serves them all. Give a window a port of its own \u2014 or set `AUTHORSHIP_MODEL_SERVER_PORT` in a launch configuration \u2014 when it should start and own a server nobody else shares."
+                        "markdownDescription": "The port the model server listens on. Every window that finds a server already answering there uses it rather than starting a second one, so one server serves them all. Give a window a port of its own — or set `AUTHORSHIP_MODEL_SERVER_PORT` in a launch configuration — when it should start and own a server nobody else shares."
                     }
                 }
             }
