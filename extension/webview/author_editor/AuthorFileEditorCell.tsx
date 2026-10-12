@@ -7,10 +7,11 @@ import {
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
+import type { AuthorFileEditorFindHighlight } from "./AuthorFileEditorFind";
 import type {
-    AuthorFileEditorFindHighlight,
     AuthorFileEditorFindMatch,
-} from "./AuthorFileEditorFind";
+    AuthorFileEditorFindMatchInTheProse,
+} from "../../vscode_runtime/commands/find_in_the_document";
 import type {
     MarkdownEditorSalientConceptHighlight,
     MarkdownEditorStoryTextShown,
@@ -227,8 +228,7 @@ export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
 }
 
 export function useAuthorFileEditorCellSalientConceptHighlights():
-    | MarkdownEditorSalientConceptHighlight[]
-    | undefined {
+    MarkdownEditorSalientConceptHighlight[] | undefined {
     return useContext(AuthorFileEditorCellStateContext)
         .salientConceptHighlights;
 }
@@ -277,10 +277,13 @@ export function useAuthorFileEditorCellFind(): {
 export function useAuthorFileEditorCellFindHighlights(): AuthorFileEditorFindHighlight[] {
     const { matches, current } = useAuthorFileEditorCellFind();
     return matches
-        .filter((match) => match.attributeName === null)
+        .filter(
+            (match): match is AuthorFileEditorFindMatchInTheProse =>
+                match.attributeName === null,
+        )
         .map((match) => ({
-            at: match.at,
-            end: match.end,
+            at: match.startCharacterOffsetInCell,
+            end: match.endCharacterOffsetInCell,
             isCurrent: match === current,
         }));
 }

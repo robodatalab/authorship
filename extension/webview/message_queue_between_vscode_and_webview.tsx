@@ -10,6 +10,7 @@ import {
     authorDocumentCellTypes,
 } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
+import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
@@ -43,6 +44,7 @@ interface WhatTheWebviewDraws {
     storyPlots: StoryPlot[];
     storyPlotsProgress: WorkProgress | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
     wordsInTheDocument: number;
@@ -90,6 +92,9 @@ function processMessageFromVscode(
             .storyPlotsProgress as WorkProgress | null;
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
+    } else if (message.data?.type === "findMatches") {
+        drawn.findMatches = message.data
+            .findMatches as AuthorFileEditorFindMatch[];
     } else if (message.data?.type === "cellsBeingWritten") {
         drawn.cellsBeingWritten = message.data.cellsBeingWritten as Record<
             string,
@@ -122,6 +127,7 @@ function openTheAuthorFileEditor(): void {
         storyPlots: [],
         storyPlotsProgress: null,
         paragraphsInStoryPlots: [],
+        findMatches: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
         wordsInTheDocument: 0,
@@ -141,6 +147,7 @@ function openTheAuthorFileEditor(): void {
                 storyPlots={drawn.storyPlots}
                 storyPlotsProgress={drawn.storyPlotsProgress}
                 paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
+                findMatches={drawn.findMatches}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
