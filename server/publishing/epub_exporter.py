@@ -22,6 +22,7 @@ from server.storydoc import (
     IMAGE,
     PART,
     PUBLISHING_METADATA_CELLS,
+    STORY_ANNOTATION_CELLS,
     TITLE_PAGE,
     Cell,
     Document,
@@ -30,7 +31,7 @@ from server.storydoc import (
 
 # A cell whose text is neither a page of the book nor part of one: built from the
 # document, or kept beside it and published nowhere.
-UNPRINTED = GENERATED_CELLS | PUBLISHING_METADATA_CELLS
+UNPRINTED = GENERATED_CELLS | PUBLISHING_METADATA_CELLS | STORY_ANNOTATION_CELLS
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is

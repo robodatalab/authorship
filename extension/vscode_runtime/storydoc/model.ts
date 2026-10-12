@@ -14,6 +14,7 @@ export const ABOUT = "about";
 export const BLURB = "blurb";
 export const NOTE = "note";
 export const RECAP = "recap";
+export const SALIENT_CONCEPT = "salient-concept";
 
 export const FOLDED = "folded";
 
@@ -42,6 +43,7 @@ const KNOWN_CELL_KINDS = new Map(
         BLURB,
         NOTE,
         RECAP,
+        SALIENT_CONCEPT,
     ].map((cellKind) => [cellKind, cellKind]),
 );
 

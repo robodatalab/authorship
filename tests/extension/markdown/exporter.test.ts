@@ -65,6 +65,14 @@ describe("what a document exports as", () => {
         ).toBe("");
     });
 
+    it("writes nothing for a salient concept", () => {
+        expect(
+            markdownOf(
+                '<!-- cell: salient-concept title="Michael" -->\n\nSarah\'s husband.\n',
+            ),
+        ).toBe("");
+    });
+
     it("writes the author's links under the heading, above what they wrote", () => {
         expect(
             markdownOf(

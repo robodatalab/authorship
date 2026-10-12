@@ -51,6 +51,7 @@ ABOUT = "about"
 BLURB = "blurb"
 NOTE = "note"
 RECAP = "recap"
+SALIENT_CONCEPT = "salient-concept"
 
 # What an attribute says when the answer to it is no.
 NO = "no"
@@ -229,6 +230,7 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 
 GENERATED_CELLS = frozenset({TABLE_OF_CONTENTS})
 PUBLISHING_METADATA_CELLS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
+STORY_ANNOTATION_CELLS = frozenset({SALIENT_CONCEPT})
 
 
 def _prose_of(lines: list[tuple[int, str]]) -> str:

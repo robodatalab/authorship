@@ -12,8 +12,7 @@ from server.progress import with_progress
 from server.models.causal_event_trajectory_classifier import (
     CausalEventTrajectoryClassifier,
 )
-from server.models.story_state import StoryState
-from server.models.story_state_extraction_model import StoryStateExtractionModel
+from server.models.story_state_extraction_model import StoryState
 from server.storydoc import Document
 from server.utils import estimate_num_tokens_in_text
 
@@ -219,52 +218,18 @@ class StoryPlotsJob(Job):
         self,
         causal_model: CompletingModel,
         causal_event_trajectory_classifier: CausalEventTrajectoryClassifier,
-        story_state_extraction_model: StoryStateExtractionModel,
         document: Document,
     ) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
         self._causal_model = causal_model
         self._causal_event_trajectory_classifier = causal_event_trajectory_classifier
-        self._story_state_extraction_model = story_state_extraction_model
         self._document = document
         self.scenes: list[StoryScene] = []
         self.plots: list[StoryPlot] = []
 
     async def execute(self) -> None:
         events = await detect_events(self._document, self._causal_model)
-        lines = [
-            line
-            for _, chapter in self._document.chapters
-            for line in chapter.splitlines()
-            if line
-        ]
-        probabilities = self._story_state_extraction_model.scene_continuation_probabilities(lines)
-        questions_count = max(len(lines) - 1, 0)
-        continuation_probabilities = [
-            probability
-            async for probability in with_progress(
-                probabilities, "reading where each scene ends", of=questions_count
-            )
-        ]
-        spans = scene_spans(len(lines), continuation_probabilities)
-        for span in with_progress(spans, "describing each scene"):
-            story_before_the_scene = "\n\n".join(lines[: span.start])
-            scene = "\n\n".join(lines[span.start : span.stop])
-            story_state = await self._story_state_extraction_model.story_state(
-                story_before_the_scene, scene
-            )
-            events_in_the_scene = [
-                event.description for event in events if event.position_in_manuscript in span
-            ]
-            story_scene = StoryScene(
-                first_line=span.start,
-                last_line=span.stop - 1,
-                opening_line=lines[span.start],
-                story_state=story_state,
-                events=events_in_the_scene,
-            )
-            self.scenes.append(story_scene)
         self.plots = await stitch_events_into_causal_trajectory(
             events,
             "\n\n".join(chapter for _, chapter in self._document.chapters),

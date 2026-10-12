@@ -12,6 +12,7 @@ import {
     NOTE,
     PART,
     RECAP,
+    SALIENT_CONCEPT,
     TITLE_PAGE,
 } from "./model";
 
@@ -161,6 +162,14 @@ const CELL_KINDS: CellKind[] = [
         fields: [{ attributeName: "documents", label: "Documents" }],
         isKeptOutOfTheBook: true,
         blank: () => new MutableCell(RECAP, "", {}),
+    },
+    {
+        cellKind: SALIENT_CONCEPT,
+        label: "Salient Concept",
+        fields: [{ attributeName: "title", label: "Title" }],
+        isKeptOutOfTheBook: true,
+        blank: () =>
+            new MutableCell(SALIENT_CONCEPT, "", { title: "Untitled" }),
     },
 ];
 
