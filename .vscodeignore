@@ -13,8 +13,9 @@ docs/**
 README.dev.md
 data/**
 training_data/**
+experiments/**
 .venv/**
-.mypy_cache/**
+**/.mypy_cache/**
 **/__pycache__/**
 **/*.pyc
 *.ipynb
@@ -29,3 +30,5 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+.ruff_cache/**
+.pytest_cache/**
