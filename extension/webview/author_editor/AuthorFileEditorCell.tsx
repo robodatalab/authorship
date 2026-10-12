@@ -11,7 +11,10 @@ import type {
     AuthorFileEditorFindHighlight,
     AuthorFileEditorFindMatch,
 } from "./AuthorFileEditorFind";
-import type { MarkdownEditorSalientConceptHighlight } from "../markdown/MarkdownEditor";
+import type {
+    MarkdownEditorSalientConceptHighlight,
+    MarkdownEditorStoryTextShown,
+} from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -50,11 +53,13 @@ interface AuthorFileEditorCellStateProps {
     proseErrors?: ProseCheckError[];
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
+    storyTextShown?: MarkdownEditorStoryTextShown;
     findMatches?: AuthorFileEditorFindMatch[];
     currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
     wordsInTheSection?: number;
     onStoryTextSelected?: (selectedFrom: number, selectedTo: number) => void;
+    onStoryTextShownAt?: (top: number, bottom: number) => void;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
 }
@@ -69,11 +74,13 @@ const AuthorFileEditorCellStateContext = createContext<
     proseErrors: [],
     paragraphsInStoryPlots: [],
     salientConceptHighlights: undefined,
+    storyTextShown: undefined,
     findMatches: [],
     currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
     wordsInTheSection: undefined,
     onStoryTextSelected: () => undefined,
+    onStoryTextShownAt: () => undefined,
     sendMessagesToVscode: () => undefined,
 });
 
@@ -85,11 +92,13 @@ export function AuthorFileEditorCellState({
     proseErrors = [],
     paragraphsInStoryPlots = [],
     salientConceptHighlights,
+    storyTextShown,
     findMatches = [],
     currentFindMatch = null,
     howFarTheCellHasBeenWritten,
     wordsInTheSection,
     onStoryTextSelected = () => undefined,
+    onStoryTextShownAt = () => undefined,
     sendMessagesToVscode,
     children,
 }: AuthorFileEditorCellStateProps) {
@@ -103,11 +112,13 @@ export function AuthorFileEditorCellState({
                 proseErrors,
                 paragraphsInStoryPlots,
                 salientConceptHighlights,
+                storyTextShown,
                 findMatches,
                 currentFindMatch,
                 howFarTheCellHasBeenWritten,
                 wordsInTheSection,
                 onStoryTextSelected,
+                onStoryTextShownAt,
                 sendMessagesToVscode,
             }}
         >
@@ -220,6 +231,19 @@ export function useAuthorFileEditorCellSalientConceptHighlights():
     | undefined {
     return useContext(AuthorFileEditorCellStateContext)
         .salientConceptHighlights;
+}
+
+export function useAuthorFileEditorCellStoryTextShown(): {
+    storyTextShown: MarkdownEditorStoryTextShown | undefined;
+    onStoryTextShownAt: (top: number, bottom: number) => void;
+} {
+    const { storyTextShown, onStoryTextShownAt } = useContext(
+        AuthorFileEditorCellStateContext,
+    );
+    return {
+        storyTextShown,
+        onStoryTextShownAt: onStoryTextShownAt ?? (() => undefined),
+    };
 }
 
 export function useAuthorFileEditorCellStoryTextSelected(): (

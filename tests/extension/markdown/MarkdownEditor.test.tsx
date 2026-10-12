@@ -869,3 +869,49 @@ describe("the words of a salient concept", () => {
         });
     });
 });
+
+describe("showing a salient concept's words", () => {
+    const THE_DOOR_SHOWN = {
+        startCharacterOffsetInCell: 8,
+        endCharacterOffsetInCell: 21,
+    };
+
+    async function mountShowing(
+        storyTextShown: typeof THE_DOOR_SHOWN | undefined,
+        shownAt: ReturnType<typeof vi.fn>,
+    ): Promise<void> {
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw **the** door."
+                        onMarkdownCommitted={committedSpy()}
+                        storyTextShown={storyTextShown}
+                        onStoryTextShownAt={shownAt}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+    }
+
+    it("says where the words are drawn in the rendered text", async () => {
+        const shownAt = vi.fn();
+        root = createRoot(emptyBody());
+
+        await mountShowing(THE_DOOR_SHOWN, shownAt);
+
+        expect(shownAt).toHaveBeenCalledTimes(1);
+    });
+
+    it("says where the words are drawn in the editor", async () => {
+        const shownAt = vi.fn();
+        root = createRoot(emptyBody());
+        await mountShowing(undefined, shownAt);
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        await mountShowing(THE_DOOR_SHOWN, shownAt);
+
+        expect(shownAt).toHaveBeenLastCalledWith(10, 28);
+    });
+});

@@ -27,7 +27,7 @@ interface AuthorFileEditorStoryPlotsProps {
     onIdentifyStoryPlotsAsked: () => void;
     onSalientConceptToggled: (conceptCellId: string, isShown: boolean) => void;
     onStoryTextAssigned: (conceptCellId: string) => void;
-    onStoryWordRangeShown: (cellId: string) => void;
+    onStoryWordRangeShown: (storyWordRange: StoryWordRange) => void;
     onStoryWordRangeRemoved: (
         conceptCellId: string,
         storyWordRange: StoryWordRange,
@@ -159,7 +159,7 @@ export function AuthorFileEditorStoryPlots({
                                                             }
                                                             onClick={() =>
                                                                 onStoryWordRangeShown(
-                                                                    storyWordRange.cellId,
+                                                                    storyWordRange,
                                                                 )
                                                             }
                                                         >

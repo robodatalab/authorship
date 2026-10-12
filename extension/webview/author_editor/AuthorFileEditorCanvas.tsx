@@ -31,10 +31,12 @@ import {
     salientConceptsIn,
     storyTextSpansOf,
     storyWordsIn,
+    type StoryWordRange,
 } from "../../vscode_runtime/storydoc/story_words";
 import {
     MarkdownEditorMediator,
     type MarkdownEditorSalientConceptHighlight,
+    type MarkdownEditorStoryTextShown,
 } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -64,6 +66,10 @@ interface StoryTextSelected {
     cellId: string;
     startCharacterOffsetInCell: number;
     endCharacterOffsetInCell: number;
+}
+
+interface StoryTextShownInTheCell extends MarkdownEditorStoryTextShown {
+    cellId: string;
 }
 
 function isFolded(cell: WebviewCell): boolean {
@@ -162,11 +168,13 @@ export function AuthorFileEditorCanvas({
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
     const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
+    const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
+    const [storyTextShown, showStoryText] =
+        useState<StoryTextShownInTheCell | null>(null);
     const [salientConceptsShown, showSalientConcepts] = useState<
         ReadonlySet<string>
     >(() => new Set());
     const salientConceptHighlightsByCellId = useMemo(() => {
-        const storyWords = storyWordsIn(cells);
         const byCellId = new Map<
             string,
             MarkdownEditorSalientConceptHighlight[]
@@ -191,7 +199,7 @@ export function AuthorFileEditorCanvas({
             }
         });
         return byCellId;
-    }, [cells, salientConcepts, salientConceptsShown]);
+    }, [storyWords, salientConcepts, salientConceptsShown]);
 
     function showTheSalientConcept(
         conceptCellId: string,
@@ -301,15 +309,22 @@ export function AuthorFileEditorCanvas({
                 theOneOfItsGroupTheDocumentCallsFor(command)),
     );
 
-    function bringTheCellToTheTop(cellId: string): void {
+    function showTheStoryWords(storyWordRange: StoryWordRange): void {
+        const [firstSpan] = storyTextSpansOf(storyWords, storyWordRange);
+        if (firstSpan) {
+            showStoryText({ ...firstSpan });
+        }
+    }
+
+    function bringTheStoryTextIntoView(top: number, bottom: number): void {
         const scrolled = cellsOnThePage.current;
-        const shown = scrolled?.querySelector(`li[data-cell-id="${cellId}"]`);
-        if (!scrolled || !shown) {
+        if (!scrolled) {
             return;
         }
         scrolled.scrollTop +=
-            shown.getBoundingClientRect().top -
-            scrolled.getBoundingClientRect().top;
+            (top + bottom) / 2 -
+            scrolled.getBoundingClientRect().top -
+            scrolled.clientHeight / 2;
     }
 
     function insertCellMenu(insertBeforeCellId: string | null): ReactNode {
@@ -383,6 +398,12 @@ export function AuthorFileEditorCanvas({
                                 salientConceptHighlights={salientConceptHighlightsByCellId.get(
                                     cell.attrs.id,
                                 )}
+                                storyTextShown={
+                                    storyTextShown?.cellId === cell.attrs.id
+                                        ? storyTextShown
+                                        : undefined
+                                }
+                                onStoryTextShownAt={bringTheStoryTextIntoView}
                                 findMatches={findMatchesByCellId.get(
                                     cell.attrs.id,
                                 )}
@@ -492,7 +513,7 @@ export function AuthorFileEditorCanvas({
                             },
                         )
                     }
-                    onStoryWordRangeShown={bringTheCellToTheTop}
+                    onStoryWordRangeShown={showTheStoryWords}
                     onStoryWordRangeRemoved={(conceptCellId, storyWordRange) =>
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,

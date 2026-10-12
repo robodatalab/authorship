@@ -9,6 +9,7 @@ import {
     useAuthorFileEditorCellParagraphsInStoryPlots,
     useAuthorFileEditorCellSalientConceptHighlights,
     useAuthorFileEditorCellStoryTextSelected,
+    useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
     ParagraphInStoryPlots,
@@ -1131,10 +1132,12 @@ describe("the salient concepts the story holds", () => {
         const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
         const salientConceptHighlights =
             useAuthorFileEditorCellSalientConceptHighlights();
+        const { storyTextShown } = useAuthorFileEditorCellStoryTextShown();
         return (
             <button
                 className="test-select-the-door"
                 data-highlights={JSON.stringify(salientConceptHighlights ?? [])}
+                data-shown={JSON.stringify(storyTextShown ?? null)}
                 onClick={() => storyTextSelected(4, 8)}
             />
         );
@@ -1225,6 +1228,30 @@ describe("the salient concepts the story holds", () => {
                 salientConceptColor: 0,
             },
         ]);
+    });
+
+    it("shows the cell the exact words of a range clicked in the panel", async () => {
+        await mountSalientConcepts();
+
+        await click(
+            salientConcept()!.querySelector(
+                ".author-file-editor-salient-concept-words-shown",
+            )!,
+        );
+
+        expect(
+            JSON.parse(
+                (
+                    document.querySelector(
+                        ".test-select-the-door",
+                    ) as HTMLElement
+                ).dataset.shown!,
+            ),
+        ).toEqual({
+            cellId: "m1",
+            startCharacterOffsetInCell: 4,
+            endCharacterOffsetInCell: 15,
+        });
     });
 
     it("cannot assign anything until words are selected", async () => {
