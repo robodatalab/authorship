@@ -52,6 +52,7 @@ interface AuthorFileEditorCellStateProps {
     currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
     wordsInTheSection?: number;
+    onStoryTextSelected?: (selectedFrom: number, selectedTo: number) => void;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
 }
@@ -69,6 +70,7 @@ const AuthorFileEditorCellStateContext = createContext<
     currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
     wordsInTheSection: undefined,
+    onStoryTextSelected: () => undefined,
     sendMessagesToVscode: () => undefined,
 });
 
@@ -83,6 +85,7 @@ export function AuthorFileEditorCellState({
     currentFindMatch = null,
     howFarTheCellHasBeenWritten,
     wordsInTheSection,
+    onStoryTextSelected = () => undefined,
     sendMessagesToVscode,
     children,
 }: AuthorFileEditorCellStateProps) {
@@ -99,6 +102,7 @@ export function AuthorFileEditorCellState({
                 currentFindMatch,
                 howFarTheCellHasBeenWritten,
                 wordsInTheSection,
+                onStoryTextSelected,
                 sendMessagesToVscode,
             }}
         >
@@ -204,6 +208,16 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function useAuthorFileEditorCellStoryTextSelected(): (
+    selectedFrom: number,
+    selectedTo: number,
+) => void {
+    return (
+        useContext(AuthorFileEditorCellStateContext).onStoryTextSelected ??
+        (() => undefined)
+    );
 }
 
 export function useAuthorFileEditorCellParagraphsInStoryPlots(): ParagraphInStoryPlots[] {

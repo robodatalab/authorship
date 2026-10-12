@@ -6,6 +6,10 @@ import type {
     StoryScene,
 } from "../../vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../../vscode_runtime/server/jobs";
+import type {
+    SalientConceptInTheStory,
+    StoryWordRange,
+} from "../../vscode_runtime/storydoc/story_words";
 import { AuthorFileEditorWorkProgress } from "./AuthorFileEditorWorkProgress";
 import { storyPlotColorClassName } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorStoryPlots.css";
@@ -14,10 +18,18 @@ const NARROWEST = 220;
 const WIDEST = 720;
 
 interface AuthorFileEditorStoryPlotsProps {
+    salientConcepts: SalientConceptInTheStory[];
+    storyTextIsSelected: boolean;
     storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     onIdentifyStoryPlotsAsked: () => void;
+    onStoryTextAssigned: (conceptCellId: string) => void;
+    onStoryWordRangeShown: (cellId: string) => void;
+    onStoryWordRangeRemoved: (
+        conceptCellId: string,
+        storyWordRange: StoryWordRange,
+    ) => void;
 }
 
 function spokenFact(fact: StoryFact): string {
@@ -25,10 +37,15 @@ function spokenFact(fact: StoryFact): string {
 }
 
 export function AuthorFileEditorStoryPlots({
+    salientConcepts,
+    storyTextIsSelected,
     storyScenes,
     storyPlots,
     storyPlotsProgress = null,
     onIdentifyStoryPlotsAsked,
+    onStoryTextAssigned,
+    onStoryWordRangeShown,
+    onStoryWordRangeRemoved,
 }: AuthorFileEditorStoryPlotsProps) {
     const [width, setWidth] = useState(280);
 
@@ -72,6 +89,91 @@ export function AuthorFileEditorStoryPlots({
                     <i className="codicon codicon-play" />
                 </button>
             </header>
+            <details className="author-file-editor-story-plots-drawer" open>
+                <summary>Salient concepts</summary>
+                {salientConcepts.length === 0 ? (
+                    <p className="author-file-editor-story-plots-none">
+                        No salient concepts yet.
+                    </p>
+                ) : (
+                    <ul>
+                        {salientConcepts.map((concept, conceptIndex) => (
+                            <li key={concept.conceptCellId}>
+                                <details className="author-file-editor-salient-concept">
+                                    <summary>
+                                        <span
+                                            className={`author-file-editor-story-plot-swatch ${storyPlotColorClassName(conceptIndex)}`}
+                                        />
+                                        {concept.title}
+                                        <button
+                                            type="button"
+                                            className="author-file-editor-salient-concept-assign"
+                                            title="Assign the selected words to this concept"
+                                            aria-label="Assign the selected words to this concept"
+                                            disabled={!storyTextIsSelected}
+                                            onClick={(clicked) => {
+                                                clicked.preventDefault();
+                                                onStoryTextAssigned(
+                                                    concept.conceptCellId,
+                                                );
+                                            }}
+                                        >
+                                            <i className="codicon codicon-add" />
+                                        </button>
+                                    </summary>
+                                    {concept.storyWordRanges.length === 0 ? (
+                                        <p className="author-file-editor-story-plots-none">
+                                            No words assigned yet.
+                                        </p>
+                                    ) : (
+                                        <ul>
+                                            {concept.storyWordRanges.map(
+                                                (storyWordRange) => (
+                                                    <li
+                                                        key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                                                        className="author-file-editor-salient-concept-words"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="author-file-editor-salient-concept-words-shown"
+                                                            title={
+                                                                storyWordRange.wordsItCovers
+                                                            }
+                                                            onClick={() =>
+                                                                onStoryWordRangeShown(
+                                                                    storyWordRange.cellId,
+                                                                )
+                                                            }
+                                                        >
+                                                            {
+                                                                storyWordRange.wordsItCovers
+                                                            }
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="author-file-editor-salient-concept-words-removed"
+                                                            title="Take these words out of the concept"
+                                                            aria-label="Take these words out of the concept"
+                                                            onClick={() =>
+                                                                onStoryWordRangeRemoved(
+                                                                    concept.conceptCellId,
+                                                                    storyWordRange,
+                                                                )
+                                                            }
+                                                        >
+                                                            <i className="codicon codicon-close" />
+                                                        </button>
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    )}
+                                </details>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </details>
             <details className="author-file-editor-story-plots-drawer" open>
                 <summary>Plots</summary>
                 {storyPlots.length === 0 ? (

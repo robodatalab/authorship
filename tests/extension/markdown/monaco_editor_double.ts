@@ -6,6 +6,7 @@ export interface MonacoEditorOnThePage {
     cursorOffset(): number;
     point(offset: number | null): void;
     pointAway(): void;
+    select(selectedFrom: number, selectedTo: number): void;
     marks(): { range: unknown; options: { inlineClassName: string } }[];
 }
 
@@ -39,6 +40,7 @@ export function monacoEditorApi(): unknown {
                 let changed = (_changed: { isFlush: boolean }): void => {};
                 let pointed: (event: unknown) => void = () => {};
                 let pointedAway = (): void => {};
+                let selected = (_changed: unknown): void => {};
                 const collections: {
                     range: unknown;
                     options: { inlineClassName: string };
@@ -80,6 +82,12 @@ export function monacoEditorApi(): unknown {
                         pointedAway = listener;
                         return disposable;
                     },
+                    onDidChangeCursorSelection: (
+                        listener: (changed: unknown) => void,
+                    ) => {
+                        selected = listener;
+                        return disposable;
+                    },
                     createDecorationsCollection: () => {
                         const drawn = collections.length;
                         collections.push([]);
@@ -118,6 +126,19 @@ export function monacoEditorApi(): unknown {
                             },
                         }),
                     pointAway: () => pointedAway(),
+                    select: (selectedFrom: number, selectedTo: number) =>
+                        selected({
+                            selection: {
+                                getStartPosition: () => ({
+                                    lineNumber: 1,
+                                    column: selectedFrom + 1,
+                                }),
+                                getEndPosition: () => ({
+                                    lineNumber: 1,
+                                    column: selectedTo + 1,
+                                }),
+                            },
+                        }),
                     type: (markdown: string) => {
                         value = markdown;
                         cursorOffset = markdown.length;

@@ -113,6 +113,7 @@ interface MarkdownEditorProps {
     highlights?: AuthorFileEditorFindHighlight[];
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     onFixAsked?: (error: ProseCheckError) => void;
+    onTextSelected?: (selectedFrom: number, selectedTo: number) => void;
     children?: (markdown: string) => ReactNode;
 }
 
@@ -125,6 +126,7 @@ export function MarkdownEditor({
     highlights = [],
     paragraphsInStoryPlots = [],
     onFixAsked = () => undefined,
+    onTextSelected = () => undefined,
     children,
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
@@ -167,6 +169,7 @@ export function MarkdownEditor({
             highlights={highlights}
             paragraphsInStoryPlots={paragraphsInStoryPlots}
             onFixAsked={onFixAsked}
+            onTextSelected={onTextSelected}
             onMarkdownChanged={(typed) => {
                 showMarkdown(typed);
                 onMarkdownCommitted(typed);
@@ -275,6 +278,7 @@ interface MonacoMarkdownEditorProps {
     highlights: AuthorFileEditorFindHighlight[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
     onFixAsked: (error: ProseCheckError) => void;
+    onTextSelected: (selectedFrom: number, selectedTo: number) => void;
     onMarkdownChanged: (markdown: string) => void;
     onFinished: () => void;
 }
@@ -291,6 +295,7 @@ function MonacoMarkdownEditor({
     highlights,
     paragraphsInStoryPlots,
     onFixAsked,
+    onTextSelected,
     onMarkdownChanged,
     onFinished,
 }: MonacoMarkdownEditorProps) {
@@ -312,8 +317,12 @@ function MonacoMarkdownEditor({
         undefined,
     );
     const pointerIsOnTheTooltip = useRef(false);
-    const latestCallbacks = useRef({ onMarkdownChanged, onFinished });
-    latestCallbacks.current = { onMarkdownChanged, onFinished };
+    const latestCallbacks = useRef({
+        onMarkdownChanged,
+        onFinished,
+        onTextSelected,
+    });
+    latestCallbacks.current = { onMarkdownChanged, onFinished, onTextSelected };
 
     useEffect(() => {
         const node = editorHost.current;
@@ -457,6 +466,18 @@ function MonacoMarkdownEditor({
             }
             latestCallbacks.current.onMarkdownChanged(editor.getValue());
         });
+        const selectionChanged = editor.onDidChangeCursorSelection(
+            (changed) => {
+                const model = editor.getModel();
+                if (!model) {
+                    return;
+                }
+                latestCallbacks.current.onTextSelected(
+                    model.getOffsetAt(changed.selection.getStartPosition()),
+                    model.getOffsetAt(changed.selection.getEndPosition()),
+                );
+            },
+        );
         const escapePressed = (event: KeyboardEvent): void => {
             if (event.key === "Escape") {
                 latestCallbacks.current.onFinished();
@@ -476,6 +497,7 @@ function MonacoMarkdownEditor({
             pointerMoved.dispose();
             pointerLeft.dispose();
             contentChanged.dispose();
+            selectionChanged.dispose();
             editor.dispose();
         };
     }, []);

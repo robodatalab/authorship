@@ -7,6 +7,7 @@ import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
     useAuthorFileEditorCellParagraphsInStoryPlots,
+    useAuthorFileEditorCellStoryTextSelected,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
     ParagraphInStoryPlots,
@@ -1062,7 +1063,7 @@ describe("the plots the story weaves", () => {
                     ".author-file-editor-story-plots-drawer > summary",
                 ),
             ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots", "Scenes", "Progress"]);
+        ).toEqual(["Salient concepts", "Plots", "Scenes", "Progress"]);
     });
 
     it("draws no progress drawer when nothing is running", async () => {
@@ -1074,7 +1075,7 @@ describe("the plots the story weaves", () => {
                     ".author-file-editor-story-plots-drawer > summary",
                 ),
             ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots", "Scenes"]);
+        ).toEqual(["Salient concepts", "Plots", "Scenes"]);
     });
 
     it("can be dragged wider by its edge", async () => {
@@ -1113,6 +1114,103 @@ describe("the plots the story weaves", () => {
                 type: "invoke",
                 commandName: "identifyStoryPlots",
                 commandArguments: {},
+            },
+        ]);
+    });
+});
+
+describe("the salient concepts the story holds", () => {
+    const THE_DOOR: WebviewCell = {
+        kind: "salient-concept",
+        source: "What she saw.",
+        attrs: { id: "k1", title: "Door", words: "1-2" },
+    };
+
+    function SelectsTheDoor() {
+        const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+        return (
+            <button
+                className="test-select-the-door"
+                onClick={() => storyTextSelected(4, 8)}
+            />
+        );
+    }
+
+    async function mountSalientConcepts() {
+        await mountCanvas({
+            cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
+            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            storyPlotsAreShown: true,
+        });
+    }
+
+    function assignButton(): HTMLButtonElement {
+        return salientConcept()!.querySelector(
+            ".author-file-editor-salient-concept-assign",
+        )!;
+    }
+
+    function salientConcept(): Element | null {
+        return document.querySelector(".author-file-editor-salient-concept");
+    }
+
+    it("lists every concept with the words it holds", async () => {
+        await mountSalientConcepts();
+
+        expect(salientConcept()?.querySelector("summary")?.textContent).toBe(
+            "Door",
+        );
+        expect(
+            salientConcept()?.querySelector(
+                ".author-file-editor-salient-concept-words-shown",
+            )?.textContent,
+        ).toBe("door opens.");
+    });
+
+    it("asks for words to be taken out of a concept", async () => {
+        await mountSalientConcepts();
+
+        await click(
+            salientConcept()!.querySelector(
+                ".author-file-editor-salient-concept-words-removed",
+            )!,
+        );
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "removeStoryWordRange",
+                commandArguments: {
+                    conceptCellId: "k1",
+                    firstWord: 1,
+                    lastWord: 2,
+                },
+            },
+        ]);
+    });
+
+    it("cannot assign anything until words are selected", async () => {
+        await mountSalientConcepts();
+
+        expect(assignButton().disabled).toBe(true);
+    });
+
+    it("asks for the selected words to be assigned to a concept", async () => {
+        await mountSalientConcepts();
+        await click(document.querySelector(".test-select-the-door")!);
+
+        await click(assignButton());
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "assignStoryText",
+                commandArguments: {
+                    conceptCellId: "k1",
+                    cellId: "m1",
+                    startCharacterOffsetInCell: 4,
+                    endCharacterOffsetInCell: 8,
+                },
             },
         ]);
     });

@@ -18,6 +18,7 @@ import {
     MutableAuthorDocument,
     type ImmutableCell,
 } from "./storydoc/model";
+import { synchronizeTheStoryWordRanges } from "./storydoc/story_words";
 import { WordCounter } from "./storydoc/word_counter";
 
 export class AuthorFileEditorSession
@@ -151,6 +152,10 @@ export class AuthorFileEditorSession
             this.documentAsItStands.text,
         );
         change(documentBeingChanged);
+        synchronizeTheStoryWordRanges(
+            this.documentAsItStands,
+            documentBeingChanged,
+        );
         return AuthorDocDiff.diff(
             this.documentAsItStands,
             documentBeingChanged.toImmutable(),

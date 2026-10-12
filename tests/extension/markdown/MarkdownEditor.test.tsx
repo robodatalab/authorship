@@ -697,3 +697,31 @@ describe("the plots the paragraphs belong to", () => {
         );
     });
 });
+
+describe("selecting text", () => {
+    it("says where the selection starts and ends in the markdown", async () => {
+        const selected = vi.fn();
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="The lantern had gone out."
+                        onMarkdownCommitted={committedSpy()}
+                        onTextSelected={selected}
+                    >
+                        {(text) => <div className="rendered">{text}</div>}
+                    </MarkdownEditor>
+                </MarkdownEditorMediator>,
+            );
+        });
+        await doubleClickRendered();
+
+        await act(async () => {
+            latestEditor().select(4, 11);
+        });
+
+        expect(selected).toHaveBeenCalledWith(4, 11);
+    });
+});

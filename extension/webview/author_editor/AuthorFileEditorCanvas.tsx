@@ -27,6 +27,7 @@ import {
     opensASection,
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
+import { salientConceptsIn } from "../../vscode_runtime/storydoc/story_words";
 import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -51,6 +52,12 @@ export interface WebviewAuthorDocumentCommandCard {
 }
 
 export type SendMessagesToVscode = (message: unknown) => void;
+
+interface StoryTextSelected {
+    cellId: string;
+    startCharacterOffsetInCell: number;
+    endCharacterOffsetInCell: number;
+}
 
 function isFolded(cell: WebviewCell): boolean {
     return cell.attrs[FOLDED] === "true";
@@ -147,8 +154,11 @@ export function AuthorFileEditorCanvas({
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
+    const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
+    const [storyTextSelected, selectStoryText] =
+        useState<StoryTextSelected | null>(null);
     const find = useAuthorFileEditorFind(
         cells,
         sendMessagesToVscode,
@@ -229,6 +239,17 @@ export function AuthorFileEditorCanvas({
             (command.drawnWhenCellAttributeIs === undefined ||
                 theOneOfItsGroupTheDocumentCallsFor(command)),
     );
+
+    function bringTheCellToTheTop(cellId: string): void {
+        const scrolled = cellsOnThePage.current;
+        const shown = scrolled?.querySelector(`li[data-cell-id="${cellId}"]`);
+        if (!scrolled || !shown) {
+            return;
+        }
+        scrolled.scrollTop +=
+            shown.getBoundingClientRect().top -
+            scrolled.getBoundingClientRect().top;
+    }
 
     function insertCellMenu(insertBeforeCellId: string | null): ReactNode {
         return (
@@ -314,6 +335,22 @@ export function AuthorFileEditorCanvas({
                                 wordsInTheSection={
                                     wordsInEverySection[cell.attrs.id]
                                 }
+                                onStoryTextSelected={(
+                                    selectedFrom,
+                                    selectedTo,
+                                ) =>
+                                    selectStoryText(
+                                        selectedFrom === selectedTo
+                                            ? null
+                                            : {
+                                                  cellId: cell.attrs.id,
+                                                  startCharacterOffsetInCell:
+                                                      selectedFrom,
+                                                  endCharacterOffsetInCell:
+                                                      selectedTo,
+                                              },
+                                    )
+                                }
                                 sendMessagesToVscode={sendMessagesToVscode}
                             >
                                 {renderCell(
@@ -367,6 +404,8 @@ export function AuthorFileEditorCanvas({
             </MarkdownEditorMediator>
             {storyPlotsAreShown && (
                 <AuthorFileEditorStoryPlots
+                    salientConcepts={salientConcepts}
+                    storyTextIsSelected={storyTextSelected !== null}
                     storyScenes={storyScenes}
                     storyPlots={storyPlots}
                     storyPlotsProgress={storyPlotsProgress}
@@ -375,6 +414,25 @@ export function AuthorFileEditorCanvas({
                             sendMessagesToVscode,
                             "identifyStoryPlots",
                             {},
+                        )
+                    }
+                    onStoryTextAssigned={(conceptCellId) =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "assignStoryText",
+                            { conceptCellId, ...storyTextSelected },
+                        )
+                    }
+                    onStoryWordRangeShown={bringTheCellToTheTop}
+                    onStoryWordRangeRemoved={(conceptCellId, storyWordRange) =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "removeStoryWordRange",
+                            {
+                                conceptCellId,
+                                firstWord: storyWordRange.firstWord,
+                                lastWord: storyWordRange.lastWord,
+                            },
                         )
                     }
                 />
