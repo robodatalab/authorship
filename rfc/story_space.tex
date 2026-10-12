@@ -186,7 +186,7 @@ B adds Bob's motivation; C adds a detail that changes nothing important. Figure~
 \end{figure}
 
 \paragraph{Salient information.} Write $I(t)$ for the salient information a text $t$ carries, and $V(t)$ for the volume that surrounds text $t$. We take as given:
-\begin{equation}
+\begin{equation}\label{eq:salient}
 \begin{gathered}
 |V(A)| \approx |V(B)|, \qquad |V(A)| > |V(C)|, \\
 |V(A + B)| \gg |V(A + C)|, \qquad |V(A)| \approx |V(A + C)| .
@@ -317,7 +317,7 @@ The spread of a text is the root mean square distance of its points from their c
 
 \section{Transforming Qwen's output}\label{sec:transform}
 
-\subsection{Volumes that represent salient information}
+\subsection{Volumes that represent salient information}\label{sec:volumes}
 
 Figures~\ref{fig:abc-areas} and~\ref{fig:separate-areas} show the transformations Qwen applies to tokens: they project them into a generic latent space, shaped by the loss Qwen was trained with, next-token prediction. We want to fine-tune or adapt Qwen's output so that volumes begin to represent salient information. In the adapted space, $V(t)$ is the volume that surrounds text $t$.
 
@@ -432,23 +432,74 @@ retraining all of Qwen & all of Qwen's weights learned anew & no & our few label
 \end{tabular}
 \end{center}
 
-\subsubsection{To do: LoRA adapter}
-\begin{enumerate}
-  \item Train the adapter and a head on the labelled texts with the volume loss.
-  \item Serve with the adapter switched on per request.
-\end{enumerate}
+\subsubsection{To do}
 
-\subsubsection{To do: soft prompt}
-\begin{enumerate}
-  \item Train the vectors and a head on the labelled texts with the volume loss.
-  \item Add an endpoint that accepts vectors in place of tokens.
-\end{enumerate}
+\begin{center}
+\small
+\begin{tabular}{@{}l p{0.7\linewidth}@{}}
+\hline
+approach & to do \\
+\hline
+LoRA adapter & 1. Train the adapter and a head on the labelled texts with the volume loss. 2. Serve with the adapter switched on per request. \\
+soft prompt & 1. Train the vectors and a head on the labelled texts with the volume loss. 2. Add an endpoint that accepts vectors in place of tokens. \\
+fully connected head & 1. Run every labelled text through Qwen once and store its points. 2. Train the head on them with the volume loss. 3. Test the relations on texts it was not trained on. \\
+\hline
+\end{tabular}
+\end{center}
 
-\subsubsection{To do: fully connected head}
-\begin{enumerate}
-  \item Run every labelled text through Qwen once and store its points.
-  \item Train the head on them with the volume loss.
-  \item Test the relations on texts it was not trained on.
-\end{enumerate}
+\FloatBarrier
+\subsection{Training data}\label{sec:data}
+
+\paragraph{Schema.}
+\begin{verbatim}
+{"data": [
+  {
+    "file": "my_file.author",
+    "concepts": {
+      "love": 1,
+      "hate": 2,
+      "Michael": 3,
+      ...
+    },
+    "annotations": [
+      {"start_word": 13, "end_word": 25, "concept": 1},
+      {"start_word": 18, "end_word": 22, "concept": 2},
+      ...
+    ]
+  },
+  ...
+]}
+\end{verbatim}
+\texttt{start\_word} and \texttt{end\_word} index the author document's words: its prose numbered from $0$, in reading order across all its cells, a word being a run of characters between whitespace that contains a letter or a digit.
+
+\subsection{LoRA parameters, dataset size and justification}\label{sec:lora}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.2\linewidth} p{0.2\linewidth} p{0.52\linewidth}@{}}
+\hline
+setting & value & justification \\
+\hline
+rank $r$ & $1$ & data needed $D \propto N^{-\alpha/\beta}$ with $|\alpha/\beta| \le 0.18$~\cite{zhang}: it does not depend on the adapter's size, so the smallest rank \\
+layers & all $7$ linear maps of all $36$ layers & attention-only LoRA underperforms~\cite{thinkingmachines} \\
+trained parameters $N$ & $2{,}727{,}936$ & $36 \cdot \sum_{m=1}^{7} (d^{\text{in}}_m + d^{\text{out}}_m) \cdot r = 36 \cdot 75{,}776 \cdot 1$ \\
+$\alpha$ & $32$ & \cite{thinkingmachines} \\
+learning rate & $10\times$ full fine-tuning & fitted multiplier $9.8$~\cite{thinkingmachines} \\
+batch size & small & LoRA tolerates large batches worse~\cite{thinkingmachines} \\
+\hline
+dataset size $B$ & $5{,}455{,}872$ bits & $B = 2N$: an adapter saturates at $2$ bits per parameter~\cite{allenzhu}; rank $1$ on Qwen3-4B, $4.1$ million bits, saturates at about $5$ million output tokens~\cite{baseten} \\
+bits per text & $189$ & $13 \cdot (\log_2 K + 2 \log_2 W) = 13 \cdot (\log_2 4.5 + 2 \log_2 73) = 13 \cdot 14.5$ \\
+dataset size $T$ & $29{,}000$ texts, $2.1$ million words & $T = B / 189$; $T \cdot W$ words \\
+words $W$, concepts $K$ and annotations per text & $73$; $4.5$, one per $16$ words; $13$, $2.9$ per concept & averages of SCENE\_1 ($84$, $4$, $14$) and DIFFERENT\_SCENE\_1 ($62$, $5$, $12$), our only annotated texts \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{9}
+\bibitem{allenzhu} Z.~Allen-Zhu and Y.~Li. Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws. ICLR 2025. arXiv:2404.05405.
+\bibitem{baseten} Baseten. Practical LoRA research. October 2025. \texttt{labs.baseten.co/\allowbreak articles/\allowbreak practical-lora-research}.
+\bibitem{thinkingmachines} J.~Schulman and Thinking Machines Lab. LoRA Without Regret. 2025. \texttt{thinkingmachines.ai/blog/lora}.
+\bibitem{zhang} B.~Zhang, Z.~Liu, C.~Cherry and O.~Firat. When Scaling Meets LLM Finetuning: The Effect of Data, Model and Finetuning Method. ICLR 2024. arXiv:2402.17193.
+\end{thebibliography}
 
 \end{document}
