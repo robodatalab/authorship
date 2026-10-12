@@ -67,6 +67,20 @@ class Models(unittest.TestCase):
         serving_status.assert_any_call(deploying)
 
 
+class RequestBeforeTheModelsAreDeployed(unittest.TestCase):
+    def test_is_told_the_models_are_still_being_deployed(self) -> None:
+        app.state.causal_model = None
+
+        response = TestClient(app).post(
+            "/generate/blurb", json={"path": "manuscript.author", "text": ""}
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json(), {"detail": "The models are still being deployed"}
+        )
+
+
 def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
     """The finished answer of whichever section is being written for a document."""
     deadline = time.monotonic() + timeout
@@ -532,7 +546,7 @@ class ExportEpub(unittest.TestCase):
                         "date": "2026-09-02",
                     },
                 ),
-                storydoc.contents(),
+                storydoc.table_of_contents(),
                 storydoc.Cell(storydoc.BLURB, "A lantern, and a stair."),
                 storydoc.chapter("One"),
                 storydoc.markdown("prose"),
@@ -577,7 +591,7 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
-            said["added"], [storydoc.CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+            said["added"], [storydoc.TABLE_OF_CONTENTS, storydoc.BLURB, storydoc.ABOUT]
         )
         wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
         # The title page is there, in place, and still not filled in — which is
@@ -706,87 +720,6 @@ class FixStyle(unittest.TestCase):
         status = self.start()
         self.assertIn("no prose", status["error"])
 
-
-def wait_for_story_plots(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = client.get("/analyze/plots/status", params={"id": job_id})
-        if response.status_code == 200 and not response.json()["running"]:
-            return response.json()
-        time.sleep(0.005)
-    raise AssertionError(f"plot identification {job_id} did not finish within {timeout}s")
-
-
-class IdentifyStoryPlots(unittest.TestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        app.state.jobs = ParallelJobsManager()
-        app.state.story_plot_classifier = mock.MagicMock()
-
-    def identify(self, cells: list[storydoc.Cell]) -> dict:
-        client = TestClient(app)
-        started = client.post(
-            "/analyze/plots",
-            json={"path": "/stories/story.author", "text": storydoc.dumps(cells)},
-        )
-        self.assertEqual(started.status_code, 202)
-        return wait_for_story_plots(client, started.json()["id"])
-
-    def test_names_every_paragraph_of_the_prose_by_where_it_stands_in_its_cell(
-        self,
-    ) -> None:
-        identified = self.identify(
-            [
-                storydoc.chapter("One"),
-                storydoc.Cell(
-                    storydoc.MARKDOWN,
-                    "The lantern had gone out.\n\nThe door stood open.\nNobody came.",
-                    {"id": "lantern"},
-                ),
-            ]
-        )
-
-        self.assertIsNone(identified["error"])
-        self.assertEqual(identified["progress"], {"identified": 1, "sections": 1})
-        self.assertEqual(
-            [
-                (
-                    paragraph["cellId"],
-                    paragraph["startCharacterOffsetInCell"],
-                    paragraph["endCharacterOffsetInCell"],
-                    paragraph["wordsInTheCell"],
-                )
-                for paragraph in identified["paragraphsInStoryPlots"]
-            ],
-            [
-                ("lantern", 0, 25, "The lantern had gone out."),
-                ("lantern", 27, 60, "The door stood open.\nNobody came."),
-            ],
-        )
-
-    def test_reads_no_cell_but_the_prose(self) -> None:
-        identified = self.identify(
-            [
-                storydoc.Cell(storydoc.NOTE, "Remember the lantern.", {"id": "note"}),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
-            ]
-        )
-
-        self.assertEqual(
-            [paragraph["cellId"] for paragraph in identified["paragraphsInStoryPlots"]],
-            ["door"],
-        )
-
-    def test_a_document_with_no_prose_fails_the_job_rather_than_the_request(
-        self,
-    ) -> None:
-        identified = self.identify([storydoc.chapter("One")])
-
-        self.assertIn("no prose", identified["error"])
-
-    def test_refuses_to_report_on_a_job_it_never_started(self) -> None:
-        response = TestClient(app).get("/analyze/plots/status", params={"id": "nothing"})
-        self.assertEqual(response.status_code, 404)
 
 if __name__ == "__main__":
     unittest.main()

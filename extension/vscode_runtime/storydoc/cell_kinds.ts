@@ -3,7 +3,7 @@ import {
     ABOUT,
     BLURB,
     CHAPTER,
-    CONTENTS,
+    TABLE_OF_CONTENTS,
     DIVIDER,
     IMAGE,
     MutableCell,
@@ -12,6 +12,7 @@ import {
     NOTE,
     PART,
     RECAP,
+    SALIENT_CONCEPT,
     TITLE_PAGE,
 } from "./model";
 
@@ -106,11 +107,11 @@ const CELL_KINDS: CellKind[] = [
         blank: () => new MutableCell(IMAGE, "", { src: "" }),
     },
     {
-        cellKind: CONTENTS,
+        cellKind: TABLE_OF_CONTENTS,
         label: "Table of Contents",
         fields: [],
         isFrontOrBackMatter: true,
-        blank: () => new MutableCell(CONTENTS, "", {}),
+        blank: () => new MutableCell(TABLE_OF_CONTENTS, "", {}),
     },
     {
         cellKind: DISCLAIMER,
@@ -161,6 +162,14 @@ const CELL_KINDS: CellKind[] = [
         fields: [{ attributeName: "documents", label: "Documents" }],
         isKeptOutOfTheBook: true,
         blank: () => new MutableCell(RECAP, "", {}),
+    },
+    {
+        cellKind: SALIENT_CONCEPT,
+        label: "Salient Concept",
+        fields: [{ attributeName: "title", label: "Title" }],
+        isKeptOutOfTheBook: true,
+        blank: () =>
+            new MutableCell(SALIENT_CONCEPT, "", { title: "Untitled" }),
     },
 ];
 

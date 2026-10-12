@@ -18,14 +18,26 @@ import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose"
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "../../vscode_runtime/commands/identify_story_plots";
+import type { WorkProgress } from "../../vscode_runtime/server/jobs";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
     opensASection,
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
-import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
+import {
+    salientConceptsIn,
+    storyTextSpansOf,
+    storyWordsIn,
+    type StoryWordRange,
+} from "../../vscode_runtime/storydoc/story_words";
+import {
+    MarkdownEditorMediator,
+    type MarkdownEditorSalientConceptHighlight,
+    type MarkdownEditorStoryTextShown,
+} from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
 const CELL_BUTTON_GROUP = "cell";
@@ -49,6 +61,16 @@ export interface WebviewAuthorDocumentCommandCard {
 }
 
 export type SendMessagesToVscode = (message: unknown) => void;
+
+interface StoryTextSelected {
+    cellId: string;
+    startCharacterOffsetInCell: number;
+    endCharacterOffsetInCell: number;
+}
+
+interface StoryTextShownInTheCell extends MarkdownEditorStoryTextShown {
+    cellId: string;
+}
 
 function isFolded(cell: WebviewCell): boolean {
     return cell.attrs[FOLDED] === "true";
@@ -113,7 +135,9 @@ interface AuthorFileEditorCanvasProps {
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
     storyPlotsAreShown?: boolean;
+    storyScenes?: StoryScene[];
     storyPlots?: StoryPlot[];
+    storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
     wordsInEverySection?: Readonly<Record<string, number>>;
@@ -128,7 +152,9 @@ export function AuthorFileEditorCanvas({
     cellRenderers,
     proseErrors = [],
     storyPlotsAreShown = false,
+    storyScenes = [],
     storyPlots = [],
+    storyPlotsProgress = null,
     paragraphsInStoryPlots = [],
     cellsBeingWritten = {},
     wordsInEverySection = {},
@@ -141,8 +167,67 @@ export function AuthorFileEditorCanvas({
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
+    const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
+    const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
+    const [storyTextShown, showStoryText] =
+        useState<StoryTextShownInTheCell | null>(null);
+    const [salientConceptsShown, showSalientConcepts] = useState<
+        ReadonlySet<string>
+    >(() => new Set());
+    const salientConceptHighlightsByCellId = useMemo(() => {
+        const byCellId = new Map<
+            string,
+            MarkdownEditorSalientConceptHighlight[]
+        >();
+        salientConcepts.forEach((concept, salientConceptColor) => {
+            if (!salientConceptsShown.has(concept.conceptCellId)) {
+                return;
+            }
+            for (const storyWordRange of concept.storyWordRanges) {
+                for (const span of storyTextSpansOf(storyWords, storyWordRange)) {
+                    byCellId.set(span.cellId, [
+                        ...(byCellId.get(span.cellId) ?? []),
+                        {
+                            startCharacterOffsetInCell:
+                                span.startCharacterOffsetInCell,
+                            endCharacterOffsetInCell:
+                                span.endCharacterOffsetInCell,
+                            salientConceptColor,
+                        },
+                    ]);
+                }
+            }
+        });
+        return byCellId;
+    }, [storyWords, salientConcepts, salientConceptsShown]);
+
+    function showTheSalientConcept(
+        conceptCellId: string,
+        isShown: boolean,
+    ): void {
+        showSalientConcepts((shown) => {
+            if (shown.has(conceptCellId) === isShown) {
+                return shown;
+            }
+            const nowShown = new Set(shown);
+            if (isShown) {
+                nowShown.add(conceptCellId);
+            } else {
+                nowShown.delete(conceptCellId);
+            }
+            return nowShown;
+        });
+    }
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
+    const storyTextSelected = useRef<StoryTextSelected | null>(null);
+    const [storyTextIsSelected, sayWhetherStoryTextIsSelected] =
+        useState(false);
+
+    function selectStoryText(selected: StoryTextSelected | null): void {
+        storyTextSelected.current = selected;
+        sayWhetherStoryTextIsSelected(selected !== null);
+    }
     const find = useAuthorFileEditorFind(
         cells,
         sendMessagesToVscode,
@@ -224,6 +309,24 @@ export function AuthorFileEditorCanvas({
                 theOneOfItsGroupTheDocumentCallsFor(command)),
     );
 
+    function showTheStoryWords(storyWordRange: StoryWordRange): void {
+        const [firstSpan] = storyTextSpansOf(storyWords, storyWordRange);
+        if (firstSpan) {
+            showStoryText({ ...firstSpan });
+        }
+    }
+
+    function bringTheStoryTextIntoView(top: number, bottom: number): void {
+        const scrolled = cellsOnThePage.current;
+        if (!scrolled) {
+            return;
+        }
+        scrolled.scrollTop +=
+            (top + bottom) / 2 -
+            scrolled.getBoundingClientRect().top -
+            scrolled.clientHeight / 2;
+    }
+
     function insertCellMenu(insertBeforeCellId: string | null): ReactNode {
         return (
             <AuthorFileEditorInsertCellMenu
@@ -292,6 +395,15 @@ export function AuthorFileEditorCanvas({
                                           )
                                         : []
                                 }
+                                salientConceptHighlights={salientConceptHighlightsByCellId.get(
+                                    cell.attrs.id,
+                                )}
+                                storyTextShown={
+                                    storyTextShown?.cellId === cell.attrs.id
+                                        ? storyTextShown
+                                        : undefined
+                                }
+                                onStoryTextShownAt={bringTheStoryTextIntoView}
                                 findMatches={findMatchesByCellId.get(
                                     cell.attrs.id,
                                 )}
@@ -307,6 +419,22 @@ export function AuthorFileEditorCanvas({
                                 }
                                 wordsInTheSection={
                                     wordsInEverySection[cell.attrs.id]
+                                }
+                                onStoryTextSelected={(
+                                    selectedFrom,
+                                    selectedTo,
+                                ) =>
+                                    selectStoryText(
+                                        selectedFrom === selectedTo
+                                            ? null
+                                            : {
+                                                  cellId: cell.attrs.id,
+                                                  startCharacterOffsetInCell:
+                                                      selectedFrom,
+                                                  endCharacterOffsetInCell:
+                                                      selectedTo,
+                                              },
+                                    )
                                 }
                                 sendMessagesToVscode={sendMessagesToVscode}
                             >
@@ -361,12 +489,40 @@ export function AuthorFileEditorCanvas({
             </MarkdownEditorMediator>
             {storyPlotsAreShown && (
                 <AuthorFileEditorStoryPlots
+                    salientConcepts={salientConcepts}
+                    salientConceptsShown={salientConceptsShown}
+                    storyTextIsSelected={storyTextIsSelected}
+                    storyScenes={storyScenes}
                     storyPlots={storyPlots}
+                    storyPlotsProgress={storyPlotsProgress}
                     onIdentifyStoryPlotsAsked={() =>
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "identifyStoryPlots",
                             {},
+                        )
+                    }
+                    onSalientConceptToggled={showTheSalientConcept}
+                    onStoryTextAssigned={(conceptCellId) =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "assignStoryText",
+                            {
+                                conceptCellId,
+                                ...storyTextSelected.current,
+                            },
+                        )
+                    }
+                    onStoryWordRangeShown={showTheStoryWords}
+                    onStoryWordRangeRemoved={(conceptCellId, storyWordRange) =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "removeStoryWordRange",
+                            {
+                                conceptCellId,
+                                firstWord: storyWordRange.firstWord,
+                                lastWord: storyWordRange.lastWord,
+                            },
                         )
                     }
                 />

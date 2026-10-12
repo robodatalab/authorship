@@ -2,6 +2,16 @@ import { fetchFromServer } from "./fetch";
 
 const MILLISECONDS_BETWEEN_POLLS = 400;
 
+export interface WorkProgress {
+    doing: string;
+    done: number;
+    of: number | null;
+    seconds: number;
+    secondsPerItem: number | null;
+    state: "waiting" | "running" | "done";
+    steps: WorkProgress[];
+}
+
 export interface ServerJob {
     running: boolean;
     error: string | null;

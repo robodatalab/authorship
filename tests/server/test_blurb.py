@@ -50,7 +50,7 @@ STORY = storydoc.dumps(
             "<!-- ask Mara whether this is the third time -->\n"
             "She did not light it."
         ),
-        storydoc.Cell(storydoc.CONTENTS, "1. The First Night", {}),
+        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
         storydoc.chapter("The Second"),
         storydoc.markdown("The door stood open."),
     ]

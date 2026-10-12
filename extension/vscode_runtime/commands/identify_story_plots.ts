@@ -3,23 +3,62 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
+import {
+    awaitServerJob,
+    startServerJob,
+    type ServerJob,
+    type WorkProgress,
+} from "../server/jobs";
 import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
 
 const STORY_PLOTS_STATUS = "/analyze/plots/status";
 
+export interface StoryFact {
+    subject: string;
+    relation: string;
+    object: string;
+}
+
+export interface StoryState {
+    madeTrue: StoryFact[];
+    madeFalse: StoryFact[];
+}
+
+export interface StoryScene {
+    firstLine: number;
+    lastLine: number;
+    openingLine: string;
+    storyState: StoryState;
+    events: string[];
+}
+
 export interface StoryPlot {
     title: string;
-    summary: string;
+    characters: string[];
+    origin: string;
+    goal: string;
+    keyEvents: string[];
 }
 
 export interface ParagraphInStoryPlots extends SynchronizedRepresentation {
     storyPlotIndices: number[];
 }
 
+const NOTHING_DONE_YET: WorkProgress = {
+    doing: "identify plots",
+    done: 0,
+    of: null,
+    seconds: 0,
+    secondsPerItem: null,
+    state: "waiting",
+    steps: [],
+};
+
 interface StoryPlotsJob extends ServerJob {
+    storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    progress: WorkProgress;
 }
 
 export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
@@ -34,16 +73,21 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
                 path: session.document.uri.fsPath,
                 text: session.document.text,
             });
+            session.identifyingStoryPlots(NOTHING_DONE_YET);
             const identified = await awaitServerJob<StoryPlotsJob>(
                 STORY_PLOTS_STATUS,
                 jobId,
-                (sofar) =>
+                (running) => {
+                    session.identifyingStoryPlots(running.progress);
                     session.showStoryPlots(
-                        sofar.storyPlots,
-                        sofar.paragraphsInStoryPlots,
-                    ),
+                        running.storyScenes,
+                        running.storyPlots,
+                        running.paragraphsInStoryPlots,
+                    );
+                },
             );
             session.showStoryPlots(
+                identified.storyScenes,
                 identified.storyPlots,
                 identified.paragraphsInStoryPlots,
             );
@@ -51,6 +95,8 @@ export class IdentifyStoryPlotsCommand implements AuthorDocumentCommand {
             void vscode.window.showErrorMessage(
                 `Cannot identify the plots — ${failure instanceof Error ? failure.message : String(failure)}`,
             );
+        } finally {
+            session.identifyingStoryPlots(null);
         }
     }
 }

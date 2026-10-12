@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
-from cortexgrid_infer import ServedRewritingModel
+from cortexgrid_infer import RewritingModel
 
 from server.writing_tools.prose_check import Finding, Passage, sentences
 
@@ -170,7 +170,7 @@ def _fault_named(was: str, now: str) -> tuple[str, str]:
 
 
 async def check(
-    model: ServedRewritingModel, prose: list[tuple[int, str]], names_to_protect: list[str]
+    model: RewritingModel, prose: list[tuple[int, str]], names_to_protect: list[str]
 ) -> list[Finding]:
     passage = Passage(prose)
     if not passage.text.strip():

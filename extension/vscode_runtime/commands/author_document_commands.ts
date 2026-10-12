@@ -1,5 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AssignStoryTextCommand } from "./assign_story_text";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
@@ -15,6 +16,7 @@ import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
+import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { ReplaceTextsCommand } from "./replace_texts";
 import { RunAllCommand } from "./run_all";
@@ -55,6 +57,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new InsertCellCommand(),
     new ReplaceAttributeCommand(),
     new ReplaceTextsCommand(),
+    new AssignStoryTextCommand(),
+    new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

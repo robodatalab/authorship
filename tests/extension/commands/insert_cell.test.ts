@@ -31,6 +31,17 @@ describe("InsertCellCommand — inserts a cell", () => {
         expect(session.document.cells[1].attrs.title).toBe("Untitled");
     });
 
+    it("starts a salient concept untitled", () => {
+        const session = storyOfThreeCells();
+
+        new InsertCellCommand().invoke(session, {
+            beforeCellId: "c2",
+            cellKind: "salient-concept",
+        });
+
+        expect(session.document.cells[1].attrs.title).toBe("Untitled");
+    });
+
     it("puts it at the end when it precedes no cell at all", () => {
         const session = storyOfThreeCells();
 

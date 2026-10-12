@@ -64,6 +64,7 @@ Examples of such edits:
    finetuned to perform very specific tasks. Running locally stays the goal, but not everyone
    has that compute: for now the models are served from a private backend we host ourselves —
    open-weight models on our own hardware, served with cortexgrid — which later moves behind a
-   web server. Gemini is to be retired.
+   web server. Gemini is out of the extension; the style model is the last deployment
+   still on it.
 4. Expose the plugin immediately for myself — install it and keep updating it in VS Code on my
    laptop.

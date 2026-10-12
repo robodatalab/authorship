@@ -1,5 +1,6 @@
 """Backend API."""
 
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -12,74 +13,22 @@ from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.story_analysis.plots import StoryPlotsJob
-from server.story_analysis.story_plot_classifier import (
-    STORY_PLOT_CLASSIFIER_NAME,
-    StoryPlotClassifier,
-    deploy_story_plot_classifier,
-)
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
-from server.models import cluster
+from server.models.inference_models import deploy_inference_models
 import cortexgrid
-from cortexgrid_infer import (
-    GeminiText2Text,
-    Hosted,
-    HuggingFaceImporter,
-    ServedCompletingModel,
-    Text2Text,
-    TextRewriter,
-)
+from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
 from server import storydoc
 from server.storydoc import Document
 
 _log = log.logger(__name__)
 
-GEC_MODEL = "Unbabel/gec-t5_small"
-CAUSAL_MODEL = "Qwen/Qwen3-8B"
-STYLE_MODEL = "gemini-3.1-pro-preview"
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    _log.info("Starting the completion models")
-    cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
-    causal_model = HuggingFaceImporter(CAUSAL_MODEL, Text2Text)
-    causal_deployment = cluster.deploy(
-        causal_model, enable_thinking="false", max_total_tokens="16384"
-    )
-    app.state.causal_model = causal_model.client(causal_deployment.url)
-    gec_model = HuggingFaceImporter(GEC_MODEL, TextRewriter)
-    gec_deployment = cluster.deploy(gec_model)
-    app.state.gec_model = gec_model.client(gec_deployment.url)
-    style_model = Hosted(STYLE_MODEL, GeminiText2Text)
-    cortexgrid.register_model(
-        style_model.serve_app,
-        family=style_model.family,
-        suffix=style_model.suffix,
-        requirements=style_model.requirements(),
-        config=style_model.config(),
-    )
-    style_deployment = cortexgrid.deploy_model(
-        family=style_model.family,
-        suffix=style_model.suffix,
-        run_name=cortexgrid.IMPORTED,
-        wait=True,
-        timeout=cluster.DEPLOY_TIMEOUT_S,
-    )
-    app.state.style_model = style_model.client(style_deployment.url)
-    story_plot_classifier_deployment = deploy_story_plot_classifier()
-    app.state.story_plot_classifier = StoryPlotClassifier.client(
-        story_plot_classifier_deployment.url, STORY_PLOT_CLASSIFIER_NAME
-    )
-    app.state.inference_models = {
-        CAUSAL_MODEL: causal_deployment.key,
-        GEC_MODEL: gec_deployment.key,
-        STYLE_MODEL: style_deployment.key,
-        STORY_PLOT_CLASSIFIER_NAME: story_plot_classifier_deployment.key,
-    }
+    app.state.inference_models = {}
     app.state.jobs = ParallelJobsManager()
-    _log.info("Completion models created")
-
+    threading.Thread(target=deploy_inference_models, args=(app,), daemon=True).start()
     _log.info("Yielding control to FastAPI server")
     yield
     _log.info("FastAPI server terminated")
@@ -98,7 +47,7 @@ def models() -> dict[str, Any]:
     return {
         "models": [
             {"model": name, "status": cortexgrid.model_serving_status(key).phase}
-            for name, key in app.state.inference_models.items()
+            for name, key in list(app.state.inference_models.items())
         ]
     }
 
@@ -108,6 +57,15 @@ def _document(path: str) -> Document:
     if not target.is_file():
         raise HTTPException(status_code=400, detail=f"No such document: {path}")
     return Document.load(target)
+
+
+def _deployed(model_client_name: str) -> Any:
+    model_client = getattr(app.state, model_client_name, None)
+    if model_client is None:
+        raise HTTPException(
+            status_code=503, detail="The models are still being deployed"
+        )
+    return model_client
 
 
 @app.get("/jobs")
@@ -208,7 +166,7 @@ class BlurbRequest(BaseModel):
 class BlurbJob(WritingJob):
     kind = "blurb"
 
-    def __init__(self, model: ServedCompletingModel, document: Document) -> None:
+    def __init__(self, model: CompletingModel, document: Document) -> None:
         super().__init__(storydoc.BLURB, str(document.path))
         self._model = model
         self._document = document
@@ -228,7 +186,7 @@ class RecapRequest(BaseModel):
 class RecapJob(WritingJob):
     kind = "recap"
 
-    def __init__(self, model: ServedCompletingModel, document: Document, earlier: list[Document]) -> None:
+    def __init__(self, model: CompletingModel, document: Document, earlier: list[Document]) -> None:
         super().__init__(storydoc.RECAP, str(document.path))
         self._model = model
         self._earlier = earlier
@@ -243,7 +201,7 @@ class RecapJob(WritingJob):
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     """Start writing the story's blurb; poll /generate/status for it."""
     document = Document(request.text, Path(request.path))
-    job = BlurbJob(app.state.causal_model, document)
+    job = BlurbJob(_deployed("causal_model"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -262,7 +220,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
             Path(request.path).parent, request.documents
         )
     ]
-    job = RecapJob(app.state.causal_model, document, earlier)
+    job = RecapJob(_deployed("causal_model"), document, earlier)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -288,7 +246,7 @@ class StyleFixRequest(BaseModel):
 @app.post("/fix/style", status_code=202)
 def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = style.StyleFixJob(app.state.style_model, document)
+    job = style.StyleFixJob(_deployed("style_model"), document)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -332,7 +290,7 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
-    job = CheckErrorsJob(app.state.gec_model, document, selection)
+    job = CheckErrorsJob(_deployed("gec_model"), document, selection)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -358,7 +316,11 @@ class StoryPlotsRequest(BaseModel):
 @app.post("/analyze/plots", status_code=202)
 def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(app.state.story_plot_classifier, document)
+    job = StoryPlotsJob(
+        _deployed("causal_model"),
+        _deployed("causal_event_trajectory_classifier"),
+        document,
+    )
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -372,7 +334,8 @@ def identify_story_plots_status(id: str) -> dict[str, Any]:
         "running": not job.done,
         "cancelled": job.cancelled,
         "error": job.error,
-        "storyPlots": job.story_plots,
-        "paragraphsInStoryPlots": job.paragraphs_in_story_plots,
-        "progress": {"identified": job.identified, "sections": job.to_identify},
+        "storyScenes": job.scenes,
+        "storyPlots": job.plots,
+        "paragraphsInStoryPlots": [],
+        "progress": job.progress.reported(),
     }

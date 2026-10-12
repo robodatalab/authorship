@@ -1,181 +1,238 @@
 from __future__ import annotations
 
-import math
-import re
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
 
-import numpy as np
-
-from server import storydoc
+from cortexgrid_infer import CompletionChunk, CompletingModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+from server import log
 from server.jobs import Job
-from server.storydoc import CHAPTER, MARKDOWN, PART, Document
-from server.story_analysis.story_plot_classifier import ServedStoryPlotClassifier
+from server.progress import with_progress
+from server.models.causal_event_trajectory_classifier import (
+    CausalEventTrajectoryClassifier,
+)
+from server.models.story_state_extraction_model import StoryState
+from server.storydoc import Document
+from server.utils import estimate_num_tokens_in_text
 
-_PARAGRAPH = re.compile(r"\S.*(?:\n[ \t]*\S.*)*")
+_log = log.logger(__name__)
 
-_CLOSEST_TO_CERTAIN = 1e-6
-_LOWEST_PROBABILITY_THAT_PASSES = 0.5
+EVENT_PROMPT = """
+Given numbered lines in format <line index>.<line>, return an event that is described in that line.
+An event describes something that happens to something or somewhere. 
+
+Examples:
+
+1. The staircase opens to a windowless cavern lit by a set of dimmed fluorescent lights. Their luminosity can be changed from blinding white to pitch black - settings my Owner often explores. I increase the brighness to allow me to see every little detail well, and begin the rounds.  -> 1. He turned up the lights in room
+2. I take the broom and begin wiping the floors. The motion kicks up the dust and I begin coughing. -> 2. He cleans the room.
+3. Suddenly, I heard footsteps on the staircase - light, calculated. I recognized them immediately. She walked in, holding her head up high. -> 3. She enters the room that he cleans.
+"""
+
+async def answered_lines(chunks: AsyncIterator[CompletionChunk]) -> AsyncIterator[str]:
+    pending = ""
+    async for chunk in chunks:
+        pending += chunk.content
+        *finished, pending = pending.split("\n")
+        for line in finished:
+            yield line
+    if pending:
+        yield pending
 
 
-def _log_odds(probability: float) -> float:
-    clipped = min(max(probability, _CLOSEST_TO_CERTAIN), 1 - _CLOSEST_TO_CERTAIN)
-    return math.log(clipped / (1 - clipped))
+@dataclass
+class StoryEvent:
+    description: str
+    position_in_manuscript: int
 
 
-@dataclass(frozen=True)
-class StoryPlotPassLevel:
-    log_odds: float
-    separation: float
+async def detect_events(document: Document, causal_model: CompletingModel) -> list[StoryEvent]:
+    max_chapter_length = max(estimate_num_tokens_in_text(chapter) for _, chapter in document.chapters)
 
-    def admits(self, probability: float) -> bool:
-        return (
-            probability >= _LOWEST_PROBABILITY_THAT_PASSES
-            and _log_odds(probability) > self.log_odds
+    all_events: list[StoryEvent] = []
+    lines_before_chapter = 0
+    for _, chapter in with_progress(document.chapters, "detecting events"):
+        lines = [line for line in chapter.splitlines() if line]
+        numbered_lines = "\n".join([f"{idx}. {line}" for idx, line in enumerate(lines)])
+        async for answer in with_progress(
+            answered_lines(causal_model.complete(
+                [
+                    {"role": "system", "content": EVENT_PROMPT},
+                    {"role": "user", "content": numbered_lines},
+                ],
+                max_new_tokens=max_chapter_length,
+                temperature=0.0,
+            )),
+            "detecting the events in the chapter",
+            of=len(lines),
+        ):
+            index, _, description = answer.partition(". ")
+            all_events.append(StoryEvent(description, lines_before_chapter + int(index)))
+        lines_before_chapter += len(lines)
+
+    return all_events
+
+
+class StoryPlot(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    title: str
+    characters: list[str]
+    origin: str
+    goal: str
+    key_events: list[str]
+
+
+SAME_SITUATION_PROBABILITY = 0.5
+
+
+async def stitch_events_into_causal_trajectory(
+    events: list[StoryEvent],
+    story: str,
+    causal_event_trajectory_classifier: CausalEventTrajectoryClassifier,
+) -> list[StoryPlot]:
+    """Takes a list of events and groups them into plots."""
+    pairs_of_next_events = [
+        (previous.description, event.description) for previous, event in zip(events, events[1:])
+    ]
+    probabilities_for_next_events = causal_event_trajectory_classifier.same_situation_probabilities(
+        story, pairs_of_next_events
+    )
+    same_situation_as_previous = [
+        probability
+        async for probability in with_progress(
+            probabilities_for_next_events,
+            "measuring whether each event continues the situation of the one before",
+            of=len(pairs_of_next_events),
+        )
+    ]
+    runs = [[event] for event in events[:1]]
+    for next_event, probability in zip(events[1:], same_situation_as_previous):
+        if probability > SAME_SITUATION_PROBABILITY:
+            runs[-1].append(next_event)
+        else:
+            runs.append([next_event])
+
+    links_between_runs = [
+        (from_run, to_run)
+        for from_run in range(len(runs))
+        for to_run in range(len(runs))
+        if from_run != to_run
+    ]
+    pairs_across_runs = [
+        (runs[from_run][-1].description, runs[to_run][0].description)
+        for from_run, to_run in links_between_runs
+    ]
+    probabilities_across_runs = causal_event_trajectory_classifier.same_situation_probabilities(
+        story, pairs_across_runs
+    )
+    same_situation_across_runs = [
+        probability
+        async for probability in with_progress(
+            probabilities_across_runs,
+            "measuring whether each run of events continues the situation of the others",
+            of=len(pairs_across_runs),
+        )
+    ]
+    run_after: dict[int, int] = {}
+    run_before: dict[int, int] = {}
+    for probability, (from_run, to_run) in sorted(
+        zip(same_situation_across_runs, links_between_runs), key=lambda link: link[0], reverse=True
+    ):
+        if probability <= SAME_SITUATION_PROBABILITY:
+            break
+        if from_run in run_after or to_run in run_before:
+            continue
+        last_run_of_chain = to_run
+        while last_run_of_chain in run_after:
+            last_run_of_chain = run_after[last_run_of_chain]
+        if last_run_of_chain == from_run:
+            continue
+        run_after[from_run] = to_run
+        run_before[to_run] = from_run
+
+    plots: list[StoryPlot] = []
+    for first_run in range(len(runs)):
+        if first_run in run_before:
+            continue
+        key_events: list[str] = []
+        run: int | None = first_run
+        while run is not None:
+            key_events.extend(event.description for event in runs[run])
+            run = run_after.get(run)
+        plots.append(
+            StoryPlot(title="", characters=[], origin="", goal="", key_events=key_events)
         )
 
-
-def _ashman_separation(below_the_cut: np.ndarray, above_the_cut: np.ndarray) -> float:
-    spread = math.sqrt(below_the_cut.var() + above_the_cut.var())
-    if spread == 0:
-        return math.inf
-    return math.sqrt(2) * (above_the_cut.mean() - below_the_cut.mean()) / spread
-
-
-def story_plot_pass_level(probabilities: Sequence[float]) -> StoryPlotPassLevel:
-    scores = np.sort(np.array([_log_odds(probability) for probability in probabilities]))
-    if len(scores) < 2 or scores[0] == scores[-1]:
-        return StoryPlotPassLevel(math.inf, 0.0)
-    counted_below = np.arange(1, len(scores))
-    counted_above = len(scores) - counted_below
-    summed_below = np.cumsum(scores)[:-1]
-    summed_above = scores.sum() - summed_below
-    variance_between_the_sides = (
-        counted_below
-        * counted_above
-        * (summed_below / counted_below - summed_above / counted_above) ** 2
-    )
-    split = int(np.argmax(variance_between_the_sides)) + 1
-    below_the_cut, above_the_cut = scores[:split], scores[split:]
-    return StoryPlotPassLevel(
-        log_odds=float((below_the_cut[-1] + above_the_cut[0]) / 2),
-        separation=_ashman_separation(below_the_cut, above_the_cut),
-    )
-
-
-_FAKE_STORY_PLOTS = [
-    {
-        "title": "The fall of the numbers",
-        "summary": "Fake data. A slow decline that nobody wants to own, "
-        "reported upwards one meeting at a time until it can no longer be "
-        "explained away.",
-    },
-    {
-        "title": "The rivalry at the top",
-        "summary": "Fake data. Two people who need each other and trust "
-        "each other less with every chapter, each waiting for the other to "
-        "make the first mistake.",
-    },
-    {
-        "title": "The thing in the servers",
-        "summary": "Fake data. Something is changing the platform from the "
-        "inside, and the only people who notice are the ones nobody listens to.",
-    },
-    {
-        "title": "The way home",
-        "summary": "Fake data. A private life kept at arm's length, which "
-        "keeps finding its way back into the working day.",
-    },
-]
-
-
-def _fake_story_plot_indices(part_or_chapter: int, paragraph: int) -> list[int]:
-    beat = paragraph % 12
-    if beat == 11:
-        return []
-    leading = part_or_chapter % len(_FAKE_STORY_PLOTS)
-    indices = [leading]
-    if 4 <= beat <= 7:
-        indices.append((leading + 1) % len(_FAKE_STORY_PLOTS))
-    if beat in (6, 7):
-        indices.append((leading + 2) % len(_FAKE_STORY_PLOTS))
-    return indices
-
-
-def identify_story_plots(
-    model: ServedStoryPlotClassifier,
-    document: Document,
-    cancelled: Callable[[], bool] = lambda: False,
-    progress: Callable[[int, int], None] = lambda identified, sections: None,
-    plots_named: Callable[[list[dict[str, Any]]], None] = lambda story_plots: None,
-    paragraph_placed: Callable[[dict[str, Any]], None] = lambda paragraph: None,
-) -> None:
-    sections = [
-        cell
-        for cell in storydoc.cells_of(document.cells, MARKDOWN)
-        if cell.source.strip()
+    scored_pairs = [
+        f"{probability:.2f}  {previous} → {event}"
+        for (previous, event), probability in zip(
+            pairs_of_next_events + pairs_across_runs,
+            same_situation_as_previous + same_situation_across_runs,
+        )
     ]
-    if not sections:
-        raise ValueError("There is no prose there to find the plots in.")
+    for scored_pair in scored_pairs:
+        _log.info(scored_pair)
+    plots.append(
+        StoryPlot(
+            title="Same situation",
+            characters=[],
+            origin="",
+            goal="",
+            key_events=scored_pairs,
+        )
+    )
+    return plots
 
-    plots_named(list(_FAKE_STORY_PLOTS))
-    progress(0, len(sections))
-    identified = 0
-    part_or_chapter = 0
-    paragraph = 0
-    for cell in document.cells:
-        if cell.kind in (PART, CHAPTER):
-            part_or_chapter += 1
-            paragraph = 0
-            continue
-        if cell.kind != MARKDOWN or not cell.source.strip():
-            continue
-        if cancelled():
-            return
-        for found in _PARAGRAPH.finditer(cell.source):
-            story_plot_indices = _fake_story_plot_indices(part_or_chapter, paragraph)
-            paragraph += 1
-            if story_plot_indices:
-                paragraph_placed(
-                    {
-                        "cellId": cell.unique_id,
-                        "startCharacterOffsetInCell": found.start(),
-                        "endCharacterOffsetInCell": found.end(),
-                        "wordsInTheCell": found.group(),
-                        "isVisible": True,
-                        "storyPlotIndices": story_plot_indices,
-                    }
-                )
-        identified += 1
-        progress(identified, len(sections))
+
+class StoryScene(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    first_line: int
+    last_line: int
+    opening_line: str
+    story_state: StoryState
+    events: list[str]
+
+
+SAME_SCENE_PROBABILITY = 0.5
+
+
+def scene_spans(lines_count: int, continuation_probabilities: list[float]) -> list[range]:
+    if not lines_count:
+        return []
+    first_lines_of_new_scenes = [
+        line
+        for line, probability in enumerate(continuation_probabilities, start=1)
+        if probability <= SAME_SCENE_PROBABILITY
+    ]
+    first_lines = [0, *first_lines_of_new_scenes]
+    ends = [*first_lines_of_new_scenes, lines_count]
+    return [range(first_line, end) for first_line, end in zip(first_lines, ends)]
 
 
 class StoryPlotsJob(Job):
     kind = "identify plots"
 
-    def __init__(self, model: ServedStoryPlotClassifier, document: Document) -> None:
+    def __init__(
+        self,
+        causal_model: CompletingModel,
+        causal_event_trajectory_classifier: CausalEventTrajectoryClassifier,
+        document: Document,
+    ) -> None:
         assert document.path is not None
         super().__init__(f"{document.path}#plots")
-        self._model = model
+        self._causal_model = causal_model
+        self._causal_event_trajectory_classifier = causal_event_trajectory_classifier
         self._document = document
-        self.story_plots: list[dict[str, Any]] = []
-        self.paragraphs_in_story_plots: list[dict[str, Any]] = []
-        self.identified = 0
-        self.to_identify = 0
+        self.scenes: list[StoryScene] = []
+        self.plots: list[StoryPlot] = []
 
     async def execute(self) -> None:
-        identify_story_plots(
-            self._model,
-            self._document,
-            lambda: self.cancelled,
-            self._reached,
-            self._named,
-            self.paragraphs_in_story_plots.append,
+        events = await detect_events(self._document, self._causal_model)
+        self.plots = await stitch_events_into_causal_trajectory(
+            events,
+            "\n\n".join(chapter for _, chapter in self._document.chapters),
+            self._causal_event_trajectory_classifier,
         )
 
-    def _reached(self, identified: int, sections: int) -> None:
-        self.identified, self.to_identify = identified, sections
-
-    def _named(self, story_plots: list[dict[str, Any]]) -> None:
-        self.story_plots = story_plots

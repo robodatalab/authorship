@@ -98,11 +98,14 @@ and a bad one, which is exactly what §6 drops plots on, and it forces filler in
 1. Lock the story and every plot.
 2. Score every paragraph against every plot.
 3. Cut each plot at its pass level.
-4. Drop the plots with no hits or with the weakest separation — they are not well defined.
+4. Drop the plots with no hits, and those whose two masses stand less than 4 apart by
+   Ashman's D — they are not well defined. The bar is 4 rather than the textbook 2 because
+   the cut in §5 is put in the best valley there is, which manufactures about 3 out of a
+   single spread-out mass.
 5. Merge plots that claim mostly the same paragraphs, starting with a Jaccard overlap above
    0.7, uniting their characters and key events. Discovering chapter by chapter proposes the
    main plot many times over; the classifier's own results decide what is a duplicate, not
-   Gemini comparing summaries.
+   the discovery model comparing summaries.
 6. Only now extract key events from each surviving plot's paragraphs, and add them to it.
 
 Nothing about a plot changes during a pass. No paragraph is known to have passed until every
@@ -111,13 +114,26 @@ paragraph's result depend on the order the paragraphs were read in.
 
 ## 7. Discovery
 
-**First**, go through the story chapter by chapter and have Gemini summarise the main theme of
-each as a plot — characters, origin, goal.
+**First**, go through the story chapter by chapter and have the discovery model summarise the
+main theme of each as a plot — characters, origin, goal. It answers in JSON, which is the
+only place in this design where a model is asked for a structure rather than for prose. The
+chapters do not depend on one another, so several are read at once; read one at a time, a
+novel's worth of chapters is minutes of waiting before the first pass can start.
 
-**Then**, after each pass, look at the paragraphs no plot claimed. Gemini sees the whole
-story, with the paragraphs already in plots marked as such rather than removed — a plot may
-span both kinds — and proposes plots that account for the unmarked ones. The new plots join
-the next pass, and every paragraph is scored against them, not only the unclaimed ones.
+**Then pool them.** A chapter at a time proposes the same thread over and over — 36 chapters
+gave 36 plots, most of them one story said 36 ways. No novel runs more than about ten
+threads, however long or tangled it is, so the proposals go back to the model to be pooled
+into at most ten, uniting characters and taking each thread's origin from its earliest
+proposal. This is the model comparing summaries, which §6 rules out for *merging* — the
+difference is that nothing has been classified yet: the cost of not pooling is paid by the
+classifier, at paragraphs × plots questions a pass. Merging after a pass stays the
+classifier's to decide.
+
+**And again**, after each pass, look at the paragraphs no plot claimed. The model sees the whole
+story, with the paragraphs already in plots marked `[in a plot]` rather than removed — a plot
+may span both kinds — and proposes plots that account for the unmarked ones. The new plots
+join the next pass, and every paragraph is scored against them, not only the unclaimed ones.
+They are pooled too, into whatever room is left under the ten.
 
 ## 8. Stopping
 
@@ -129,8 +145,26 @@ few borderline paragraphs changing sides every pass is a steady state, not a rea
 
 ## 9. Progress
 
-A run is many passes, each of them long, so the author has to be able to see where it is. The
-Plots panel shows the status of every pass and how far the current one has got.
+A run is many passes, each of them long, so the author has to be able to see where it is.
+
+The job reports a step at a time — which pass, what it is doing, how far through it is — and
+the Plots panel draws them as a bar each: reading the chapters, then a drawer per pass
+holding the three things a pass does. **Finding plots** is the discovery that fed the pass,
+**attributing passages** is the scoring, and **updating plots** is the key events being read.
+The pass being worked on is the open drawer.
+
+A pass announces what each of its steps will cost before it starts them, so a pass's own bar
+is the work done over the work there is rather than the steps finished over three — and the
+scoring, which is nearly all of the work, is nearly all of the bar. The job times each step
+and the panel shows that time, running or finished, because a step that is waiting on a model
+looks exactly like a step that has hung.
+
+Paragraphs are scored in batches rather than a plot at a time, so that count moves while a
+plot is still being read, and each batch cuts the plot at the pass level of the scores in
+hand and sends what it claims so far. That preview moves as the distribution fills out and is
+overwritten by the real cut when the plot is done: §6's rule is about what the algorithm
+decides, not about what the author is allowed to watch. The plots and their paragraphs are
+redrawn at the end of every pass rather than kept until the run settles.
 
 ## 10. Open
 
@@ -139,8 +173,10 @@ to discover.
 
 ## 11. Where it runs
 
-The extension starts `/analyze/plots` with the document and the author's Gemini key and model,
-and polls `/analyze/plots/status`, which answers with the plots and the paragraphs in them as
-they are found. The job is `StoryPlotsJob` in `server/story_analysis/plots.py`; until this
-algorithm is in, it returns fake plots. The key and the model are Gemini's for now; they go when the job
-moves to the hosted backend.
+The extension starts `/analyze/plots` with the document and polls `/analyze/plots/status`,
+which answers with the plots, the paragraphs in them, and the pass being read. The job is
+`StoryPlotsJob` in `server/story_analysis/plots.py`. It is given two models by the server:
+the larger hosted one for discovery and key events, and the served `StoryPlotClassifier` —
+`server/story_analysis/story_plot_classifier.py`, its own registered model, which stages and
+loads the Qwen3-8B it reads the logits of — for scoring. Nothing about the key or the model
+reaches the extension; both are the backend's.

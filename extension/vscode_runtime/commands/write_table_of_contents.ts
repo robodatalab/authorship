@@ -2,7 +2,7 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import {
     CHAPTER,
-    CONTENTS,
+    TABLE_OF_CONTENTS,
     PART,
     type ImmutableAuthorDocument,
     type ImmutableCell,
@@ -12,7 +12,7 @@ import { cellsBySection, type CellsInASection } from "../storydoc/sections";
 const UNTITLED = "Untitled";
 const UNDER_THE_PART = "    ";
 
-function contentsOf(document: ImmutableAuthorDocument): string {
+function tableOfContentsOf(document: ImmutableAuthorDocument): string {
     return linesOfTheContents(cellsBySection(document.cells), "").join("\n");
 }
 
@@ -40,7 +40,7 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "run";
     readonly iconClassName = "";
     readonly tooltip = "";
-    readonly runsCellsOfKind = CONTENTS;
+    readonly runsCellsOfKind = TABLE_OF_CONTENTS;
 
     invoke(
         session: AuthorFileEditorSession,
@@ -49,7 +49,7 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
         session.changeTheDocument((story) =>
             story
                 .cellWithId(commandArguments.cellId as string)
-                ?.replaceMarkdown(contentsOf(session.document)),
+                ?.replaceMarkdown(tableOfContentsOf(session.document)),
         );
     }
 }

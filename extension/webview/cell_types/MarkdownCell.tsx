@@ -7,6 +7,9 @@ import {
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
     useAuthorFileEditorCellParagraphsInStoryPlots,
+    useAuthorFileEditorCellSalientConceptHighlights,
+    useAuthorFileEditorCellStoryTextSelected,
+    useAuthorFileEditorCellStoryTextShown,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -33,6 +36,11 @@ export function MarkdownCell({
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const paragraphsInStoryPlots =
         useAuthorFileEditorCellParagraphsInStoryPlots();
+    const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+    const salientConceptHighlights =
+        useAuthorFileEditorCellSalientConceptHighlights();
+    const { storyTextShown, onStoryTextShownAt } =
+        useAuthorFileEditorCellStoryTextShown();
 
     return (
         <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
@@ -42,6 +50,10 @@ export function MarkdownCell({
                     cellId={cellId}
                     highlights={findHighlights}
                     paragraphsInStoryPlots={paragraphsInStoryPlots}
+                    salientConceptHighlights={salientConceptHighlights}
+                    storyTextShown={storyTextShown}
+                    onTextSelected={storyTextSelected}
+                    onStoryTextShownAt={onStoryTextShownAt}
                     markdown={cell.source}
                     timesTheHostWroteIt={cell.timesTheHostWroteIt}
                     errors={proseErrors}

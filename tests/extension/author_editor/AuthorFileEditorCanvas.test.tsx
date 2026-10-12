@@ -7,11 +7,16 @@ import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
     useAuthorFileEditorCellParagraphsInStoryPlots,
+    useAuthorFileEditorCellSalientConceptHighlights,
+    useAuthorFileEditorCellStoryTextSelected,
+    useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "../../../extension/vscode_runtime/commands/identify_story_plots";
+import type { WorkProgress } from "../../../extension/vscode_runtime/server/jobs";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,
@@ -69,7 +74,9 @@ async function mountCanvas(options: {
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
     storyPlotsAreShown?: boolean;
+    storyScenes?: StoryScene[];
     storyPlots?: StoryPlot[];
+    storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
 }): Promise<void> {
     posted = [];
@@ -89,7 +96,9 @@ async function mountCanvas(options: {
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 storyPlotsAreShown={options.storyPlotsAreShown}
+                storyScenes={options.storyScenes}
                 storyPlots={options.storyPlots}
+                storyPlotsProgress={options.storyPlotsProgress}
                 paragraphsInStoryPlots={options.paragraphsInStoryPlots}
             />,
         );
@@ -741,7 +750,11 @@ describe("the part and the chapter the author is looking at", () => {
             ObserverTheTestDrives;
         await mountCanvas({
             cells: [
-                { kind: "part", source: "", attrs: { id: "p1", title: "Book One" } },
+                {
+                    kind: "part",
+                    source: "",
+                    attrs: { id: "p1", title: "Book One" },
+                },
                 {
                     kind: "chapter",
                     source: "",
@@ -913,9 +926,26 @@ describe("a folded cell", () => {
 });
 
 describe("the plots the story weaves", () => {
+    const THE_SHOPPING: StoryScene = {
+        firstLine: 0,
+        lastLine: 1,
+        openingLine: "She moves like a cat on the prowl.",
+        storyState: {
+            madeTrue: [
+                { subject: "Kaitlyn", relation: "is in", object: "the dressing room" },
+                { subject: "Frank", relation: "is doing", object: "assisting Kaitlyn" },
+            ],
+            madeFalse: [{ subject: "Frank", relation: "is in", object: "the office" }],
+        },
+        events: ["She touches the fabric."],
+    };
+
     const THE_QUEST: StoryPlot = {
         title: "The quest",
-        summary: "Someone goes looking.",
+        characters: ["Bob", "Alice"],
+        origin: "Bob loses his ring",
+        goal: "Bob finds his ring",
+        keyEvents: ["Bob asked Alice for help"],
     };
 
     const THE_DOOR: ParagraphInStoryPlots = {
@@ -935,12 +965,17 @@ describe("the plots the story weaves", () => {
         );
     }
 
-    async function mountStoryPlots(storyPlotsAreShown: boolean) {
+    async function mountStoryPlots(
+        storyPlotsAreShown: boolean,
+        storyPlotsProgress: WorkProgress | null = null,
+    ) {
         await mountCanvas({
             cells: [markdownCell("The door.", "m1")],
             cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
             storyPlotsAreShown,
+            storyScenes: [THE_SHOPPING],
             storyPlots: [THE_QUEST],
+            storyPlotsProgress,
             paragraphsInStoryPlots: [THE_DOOR],
         });
     }
@@ -962,14 +997,109 @@ describe("the plots the story weaves", () => {
         await mountStoryPlots(true);
 
         expect(
-            storyPlotsPanel()?.querySelector("summary")?.textContent,
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-plot summary",
+            )?.textContent,
         ).toBe("The quest");
-        expect(storyPlotsPanel()?.querySelector("p")?.textContent).toBe(
-            "Someone goes looking.",
-        );
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plot dd",
+                ),
+            ].map((said) => said.textContent),
+        ).toEqual([
+            "Bob, Alice",
+            "Bob loses his ring",
+            "Bob finds his ring",
+            "Bob asked Alice for help",
+        ]);
         expect(
             document.querySelector(".test-story-plot-borders")?.textContent,
         ).toBe("1");
+    });
+
+    it("lists every scene by the lines it spans, with what holds in it", async () => {
+        await mountStoryPlots(true);
+
+        expect(
+            storyPlotsPanel()?.querySelector(
+                ".author-file-editor-story-scene summary",
+            )?.textContent,
+        ).toBe("Lines 1–2: She moves like a cat on the prowl.");
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-scene dd",
+                ),
+            ].map((said) => said.textContent),
+        ).toEqual([
+            "Kaitlyn is in the dressing roomFrank is doing assisting Kaitlyn",
+            "Frank is in the office",
+        ]);
+    });
+
+    it("keeps the plots above the progress, each in its own drawer", async () => {
+        await mountStoryPlots(true, {
+            doing: "identify plots",
+            done: 0,
+            of: null,
+            seconds: 20,
+            secondsPerItem: null,
+            state: "running",
+            steps: [
+                {
+                    doing: "asking whether the events share a plot",
+                    done: 3,
+                    of: 24,
+                    seconds: 20,
+                    secondsPerItem: null,
+                    state: "running",
+                    steps: [],
+                },
+            ],
+        });
+
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plots-drawer > summary",
+                ),
+            ].map((drawer) => drawer.textContent),
+        ).toEqual(["Salient concepts", "Plots", "Scenes", "Progress"]);
+    });
+
+    it("draws no progress drawer when nothing is running", async () => {
+        await mountStoryPlots(true);
+
+        expect(
+            [
+                ...storyPlotsPanel()!.querySelectorAll(
+                    ".author-file-editor-story-plots-drawer > summary",
+                ),
+            ].map((drawer) => drawer.textContent),
+        ).toEqual(["Salient concepts", "Plots", "Scenes"]);
+    });
+
+    it("can be dragged wider by its edge", async () => {
+        await mountStoryPlots(true);
+        const panel = storyPlotsPanel() as HTMLElement;
+        const edge = panel.querySelector(
+            ".author-file-editor-story-plots-edge",
+        )!;
+
+        await act(async () => {
+            edge.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    clientX: 500,
+                    bubbles: true,
+                }),
+            );
+            window.dispatchEvent(
+                new PointerEvent("pointermove", { clientX: 420 }),
+            );
+        });
+
+        expect(panel.style.width).toBe("360px");
     });
 
     it("asks for the plots to be identified", async () => {
@@ -986,6 +1116,166 @@ describe("the plots the story weaves", () => {
                 type: "invoke",
                 commandName: "identifyStoryPlots",
                 commandArguments: {},
+            },
+        ]);
+    });
+});
+
+describe("the salient concepts the story holds", () => {
+    const THE_DOOR: WebviewCell = {
+        kind: "salient-concept",
+        source: "What she saw.",
+        attrs: { id: "k1", title: "Door", words: "1-2" },
+    };
+
+    function SelectsTheDoor() {
+        const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+        const salientConceptHighlights =
+            useAuthorFileEditorCellSalientConceptHighlights();
+        const { storyTextShown } = useAuthorFileEditorCellStoryTextShown();
+        return (
+            <button
+                className="test-select-the-door"
+                data-highlights={JSON.stringify(salientConceptHighlights ?? [])}
+                data-shown={JSON.stringify(storyTextShown ?? null)}
+                onClick={() => storyTextSelected(4, 8)}
+            />
+        );
+    }
+
+    function highlightsDrawnOnTheStory(): unknown {
+        return JSON.parse(
+            (
+                document.querySelector(
+                    ".test-select-the-door",
+                ) as HTMLElement
+            ).dataset.highlights!,
+        );
+    }
+
+    async function mountSalientConcepts() {
+        await mountCanvas({
+            cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
+            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            storyPlotsAreShown: true,
+        });
+    }
+
+    function assignButton(): HTMLButtonElement {
+        return salientConcept()!.querySelector(
+            ".author-file-editor-salient-concept-assign",
+        )!;
+    }
+
+    function salientConcept(): Element | null {
+        return document.querySelector(".author-file-editor-salient-concept");
+    }
+
+    it("lists every concept with the words it holds", async () => {
+        await mountSalientConcepts();
+
+        expect(salientConcept()?.querySelector("summary")?.textContent).toBe(
+            "Door",
+        );
+        expect(
+            salientConcept()?.querySelector(
+                ".author-file-editor-salient-concept-words-shown",
+            )?.textContent,
+        ).toBe("door opens.");
+    });
+
+    it("asks for words to be taken out of a concept", async () => {
+        await mountSalientConcepts();
+
+        await click(
+            salientConcept()!.querySelector(
+                ".author-file-editor-salient-concept-words-removed",
+            )!,
+        );
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "removeStoryWordRange",
+                commandArguments: {
+                    conceptCellId: "k1",
+                    firstWord: 1,
+                    lastWord: 2,
+                },
+            },
+        ]);
+    });
+
+    it("highlights none of the words until the concept is opened", async () => {
+        await mountSalientConcepts();
+
+        expect(highlightsDrawnOnTheStory()).toEqual([]);
+    });
+
+    it("highlights the concept's words in its colour once it is opened", async () => {
+        await mountSalientConcepts();
+        const drawer = salientConcept() as HTMLDetailsElement;
+
+        await act(async () => {
+            drawer.open = true;
+            drawer.dispatchEvent(new Event("toggle"));
+        });
+
+        expect(highlightsDrawnOnTheStory()).toEqual([
+            {
+                startCharacterOffsetInCell: 4,
+                endCharacterOffsetInCell: 15,
+                salientConceptColor: 0,
+            },
+        ]);
+    });
+
+    it("shows the cell the exact words of a range clicked in the panel", async () => {
+        await mountSalientConcepts();
+
+        await click(
+            salientConcept()!.querySelector(
+                ".author-file-editor-salient-concept-words-shown",
+            )!,
+        );
+
+        expect(
+            JSON.parse(
+                (
+                    document.querySelector(
+                        ".test-select-the-door",
+                    ) as HTMLElement
+                ).dataset.shown!,
+            ),
+        ).toEqual({
+            cellId: "m1",
+            startCharacterOffsetInCell: 4,
+            endCharacterOffsetInCell: 15,
+        });
+    });
+
+    it("cannot assign anything until words are selected", async () => {
+        await mountSalientConcepts();
+
+        expect(assignButton().disabled).toBe(true);
+    });
+
+    it("asks for the selected words to be assigned to a concept", async () => {
+        await mountSalientConcepts();
+        await click(document.querySelector(".test-select-the-door")!);
+
+        await click(assignButton());
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "assignStoryText",
+                commandArguments: {
+                    conceptCellId: "k1",
+                    cellId: "m1",
+                    startCharacterOffsetInCell: 4,
+                    endCharacterOffsetInCell: 8,
+                },
             },
         ]);
     });

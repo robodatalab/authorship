@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from cortexgrid_infer import ServedRewritingModel
+from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
 from server.storydoc import Document
@@ -17,13 +17,6 @@ from server.writing_tools import grammar_check, prose_check
 def _check_target(path: Path, selection: tuple[int, int] | None) -> str:
     where = "all" if selection is None else f"{selection[0]}-{selection[1]}"
     return f"{path}#{where}"
-
-
-def _story_lines(document: Document, start: int, end: int) -> list[tuple[int, str]]:
-    return [
-        (index, document.lines[index])
-        for index, _ in document.story_lines(start, end)
-    ]
 
 
 def _errors_of(
@@ -68,7 +61,7 @@ class CheckErrorsJob(Job):
 
     def __init__(
         self,
-        model: ServedRewritingModel,
+        model: RewritingModel,
         document: Document,
         selection: tuple[int, int] | None,
     ) -> None:
@@ -82,15 +75,13 @@ class CheckErrorsJob(Job):
     async def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
         crutches = (
-            prose_check.crutch_lemmas(
-                _story_lines(self._document, 0, len(self._document.lines) - 1)
-            )
+            prose_check.crutch_lemmas(list(self._document.story_lines()))
             if self._selection is None
             else frozenset()
         )
         if self.cancelled:
             return
-        passage = _story_lines(self._document, start, end)
+        passage = list(self._document.story_lines(start, end))
         by_the_rules = [
             error
             for finding in await asyncio.to_thread(prose_check.check, passage, crutches)

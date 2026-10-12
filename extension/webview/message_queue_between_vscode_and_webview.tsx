@@ -13,7 +13,9 @@ import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
+    StoryScene,
 } from "../vscode_runtime/commands/identify_story_plots";
+import type { WorkProgress } from "../vscode_runtime/server/jobs";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -37,7 +39,9 @@ interface WhatTheWebviewDraws {
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
     storyPlotsAreShown: boolean;
+    storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
+    storyPlotsProgress: WorkProgress | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -80,7 +84,10 @@ function processMessageFromVscode(
         drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
     } else if (message.data?.type === "storyPlots") {
         drawn.storyPlotsAreShown = message.data.storyPlotsAreShown as boolean;
+        drawn.storyScenes = message.data.storyScenes as StoryScene[];
         drawn.storyPlots = message.data.storyPlots as StoryPlot[];
+        drawn.storyPlotsProgress = message.data
+            .storyPlotsProgress as WorkProgress | null;
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
     } else if (message.data?.type === "cellsBeingWritten") {
@@ -111,7 +118,9 @@ function openTheAuthorFileEditor(): void {
         commands: [],
         proseErrors: [],
         storyPlotsAreShown: false,
+        storyScenes: [],
         storyPlots: [],
+        storyPlotsProgress: null,
         paragraphsInStoryPlots: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
@@ -128,7 +137,9 @@ function openTheAuthorFileEditor(): void {
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
                 storyPlotsAreShown={drawn.storyPlotsAreShown}
+                storyScenes={drawn.storyScenes}
                 storyPlots={drawn.storyPlots}
+                storyPlotsProgress={drawn.storyPlotsProgress}
                 paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}

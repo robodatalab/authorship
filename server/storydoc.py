@@ -45,12 +45,13 @@ PART = "part"
 DIVIDER = "divider"
 TITLE_PAGE = "title-page"
 IMAGE = "image"
-CONTENTS = "contents"
+TABLE_OF_CONTENTS = "contents"
 DISCLAIMER = "disclaimer"
 ABOUT = "about"
 BLURB = "blurb"
 NOTE = "note"
 RECAP = "recap"
+SALIENT_CONCEPT = "salient-concept"
 
 # What an attribute says when the answer to it is no.
 NO = "no"
@@ -148,10 +149,6 @@ def save(path: Path, cells: list[Cell]) -> None:
     path.write_text(dumps(cells), encoding="utf-8")
 
 
-def cells_of(cells: list[Cell], kind: str) -> list[Cell]:
-    return [cell for cell in cells if cell.kind == kind]
-
-
 def add_missing(cells: list[Cell], wanted: list[Cell]) -> list[Cell]:
     added_cells = list(cells)
     for cell in wanted:
@@ -184,8 +181,8 @@ def is_full_page(cell: Cell) -> bool:
     return cell.attrs.get(FULL_PAGE, "") != NO
 
 
-def contents() -> Cell:
-    return Cell(CONTENTS)
+def table_of_contents() -> Cell:
+    return Cell(TABLE_OF_CONTENTS)
 
 
 def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
@@ -231,8 +228,9 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 
     return ranges
 
-BUILT_KINDS = frozenset({CONTENTS})
-PRIVATE_KINDS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
+GENERATED_CELLS = frozenset({TABLE_OF_CONTENTS})
+PUBLISHING_METADATA_CELLS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
+STORY_ANNOTATION_CELLS = frozenset({SALIENT_CONCEPT})
 
 
 def _prose_of(lines: list[tuple[int, str]]) -> str:
@@ -263,19 +261,27 @@ class Document:
         return cls(path.read_text(encoding="utf-8"), path)
 
     @property
+    def title_page(self) -> Cell:
+        """What the book says of itself, blank in a document that says nothing."""
+        return next(
+            (cell for cell in self.cells if cell.kind == TITLE_PAGE), Cell(TITLE_PAGE)
+        )
+
+    @property
     def title(self) -> str:
-        """What the book is called, which only the title page says."""
-        for cell in self.cells:
-            if cell.kind == TITLE_PAGE and cell.title:
-                return cell.title
-        return "Anonymous"
+        return self.title_page.title or "Anonymous"
+
+    def markdown_cells(self) -> list[Cell]:
+        return [cell for cell in self.cells if cell.kind == MARKDOWN]
 
     def story_lines(
         self, start: int = 0, end: int | None = None
     ) -> Iterator[tuple[int, str]]:
+        """The story itself, line by line: the prose of the markdown cells,
+        by the line of the document each is written on."""
         last = len(self.lines) - 1 if end is None else end
         for cell in self.cells:
-            if cell.at is None or cell.kind in BUILT_KINDS:
+            if cell.at is None or cell.kind != MARKDOWN:
                 continue
             first, final = cell.at
             covered = list(range(first, final + 1))
@@ -285,9 +291,8 @@ class Document:
                 [self.lines[i] for i in covered], covered
             ):
                 for index in range(max(kept_first, start), min(kept_last, last) + 1):
-                    said = self.lines[index].strip()
-                    if said:
-                        yield index, said
+                    if self.lines[index].strip():
+                        yield index, self.lines[index]
 
     @property
     def chapters(self) -> list[tuple[str, str]]:
@@ -296,7 +301,7 @@ class Document:
         for cell in self.cells:
             if cell.kind == CHAPTER:
                 found.append((cell.title or f"Chapter {len(found) + 1}", []))
-            elif found and cell.at and cell.kind not in PRIVATE_KINDS:
+            elif found and cell.at:
                 found[-1][1].extend(self.story_lines(*cell.at))
         return [(title, _prose_of(lines)) for title, lines in found if lines]
 
