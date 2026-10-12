@@ -6,6 +6,7 @@ import {
 } from "../../../extension/vscode_runtime/storydoc/model";
 import {
     salientConceptsIn,
+    storyTextSpansOf,
     storyWordRangesOf,
     storyWordsIn,
     synchronizeTheStoryWordRanges,
@@ -80,6 +81,32 @@ describe("the story's words", () => {
             startCharacterOffsetInCell: 3,
             endCharacterOffsetInCell: 8,
         });
+    });
+});
+
+describe("the text a range of story words covers", () => {
+    it("is one span in every cell the range reaches", () => {
+        const story = ImmutableAuthorDocument.fromText(
+            storyWhereSheSaw("She saw the door.", "2-5"),
+        );
+
+        expect(
+            storyTextSpansOf(storyWordsIn(story.cells), {
+                firstWord: 2,
+                lastWord: 5,
+            }),
+        ).toEqual([
+            {
+                cellId: "c2",
+                startCharacterOffsetInCell: 8,
+                endCharacterOffsetInCell: 17,
+            },
+            {
+                cellId: "c3",
+                startCharacterOffsetInCell: 0,
+                endCharacterOffsetInCell: 8,
+            },
+        ]);
     });
 });
 

@@ -27,8 +27,15 @@ import {
     opensASection,
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
-import { salientConceptsIn } from "../../vscode_runtime/storydoc/story_words";
-import { MarkdownEditorMediator } from "../markdown/MarkdownEditor";
+import {
+    salientConceptsIn,
+    storyTextSpansOf,
+    storyWordsIn,
+} from "../../vscode_runtime/storydoc/story_words";
+import {
+    MarkdownEditorMediator,
+    type MarkdownEditorSalientConceptHighlight,
+} from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
 const CELL_BUTTON_GROUP = "cell";
@@ -155,10 +162,64 @@ export function AuthorFileEditorCanvas({
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
     const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
+    const [salientConceptsShown, showSalientConcepts] = useState<
+        ReadonlySet<string>
+    >(() => new Set());
+    const salientConceptHighlightsByCellId = useMemo(() => {
+        const storyWords = storyWordsIn(cells);
+        const byCellId = new Map<
+            string,
+            MarkdownEditorSalientConceptHighlight[]
+        >();
+        salientConcepts.forEach((concept, salientConceptColor) => {
+            if (!salientConceptsShown.has(concept.conceptCellId)) {
+                return;
+            }
+            for (const storyWordRange of concept.storyWordRanges) {
+                for (const span of storyTextSpansOf(storyWords, storyWordRange)) {
+                    byCellId.set(span.cellId, [
+                        ...(byCellId.get(span.cellId) ?? []),
+                        {
+                            startCharacterOffsetInCell:
+                                span.startCharacterOffsetInCell,
+                            endCharacterOffsetInCell:
+                                span.endCharacterOffsetInCell,
+                            salientConceptColor,
+                        },
+                    ]);
+                }
+            }
+        });
+        return byCellId;
+    }, [cells, salientConcepts, salientConceptsShown]);
+
+    function showTheSalientConcept(
+        conceptCellId: string,
+        isShown: boolean,
+    ): void {
+        showSalientConcepts((shown) => {
+            if (shown.has(conceptCellId) === isShown) {
+                return shown;
+            }
+            const nowShown = new Set(shown);
+            if (isShown) {
+                nowShown.add(conceptCellId);
+            } else {
+                nowShown.delete(conceptCellId);
+            }
+            return nowShown;
+        });
+    }
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
-    const [storyTextSelected, selectStoryText] =
-        useState<StoryTextSelected | null>(null);
+    const storyTextSelected = useRef<StoryTextSelected | null>(null);
+    const [storyTextIsSelected, sayWhetherStoryTextIsSelected] =
+        useState(false);
+
+    function selectStoryText(selected: StoryTextSelected | null): void {
+        storyTextSelected.current = selected;
+        sayWhetherStoryTextIsSelected(selected !== null);
+    }
     const find = useAuthorFileEditorFind(
         cells,
         sendMessagesToVscode,
@@ -319,6 +380,9 @@ export function AuthorFileEditorCanvas({
                                           )
                                         : []
                                 }
+                                salientConceptHighlights={salientConceptHighlightsByCellId.get(
+                                    cell.attrs.id,
+                                )}
                                 findMatches={findMatchesByCellId.get(
                                     cell.attrs.id,
                                 )}
@@ -405,7 +469,8 @@ export function AuthorFileEditorCanvas({
             {storyPlotsAreShown && (
                 <AuthorFileEditorStoryPlots
                     salientConcepts={salientConcepts}
-                    storyTextIsSelected={storyTextSelected !== null}
+                    salientConceptsShown={salientConceptsShown}
+                    storyTextIsSelected={storyTextIsSelected}
                     storyScenes={storyScenes}
                     storyPlots={storyPlots}
                     storyPlotsProgress={storyPlotsProgress}
@@ -416,11 +481,15 @@ export function AuthorFileEditorCanvas({
                             {},
                         )
                     }
+                    onSalientConceptToggled={showTheSalientConcept}
                     onStoryTextAssigned={(conceptCellId) =>
                         invokeAuthorDocumentCommand(
                             sendMessagesToVscode,
                             "assignStoryText",
-                            { conceptCellId, ...storyTextSelected },
+                            {
+                                conceptCellId,
+                                ...storyTextSelected.current,
+                            },
                         )
                     }
                     onStoryWordRangeShown={bringTheCellToTheTop}

@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import * as monaco from "monaco-editor/editor/editor.api";
@@ -17,6 +24,10 @@ import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileE
 import { LinterTooltip } from "../linter/LinterTooltip";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
+import {
+    storyWordSpansIn,
+    type StoryWordSpan,
+} from "../../vscode_runtime/storydoc/story_words";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -46,6 +57,16 @@ const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
 const STORY_PLOT_COLORS_THE_STYLESHEET_DEFINES = 6;
 const MONACO_STOPS_WRAPPING_THIS_FAR_BEFORE_ITS_VERTICAL_SCROLLBAR_PX = 2;
+const MARKDOWN_WORDS_A_RENDERED_WORD_MAY_SKIP = 8;
+
+export interface MarkdownEditorSalientConceptHighlight {
+    startCharacterOffsetInCell: number;
+    endCharacterOffsetInCell: number;
+    salientConceptColor: number;
+}
+
+const NO_SALIENT_CONCEPT_HIGHLIGHTS: MarkdownEditorSalientConceptHighlight[] =
+    [];
 
 export function storyPlotColorClassName(storyPlotIndex: number): string {
     return `markdown-editor-story-plot-${storyPlotIndex % STORY_PLOT_COLORS_THE_STYLESHEET_DEFINES}`;
@@ -112,6 +133,7 @@ interface MarkdownEditorProps {
     errors?: ProseCheckError[];
     highlights?: AuthorFileEditorFindHighlight[];
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
+    salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
     onFixAsked?: (error: ProseCheckError) => void;
     onTextSelected?: (selectedFrom: number, selectedTo: number) => void;
     children?: (markdown: string) => ReactNode;
@@ -125,17 +147,113 @@ export function MarkdownEditor({
     errors = [],
     highlights = [],
     paragraphsInStoryPlots = [],
+    salientConceptHighlights = NO_SALIENT_CONCEPT_HIGHLIGHTS,
     onFixAsked = () => undefined,
-    onTextSelected = () => undefined,
+    onTextSelected,
     children,
 }: MarkdownEditorProps) {
     const { isEditing, beginEditing, finishEditing } =
         useMarkdownEditorBeingEdited(cellId);
     const [markdownShown, showMarkdown] = useState(markdown);
+    const renderedMarkdown = useRef<HTMLDivElement>(null);
+    const textSelectedNow = useRef(onTextSelected);
+    textSelectedNow.current = onTextSelected;
 
     useEffect(() => {
         showMarkdown(markdown);
     }, [markdown, timesTheHostWroteIt]);
+
+    useEffect(() => {
+        if (isEditing || children || !textSelectedNow.current) {
+            return;
+        }
+        const selectionChanged = (): void => {
+            const rendered = renderedMarkdown.current;
+            const selection = document.getSelection();
+            if (!rendered || !selection || selection.rangeCount === 0) {
+                return;
+            }
+            const selected = selection.getRangeAt(0);
+            if (
+                !rendered.contains(selected.startContainer) ||
+                !rendered.contains(selected.endContainer)
+            ) {
+                return;
+            }
+            if (selected.collapsed) {
+                textSelectedNow.current?.(0, 0);
+                return;
+            }
+            const inTheMarkdown = whereTheRenderedSelectionStandsInTheMarkdown(
+                markdownShown,
+                rendered,
+                selected,
+            );
+            textSelectedNow.current?.(inTheMarkdown.from, inTheMarkdown.to);
+        };
+        document.addEventListener("selectionchange", selectionChanged);
+        return () =>
+            document.removeEventListener("selectionchange", selectionChanged);
+    }, [isEditing, children, markdownShown]);
+
+    const renderedHtml =
+        isEditing || children
+            ? ""
+            : markedUp(
+                  renderedWithStoryPlotBorders(
+                      fenced(markdownShown, highlights),
+                      paragraphsInStoryPlots,
+                  ),
+              );
+    const renderedHtmlThatKeepsTheSelection = useMemo(
+        () => ({ __html: renderedHtml }),
+        [renderedHtml],
+    );
+
+    useEffect(() => {
+        const rendered = renderedMarkdown.current;
+        if (
+            isEditing ||
+            children ||
+            !rendered ||
+            salientConceptHighlights.length === 0 ||
+            typeof Highlight === "undefined"
+        ) {
+            return;
+        }
+        const drawn = salientConceptHighlights.flatMap((highlighted) => {
+            const range = renderedRangeOfTheMarkdown(
+                markdownShown,
+                rendered,
+                highlighted.startCharacterOffsetInCell,
+                highlighted.endCharacterOffsetInCell,
+            );
+            return range
+                ? [
+                      {
+                          highlight: salientConceptHighlightOfColor(
+                              highlighted.salientConceptColor,
+                          ),
+                          range,
+                      },
+                  ]
+                : [];
+        });
+        for (const { highlight, range } of drawn) {
+            highlight.add(range);
+        }
+        return () => {
+            for (const { highlight, range } of drawn) {
+                highlight.delete(range);
+            }
+        };
+    }, [
+        isEditing,
+        children,
+        markdownShown,
+        renderedHtml,
+        salientConceptHighlights,
+    ]);
 
     if (!isEditing && children) {
         return (
@@ -149,15 +267,9 @@ export function MarkdownEditor({
         return (
             <div
                 className="markdown-rendered"
+                ref={renderedMarkdown}
                 onDoubleClick={beginEditing}
-                dangerouslySetInnerHTML={{
-                    __html: markedUp(
-                        renderedWithStoryPlotBorders(
-                            fenced(markdownShown, highlights),
-                            paragraphsInStoryPlots,
-                        ),
-                    ),
-                }}
+                dangerouslySetInnerHTML={renderedHtmlThatKeepsTheSelection}
             />
         );
     }
@@ -168,8 +280,9 @@ export function MarkdownEditor({
             errors={errors}
             highlights={highlights}
             paragraphsInStoryPlots={paragraphsInStoryPlots}
+            salientConceptHighlights={salientConceptHighlights}
             onFixAsked={onFixAsked}
-            onTextSelected={onTextSelected}
+            onTextSelected={onTextSelected ?? (() => undefined)}
             onMarkdownChanged={(typed) => {
                 showMarkdown(typed);
                 onMarkdownCommitted(typed);
@@ -177,6 +290,160 @@ export function MarkdownEditor({
             onFinished={finishEditing}
         />
     );
+}
+
+function renderedCharactersBefore(
+    rendered: HTMLElement,
+    node: Node,
+    offset: number,
+): number {
+    const before = document.createRange();
+    before.setStart(rendered, 0);
+    before.setEnd(node, offset);
+    return before.toString().length;
+}
+
+function lettersAndDigitsOf(word: string): string {
+    return word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function markdownWordOfEachRenderedWord(
+    renderedWords: StoryWordSpan[],
+    markdownWords: StoryWordSpan[],
+): (number | null)[] {
+    let nextMarkdownWord = 0;
+    return renderedWords.map((renderedWord) => {
+        const wanted = lettersAndDigitsOf(renderedWord.text);
+        const lookedAsFarAs = Math.min(
+            markdownWords.length,
+            nextMarkdownWord + MARKDOWN_WORDS_A_RENDERED_WORD_MAY_SKIP,
+        );
+        for (
+            let looked = nextMarkdownWord;
+            looked < lookedAsFarAs;
+            looked += 1
+        ) {
+            if (lettersAndDigitsOf(markdownWords[looked].text) === wanted) {
+                nextMarkdownWord = looked + 1;
+                return looked;
+            }
+        }
+        return null;
+    });
+}
+
+function salientConceptHighlightOfColor(salientConceptColor: number): Highlight {
+    const highlightName = `markdown-editor-salient-concept-${salientConceptColor % STORY_PLOT_COLORS_THE_STYLESHEET_DEFINES}`;
+    const registered = CSS.highlights.get(highlightName);
+    if (registered) {
+        return registered;
+    }
+    const highlight = new Highlight();
+    CSS.highlights.set(highlightName, highlight);
+    return highlight;
+}
+
+function renderedPositionOf(
+    rendered: HTMLElement,
+    renderedOffset: number,
+): { node: Node; offset: number } | null {
+    const walking = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+    let charactersPassed = 0;
+    while (walking.nextNode()) {
+        const text = walking.currentNode as Text;
+        if (renderedOffset <= charactersPassed + text.data.length) {
+            return { node: text, offset: renderedOffset - charactersPassed };
+        }
+        charactersPassed += text.data.length;
+    }
+    return null;
+}
+
+function renderedRangeOfTheMarkdown(
+    markdown: string,
+    rendered: HTMLElement,
+    from: number,
+    to: number,
+): Range | null {
+    const markdownWords = storyWordSpansIn(markdown);
+    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownWordOfEach = markdownWordOfEachRenderedWord(
+        renderedWords,
+        markdownWords,
+    );
+    const renderedWordsCovered = renderedWords.filter(
+        (_renderedWord, renderedWordIndex) => {
+            const markdownWord = markdownWordOfEach[renderedWordIndex];
+            return (
+                markdownWord !== null &&
+                markdownWords[markdownWord].startCharacterOffsetInCell < to &&
+                from < markdownWords[markdownWord].endCharacterOffsetInCell
+            );
+        },
+    );
+    if (renderedWordsCovered.length === 0) {
+        return null;
+    }
+    const startsAt = renderedPositionOf(
+        rendered,
+        renderedWordsCovered[0].startCharacterOffsetInCell,
+    );
+    const endsAt = renderedPositionOf(
+        rendered,
+        renderedWordsCovered[renderedWordsCovered.length - 1]
+            .endCharacterOffsetInCell,
+    );
+    if (!startsAt || !endsAt) {
+        return null;
+    }
+    const range = document.createRange();
+    range.setStart(startsAt.node, startsAt.offset);
+    range.setEnd(endsAt.node, endsAt.offset);
+    return range;
+}
+
+function whereTheRenderedSelectionStandsInTheMarkdown(
+    markdown: string,
+    rendered: HTMLElement,
+    selected: Range,
+): { from: number; to: number } {
+    const selectedFrom = renderedCharactersBefore(
+        rendered,
+        selected.startContainer,
+        selected.startOffset,
+    );
+    const selectedTo = renderedCharactersBefore(
+        rendered,
+        selected.endContainer,
+        selected.endOffset,
+    );
+    const markdownWords = storyWordSpansIn(markdown);
+    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownWordOfEach = markdownWordOfEachRenderedWord(
+        renderedWords,
+        markdownWords,
+    );
+    const markdownWordsSelected = renderedWords
+        .map((renderedWord, renderedWordIndex) => ({
+            renderedWord,
+            markdownWord: markdownWordOfEach[renderedWordIndex],
+        }))
+        .filter(
+            ({ renderedWord, markdownWord }) =>
+                markdownWord !== null &&
+                renderedWord.startCharacterOffsetInCell < selectedTo &&
+                selectedFrom < renderedWord.endCharacterOffsetInCell,
+        )
+        .map(({ markdownWord }) => markdownWord as number);
+    if (markdownWordsSelected.length === 0) {
+        return { from: 0, to: 0 };
+    }
+    return {
+        from: markdownWords[Math.min(...markdownWordsSelected)]
+            .startCharacterOffsetInCell,
+        to: markdownWords[Math.max(...markdownWordsSelected)]
+            .endCharacterOffsetInCell,
+    };
 }
 
 function storyPlotColorClassNamesOf(
@@ -277,6 +544,7 @@ interface MonacoMarkdownEditorProps {
     errors: ProseCheckError[];
     highlights: AuthorFileEditorFindHighlight[];
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    salientConceptHighlights: MarkdownEditorSalientConceptHighlight[];
     onFixAsked: (error: ProseCheckError) => void;
     onTextSelected: (selectedFrom: number, selectedTo: number) => void;
     onMarkdownChanged: (markdown: string) => void;
@@ -294,6 +562,7 @@ function MonacoMarkdownEditor({
     errors,
     highlights,
     paragraphsInStoryPlots,
+    salientConceptHighlights,
     onFixAsked,
     onTextSelected,
     onMarkdownChanged,
@@ -308,6 +577,8 @@ function MonacoMarkdownEditor({
     const drawnHighlights =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const drawnStoryPlotBorders =
+        useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const drawnSalientConceptHighlights =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const errorsNow = useRef(errors);
     errorsNow.current = errors;
@@ -411,6 +682,8 @@ function MonacoMarkdownEditor({
         drawnMarks.current = editor.createDecorationsCollection([]);
         drawnHighlights.current = editor.createDecorationsCollection([]);
         drawnStoryPlotBorders.current = editor.createDecorationsCollection([]);
+        drawnSalientConceptHighlights.current =
+            editor.createDecorationsCollection([]);
 
         const errorUnderPointer = (
             event: monaco.editor.IEditorMouseEvent,
@@ -594,6 +867,24 @@ function MonacoMarkdownEditor({
             ),
         );
     }, [paragraphsInStoryPlots, markdown]);
+
+    useEffect(() => {
+        const model = monacoEditor.current?.getModel();
+        if (!model) {
+            return;
+        }
+        drawnSalientConceptHighlights.current?.set(
+            salientConceptHighlights.map((highlighted) => ({
+                range: monaco.Range.fromPositions(
+                    model.getPositionAt(highlighted.startCharacterOffsetInCell),
+                    model.getPositionAt(highlighted.endCharacterOffsetInCell),
+                ),
+                options: {
+                    inlineClassName: `markdown-editor-salient-concept ${storyPlotColorClassName(highlighted.salientConceptColor)}`,
+                },
+            })),
+        );
+    }, [salientConceptHighlights, markdown]);
 
     return (
         <>

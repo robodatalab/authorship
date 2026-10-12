@@ -11,16 +11,25 @@ type StoryDocumentCell = Pick<ImmutableCell, "kind" | "source" | "attrs">;
 
 export const STORY_WORD_RANGES = "words";
 
-export interface StoryWord {
-    cellId: string;
+export interface StoryWordSpan {
     text: string;
     startCharacterOffsetInCell: number;
     endCharacterOffsetInCell: number;
 }
 
+export interface StoryWord extends StoryWordSpan {
+    cellId: string;
+}
+
 export interface StoryWordRange {
     firstWord: number;
     lastWord: number;
+}
+
+export interface StoryTextSpan {
+    cellId: string;
+    startCharacterOffsetInCell: number;
+    endCharacterOffsetInCell: number;
 }
 
 export interface StoryWordRangeInTheStory extends StoryWordRange {
@@ -46,15 +55,21 @@ interface WhereTheStoryWordsWent {
     wordsTheEditsReplaced: WordsAnEditReplaced[];
 }
 
-function storyWordsInTheCell(cell: StoryDocumentCell): StoryWord[] {
-    return [...cell.source.matchAll(/\S+/g)]
+export function storyWordSpansIn(text: string): StoryWordSpan[] {
+    return [...text.matchAll(/\S+/g)]
         .filter((run) => /\w/.test(run[0]))
         .map((run) => ({
-            cellId: cell.attrs[UNIQUE_CELL_ID],
             text: run[0],
             startCharacterOffsetInCell: run.index,
             endCharacterOffsetInCell: run.index + run[0].length,
         }));
+}
+
+function storyWordsInTheCell(cell: StoryDocumentCell): StoryWord[] {
+    return storyWordSpansIn(cell.source).map((span) => ({
+        cellId: cell.attrs[UNIQUE_CELL_ID],
+        ...span,
+    }));
 }
 
 export function storyWordsIn(
@@ -63,6 +78,26 @@ export function storyWordsIn(
     return cells
         .filter((cell) => cell.kind === MARKDOWN)
         .flatMap(storyWordsInTheCell);
+}
+
+export function storyTextSpansOf(
+    storyWords: readonly StoryWord[],
+    range: StoryWordRange,
+): StoryTextSpan[] {
+    const spans: StoryTextSpan[] = [];
+    for (const word of storyWords.slice(range.firstWord, range.lastWord + 1)) {
+        const spanBefore = spans[spans.length - 1];
+        if (spanBefore?.cellId === word.cellId) {
+            spanBefore.endCharacterOffsetInCell = word.endCharacterOffsetInCell;
+        } else {
+            spans.push({
+                cellId: word.cellId,
+                startCharacterOffsetInCell: word.startCharacterOffsetInCell,
+                endCharacterOffsetInCell: word.endCharacterOffsetInCell,
+            });
+        }
+    }
+    return spans;
 }
 
 export function storyWordRangeBetween(

@@ -11,6 +11,7 @@ import type {
     AuthorFileEditorFindHighlight,
     AuthorFileEditorFindMatch,
 } from "./AuthorFileEditorFind";
+import type { MarkdownEditorSalientConceptHighlight } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
@@ -48,6 +49,7 @@ interface AuthorFileEditorCellStateProps {
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
+    salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
     findMatches?: AuthorFileEditorFindMatch[];
     currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
@@ -66,6 +68,7 @@ const AuthorFileEditorCellStateContext = createContext<
     cellAttributes: {},
     proseErrors: [],
     paragraphsInStoryPlots: [],
+    salientConceptHighlights: undefined,
     findMatches: [],
     currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
@@ -81,6 +84,7 @@ export function AuthorFileEditorCellState({
     cellAttributes,
     proseErrors = [],
     paragraphsInStoryPlots = [],
+    salientConceptHighlights,
     findMatches = [],
     currentFindMatch = null,
     howFarTheCellHasBeenWritten,
@@ -98,6 +102,7 @@ export function AuthorFileEditorCellState({
                 cellAttributes,
                 proseErrors,
                 paragraphsInStoryPlots,
+                salientConceptHighlights,
                 findMatches,
                 currentFindMatch,
                 howFarTheCellHasBeenWritten,
@@ -208,6 +213,13 @@ export function AuthorFileEditorCellCard({
 
 export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
+}
+
+export function useAuthorFileEditorCellSalientConceptHighlights():
+    | MarkdownEditorSalientConceptHighlight[]
+    | undefined {
+    return useContext(AuthorFileEditorCellStateContext)
+        .salientConceptHighlights;
 }
 
 export function useAuthorFileEditorCellStoryTextSelected(): (

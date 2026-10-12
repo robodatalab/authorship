@@ -136,6 +136,7 @@
 }
 
 .author-file-editor-salient-concept ul {
+    clear: both;
     margin: 0 0 8px 16px;
     padding: 0;
     list-style: none;

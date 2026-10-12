@@ -7,6 +7,7 @@ import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
     useAuthorFileEditorCellParagraphsInStoryPlots,
+    useAuthorFileEditorCellSalientConceptHighlights,
     useAuthorFileEditorCellStoryTextSelected,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type {
@@ -1128,11 +1129,24 @@ describe("the salient concepts the story holds", () => {
 
     function SelectsTheDoor() {
         const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+        const salientConceptHighlights =
+            useAuthorFileEditorCellSalientConceptHighlights();
         return (
             <button
                 className="test-select-the-door"
+                data-highlights={JSON.stringify(salientConceptHighlights ?? [])}
                 onClick={() => storyTextSelected(4, 8)}
             />
+        );
+    }
+
+    function highlightsDrawnOnTheStory(): unknown {
+        return JSON.parse(
+            (
+                document.querySelector(
+                    ".test-select-the-door",
+                ) as HTMLElement
+            ).dataset.highlights!,
         );
     }
 
@@ -1185,6 +1199,30 @@ describe("the salient concepts the story holds", () => {
                     firstWord: 1,
                     lastWord: 2,
                 },
+            },
+        ]);
+    });
+
+    it("highlights none of the words until the concept is opened", async () => {
+        await mountSalientConcepts();
+
+        expect(highlightsDrawnOnTheStory()).toEqual([]);
+    });
+
+    it("highlights the concept's words in its colour once it is opened", async () => {
+        await mountSalientConcepts();
+        const drawer = salientConcept() as HTMLDetailsElement;
+
+        await act(async () => {
+            drawer.open = true;
+            drawer.dispatchEvent(new Event("toggle"));
+        });
+
+        expect(highlightsDrawnOnTheStory()).toEqual([
+            {
+                startCharacterOffsetInCell: 4,
+                endCharacterOffsetInCell: 15,
+                salientConceptColor: 0,
             },
         ]);
     });

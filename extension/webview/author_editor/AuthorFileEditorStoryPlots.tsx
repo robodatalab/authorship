@@ -19,11 +19,13 @@ const WIDEST = 720;
 
 interface AuthorFileEditorStoryPlotsProps {
     salientConcepts: SalientConceptInTheStory[];
+    salientConceptsShown: ReadonlySet<string>;
     storyTextIsSelected: boolean;
     storyScenes: StoryScene[];
     storyPlots: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     onIdentifyStoryPlotsAsked: () => void;
+    onSalientConceptToggled: (conceptCellId: string, isShown: boolean) => void;
     onStoryTextAssigned: (conceptCellId: string) => void;
     onStoryWordRangeShown: (cellId: string) => void;
     onStoryWordRangeRemoved: (
@@ -38,11 +40,13 @@ function spokenFact(fact: StoryFact): string {
 
 export function AuthorFileEditorStoryPlots({
     salientConcepts,
+    salientConceptsShown,
     storyTextIsSelected,
     storyScenes,
     storyPlots,
     storyPlotsProgress = null,
     onIdentifyStoryPlotsAsked,
+    onSalientConceptToggled,
     onStoryTextAssigned,
     onStoryWordRangeShown,
     onStoryWordRangeRemoved,
@@ -99,7 +103,18 @@ export function AuthorFileEditorStoryPlots({
                     <ul>
                         {salientConcepts.map((concept, conceptIndex) => (
                             <li key={concept.conceptCellId}>
-                                <details className="author-file-editor-salient-concept">
+                                <details
+                                    className="author-file-editor-salient-concept"
+                                    open={salientConceptsShown.has(
+                                        concept.conceptCellId,
+                                    )}
+                                    onToggle={(toggled) =>
+                                        onSalientConceptToggled(
+                                            concept.conceptCellId,
+                                            toggled.currentTarget.open,
+                                        )
+                                    }
+                                >
                                     <summary>
                                         <span
                                             className={`author-file-editor-story-plot-swatch ${storyPlotColorClassName(conceptIndex)}`}
@@ -111,6 +126,9 @@ export function AuthorFileEditorStoryPlots({
                                             title="Assign the selected words to this concept"
                                             aria-label="Assign the selected words to this concept"
                                             disabled={!storyTextIsSelected}
+                                            onMouseDown={(pressed) =>
+                                                pressed.preventDefault()
+                                            }
                                             onClick={(clicked) => {
                                                 clicked.preventDefault();
                                                 onStoryTextAssigned(

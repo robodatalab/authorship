@@ -725,3 +725,147 @@ describe("selecting text", () => {
         expect(selected).toHaveBeenCalledWith(4, 11);
     });
 });
+
+describe("selecting text in the rendered markdown", () => {
+    async function mountRendered(
+        markdown: string,
+        selected: ReturnType<typeof vi.fn>,
+    ): Promise<HTMLElement> {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown={markdown}
+                        onMarkdownCommitted={committedSpy()}
+                        onTextSelected={selected}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+        return document.querySelector(".markdown-rendered")!;
+    }
+
+    async function selectInTheRenderedText(
+        rendered: HTMLElement,
+        from: string,
+        to: string,
+    ): Promise<void> {
+        const textNodes: Text[] = [];
+        const walking = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+        while (walking.nextNode()) {
+            textNodes.push(walking.currentNode as Text);
+        }
+        const startsIn = textNodes.find((node) => node.data.includes(from))!;
+        const endsIn = textNodes.find((node) => node.data.includes(to))!;
+        const range = document.createRange();
+        range.setStart(startsIn, startsIn.data.indexOf(from));
+        range.setEnd(endsIn, endsIn.data.indexOf(to) + to.length);
+        await act(async () => {
+            document.getSelection()!.removeAllRanges();
+            document.getSelection()!.addRange(range);
+            document.dispatchEvent(new Event("selectionchange"));
+        });
+    }
+
+    it("says which words of the markdown the selection touches", async () => {
+        const selected = vi.fn();
+        const rendered = await mountRendered("She saw **the** door.", selected);
+
+        await selectInTheRenderedText(rendered, "the", "do");
+
+        expect(selected).toHaveBeenLastCalledWith(8, 21);
+    });
+
+    it("keeps the rendered text, and so the selection, when the page is drawn again", async () => {
+        const selected = vi.fn();
+        const rendered = await mountRendered("She saw the door.", selected);
+        const textSelectedIn = rendered.querySelector("p")!.firstChild!;
+
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw the door."
+                        onMarkdownCommitted={committedSpy()}
+                        onTextSelected={vi.fn()}
+                        highlights={[]}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+
+        expect(textSelectedIn.isConnected).toBe(true);
+    });
+
+    it("finds the words past markdown that renders no words", async () => {
+        const selected = vi.fn();
+        const rendered = await mountRendered(
+            "1. She saw the door.\n2. He heard the bell.",
+            selected,
+        );
+
+        await selectInTheRenderedText(rendered, "heard", "heard");
+
+        expect(selected).toHaveBeenLastCalledWith(27, 32);
+    });
+});
+
+describe("the words of a salient concept", () => {
+    const THE_DOOR_HIGHLIGHTED = [
+        {
+            startCharacterOffsetInCell: 8,
+            endCharacterOffsetInCell: 21,
+            salientConceptColor: 1,
+        },
+    ];
+
+    async function mountHighlighted(): Promise<void> {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw **the** door."
+                        onMarkdownCommitted={committedSpy()}
+                        salientConceptHighlights={THE_DOOR_HIGHLIGHTED}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+    }
+
+    it("are highlighted in the rendered text, in the concept's colour", async () => {
+        const highlights = new Map<string, Set<Range>>();
+        vi.stubGlobal("Highlight", Set);
+        vi.stubGlobal("CSS", { highlights });
+
+        await mountHighlighted();
+
+        expect(
+            [
+                ...(highlights.get("markdown-editor-salient-concept-1") ?? []),
+            ].map((range) => range.toString()),
+        ).toEqual(["the door."]);
+        vi.unstubAllGlobals();
+    });
+
+    it("are highlighted in the editor, in the concept's colour", async () => {
+        await mountHighlighted();
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        expect(latestEditor().marks()).toContainEqual({
+            range: {
+                from: { lineNumber: 1, column: 9 },
+                to: { lineNumber: 1, column: 22 },
+            },
+            options: {
+                inlineClassName:
+                    "markdown-editor-salient-concept markdown-editor-story-plot-1",
+            },
+        });
+    });
+});
