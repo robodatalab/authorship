@@ -6,6 +6,10 @@ import { DeleteCellCommand } from "./delete_cell";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
+import {
+    FindInTheDocumentCommand,
+    ReplaceFindMatchesCommand,
+} from "./find_in_the_document";
 import { FixProseCommand } from "./fix_prose";
 import { FixStyleCommand } from "./fix_style";
 import { FoldAllCommand } from "./fold_all";
@@ -18,7 +22,6 @@ import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
 import { ReplaceAttributeCommand } from "./replace_attribute";
-import { ReplaceTextsCommand } from "./replace_texts";
 import { RunAllCommand } from "./run_all";
 import { ToggleStoryPlotsCommand } from "./toggle_story_plots";
 import { WriteBlurbCommand } from "./write_blurb";
@@ -56,7 +59,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DeleteCellCommand(),
     new InsertCellCommand(),
     new ReplaceAttributeCommand(),
-    new ReplaceTextsCommand(),
+    new FindInTheDocumentCommand(),
+    new ReplaceFindMatchesCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),

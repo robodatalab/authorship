@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./commands/check_prose";
 import type {
+    AuthorFileEditorFindMatch,
+    AuthorFileEditorFindMatchInTheProse,
+} from "./commands/find_in_the_document";
+import type {
     ParagraphInStoryPlots,
     StoryPlot,
     StoryScene,
@@ -28,11 +32,15 @@ export class AuthorFileEditorSession
     private storyScenes: StoryScene[] = [];
     private storyPlots: StoryPlot[] = [];
     private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
+    private readonly findMatches: AuthorFileEditorFindMatch[] = [];
+    private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
+        [];
     private storyPlotsAreShown = false;
     private storyPlotsProgress: WorkProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private readonly paragraphsInStoryPlotsSynchronizer: AuthorDocSynchronizer<ParagraphInStoryPlots>;
+    private readonly findMatchesInTheProseSynchronizer: AuthorDocSynchronizer<AuthorFileEditorFindMatchInTheProse>;
     private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
 
@@ -56,6 +64,9 @@ export class AuthorFileEditorSession
         );
         this.paragraphsInStoryPlotsSynchronizer = new AuthorDocSynchronizer(
             this.paragraphsInStoryPlots,
+        );
+        this.findMatchesInTheProseSynchronizer = new AuthorDocSynchronizer(
+            this.findMatchesInTheProse,
         );
         this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
         this.wordCounter.synchronize(this.documentAsItStands);
@@ -217,6 +228,20 @@ export class AuthorFileEditorSession
         this.sendStoryPlots();
     }
 
+    showFindMatches(findMatches: AuthorFileEditorFindMatch[]): void {
+        this.findMatches.splice(0, this.findMatches.length, ...findMatches);
+        const findMatchesInTheProse = findMatches.filter(
+            (findMatch): findMatch is AuthorFileEditorFindMatchInTheProse =>
+                findMatch.attributeName === null,
+        );
+        this.findMatchesInTheProse.splice(
+            0,
+            this.findMatchesInTheProse.length,
+            ...findMatchesInTheProse,
+        );
+        this.sendFindMatches();
+    }
+
     identifyingStoryPlots(progress: WorkProgress | null): void {
         this.storyPlotsProgress = progress;
         this.sendStoryPlots();
@@ -243,6 +268,10 @@ export class AuthorFileEditorSession
             this.documentAsItStands,
         );
         this.paragraphsInStoryPlotsSynchronizer.synchronize(
+            this.documentAsTheLastSynchronizationLeftIt,
+            this.documentAsItStands,
+        );
+        this.findMatchesInTheProseSynchronizer.synchronize(
             this.documentAsTheLastSynchronizationLeftIt,
             this.documentAsItStands,
         );
@@ -285,6 +314,13 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendFindMatches(): void {
+        void this.panel?.webview.postMessage({
+            type: "findMatches",
+            findMatches: [...this.findMatches],
+        });
+    }
+
     sendDocument(): void {
         this.synchronizeTheRepresentations();
         void this.panel?.webview.postMessage({
@@ -293,6 +329,7 @@ export class AuthorFileEditorSession
         });
         this.sendProseErrors();
         this.sendStoryPlots();
+        this.sendFindMatches();
         this.sendWordCounts();
     }
 
@@ -334,6 +371,7 @@ export class AuthorFileEditorSession
         }
         this.sendProseErrors();
         this.sendStoryPlots();
+        this.sendFindMatches();
         this.sendWordCounts();
     }
 }

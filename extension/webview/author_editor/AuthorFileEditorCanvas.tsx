@@ -11,10 +11,10 @@ import {
     AuthorFileEditorFindBar,
     useAuthorFileEditorFind,
 } from "./AuthorFileEditorFindBar";
-import type { AuthorFileEditorFindMatch } from "./AuthorFileEditorFind";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
 import type {
     ParagraphInStoryPlots,
     StoryPlot,
@@ -139,6 +139,7 @@ interface AuthorFileEditorCanvasProps {
     storyPlots?: StoryPlot[];
     storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
+    findMatches?: AuthorFileEditorFindMatch[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
     wordsInEverySection?: Readonly<Record<string, number>>;
     wordsInTheDocument?: number;
@@ -156,6 +157,7 @@ export function AuthorFileEditorCanvas({
     storyPlots = [],
     storyPlotsProgress = null,
     paragraphsInStoryPlots = [],
+    findMatches = [],
     cellsBeingWritten = {},
     wordsInEverySection = {},
     wordsInTheDocument = 0,
@@ -184,7 +186,10 @@ export function AuthorFileEditorCanvas({
                 return;
             }
             for (const storyWordRange of concept.storyWordRanges) {
-                for (const span of storyTextSpansOf(storyWords, storyWordRange)) {
+                for (const span of storyTextSpansOf(
+                    storyWords,
+                    storyWordRange,
+                )) {
                     byCellId.set(span.cellId, [
                         ...(byCellId.get(span.cellId) ?? []),
                         {
@@ -229,7 +234,7 @@ export function AuthorFileEditorCanvas({
         sayWhetherStoryTextIsSelected(selected !== null);
     }
     const find = useAuthorFileEditorFind(
-        cells,
+        findMatches,
         sendMessagesToVscode,
         cellsOnThePage,
     );
@@ -237,13 +242,13 @@ export function AuthorFileEditorCanvas({
     const findMatchesByCellId = useMemo(() => {
         const byCellId = new Map<string, AuthorFileEditorFindMatch[]>();
         for (const match of find.found) {
-            const cellId = cells[match.cell]?.attrs.id;
-            if (cellId) {
-                byCellId.set(cellId, [...(byCellId.get(cellId) ?? []), match]);
-            }
+            byCellId.set(match.cellId, [
+                ...(byCellId.get(match.cellId) ?? []),
+                match,
+            ]);
         }
         return byCellId;
-    }, [find.found, cells]);
+    }, [find.found]);
 
     useEffect(() => {
         const scrolled = cellsOnThePage.current;
@@ -408,9 +413,7 @@ export function AuthorFileEditorCanvas({
                                     cell.attrs.id,
                                 )}
                                 currentFindMatch={
-                                    find.current &&
-                                    cells[find.current.cell]?.attrs.id ===
-                                        cell.attrs.id
+                                    find.current?.cellId === cell.attrs.id
                                         ? find.current
                                         : null
                                 }

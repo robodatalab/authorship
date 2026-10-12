@@ -3,26 +3,19 @@
 // The editor is a webview and the find widget is the text editor's; nothing
 // about Ctrl+F reaches in here. So the widget is ours: this is the box, the keys
 // that open it, and the state that says which match the author is standing on.
-// Where the matches themselves are is AuthorFileEditorFind, which is free of the
+// Where the matches themselves are is find_in_the_document, which is free of the
 // DOM and tested without one.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import {
-    isUnderstood,
-    matchesIn,
-    replaced,
-    replacedAll,
-} from "./AuthorFileEditorFind";
+import { isUnderstood } from "../../vscode_runtime/commands/find_in_the_document";
 import type {
     AuthorFileEditorFindMatch,
     AuthorFileEditorFindQuery,
-    AuthorFileEditorFindReplacement,
-} from "./AuthorFileEditorFind";
+} from "../../vscode_runtime/commands/find_in_the_document";
 import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "./AuthorFileEditorCanvas";
 import "./AuthorFileEditorFindBar.css";
 
@@ -54,44 +47,42 @@ export interface WhatTheAuthorFileEditorIsFinding {
  *
  * The query outlives the widget being shut, as it does in the editor next door —
  * an author who closes the box and opens it again is looking for the same thing.
- *
- * Where the author stands is kept as a place in the document rather than a
- * number: an edit anywhere above them would otherwise renumber the matches under
- * their feet and send them back to a chapter they had finished with.
  */
 export function useAuthorFileEditorFind(
-    cells: WebviewCell[],
+    findMatches: AuthorFileEditorFindMatch[],
     sendMessagesToVscode: SendMessagesToVscode,
     cellsOnThePage: RefObject<HTMLElement | null>,
 ): WhatTheAuthorFileEditorIsFinding {
-    const [query, askFor] = useState(NOTHING_LOOKED_FOR);
+    const [query, setQuery] = useState(NOTHING_LOOKED_FOR);
     const [isSearching, search] = useState(false);
     const [isReplaceShown, showReplace] = useState(false);
-    const [placeStoodOn, standOn] = useState<AuthorFileEditorFindMatch | null>(
-        null,
-    );
+    const [findMatchStoodOn, standOnFindMatch] = useState(0);
     const lookedForBox = useRef<HTMLInputElement>(null);
 
     const found = useMemo(
-        () => (isSearching ? matchesIn(cells, query) : []),
-        [cells, query, isSearching],
+        () => (isSearching ? findMatches.filter(isShown) : []),
+        [findMatches, isSearching],
     );
-    const current = placeStoodOn
-        ? (found[nextFrom(found, placeStoodOn)] ?? null)
-        : (found[0] ?? null);
+    const findMatchesFromTheOneStoodOn = findMatches.slice(findMatchStoodOn);
+    const current = isSearching
+        ? (findMatchesFromTheOneStoodOn.find(isShown) ?? found[0] ?? null)
+        : null;
+    const currentFindMatchIndex = current ? findMatches.indexOf(current) : -1;
 
-    function write(replacements: AuthorFileEditorFindReplacement[]): void {
-        if (replacements.length > 0) {
-            invokeAuthorDocumentCommand(sendMessagesToVscode, "replaceTexts", {
-                texts: replacements,
-            });
-        }
+    function askFor(lookedFor: AuthorFileEditorFindQuery): void {
+        setQuery(lookedFor);
+        standOnFindMatch(0);
+        invokeAuthorDocumentCommand(sendMessagesToVscode, "findInTheDocument", {
+            query: lookedFor,
+        });
     }
 
     function open(withReplace: boolean): void {
         const seed = selectedText();
         if (seed) {
             askFor({ ...query, text: seed });
+        } else if (!isSearching) {
+            askFor(query);
         }
         search(true);
         if (withReplace) {
@@ -107,7 +98,10 @@ export function useAuthorFileEditorFind(
 
     function close(): void {
         search(false);
-        standOn(null);
+        standOnFindMatch(0);
+        invokeAuthorDocumentCommand(sendMessagesToVscode, "findInTheDocument", {
+            query: NOTHING_LOOKED_FOR,
+        });
     }
 
     function step(by: number): void {
@@ -115,21 +109,33 @@ export function useAuthorFileEditorFind(
             return;
         }
         const at = current ? found.indexOf(current) : 0;
-        standOn(found[(at + by + found.length) % found.length]);
+        const steppedOnto = found[(at + by + found.length) % found.length];
+        standOnFindMatch(findMatches.indexOf(steppedOnto));
+    }
+
+    function replace(
+        findMatchesReplaced: AuthorFileEditorFindMatch[],
+        replacement: string,
+    ): void {
+        invokeAuthorDocumentCommand(
+            sendMessagesToVscode,
+            "replaceFindMatches",
+            {
+                query,
+                replacement,
+                findMatches: findMatchesReplaced,
+            },
+        );
     }
 
     function replaceCurrent(replacement: string): void {
         if (!current) {
             return;
         }
-        const written = replaced(cells, current, query, replacement);
-        if (!written) {
-            return;
-        }
-        write([written]);
+        replace([current], replacement);
         // Past what was just written, not at it: replacing "the" with "there"
         // would otherwise land on the match it had just made and never move on.
-        standOn({ ...current, at: current.at + replacement.length });
+        standOnFindMatch(currentFindMatchIndex + 1);
     }
 
     useEffect(() => {
@@ -152,7 +158,7 @@ export function useAuthorFileEditorFind(
         return () => document.removeEventListener("keydown", pressed);
     });
 
-    const cellStoodOn = current ? cells[current.cell]?.attrs.id : undefined;
+    const cellStoodOn = current?.cellId;
 
     // Bringing the current match on screen without taking the focus off the box:
     // the author is still typing what they are looking for, and a match that took
@@ -188,7 +194,7 @@ export function useAuthorFileEditorFind(
                 scrolled.clientHeight / 2;
         });
         return () => cancelAnimationFrame(drawn);
-    }, [cellStoodOn, current?.attributeName, current?.at]);
+    }, [cellStoodOn, currentFindMatchIndex]);
 
     return {
         query,
@@ -203,9 +209,12 @@ export function useAuthorFileEditorFind(
         close,
         step,
         replaceCurrent,
-        replaceEverywhere: (replacement: string) =>
-            write(replacedAll(cells, query, replacement)),
+        replaceEverywhere: (replacement: string) => replace(found, replacement),
     };
+}
+
+function isShown(findMatch: AuthorFileEditorFindMatch): boolean {
+    return findMatch.attributeName !== null || findMatch.isVisible;
 }
 
 /** Ctrl+F, and Cmd+F on a Mac. */
@@ -225,19 +234,6 @@ function isReplaceKey(event: KeyboardEvent): boolean {
         return (event.ctrlKey || event.metaKey) && event.code === "KeyF";
     }
     return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h";
-}
-
-/** The first match at or after a place, wrapping to the top when there is none. */
-function nextFrom(
-    found: AuthorFileEditorFindMatch[],
-    place: AuthorFileEditorFindMatch,
-): number {
-    const at = found.findIndex(
-        (match) =>
-            match.cell > place.cell ||
-            (match.cell === place.cell && match.at >= place.at),
-    );
-    return at >= 0 ? at : 0;
 }
 
 /**

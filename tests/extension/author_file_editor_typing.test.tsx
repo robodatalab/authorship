@@ -266,3 +266,76 @@ describe("undoing what the author typed", () => {
         expect(editor.documentText()).toContain("The lanternb\n");
     });
 });
+
+describe("finding in what the author has just typed", () => {
+    it("marks the match where it stands in the text as typed", async () => {
+        theCellBeingTyped().putTheCursorAt(0);
+        await typeCharacter("A");
+        await typeCharacter(" ");
+        await act(async () => {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "f", ctrlKey: true }),
+            );
+        });
+        const lookedForBox = document.querySelector<HTMLInputElement>(
+            'input[aria-label="Find"]',
+        )!;
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )!.set!.call(lookedForBox, "lantern");
+            lookedForBox.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await settle();
+
+        expect(theCellBeingTyped().marks()).toEqual([
+            {
+                range: {
+                    from: { lineNumber: 1, column: 7 },
+                    to: { lineNumber: 1, column: 14 },
+                },
+                options: {
+                    inlineClassName:
+                        "author-file-editor-find-match author-file-editor-find-match-current",
+                },
+            },
+        ]);
+    });
+
+    it("moves the mark along with the words when the author types before them", async () => {
+        await act(async () => {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "f", ctrlKey: true }),
+            );
+        });
+        const lookedForBox = document.querySelector<HTMLInputElement>(
+            'input[aria-label="Find"]',
+        )!;
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )!.set!.call(lookedForBox, "lantern");
+            lookedForBox.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await settle();
+
+        theCellBeingTyped().putTheCursorAt(0);
+        await typeCharacter("A");
+        await typeCharacter(" ");
+
+        expect(theCellBeingTyped().marks()).toEqual([
+            {
+                range: {
+                    from: { lineNumber: 1, column: 7 },
+                    to: { lineNumber: 1, column: 14 },
+                },
+                options: {
+                    inlineClassName:
+                        "author-file-editor-find-match author-file-editor-find-match-current",
+                },
+            },
+        ]);
+    });
+});
