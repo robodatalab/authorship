@@ -472,7 +472,7 @@ fully connected head & 1. Run every labelled text through Qwen once and store it
 \end{verbatim}
 \texttt{start\_word} and \texttt{end\_word} index the author document's words: its prose numbered from $0$, in reading order across all its cells, a word being a run of characters between whitespace that contains a letter or a digit.
 
-\subsection{LoRA parameters, dataset size and justification}\label{sec:lora}
+\subsection{LoRA parameters and justification}\label{sec:lora}
 
 \begin{center}
 \small
@@ -487,16 +487,19 @@ $\alpha$ & $32$ & \cite{thinkingmachines} \\
 learning rate & $10\times$ full fine-tuning & fitted multiplier $9.8$~\cite{thinkingmachines} \\
 batch size & small & LoRA tolerates large batches worse~\cite{thinkingmachines} \\
 \hline
-dataset size $B$ & $5{,}455{,}872$ bits & $B = 2N$: an adapter saturates at $2$ bits per parameter~\cite{allenzhu}; rank $1$ on Qwen3-4B, $4.1$ million bits, saturates at about $5$ million output tokens~\cite{baseten} \\
-bits per text & $189$ & $13 \cdot (\log_2 K + 2 \log_2 W) = 13 \cdot (\log_2 4.5 + 2 \log_2 73) = 13 \cdot 14.5$ \\
-dataset size $T$ & $29{,}000$ texts, $2.1$ million words & $T = B / 189$; $T \cdot W$ words \\
-words $W$, concepts $K$ and annotations per text & $73$; $4.5$, one per $16$ words; $13$, $2.9$ per concept & averages of SCENE\_1 ($84$, $4$, $14$) and DIFFERENT\_SCENE\_1 ($62$, $5$, $12$), our only annotated texts \\
 \hline
 \end{tabular}
 \end{center}
 
+\subsection{Dataset size}\label{sec:dataset-size}
+
+\paragraph{Dataset.} $10$ stories, $10{,}000$ words each; about $1{,}780$ annotated spans per story.
+
+\paragraph{Metric: pair accuracy.} Take two annotated spans from a story the adapter was not trained on. The adapter is right when their volumes overlap exactly when the two spans share a salient concept. Pair accuracy is the share of such pairs it gets right, over equal numbers of pairs that share a concept and pairs that do not, so guessing scores $0.5$.
+
+\paragraph{Predicted value.} It cannot be predicted from published results: the smallest dataset they report, $1{,}000$ clinical conversations of about $3{,}700$ words each~\cite{baseten}, holds $37$ times more text than these $10$ stories. It has to be measured: train on $9$ stories, measure pair accuracy on the $10$th, and repeat for each of the $10$.
+
 \begin{thebibliography}{9}
-\bibitem{allenzhu} Z.~Allen-Zhu and Y.~Li. Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws. ICLR 2025. arXiv:2404.05405.
 \bibitem{baseten} Baseten. Practical LoRA research. October 2025. \texttt{labs.baseten.co/\allowbreak articles/\allowbreak practical-lora-research}.
 \bibitem{thinkingmachines} J.~Schulman and Thinking Machines Lab. LoRA Without Regret. 2025. \texttt{thinkingmachines.ai/blog/lora}.
 \bibitem{zhang} B.~Zhang, Z.~Liu, C.~Cherry and O.~Firat. When Scaling Meets LLM Finetuning: The Effect of Data, Model and Finetuning Method. ICLR 2024. arXiv:2402.17193.
