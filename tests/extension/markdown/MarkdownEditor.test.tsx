@@ -50,6 +50,7 @@ async function mount(
 async function render(
     markdown: string,
     onMarkdownCommitted: ReturnType<typeof committedSpy>,
+    timesTheHostWroteIt = 0,
 ): Promise<void> {
     await act(async () => {
         root.render(
@@ -57,6 +58,7 @@ async function render(
                 <MarkdownEditor
                     cellId="c1"
                     markdown={markdown}
+                    timesTheHostWroteIt={timesTheHostWroteIt}
                     onMarkdownCommitted={onMarkdownCommitted}
                 >
                     {(text) => <div className="rendered">{text}</div>}
@@ -156,7 +158,7 @@ async function whereTheCursorStandsAfter(
     await doubleClickRendered();
     await putTheCursorAt(stoodAt);
 
-    await render(wanted, committed);
+    await render(wanted, committed, 1);
 
     return latestEditor().cursorOffset();
 }
@@ -321,7 +323,7 @@ describe("markdown that changes underneath the editor", () => {
         await mount("The lantern.", committed);
         await doubleClickRendered();
 
-        await render("The lantern had gone out.", committed);
+        await render("The lantern had gone out.", committed, 1);
 
         expect(monacoEditorsOnThePage[0].getValue()).toBe("The lantern had gone out.");
     });

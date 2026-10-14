@@ -172,7 +172,7 @@ export function MarkdownEditor({
 
     useEffect(() => {
         showMarkdown(markdown);
-    }, [markdown, timesTheHostWroteIt]);
+    }, [timesTheHostWroteIt]);
 
     useEffect(() => {
         if (isEditing || children || !textSelectedNow.current) {
