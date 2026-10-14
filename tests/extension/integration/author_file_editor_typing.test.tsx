@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
@@ -510,6 +510,395 @@ describe("the words of a salient concept while the author types", () => {
                     ".author-file-editor-salient-concept-words-shown",
                 )?.textContent,
             ).toBe(wordsListedAfter);
+        },
+    );
+});
+
+describe("the words found while the author types", () => {
+    it.each([
+        {
+            edit: "an em dash before them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightsBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+            keystrokes: [
+                { cursorAt: 18, typed: " " },
+                { cursorAt: 20, typed: " " },
+            ],
+            textAfter: "She waited for him — a Companion knelt—head bowed.",
+            highlightsAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 24 },
+                        to: { lineNumber: 1, column: 50 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+        },
+        {
+            edit: "a word typed before them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightsBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 11, typed: "long " }],
+            textAfter: "She waited long for him—a Companion knelt—head bowed.",
+            highlightsAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 27 },
+                        to: { lineNumber: 1, column: 53 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+        },
+        {
+            edit: "an em dash among them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightsBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+            keystrokes: [
+                { cursorAt: 36, typed: " " },
+                { cursorAt: 38, typed: " " },
+            ],
+            textAfter: "She waited for him—a Companion knelt — head bowed.",
+            highlightsAfter: [],
+        },
+        {
+            edit: "a word typed among them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightsBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 31, typed: "slowly " }],
+            textAfter:
+                "She waited for him—a Companion slowly knelt—head bowed.",
+            highlightsAfter: [],
+        },
+        {
+            edit: "a sentence typed after them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightsBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 48, typed: " Then she smiled." }],
+            textAfter:
+                "She waited for him—a Companion knelt—head bowed. Then she smiled.",
+            highlightsAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName:
+                            "author-file-editor-find-match author-file-editor-find-match-current",
+                    },
+                },
+            ],
+        },
+    ])(
+        "move with the found words after $edit",
+        async ({
+            textBefore,
+            highlightsBefore,
+            keystrokes,
+            textAfter,
+            highlightsAfter,
+        }) => {
+            editor = await openEditor(
+                ['<!-- cell: markdown id="m1" -->', "", textBefore, ""].join(
+                    "\n",
+                ),
+            );
+            await openTheCellForTyping();
+            await act(async () => {
+                document.dispatchEvent(
+                    new KeyboardEvent("keydown", { key: "f", ctrlKey: true }),
+                );
+            });
+            const lookedForBox = document.querySelector<HTMLInputElement>(
+                'input[aria-label="Find"]',
+            )!;
+            await act(async () => {
+                Object.getOwnPropertyDescriptor(
+                    HTMLInputElement.prototype,
+                    "value",
+                )!.set!.call(lookedForBox, "Companion knelt—head bowed");
+                lookedForBox.dispatchEvent(
+                    new Event("input", { bubbles: true }),
+                );
+            });
+            await settle();
+
+            expect(theCellBeingTyped().marks()).toEqual(highlightsBefore);
+
+            for (const { cursorAt, typed } of keystrokes) {
+                theCellBeingTyped().putTheCursorAt(cursorAt);
+                await typeCharacter(typed);
+            }
+
+            expect(theCellBeingTyped().getValue()).toBe(textAfter);
+            expect(theCellBeingTyped().marks()).toEqual(highlightsAfter);
+        },
+    );
+});
+
+describe("the prose errors marked while the author types", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+    });
+
+    it.each([
+        {
+            edit: "an em dash before them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            marksBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+            keystrokes: [
+                { cursorAt: 18, typed: " " },
+                { cursorAt: 20, typed: " " },
+            ],
+            textAfter: "She waited for him — a Companion knelt—head bowed.",
+            marksAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 24 },
+                        to: { lineNumber: 1, column: 50 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+        },
+        {
+            edit: "a word typed before them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            marksBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 11, typed: "long " }],
+            textAfter: "She waited long for him—a Companion knelt—head bowed.",
+            marksAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 27 },
+                        to: { lineNumber: 1, column: 53 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+        },
+        {
+            edit: "an em dash among them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            marksBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+            keystrokes: [
+                { cursorAt: 36, typed: " " },
+                { cursorAt: 38, typed: " " },
+            ],
+            textAfter: "She waited for him—a Companion knelt — head bowed.",
+            marksAfter: [],
+        },
+        {
+            edit: "a word typed among them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            marksBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 31, typed: "slowly " }],
+            textAfter: "She waited for him—a Companion slowly knelt—head bowed.",
+            marksAfter: [],
+        },
+        {
+            edit: "a sentence typed after them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            marksBefore: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+            keystrokes: [{ cursorAt: 48, typed: " Then she smiled." }],
+            textAfter:
+                "She waited for him—a Companion knelt—head bowed. Then she smiled.",
+            marksAfter: [
+                {
+                    range: {
+                        from: { lineNumber: 1, column: 22 },
+                        to: { lineNumber: 1, column: 48 },
+                    },
+                    options: {
+                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                    },
+                },
+            ],
+        },
+    ])(
+        "move with the marked words after $edit",
+        async ({
+            textBefore,
+            marksBefore,
+            keystrokes,
+            textAfter,
+            marksAfter,
+        }) => {
+            vi.stubGlobal("fetch", (url: string) =>
+                Promise.resolve({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve(
+                            url.includes("/check/errors/status")
+                                ? {
+                                      running: false,
+                                      error: null,
+                                      findings: [
+                                          {
+                                              cellId: "m1",
+                                              startCharacterOffsetInCell: 21,
+                                              endCharacterOffsetInCell: 47,
+                                              wordsInTheCell:
+                                                  "Companion knelt—head bowed",
+                                              isVisible: true,
+                                              ruleThatFoundTheError:
+                                                  "filter-word",
+                                              isAnErrorOf: "style",
+                                              reasonForError:
+                                                  "It reports rather than shows.",
+                                              correctVersion: "",
+                                          },
+                                      ],
+                                  }
+                                : { id: "job-1" },
+                        ),
+                }),
+            );
+            editor = await openEditor(
+                ['<!-- cell: markdown id="m1" -->', "", textBefore, ""].join(
+                    "\n",
+                ),
+            );
+            vi.useFakeTimers();
+            await act(async () => {
+                document
+                    .querySelector<HTMLButtonElement>(
+                        'button[aria-label="Check Prose — read the whole session.document for faults of usage and style"]',
+                    )!
+                    .click();
+            });
+            await vi.runAllTimersAsync();
+            vi.useRealTimers();
+            await settle();
+            await openTheCellForTyping();
+
+            expect(theCellBeingTyped().marks()).toEqual(marksBefore);
+
+            for (const { cursorAt, typed } of keystrokes) {
+                theCellBeingTyped().putTheCursorAt(cursorAt);
+                await typeCharacter(typed);
+            }
+
+            expect(theCellBeingTyped().getValue()).toBe(textAfter);
+            expect(theCellBeingTyped().marks()).toEqual(marksAfter);
         },
     );
 });
