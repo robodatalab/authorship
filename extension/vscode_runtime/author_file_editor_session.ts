@@ -353,20 +353,26 @@ export class AuthorFileEditorSession
             (cell, standing) => {
                 const before = asItStoodBefore.cells[standing];
                 return (
-                    (cell.source !== before.source ||
-                        cell.kind !== before.kind ||
-                        cell.marker() !== before.marker()) &&
-                    !(
-                        thePageDrewItAlready?.cellId === cell.uniqueId &&
-                        thePageDrewItAlready.markdown === cell.source
-                    )
+                    cell.source !== before.source ||
+                    cell.kind !== before.kind ||
+                    cell.marker() !== before.marker()
                 );
             },
         );
+        const thePageTypedIt = (cell: ImmutableCell): boolean =>
+            thePageDrewItAlready?.cellId === cell.uniqueId &&
+            thePageDrewItAlready.markdown === cell.source;
+        const cellsTheHostWrote = changed
+            .filter((cell) => !thePageTypedIt(cell))
+            .map(asThePageDrawsIt);
+        const cellsThePageTyped = changed
+            .filter(thePageTypedIt)
+            .map(asThePageDrawsIt);
         if (changed.length > 0) {
             void this.panel?.webview.postMessage({
                 type: "cells",
-                cells: changed.map(asThePageDrawsIt),
+                cells: cellsTheHostWrote,
+                cellsThePageTyped,
             });
         }
         this.sendProseErrors();

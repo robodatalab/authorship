@@ -73,11 +73,23 @@ function processMessageFromVscode(
         );
     } else if (message.data?.type === "cells") {
         const changed = message.data.cells as WebviewCell[];
+        const typed = message.data.cellsThePageTyped as WebviewCell[];
         drawn.cells = drawn.cells.map((drawing) => {
             const written = changed.find(
                 (cell) => cell.attrs.id === drawing.attrs.id,
             );
-            return written ? asTheHostWroteIt(written, drawn.cells) : drawing;
+            if (written) {
+                return asTheHostWroteIt(written, drawn.cells);
+            }
+            const typedOnThePage = typed.find(
+                (cell) => cell.attrs.id === drawing.attrs.id,
+            );
+            return typedOnThePage
+                ? {
+                      ...typedOnThePage,
+                      timesTheHostWroteIt: drawing.timesTheHostWroteIt,
+                  }
+                : drawing;
         });
     } else if (message.data?.type === "commands") {
         drawn.commands = message.data

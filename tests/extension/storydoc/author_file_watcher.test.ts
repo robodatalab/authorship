@@ -41,12 +41,23 @@ async function openEditor(text: string): Promise<OpenEditor> {
             postMessage: (message: {
                 type: string;
                 cells?: { attrs: Record<string, string>; source: string }[];
+                cellsThePageTyped?: {
+                    attrs: Record<string, string>;
+                    source: string;
+                }[];
             }) => {
                 if (message.type === "document" && message.cells) {
                     documentsSentToThePage.push(message.cells);
                     cellsOnThePage = message.cells;
-                } else if (message.type === "cells" && message.cells) {
-                    const changed = message.cells;
+                } else if (
+                    message.type === "cells" &&
+                    message.cells &&
+                    message.cellsThePageTyped
+                ) {
+                    const changed = [
+                        ...message.cells,
+                        ...message.cellsThePageTyped,
+                    ];
                     documentsSentToThePage.push(changed);
                     cellsOnThePage = cellsOnThePage.map(
                         (drawing) =>
@@ -70,11 +81,6 @@ async function openEditor(text: string): Promise<OpenEditor> {
 
     return {
         typeIntoTheCell: async (cellId: string, markdown: string) => {
-            cellsOnThePage = cellsOnThePage.map((drawing) =>
-                drawing.attrs.id === cellId
-                    ? { ...drawing, source: markdown }
-                    : drawing,
-            );
             receiveFromThePage({ type: "typed", cellId, markdown });
             await new Promise((settled) => setTimeout(settled, 0));
         },
