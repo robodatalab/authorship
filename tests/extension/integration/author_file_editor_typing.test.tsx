@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
-import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "./vscode";
+import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
+import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -13,11 +13,11 @@ vi.mock("monaco-editor/languages/definitions/markdown/markdown.js", () => ({
     language: {},
 }));
 vi.mock("monaco-editor/editor/editor.api", async () => {
-    const { monacoEditorApi } = await import("./markdown/monaco_editor_double");
+    const { monacoEditorApi } = await import("../markdown/monaco_editor_double");
     return monacoEditorApi();
 });
 
-import { monacoEditorsOnThePage } from "./markdown/monaco_editor_double";
+import { monacoEditorsOnThePage } from "../markdown/monaco_editor_double";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -96,8 +96,8 @@ async function openEditor(text: string): Promise<OpenEditor> {
         addEventListenerItself(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
-        await import("../../extension/webview/cell_types/MarkdownCell");
-        await import("../../extension/webview/message_queue_between_vscode_and_webview");
+        await import("../../../extension/webview/cell_types/MarkdownCell");
+        await import("../../../extension/webview/message_queue_between_vscode_and_webview");
     });
     window.addEventListener = addEventListenerItself;
     await settle();
@@ -338,4 +338,178 @@ describe("finding in what the author has just typed", () => {
             },
         ]);
     });
+});
+
+describe("the words of a salient concept while the author types", () => {
+    it.each([
+        {
+            edit: "an em dash before them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightBefore: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedBefore: "Companion knelt—head bowed.",
+            keystrokes: [
+                { cursorAt: 18, typed: " " },
+                { cursorAt: 20, typed: " " },
+            ],
+            textAfter: "She waited for him — a Companion knelt—head bowed.",
+            highlightAfter: {
+                from: { lineNumber: 1, column: 24 },
+                to: { lineNumber: 1, column: 51 },
+            },
+            wordsListedAfter: "Companion knelt—head bowed.",
+        },
+        {
+            edit: "a word typed before them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightBefore: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedBefore: "Companion knelt—head bowed.",
+            keystrokes: [
+                { cursorAt: 11, typed: "long " },
+            ],
+            textAfter: "She waited long for him—a Companion knelt—head bowed.",
+            highlightAfter: {
+                from: { lineNumber: 1, column: 27 },
+                to: { lineNumber: 1, column: 54 },
+            },
+            wordsListedAfter: "Companion knelt—head bowed.",
+        },
+        {
+            edit: "an em dash among them spaced apart",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightBefore: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedBefore: "Companion knelt—head bowed.",
+            keystrokes: [
+                { cursorAt: 36, typed: " " },
+                { cursorAt: 38, typed: " " },
+            ],
+            textAfter: "She waited for him—a Companion knelt — head bowed.",
+            highlightAfter: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 51 },
+            },
+            wordsListedAfter: "Companion knelt head bowed.",
+        },
+        {
+            edit: "a word typed among them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightBefore: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedBefore: "Companion knelt—head bowed.",
+            keystrokes: [
+                { cursorAt: 31, typed: "slowly " },
+            ],
+            textAfter: "She waited for him—a Companion slowly knelt—head bowed.",
+            highlightAfter: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 56 },
+            },
+            wordsListedAfter: "Companion slowly knelt—head bowed.",
+        },
+        {
+            edit: "a sentence typed after them",
+            textBefore: "She waited for him—a Companion knelt—head bowed.",
+            highlightBefore: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedBefore: "Companion knelt—head bowed.",
+            keystrokes: [
+                { cursorAt: 48, typed: " Then she smiled." },
+            ],
+            textAfter:
+                "She waited for him—a Companion knelt—head bowed. Then she smiled.",
+            highlightAfter: {
+                from: { lineNumber: 1, column: 22 },
+                to: { lineNumber: 1, column: 49 },
+            },
+            wordsListedAfter: "Companion knelt—head bowed.",
+        },
+    ])(
+        "move with the concept's words after $edit",
+        async ({
+            textBefore,
+            highlightBefore,
+            wordsListedBefore,
+            keystrokes,
+            textAfter,
+            highlightAfter,
+            wordsListedAfter,
+        }) => {
+            editor = await openEditor(
+                [
+                    '<!-- cell: markdown id="m1" -->',
+                    "",
+                    textBefore,
+                    "",
+                    '<!-- cell: salient-concept id="k1" title="The Companion" words="4-6" -->',
+                    "",
+                    "The man who kneels.",
+                    "",
+                ].join("\n"),
+            );
+            await act(async () => {
+                document
+                    .querySelector<HTMLButtonElement>(
+                        'button[aria-label="Show or hide the plots the story weaves"]',
+                    )!
+                    .click();
+            });
+            await settle();
+            const conceptDrawer = document.querySelector<HTMLDetailsElement>(
+                ".author-file-editor-salient-concept",
+            )!;
+            await act(async () => {
+                conceptDrawer.open = true;
+                conceptDrawer.dispatchEvent(new Event("toggle"));
+            });
+            await openTheCellForTyping();
+
+            expect(theCellBeingTyped().marks()).toEqual([
+                {
+                    range: highlightBefore,
+                    options: {
+                        inlineClassName:
+                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                    },
+                },
+            ]);
+            expect(
+                document.querySelector(
+                    ".author-file-editor-salient-concept-words-shown",
+                )?.textContent,
+            ).toBe(wordsListedBefore);
+
+            for (const { cursorAt, typed } of keystrokes) {
+                theCellBeingTyped().putTheCursorAt(cursorAt);
+                await typeCharacter(typed);
+            }
+
+            expect(theCellBeingTyped().getValue()).toBe(textAfter);
+            expect(theCellBeingTyped().marks()).toEqual([
+                {
+                    range: highlightAfter,
+                    options: {
+                        inlineClassName:
+                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                    },
+                },
+            ]);
+            expect(
+                document.querySelector(
+                    ".author-file-editor-salient-concept-words-shown",
+                )?.textContent,
+            ).toBe(wordsListedAfter);
+        },
+    );
 });
