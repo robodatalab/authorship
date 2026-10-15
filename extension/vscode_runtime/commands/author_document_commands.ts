@@ -23,7 +23,6 @@ import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { RunAllCommand } from "./run_all";
-import { ToggleStoryPlotsCommand } from "./toggle_story_plots";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
@@ -70,7 +69,6 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
-    new ToggleStoryPlotsCommand(),
     new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),

@@ -33,7 +33,7 @@ export function AuthorshipPanelSalientConcepts({
 
     return (
         <div className="authorship-panel-salient-concepts">
-            <ul className="authorship-panel-salient-concepts-list">
+            <ul className="authorship-panel-salient-concepts-list authorship-panel-swatches">
                 {salientConcepts.map((concept) => (
                     <li
                         key={concept.conceptCellId}
@@ -57,7 +57,7 @@ export function AuthorshipPanelSalientConcepts({
                                 })
                             }
                         >
-                            <span className="authorship-panel-salient-concept-swatch" />
+                            <span className="authorship-panel-swatch" />
                             {concept.title}
                         </button>
                         <button

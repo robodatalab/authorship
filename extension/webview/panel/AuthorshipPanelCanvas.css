@@ -1,3 +1,5 @@
+@import "../../../media/codicon.css";
+
 /* The Publish view dresses in VS Code's own theme variables, like the graph
    view, so it follows whatever theme the editor is wearing without a light/dark
    branch of its own. */
@@ -25,12 +27,9 @@ body {
 }
 
 .authorship-panel-tab {
+    display: flex;
+    align-items: center;
     padding: 8px 6px 6px;
-    font-family: inherit;
-    font-size: calc(var(--vscode-font-size) - 1px);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     color: var(
         --vscode-panelTitle-inactiveForeground,
         var(--vscode-descriptionForeground)
@@ -74,4 +73,37 @@ body {
 
 .authorship-panel-idle {
     color: var(--vscode-descriptionForeground);
+}
+
+.authorship-panel-swatch {
+    display: inline-block;
+    width: 3px;
+    height: 1em;
+    margin: 0 8px 0 4px;
+    vertical-align: middle;
+    background: var(--authorship-panel-swatch-color);
+}
+
+.authorship-panel-swatches > :nth-child(6n + 1) {
+    --authorship-panel-swatch-color: var(--vscode-charts-blue, #3794ff);
+}
+
+.authorship-panel-swatches > :nth-child(6n + 2) {
+    --authorship-panel-swatch-color: var(--vscode-charts-orange, #d18616);
+}
+
+.authorship-panel-swatches > :nth-child(6n + 3) {
+    --authorship-panel-swatch-color: var(--vscode-charts-green, #89d185);
+}
+
+.authorship-panel-swatches > :nth-child(6n + 4) {
+    --authorship-panel-swatch-color: var(--vscode-charts-purple, #b180d7);
+}
+
+.authorship-panel-swatches > :nth-child(6n + 5) {
+    --authorship-panel-swatch-color: var(--vscode-charts-red, #f14c4c);
+}
+
+.authorship-panel-swatches > :nth-child(6n) {
+    --authorship-panel-swatch-color: var(--vscode-charts-yellow, #cca700);
 }

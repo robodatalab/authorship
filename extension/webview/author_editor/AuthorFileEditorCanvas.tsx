@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
-import { AuthorFileEditorStoryPlots } from "./AuthorFileEditorStoryPlots";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -15,12 +14,7 @@ import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/autho
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
-import type {
-    ParagraphInStoryPlots,
-    StoryPlot,
-    StoryScene,
-} from "../../vscode_runtime/commands/identify_story_plots";
-import type { WorkProgress } from "../../vscode_runtime/server/jobs";
+import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
@@ -123,10 +117,6 @@ interface AuthorFileEditorCanvasProps {
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
-    storyPlotsAreShown?: boolean;
-    storyScenes?: StoryScene[];
-    storyPlots?: StoryPlot[];
-    storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
@@ -143,10 +133,6 @@ export function AuthorFileEditorCanvas({
     sendMessagesToVscode,
     cellRenderers,
     proseErrors = [],
-    storyPlotsAreShown = false,
-    storyScenes = [],
-    storyPlots = [],
-    storyPlotsProgress = null,
     paragraphsInStoryPlots = [],
     salientConceptSelected = null,
     storyTextShown = null,
@@ -344,16 +330,11 @@ export function AuthorFileEditorCanvas({
                                         proseError.cellId === cell.attrs.id &&
                                         proseError.isVisible,
                                 )}
-                                paragraphsInStoryPlots={
-                                    storyPlotsAreShown
-                                        ? paragraphsInStoryPlots.filter(
-                                              (paragraph) =>
-                                                  paragraph.cellId ===
-                                                      cell.attrs.id &&
-                                                  paragraph.isVisible,
-                                          )
-                                        : []
-                                }
+                                paragraphsInStoryPlots={paragraphsInStoryPlots.filter(
+                                    (paragraph) =>
+                                        paragraph.cellId === cell.attrs.id &&
+                                        paragraph.isVisible,
+                                )}
                                 salientConceptHighlights={salientConceptHighlightsByCellId.get(
                                     cell.attrs.id,
                                 )}
@@ -446,20 +427,6 @@ export function AuthorFileEditorCanvas({
             >
                 {cellsInScope(sections, null)}
             </MarkdownEditorMediator>
-            {storyPlotsAreShown && (
-                <AuthorFileEditorStoryPlots
-                    storyScenes={storyScenes}
-                    storyPlots={storyPlots}
-                    storyPlotsProgress={storyPlotsProgress}
-                    onIdentifyStoryPlotsAsked={() =>
-                        invokeAuthorDocumentCommand(
-                            sendMessagesToVscode,
-                            "identifyStoryPlots",
-                            {},
-                        )
-                    }
-                />
-            )}
         </div>
     );
 }

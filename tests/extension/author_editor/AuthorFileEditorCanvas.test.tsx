@@ -11,12 +11,7 @@ import {
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type {
-    ParagraphInStoryPlots,
-    StoryPlot,
-    StoryScene,
-} from "../../../extension/vscode_runtime/commands/identify_story_plots";
-import type { WorkProgress } from "../../../extension/vscode_runtime/server/jobs";
+import type { ParagraphInStoryPlots } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/story_words";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
@@ -74,10 +69,6 @@ async function mountCanvas(options: {
     commands?: WebviewAuthorDocumentCommandCard[];
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
-    storyPlotsAreShown?: boolean;
-    storyScenes?: StoryScene[];
-    storyPlots?: StoryPlot[];
-    storyPlotsProgress?: WorkProgress | null;
     paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
@@ -98,10 +89,6 @@ async function mountCanvas(options: {
                     posted.push(message as Invocation)
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
-                storyPlotsAreShown={options.storyPlotsAreShown}
-                storyScenes={options.storyScenes}
-                storyPlots={options.storyPlots}
-                storyPlotsProgress={options.storyPlotsProgress}
                 paragraphsInStoryPlots={options.paragraphsInStoryPlots}
                 salientConceptSelected={options.salientConceptSelected}
                 storyTextShown={options.storyTextShown}
@@ -931,37 +918,6 @@ describe("a folded cell", () => {
 });
 
 describe("the plots the story weaves", () => {
-    const THE_SHOPPING: StoryScene = {
-        firstLine: 0,
-        lastLine: 1,
-        openingLine: "She moves like a cat on the prowl.",
-        storyState: {
-            madeTrue: [
-                { subject: "Kaitlyn", relation: "is in", object: "the dressing room" },
-                { subject: "Frank", relation: "is doing", object: "assisting Kaitlyn" },
-            ],
-            madeFalse: [{ subject: "Frank", relation: "is in", object: "the office" }],
-        },
-        events: ["She touches the fabric."],
-    };
-
-    const THE_QUEST: StoryPlot = {
-        title: "The quest",
-        characters: ["Bob", "Alice"],
-        origin: "Bob loses his ring",
-        goal: "Bob finds his ring",
-        keyEvents: ["Bob asked Alice for help"],
-    };
-
-    const THE_DOOR: ParagraphInStoryPlots = {
-        cellId: "m1",
-        startCharacterOffsetInCell: 0,
-        endCharacterOffsetInCell: 9,
-        wordsInTheCell: "The door.",
-        isVisible: true,
-        storyPlotIndices: [0],
-    };
-
     function StoryPlotBordersDrawn() {
         return (
             <div className="test-story-plot-borders">
@@ -970,159 +926,25 @@ describe("the plots the story weaves", () => {
         );
     }
 
-    async function mountStoryPlots(
-        storyPlotsAreShown: boolean,
-        storyPlotsProgress: WorkProgress | null = null,
-    ) {
+    it("borders the paragraphs of every plot", async () => {
         await mountCanvas({
             cells: [markdownCell("The door.", "m1")],
             cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
-            storyPlotsAreShown,
-            storyScenes: [THE_SHOPPING],
-            storyPlots: [THE_QUEST],
-            storyPlotsProgress,
-            paragraphsInStoryPlots: [THE_DOOR],
-        });
-    }
-
-    function storyPlotsPanel(): Element | null {
-        return document.querySelector(".author-file-editor-story-plots");
-    }
-
-    it("draws neither the panel nor the borders until they are shown", async () => {
-        await mountStoryPlots(false);
-
-        expect(storyPlotsPanel()).toBeNull();
-        expect(
-            document.querySelector(".test-story-plot-borders")?.textContent,
-        ).toBe("0");
-    });
-
-    it("lists every plot with its summary and borders its paragraphs", async () => {
-        await mountStoryPlots(true);
-
-        expect(
-            storyPlotsPanel()?.querySelector(
-                ".author-file-editor-story-plot summary",
-            )?.textContent,
-        ).toBe("The quest");
-        expect(
-            [
-                ...storyPlotsPanel()!.querySelectorAll(
-                    ".author-file-editor-story-plot dd",
-                ),
-            ].map((said) => said.textContent),
-        ).toEqual([
-            "Bob, Alice",
-            "Bob loses his ring",
-            "Bob finds his ring",
-            "Bob asked Alice for help",
-        ]);
-        expect(
-            document.querySelector(".test-story-plot-borders")?.textContent,
-        ).toBe("1");
-    });
-
-    it("lists every scene by the lines it spans, with what holds in it", async () => {
-        await mountStoryPlots(true);
-
-        expect(
-            storyPlotsPanel()?.querySelector(
-                ".author-file-editor-story-scene summary",
-            )?.textContent,
-        ).toBe("Lines 1–2: She moves like a cat on the prowl.");
-        expect(
-            [
-                ...storyPlotsPanel()!.querySelectorAll(
-                    ".author-file-editor-story-scene dd",
-                ),
-            ].map((said) => said.textContent),
-        ).toEqual([
-            "Kaitlyn is in the dressing roomFrank is doing assisting Kaitlyn",
-            "Frank is in the office",
-        ]);
-    });
-
-    it("keeps the plots above the progress, each in its own drawer", async () => {
-        await mountStoryPlots(true, {
-            doing: "identify plots",
-            done: 0,
-            of: null,
-            seconds: 20,
-            secondsPerItem: null,
-            state: "running",
-            steps: [
+            paragraphsInStoryPlots: [
                 {
-                    doing: "asking whether the events share a plot",
-                    done: 3,
-                    of: 24,
-                    seconds: 20,
-                    secondsPerItem: null,
-                    state: "running",
-                    steps: [],
+                    cellId: "m1",
+                    startCharacterOffsetInCell: 0,
+                    endCharacterOffsetInCell: 9,
+                    wordsInTheCell: "The door.",
+                    isVisible: true,
+                    storyPlotIndices: [0],
                 },
             ],
         });
 
         expect(
-            [
-                ...storyPlotsPanel()!.querySelectorAll(
-                    ".author-file-editor-story-plots-drawer > summary",
-                ),
-            ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots", "Scenes", "Progress"]);
-    });
-
-    it("draws no progress drawer when nothing is running", async () => {
-        await mountStoryPlots(true);
-
-        expect(
-            [
-                ...storyPlotsPanel()!.querySelectorAll(
-                    ".author-file-editor-story-plots-drawer > summary",
-                ),
-            ].map((drawer) => drawer.textContent),
-        ).toEqual(["Plots", "Scenes"]);
-    });
-
-    it("can be dragged wider by its edge", async () => {
-        await mountStoryPlots(true);
-        const panel = storyPlotsPanel() as HTMLElement;
-        const edge = panel.querySelector(
-            ".author-file-editor-story-plots-edge",
-        )!;
-
-        await act(async () => {
-            edge.dispatchEvent(
-                new PointerEvent("pointerdown", {
-                    clientX: 500,
-                    bubbles: true,
-                }),
-            );
-            window.dispatchEvent(
-                new PointerEvent("pointermove", { clientX: 420 }),
-            );
-        });
-
-        expect(panel.style.width).toBe("360px");
-    });
-
-    it("asks for the plots to be identified", async () => {
-        await mountStoryPlots(true);
-
-        await click(
-            storyPlotsPanel()!.querySelector(
-                ".author-file-editor-story-plots-identify",
-            )!,
-        );
-
-        expect(posted).toEqual([
-            {
-                type: "invoke",
-                commandName: "identifyStoryPlots",
-                commandArguments: {},
-            },
-        ]);
+            document.querySelector(".test-story-plot-borders")?.textContent,
+        ).toBe("1");
     });
 });
 

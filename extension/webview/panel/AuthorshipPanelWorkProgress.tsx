@@ -1,8 +1,8 @@
 import type { WorkProgress } from "../../vscode_runtime/server/jobs";
 import { onTheClock } from "../elapsed_time";
-import "./AuthorFileEditorWorkProgress.css";
+import "./AuthorshipPanelWorkProgress.css";
 
-interface AuthorFileEditorWorkProgressProps {
+interface AuthorshipPanelWorkProgressProps {
     progress: WorkProgress;
 }
 
@@ -41,36 +41,36 @@ function howFast(step: WorkProgress): string {
         : `${(1 / step.secondsPerItem).toFixed(1)} it/s`;
 }
 
-function AuthorFileEditorWorkProgressBar({ step }: { step: WorkProgress }) {
+function AuthorshipPanelWorkProgressBar({ step }: { step: WorkProgress }) {
     const filled = Math.round(howFarAlong(step) * 100);
     const counted = howManyDone(step);
     return (
         <div
-            className={`author-file-editor-work-progress-step author-file-editor-work-progress-step-${step.state}`}
+            className={`authorship-panel-work-progress-step authorship-panel-work-progress-step-${step.state}`}
         >
-            <span className="author-file-editor-work-progress-step-dot" />
-            <span className="author-file-editor-work-progress-step-bar">
+            <span className="authorship-panel-work-progress-step-dot" />
+            <span className="authorship-panel-work-progress-step-bar">
                 <span
-                    className="author-file-editor-work-progress-step-bar-fill"
+                    className="authorship-panel-work-progress-step-bar-fill"
                     style={{ width: `${filled}%` }}
                 />
-                <span className="author-file-editor-work-progress-step-counted">
+                <span className="authorship-panel-work-progress-step-counted">
                     {counted}
                 </span>
                 <span
-                    className="author-file-editor-work-progress-step-counted author-file-editor-work-progress-step-counted-filled"
+                    className="authorship-panel-work-progress-step-counted authorship-panel-work-progress-step-counted-filled"
                     style={{ clipPath: `inset(0 ${100 - filled}% 0 0)` }}
                     aria-hidden
                 >
                     {counted}
                 </span>
             </span>
-            <span className="author-file-editor-work-progress-step-says">
+            <span className="authorship-panel-work-progress-step-says">
                 <span>{step.doing}</span>
-                <span className="author-file-editor-work-progress-step-took">
+                <span className="authorship-panel-work-progress-step-took">
                     {timeOnTheStep(step)}
                 </span>
-                <span className="author-file-editor-work-progress-step-rate">
+                <span className="authorship-panel-work-progress-step-rate">
                     {howFast(step)}
                 </span>
             </span>
@@ -78,32 +78,32 @@ function AuthorFileEditorWorkProgressBar({ step }: { step: WorkProgress }) {
     );
 }
 
-function AuthorFileEditorWorkProgressStep({ step }: { step: WorkProgress }) {
+function AuthorshipPanelWorkProgressStep({ step }: { step: WorkProgress }) {
     if (step.steps.length === 0) {
-        return <AuthorFileEditorWorkProgressBar step={step} />;
+        return <AuthorshipPanelWorkProgressBar step={step} />;
     }
     return (
         <details
-            className="author-file-editor-work-progress-steps"
+            className="authorship-panel-work-progress-steps"
             open={step.state === "running"}
         >
             <summary>
-                <AuthorFileEditorWorkProgressBar step={step} />
+                <AuthorshipPanelWorkProgressBar step={step} />
             </summary>
             {step.steps.map((inner, index) => (
-                <AuthorFileEditorWorkProgressStep key={index} step={inner} />
+                <AuthorshipPanelWorkProgressStep key={index} step={inner} />
             ))}
         </details>
     );
 }
 
-export function AuthorFileEditorWorkProgress({
+export function AuthorshipPanelWorkProgress({
     progress,
-}: AuthorFileEditorWorkProgressProps) {
+}: AuthorshipPanelWorkProgressProps) {
     return (
-        <div className="author-file-editor-work-progress">
+        <div className="authorship-panel-work-progress">
             {progress.steps.map((step, index) => (
-                <AuthorFileEditorWorkProgressStep key={index} step={step} />
+                <AuthorshipPanelWorkProgressStep key={index} step={step} />
             ))}
         </div>
     );

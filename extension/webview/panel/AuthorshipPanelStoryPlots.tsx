@@ -1,92 +1,66 @@
-import { useState, type PointerEvent as ReactPointerEvent } from "react";
-
 import type {
     StoryFact,
     StoryPlot,
     StoryScene,
 } from "../../vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../../vscode_runtime/server/jobs";
-import { AuthorFileEditorWorkProgress } from "./AuthorFileEditorWorkProgress";
-import { storyPlotColorClassName } from "../markdown/MarkdownEditor";
-import "./AuthorFileEditorStoryPlots.css";
+import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
+import { AuthorshipPanelWorkProgress } from "./AuthorshipPanelWorkProgress";
+import "./AuthorshipPanelStoryPlots.css";
 
-const NARROWEST = 220;
-const WIDEST = 720;
-
-interface AuthorFileEditorStoryPlotsProps {
-    storyScenes: StoryScene[];
-    storyPlots: StoryPlot[];
-    storyPlotsProgress?: WorkProgress | null;
-    onIdentifyStoryPlotsAsked: () => void;
+interface AuthorshipPanelStoryPlotsProps {
+    storyScenes: StoryScene[] | null;
+    storyPlots: StoryPlot[] | null;
+    storyPlotsProgress: WorkProgress | null;
+    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function spokenFact(fact: StoryFact): string {
     return `${fact.subject} ${fact.relation} ${fact.object}`;
 }
 
-export function AuthorFileEditorStoryPlots({
+export function AuthorshipPanelStoryPlots({
     storyScenes,
     storyPlots,
-    storyPlotsProgress = null,
-    onIdentifyStoryPlotsAsked,
-}: AuthorFileEditorStoryPlotsProps) {
-    const [width, setWidth] = useState(280);
-
-    function dragTheEdge(grabbed: ReactPointerEvent<HTMLDivElement>): void {
-        const grabbedAt = grabbed.clientX;
-        const wasWide = width;
-        function widen(dragged: PointerEvent): void {
-            setWidth(
-                Math.min(
-                    WIDEST,
-                    Math.max(NARROWEST, wasWide + grabbedAt - dragged.clientX),
-                ),
-            );
-        }
-        function letGo(): void {
-            window.removeEventListener("pointermove", widen);
-            window.removeEventListener("pointerup", letGo);
-        }
-        window.addEventListener("pointermove", widen);
-        window.addEventListener("pointerup", letGo);
+    storyPlotsProgress,
+    sendMessagesToVscode,
+}: AuthorshipPanelStoryPlotsProps) {
+    if (storyScenes === null || storyPlots === null) {
+        return <div className="authorship-panel-idle">No manuscript open</div>;
     }
 
     return (
-        <aside
-            className="author-file-editor-story-plots"
-            style={{ width: `${width}px` }}
-        >
-            <div
-                className="author-file-editor-story-plots-edge"
-                onPointerDown={dragTheEdge}
-            />
-            <header className="author-file-editor-story-plots-header">
-                Plots
+        <>
+            <header className="authorship-panel-story-plots-header">
                 <button
                     type="button"
-                    className="author-file-editor-story-plots-identify"
+                    className="authorship-panel-story-plots-identify"
                     title="Identify the plots the story weaves"
                     aria-label="Identify the plots the story weaves"
-                    onClick={onIdentifyStoryPlotsAsked}
+                    onClick={() =>
+                        sendMessagesToVscode({
+                            type: "invoke",
+                            commandName: "identifyStoryPlots",
+                            commandArguments: {},
+                        })
+                    }
                 >
                     <i className="codicon codicon-play" />
                 </button>
             </header>
-            <details className="author-file-editor-story-plots-drawer" open>
+            <details className="authorship-panel-story-plots-drawer" open>
                 <summary>Plots</summary>
                 {storyPlots.length === 0 ? (
-                    <p className="author-file-editor-story-plots-none">
-                        No plots identified yet.
-                    </p>
+                    <div className="authorship-panel-idle">
+                        No plots identified yet
+                    </div>
                 ) : (
-                    <ul>
+                    <ul className="authorship-panel-story-plots authorship-panel-swatches">
                         {storyPlots.map((storyPlot, storyPlotIndex) => (
                             <li key={storyPlotIndex}>
-                                <details className="author-file-editor-story-plot">
+                                <details className="authorship-panel-story-plot">
                                     <summary>
-                                        <span
-                                            className={`author-file-editor-story-plot-swatch ${storyPlotColorClassName(storyPlotIndex)}`}
-                                        />
+                                        <span className="authorship-panel-swatch" />
                                         {storyPlot.title}
                                     </summary>
                                     <dl>
@@ -122,17 +96,17 @@ export function AuthorFileEditorStoryPlots({
                     </ul>
                 )}
             </details>
-            <details className="author-file-editor-story-plots-drawer" open>
+            <details className="authorship-panel-story-plots-drawer" open>
                 <summary>Scenes</summary>
                 {storyScenes.length === 0 ? (
-                    <p className="author-file-editor-story-plots-none">
-                        No scenes identified yet.
-                    </p>
+                    <div className="authorship-panel-idle">
+                        No scenes identified yet
+                    </div>
                 ) : (
-                    <ul>
+                    <ul className="authorship-panel-story-scenes">
                         {storyScenes.map((storyScene, storySceneIndex) => (
                             <li key={storySceneIndex}>
-                                <details className="author-file-editor-story-scene">
+                                <details className="authorship-panel-story-scene">
                                     <summary>
                                         Lines {storyScene.firstLine + 1}–
                                         {storyScene.lastLine + 1}:{" "}
@@ -171,13 +145,13 @@ export function AuthorFileEditorStoryPlots({
                 )}
             </details>
             {storyPlotsProgress && (
-                <details className="author-file-editor-story-plots-drawer" open>
+                <details className="authorship-panel-story-plots-drawer" open>
                     <summary>Progress</summary>
-                    <AuthorFileEditorWorkProgress
+                    <AuthorshipPanelWorkProgress
                         progress={storyPlotsProgress}
                     />
                 </details>
             )}
-        </aside>
+        </>
     );
 }

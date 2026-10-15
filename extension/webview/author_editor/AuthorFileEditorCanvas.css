@@ -10,7 +10,7 @@ body {
 .author-file-editor-canvas {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     height: 100vh;
     overflow: hidden;
 }

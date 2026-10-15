@@ -41,7 +41,6 @@ export class AuthorFileEditorSession
     private readonly findMatches: AuthorFileEditorFindMatch[] = [];
     private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
         [];
-    private storyPlotsAreShown = false;
     private storyPlotsProgress: WorkProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
@@ -68,6 +67,10 @@ export class AuthorFileEditorSession
 
     readonly onDocumentOrSelectionChanged =
         this.documentOrSelectionChanged.event;
+
+    private readonly storyPlotsChanged = new vscode.EventEmitter<void>();
+
+    readonly onStoryPlotsChanged = this.storyPlotsChanged.event;
 
     constructor(
         private documentAsItStands: ImmutableAuthorDocument,
@@ -112,6 +115,18 @@ export class AuthorFileEditorSession
 
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
+    }
+
+    get theStoryScenes(): StoryScene[] {
+        return this.storyScenes;
+    }
+
+    get theStoryPlots(): StoryPlot[] {
+        return this.storyPlots;
+    }
+
+    get theStoryPlotsProgress(): WorkProgress | null {
+        return this.storyPlotsProgress;
     }
 
     selectTheSalientConcept(conceptCellId: string | null): void {
@@ -271,7 +286,8 @@ export class AuthorFileEditorSession
             this.paragraphsInStoryPlots.length,
             ...paragraphsInStoryPlots,
         );
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
+        this.storyPlotsChanged.fire();
     }
 
     showFindMatches(findMatches: AuthorFileEditorFindMatch[]): void {
@@ -290,12 +306,7 @@ export class AuthorFileEditorSession
 
     identifyingStoryPlots(progress: WorkProgress | null): void {
         this.storyPlotsProgress = progress;
-        this.sendStoryPlots();
-    }
-
-    toggleStoryPlots(): void {
-        this.storyPlotsAreShown = !this.storyPlotsAreShown;
-        this.sendStoryPlots();
+        this.storyPlotsChanged.fire();
     }
 
     writingCell(cellId: string, howFarAlong: number): void {
@@ -349,13 +360,9 @@ export class AuthorFileEditorSession
         });
     }
 
-    sendStoryPlots(): void {
+    sendParagraphsInStoryPlots(): void {
         void this.panel?.webview.postMessage({
-            type: "storyPlots",
-            storyPlotsAreShown: this.storyPlotsAreShown,
-            storyScenes: this.storyScenes,
-            storyPlots: this.storyPlots,
-            storyPlotsProgress: this.storyPlotsProgress,
+            type: "paragraphsInStoryPlots",
             paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],
         });
     }
@@ -381,7 +388,7 @@ export class AuthorFileEditorSession
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
         this.sendSalientConceptSelected();
         this.sendFindMatches();
         this.sendWordCounts();
@@ -431,7 +438,7 @@ export class AuthorFileEditorSession
             });
         }
         this.sendProseErrors();
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
         this.sendFindMatches();
         this.sendWordCounts();
         this.documentOrSelectionChanged.fire();

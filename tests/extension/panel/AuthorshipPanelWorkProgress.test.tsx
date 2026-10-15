@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
-import { AuthorFileEditorWorkProgress } from "../../../extension/webview/author_editor/AuthorFileEditorWorkProgress";
+import { AuthorshipPanelWorkProgress } from "../../../extension/webview/panel/AuthorshipPanelWorkProgress";
 import type { WorkProgress } from "../../../extension/vscode_runtime/server/jobs";
 
 async function drawn(progress: WorkProgress): Promise<void> {
@@ -11,14 +11,14 @@ async function drawn(progress: WorkProgress): Promise<void> {
     document.body.append(container);
     await act(async () => {
         createRoot(container).render(
-            <AuthorFileEditorWorkProgress progress={progress} />,
+            <AuthorshipPanelWorkProgress progress={progress} />,
         );
     });
 }
 
 function stepsShown(): string[] {
     return [
-        ...document.querySelectorAll(".author-file-editor-work-progress-step-says"),
+        ...document.querySelectorAll(".authorship-panel-work-progress-step-says"),
     ].map((says) =>
         [...says.childNodes]
             .map((said) => said.textContent?.trim())
@@ -30,7 +30,7 @@ function stepsShown(): string[] {
 function countsShown(): string[] {
     return [
         ...document.querySelectorAll(
-            ".author-file-editor-work-progress-step-counted:not(.author-file-editor-work-progress-step-counted-filled)",
+            ".authorship-panel-work-progress-step-counted:not(.authorship-panel-work-progress-step-counted-filled)",
         ),
     ].map((counted) => counted.textContent ?? "");
 }
@@ -74,12 +74,12 @@ describe("how far along a job is", () => {
         expect(
             [
                 ...document.querySelectorAll(
-                    ".author-file-editor-work-progress-step",
+                    ".authorship-panel-work-progress-step",
                 ),
             ].map((step) => step.className),
         ).toEqual([
-            "author-file-editor-work-progress-step author-file-editor-work-progress-step-done",
-            "author-file-editor-work-progress-step author-file-editor-work-progress-step-running",
+            "authorship-panel-work-progress-step authorship-panel-work-progress-step-done",
+            "authorship-panel-work-progress-step authorship-panel-work-progress-step-running",
         ]);
     });
 
@@ -151,13 +151,13 @@ describe("how far along a job is", () => {
 
         const drawers = [
             ...document.querySelectorAll<HTMLDetailsElement>(
-                ".author-file-editor-work-progress-steps",
+                ".authorship-panel-work-progress-steps",
             ),
         ];
         expect(drawers.map((drawer) => drawer.open)).toEqual([true]);
         expect(
             drawers[0].querySelector(
-                ":scope > .author-file-editor-work-progress-step .author-file-editor-work-progress-step-says",
+                ":scope > .authorship-panel-work-progress-step .authorship-panel-work-progress-step-says",
             )?.textContent,
         ).toContain("reading the chapters");
         expect(stepsShown()).toEqual([
