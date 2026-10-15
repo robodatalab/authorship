@@ -724,6 +724,8 @@ function MonacoMarkdownEditor({
                     ),
                 ) || undefined,
             wordWrap: "on",
+            wordWrapBreakAfterCharacters: " \t-–—",
+            wordWrapBreakBeforeCharacters: "",
             lineNumbers: "off",
             glyphMargin: false,
             folding: false,
