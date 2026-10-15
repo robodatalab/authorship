@@ -4,6 +4,7 @@ import { AddSalientConceptCommand } from "./add_salient_concept";
 import { AssignStoryTextCommand } from "./assign_story_text";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
+import { DeleteSalientConceptCommand } from "./delete_salient_concept";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
@@ -62,6 +63,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
     new AddSalientConceptCommand(),
+    new DeleteSalientConceptCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),

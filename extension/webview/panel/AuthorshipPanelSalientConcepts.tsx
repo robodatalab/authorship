@@ -1,5 +1,12 @@
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
+import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
+import {
+    MarkdownEditor,
+    MarkdownEditorMediator,
+} from "../markdown/MarkdownEditor";
+import { fieldsOfCellKind } from "../../vscode_runtime/storydoc/cell_kinds";
+import { SALIENT_CONCEPT } from "../../vscode_runtime/storydoc/model";
 import type {
     SalientConceptInTheStory,
     StoryTextSpan,
@@ -78,24 +85,28 @@ export function AuthorshipPanelSalientConcepts({
                                     <span className="authorship-panel-swatch" />
                                     {concept.title}
                                 </button>
+                                <span
+                                    className="authorship-panel-salient-concept-examples-count"
+                                    title="Examples"
+                                >
+                                    {concept.storyWordRanges.length}
+                                </span>
                                 <button
                                     type="button"
-                                    className="authorship-panel-salient-concept-assign"
-                                    title="Assign the selected words to this concept"
-                                    aria-label="Assign the selected words to this concept"
-                                    disabled={storyTextSelected === null}
+                                    className="authorship-panel-salient-concept-deleted"
+                                    title="Delete this concept"
+                                    aria-label="Delete this concept"
                                     onClick={() =>
                                         sendMessagesToVscode({
                                             type: "invoke",
-                                            commandName: "assignStoryText",
+                                            commandName: "deleteSalientConcept",
                                             commandArguments: {
                                                 conceptCellId: concept.conceptCellId,
-                                                ...storyTextSelected,
                                             },
                                         })
                                     }
                                 >
-                                    <i className="codicon codicon-add" />
+                                    <i className="codicon codicon-trash" />
                                 </button>
                             </li>
                         ))}
@@ -110,6 +121,7 @@ export function AuthorshipPanelSalientConcepts({
                         <AuthorshipPanelSalientConceptDetails
                             key={conceptSelected.conceptCellId}
                             concept={conceptSelected}
+                            storyTextSelected={storyTextSelected}
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
                     )}
@@ -121,91 +133,102 @@ export function AuthorshipPanelSalientConcepts({
 
 interface AuthorshipPanelSalientConceptDetailsProps {
     concept: SalientConceptInTheStory;
+    storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-function useTextTheAuthorIsTyping(
-    said: string,
-    onSaid: (said: string) => void,
-) {
-    const [beingTyped, setBeingTyped] = useState<string | null>(null);
+function useTimesTheHostRewroteIt(markdown: string): {
+    timesTheHostRewroteIt: number;
+    theAuthorTyped: (markdown: string) => void;
+} {
+    const typedAndNotYetEchoed = useRef<string[]>([]);
+    const [timesTheHostRewroteIt, countAHostRewrite] = useState(0);
+
+    useEffect(() => {
+        const echoed = typedAndNotYetEchoed.current.indexOf(markdown);
+        if (echoed >= 0) {
+            typedAndNotYetEchoed.current.splice(0, echoed + 1);
+            return;
+        }
+        typedAndNotYetEchoed.current = [];
+        countAHostRewrite((times) => times + 1);
+    }, [markdown]);
+
     return {
-        value: beingTyped ?? said,
-        onFocus: () => setBeingTyped(said),
-        onBlur: () => setBeingTyped(null),
-        onChange: (
-            typed: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-        ) => {
-            setBeingTyped(typed.currentTarget.value);
-            onSaid(typed.currentTarget.value);
-        },
+        timesTheHostRewroteIt,
+        theAuthorTyped: (typed) => typedAndNotYetEchoed.current.push(typed),
     };
 }
 
 function AuthorshipPanelSalientConceptDetails({
     concept,
+    storyTextSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelSalientConceptDetailsProps) {
-    const title = useTextTheAuthorIsTyping(concept.title, (said) =>
-        sendMessagesToVscode({
-            type: "invoke",
-            commandName: "replaceAttribute",
-            commandArguments: {
-                cellId: concept.conceptCellId,
-                attributeName: "title",
-                attributeValue: said,
-            },
-        }),
-    );
-    const description = useTextTheAuthorIsTyping(concept.description, (said) =>
-        sendMessagesToVscode({
-            type: "typed",
-            cellId: concept.conceptCellId,
-            markdown: said,
-        }),
-    );
+    const description = useTimesTheHostRewroteIt(concept.description);
+    const examplesNewestFirst = [...concept.storyWordRanges].reverse();
 
     return (
         <section className="authorship-panel-salient-concept-details">
-            <div className="authorship-panel-salient-concept-heading">
-                <input
-                    type="text"
-                    className="authorship-panel-salient-concept-title-box"
-                    aria-label="Title"
-                    placeholder="Title"
-                    {...title}
-                />
+            <AuthorFileEditorCellFields
+                fields={fieldsOfCellKind(SALIENT_CONCEPT)}
+                cellAttributes={{ title: concept.title }}
+                onAttributeChanged={(attributeName, attributeValue) =>
+                    sendMessagesToVscode({
+                        type: "invoke",
+                        commandName: "replaceAttribute",
+                        commandArguments: {
+                            cellId: concept.conceptCellId,
+                            attributeName,
+                            attributeValue,
+                        },
+                    })
+                }
+            />
+            <div className="authorship-panel-salient-concept-description">
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId={concept.conceptCellId}
+                        markdown={concept.description}
+                        timesTheHostWroteIt={description.timesTheHostRewroteIt}
+                        onMarkdownCommitted={(markdown) => {
+                            description.theAuthorTyped(markdown);
+                            sendMessagesToVscode({
+                                type: "typed",
+                                cellId: concept.conceptCellId,
+                                markdown,
+                            });
+                        }}
+                    />
+                </MarkdownEditorMediator>
+            </div>
+            <div className="authorship-panel-salient-concept-examples-heading">
+                <h4>Examples</h4>
                 <button
                     type="button"
-                    className="authorship-panel-salient-concept-deleted"
-                    title="Delete this concept"
-                    aria-label="Delete this concept"
+                    className="authorship-panel-salient-concept-assign"
+                    title="Assign the selected words to this concept"
+                    aria-label="Assign the selected words to this concept"
+                    disabled={storyTextSelected === null}
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
-                            commandName: "deleteCell",
+                            commandName: "assignStoryText",
                             commandArguments: {
-                                cellId: concept.conceptCellId,
+                                conceptCellId: concept.conceptCellId,
+                                ...storyTextSelected,
                             },
                         })
                     }
                 >
-                    <i className="codicon codicon-trash" />
+                    <i className="codicon codicon-add" />
                 </button>
             </div>
-            <textarea
-                className="authorship-panel-salient-concept-description"
-                aria-label="Description"
-                placeholder="Description"
-                rows={4}
-                {...description}
-            />
-            <h4>Examples</h4>
-            {concept.storyWordRanges.length === 0 ? (
+            {examplesNewestFirst.length === 0 ? (
                 <div className="authorship-panel-idle">No words assigned yet</div>
             ) : (
                 <ul className="authorship-panel-salient-concept-examples">
-                    {concept.storyWordRanges.map((storyWordRange) => (
+                    {examplesNewestFirst.map((storyWordRange) => (
                         <li
                             key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
                             className="authorship-panel-salient-concept-example"

@@ -1,29 +1,62 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 
-import { AuthorshipPanelSalientConcepts } from "../../../extension/webview/panel/AuthorshipPanelSalientConcepts";
 import type {
     SalientConceptInTheStory,
     StoryTextSpan,
 } from "../../../extension/vscode_runtime/storydoc/story_words";
 
+vi.mock(
+    "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
+    () => ({}),
+);
+vi.mock("monaco-editor/languages/definitions/markdown/markdown.js", () => ({
+    conf: {},
+    language: {},
+}));
+vi.mock("monaco-editor/editor/editor.api", async () => {
+    const { monacoEditorApi } = await import("../markdown/monaco_editor_double");
+    return monacoEditorApi();
+});
+
+const { monacoEditorsOnThePage } = await import(
+    "../markdown/monaco_editor_double"
+);
+
+const { AuthorshipPanelSalientConcepts } = await import(
+    "../../../extension/webview/panel/AuthorshipPanelSalientConcepts"
+);
+
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("the salient concepts tab", () => {
     let posted: unknown[] = [];
+    let root: Root;
 
-    async function mountSalientConcepts(options: {
+    interface WhatTheTabIsGiven {
         salientConcepts: SalientConceptInTheStory[] | null;
         salientConceptSelected?: string | null;
         storyTextSelected?: StoryTextSpan | null;
-    }): Promise<void> {
+    }
+
+    async function mountSalientConcepts(
+        options: WhatTheTabIsGiven,
+    ): Promise<void> {
         posted = [];
+        monacoEditorsOnThePage.length = 0;
         document.body.innerHTML = "";
         const container = document.createElement("div");
         document.body.append(container);
+        root = createRoot(container);
+        await redrawSalientConcepts(options);
+    }
+
+    async function redrawSalientConcepts(
+        options: WhatTheTabIsGiven,
+    ): Promise<void> {
         await act(async () => {
-            createRoot(container).render(
+            root.render(
                 <AuthorshipPanelSalientConcepts
                     salientConcepts={options.salientConcepts}
                     salientConceptSelected={
@@ -215,13 +248,11 @@ describe("the salient concepts tab", () => {
 
         expect(
             document.querySelector<HTMLInputElement>(
-                ".authorship-panel-salient-concept-title-box",
+                ".author-file-editor-cell-field-input",
             )!.value,
         ).toBe("Door");
         expect(
-            document.querySelector<HTMLTextAreaElement>(
-                ".authorship-panel-salient-concept-description",
-            )!.value,
+            document.querySelector(".markdown-rendered p")?.textContent,
         ).toBe("What she saw.");
         expect(
             document.querySelector(
@@ -243,7 +274,7 @@ describe("the salient concepts tab", () => {
             salientConceptSelected: "k1",
         });
         const titleBox = document.querySelector<HTMLInputElement>(
-            ".authorship-panel-salient-concept-title-box",
+            ".author-file-editor-cell-field-input",
         )!;
 
         await act(async () => {
@@ -279,24 +310,23 @@ describe("the salient concepts tab", () => {
             ],
             salientConceptSelected: "k1",
         });
-        const descriptionBox = document.querySelector<HTMLTextAreaElement>(
-            ".authorship-panel-salient-concept-description",
-        )!;
 
         await act(async () => {
-            Object.getOwnPropertyDescriptor(
-                HTMLTextAreaElement.prototype,
-                "value",
-            )!.set!.call(descriptionBox, "What she opened.");
-            descriptionBox.dispatchEvent(new Event("input", { bubbles: true }));
+            document
+                .querySelector(".markdown-rendered")!
+                .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+        });
+        await act(async () => {
+            monacoEditorsOnThePage[0].putTheCursorAt(13);
+            monacoEditorsOnThePage[0].typeCharacter("!");
         });
 
         expect(posted).toEqual([
-            { type: "typed", cellId: "k1", markdown: "What she opened." },
+            { type: "typed", cellId: "k1", markdown: "What she saw.!" },
         ]);
     });
 
-    it("asks for the selected concept to be deleted", async () => {
+    it("shows the description the host rewrote, as after an undo", async () => {
         await mountSalientConcepts({
             salientConcepts: [
                 {
@@ -309,17 +339,129 @@ describe("the salient concepts tab", () => {
             salientConceptSelected: "k1",
         });
 
+        await redrawSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she opened.",
+                    storyWordRanges: [],
+                },
+            ],
+            salientConceptSelected: "k1",
+        });
+
+        expect(
+            document.querySelector(".markdown-rendered p")?.textContent,
+        ).toBe("What she opened.");
+    });
+
+    it("asks for the concept whose bin is pressed to be deleted", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [],
+                },
+                {
+                    conceptCellId: "k2",
+                    title: "Bell",
+                    description: "What he heard.",
+                    storyWordRanges: [],
+                },
+            ],
+        });
+
         await click(
-            document.querySelector(".authorship-panel-salient-concept-deleted")!,
+            document.querySelectorAll(
+                ".authorship-panel-salient-concept-deleted",
+            )[1],
         );
 
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "deleteCell",
-                commandArguments: { cellId: "k1" },
+                commandName: "deleteSalientConcept",
+                commandArguments: { conceptCellId: "k2" },
             },
         ]);
+    });
+
+    it("counts each concept's examples in a column beside its title", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [
+                        {
+                            firstWord: 2,
+                            lastWord: 3,
+                            cellId: "c2",
+                            wordsItCovers: "the door.",
+                        },
+                        {
+                            firstWord: 6,
+                            lastWord: 7,
+                            cellId: "c3",
+                            wordsItCovers: "the bell.",
+                        },
+                    ],
+                },
+                {
+                    conceptCellId: "k2",
+                    title: "Bell",
+                    description: "What he heard.",
+                    storyWordRanges: [],
+                },
+            ],
+        });
+
+        expect(
+            [
+                ...document.querySelectorAll(
+                    ".authorship-panel-salient-concept-examples-count",
+                ),
+            ].map((count) => count.textContent),
+        ).toEqual(["2", "0"]);
+    });
+
+    it("lists the examples newest first", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [
+                        {
+                            firstWord: 2,
+                            lastWord: 3,
+                            cellId: "c2",
+                            wordsItCovers: "the door.",
+                        },
+                        {
+                            firstWord: 6,
+                            lastWord: 7,
+                            cellId: "c3",
+                            wordsItCovers: "the bell.",
+                        },
+                    ],
+                },
+            ],
+            salientConceptSelected: "k1",
+        });
+
+        expect(
+            [
+                ...document.querySelectorAll(
+                    ".authorship-panel-salient-concept-example-shown",
+                ),
+            ].map((example) => example.textContent),
+        ).toEqual(["the bell.", "the door."]);
     });
 
     it("asks the host to show the words of an example", async () => {
@@ -409,6 +551,7 @@ describe("the salient concepts tab", () => {
                     ],
                 },
             ],
+            salientConceptSelected: "k1",
         });
 
         expect(
@@ -418,7 +561,7 @@ describe("the salient concepts tab", () => {
         ).toBe(true);
     });
 
-    it("asks for the selected words to be assigned to a concept", async () => {
+    it("asks for the selected words to be assigned to the selected concept", async () => {
         await mountSalientConcepts({
             salientConcepts: [
                 {
@@ -435,6 +578,7 @@ describe("the salient concepts tab", () => {
                     ],
                 },
             ],
+            salientConceptSelected: "k1",
             storyTextSelected: {
                 cellId: "m1",
                 startCharacterOffsetInCell: 4,
