@@ -48,6 +48,40 @@ describe("the salient concepts tab", () => {
         expect(document.body.textContent).toBe("No manuscript open");
     });
 
+    it.each([
+        { story: "none yet", salientConcepts: [] },
+        {
+            story: "one already",
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [],
+                },
+            ],
+        },
+    ])(
+        "asks for a new concept to be added when the story holds $story",
+        async ({ salientConcepts }) => {
+            await mountSalientConcepts({ salientConcepts });
+
+            await click(
+                document.querySelector(
+                    'button[aria-label="Add a salient concept"]',
+                )!,
+            );
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "addSalientConcept",
+                    commandArguments: {},
+                },
+            ]);
+        },
+    );
+
     it("lists every concept by its title", async () => {
         await mountSalientConcepts({
             salientConcepts: [

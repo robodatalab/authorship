@@ -1,5 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddSalientConceptCommand } from "./add_salient_concept";
 import { AssignStoryTextCommand } from "./assign_story_text";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
@@ -60,6 +61,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceAttributeCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
+    new AddSalientConceptCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),

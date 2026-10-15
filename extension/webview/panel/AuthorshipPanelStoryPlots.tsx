@@ -31,10 +31,10 @@ export function AuthorshipPanelStoryPlots({
 
     return (
         <>
-            <header className="authorship-panel-story-plots-header">
+            <header className="authorship-panel-toolbar">
                 <button
                     type="button"
-                    className="authorship-panel-story-plots-identify"
+                    className="authorship-panel-toolbar-button"
                     title="Identify the plots the story weaves"
                     aria-label="Identify the plots the story weaves"
                     onClick={() =>

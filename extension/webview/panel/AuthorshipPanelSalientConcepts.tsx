@@ -22,79 +22,98 @@ export function AuthorshipPanelSalientConcepts({
     if (salientConcepts === null) {
         return <div className="authorship-panel-idle">No manuscript open</div>;
     }
-    if (salientConcepts.length === 0) {
-        return (
-            <div className="authorship-panel-idle">No salient concepts yet</div>
-        );
-    }
-
     const conceptSelected = salientConcepts.find(
         (concept) => concept.conceptCellId === salientConceptSelected,
     );
 
     return (
         <div className="authorship-panel-salient-concepts">
-            <ul className="authorship-panel-salient-concepts-list authorship-panel-swatches">
-                {salientConcepts.map((concept) => (
-                    <li
-                        key={concept.conceptCellId}
-                        className={
-                            concept === conceptSelected
-                                ? "authorship-panel-salient-concept authorship-panel-salient-concept-selected"
-                                : "authorship-panel-salient-concept"
-                        }
-                    >
-                        <button
-                            type="button"
-                            className="authorship-panel-salient-concept-title"
-                            aria-pressed={concept === conceptSelected}
-                            onClick={() =>
-                                sendMessagesToVscode({
-                                    type: "selectSalientConcept",
-                                    conceptCellId:
-                                        concept === conceptSelected
-                                            ? null
-                                            : concept.conceptCellId,
-                                })
-                            }
-                        >
-                            <span className="authorship-panel-swatch" />
-                            {concept.title}
-                        </button>
-                        <button
-                            type="button"
-                            className="authorship-panel-salient-concept-assign"
-                            title="Assign the selected words to this concept"
-                            aria-label="Assign the selected words to this concept"
-                            disabled={storyTextSelected === null}
-                            onClick={() =>
-                                sendMessagesToVscode({
-                                    type: "invoke",
-                                    commandName: "assignStoryText",
-                                    commandArguments: {
-                                        conceptCellId: concept.conceptCellId,
-                                        ...storyTextSelected,
-                                    },
-                                })
-                            }
-                        >
-                            <i className="codicon codicon-add" />
-                        </button>
-                    </li>
-                ))}
-            </ul>
-            {conceptSelected === undefined ? (
-                <section className="authorship-panel-salient-concept-details">
-                    <div className="authorship-panel-idle">
-                        Select a concept to see its description and examples
-                    </div>
-                </section>
+            <header className="authorship-panel-toolbar">
+                <button
+                    type="button"
+                    className="authorship-panel-toolbar-button"
+                    title="Add a salient concept"
+                    aria-label="Add a salient concept"
+                    onClick={() =>
+                        sendMessagesToVscode({
+                            type: "invoke",
+                            commandName: "addSalientConcept",
+                            commandArguments: {},
+                        })
+                    }
+                >
+                    <i className="codicon codicon-add" />
+                </button>
+            </header>
+            {salientConcepts.length === 0 ? (
+                <div className="authorship-panel-idle">
+                    No salient concepts yet
+                </div>
             ) : (
-                <AuthorshipPanelSalientConceptDetails
-                    key={conceptSelected.conceptCellId}
-                    concept={conceptSelected}
-                    sendMessagesToVscode={sendMessagesToVscode}
-                />
+                <>
+                    <ul className="authorship-panel-salient-concepts-list authorship-panel-swatches">
+                        {salientConcepts.map((concept) => (
+                            <li
+                                key={concept.conceptCellId}
+                                className={
+                                    concept === conceptSelected
+                                        ? "authorship-panel-salient-concept authorship-panel-salient-concept-selected"
+                                        : "authorship-panel-salient-concept"
+                                }
+                            >
+                                <button
+                                    type="button"
+                                    className="authorship-panel-salient-concept-title"
+                                    aria-pressed={concept === conceptSelected}
+                                    onClick={() =>
+                                        sendMessagesToVscode({
+                                            type: "selectSalientConcept",
+                                            conceptCellId:
+                                                concept === conceptSelected
+                                                    ? null
+                                                    : concept.conceptCellId,
+                                        })
+                                    }
+                                >
+                                    <span className="authorship-panel-swatch" />
+                                    {concept.title}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="authorship-panel-salient-concept-assign"
+                                    title="Assign the selected words to this concept"
+                                    aria-label="Assign the selected words to this concept"
+                                    disabled={storyTextSelected === null}
+                                    onClick={() =>
+                                        sendMessagesToVscode({
+                                            type: "invoke",
+                                            commandName: "assignStoryText",
+                                            commandArguments: {
+                                                conceptCellId: concept.conceptCellId,
+                                                ...storyTextSelected,
+                                            },
+                                        })
+                                    }
+                                >
+                                    <i className="codicon codicon-add" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    {conceptSelected === undefined ? (
+                        <section className="authorship-panel-salient-concept-details">
+                            <div className="authorship-panel-idle">
+                                Select a concept to see its description and examples
+                            </div>
+                        </section>
+                    ) : (
+                        <AuthorshipPanelSalientConceptDetails
+                            key={conceptSelected.conceptCellId}
+                            concept={conceptSelected}
+                            sendMessagesToVscode={sendMessagesToVscode}
+                        />
+                    )}
+                </>
             )}
         </div>
     );

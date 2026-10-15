@@ -172,7 +172,9 @@ describe("the plots tab", () => {
 
         await act(async () => {
             document
-                .querySelector(".authorship-panel-story-plots-identify")!
+                .querySelector(
+                    'button[aria-label="Identify the plots the story weaves"]',
+                )!
                 .dispatchEvent(new MouseEvent("click", { bubbles: true }));
         });
 
