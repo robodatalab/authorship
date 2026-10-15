@@ -418,6 +418,51 @@ describe("where the cursor stands when the text changes underneath the author", 
         ).toBe(15);
     });
 
+    it.each([
+        {
+            edit: "a space typed beside another is taken back",
+            shown: "The  lantern",
+            stoodAt: 4,
+            wanted: "The lantern",
+            standsAt: 3,
+        },
+        {
+            edit: "a space typed beside another is put back",
+            shown: "The lantern",
+            stoodAt: 3,
+            wanted: "The  lantern",
+            standsAt: 4,
+        },
+        {
+            edit: "a letter typed before the same letter is taken back",
+            shown: "abcc",
+            stoodAt: 3,
+            wanted: "abc",
+            standsAt: 2,
+        },
+        {
+            edit: "a word typed is taken back",
+            shown: "The old lantern",
+            stoodAt: 8,
+            wanted: "The lantern",
+            standsAt: 4,
+        },
+        {
+            edit: "the words after it are taken away",
+            shown: "The lantern went out.",
+            stoodAt: 11,
+            wanted: "The lantern",
+            standsAt: 11,
+        },
+    ])(
+        "stands where the text was changed when $edit",
+        async ({ shown, stoodAt, wanted, standsAt }) => {
+            expect(
+                await whereTheCursorStandsAfter(shown, stoodAt, wanted),
+            ).toBe(standsAt);
+        },
+    );
+
     it("never stands past the end of a shorter text", async () => {
         expect(
             await whereTheCursorStandsAfter(A_SENTENCE, A_SENTENCE.length, "x"),

@@ -266,6 +266,27 @@ describe("undoing what the author typed", () => {
         expect(theCellBeingTyped().getValue()).toBe("The lanterngers");
     });
 
+    it("puts the cursor back where it stood before a space typed beside another was taken back", async () => {
+        theCellBeingTyped().putTheCursorAt(3);
+        await typeCharacter(" ");
+
+        await editor.undoTheNewestEdit();
+
+        expect(theCellBeingTyped().getValue()).toBe("The lantern");
+        expect(theCellBeingTyped().cursorOffset()).toBe(3);
+    });
+
+    it("puts the cursor after a space typed beside another when it is put back", async () => {
+        theCellBeingTyped().putTheCursorAt(3);
+        await typeCharacter(" ");
+        await editor.undoTheNewestEdit();
+
+        await editor.redoTheNewestEdit();
+
+        expect(theCellBeingTyped().getValue()).toBe("The  lantern");
+        expect(theCellBeingTyped().cursorOffset()).toBe(4);
+    });
+
     it("leaves the page saying what the document says, so the next keystroke follows on", async () => {
         await typeCharacter("a");
         await editor.undoTheNewestEdit();
