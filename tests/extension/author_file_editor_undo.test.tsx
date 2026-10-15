@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
+import { PublishView } from "../../extension/vscode_runtime/publish/panel";
 import { Uri, executedCommands, files, window as vscodeWindow } from "./vscode";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -22,6 +23,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider(
         { extensionUri: Uri.file("/extension") } as never,
         vscodeWindow.createOutputChannel("Authorship") as never,
+        new PublishView({ extensionUri: Uri.file("/extension") } as never),
     );
     const edits: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
@@ -52,6 +54,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
             },
         },
         onDidDispose: () => ({ dispose: () => undefined }),
+        onDidChangeViewState: () => ({ dispose: () => undefined }),
     };
     provider.resolveCustomEditor(fileDocument, panel as never);
 

@@ -17,6 +17,7 @@ import type {
     StoryScene,
 } from "../vscode_runtime/commands/identify_story_plots";
 import type { WorkProgress } from "../vscode_runtime/server/jobs";
+import type { StoryTextSpan } from "../vscode_runtime/storydoc/story_words";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -44,6 +45,8 @@ interface WhatTheWebviewDraws {
     storyPlots: StoryPlot[];
     storyPlotsProgress: WorkProgress | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    salientConceptSelected: string | null;
+    storyTextShown: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -104,6 +107,12 @@ function processMessageFromVscode(
             .storyPlotsProgress as WorkProgress | null;
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
+    } else if (message.data?.type === "salientConceptSelected") {
+        drawn.salientConceptSelected = message.data.salientConceptSelected as
+            | string
+            | null;
+    } else if (message.data?.type === "storyTextShown") {
+        drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
     } else if (message.data?.type === "findMatches") {
         drawn.findMatches = message.data
             .findMatches as AuthorFileEditorFindMatch[];
@@ -139,6 +148,8 @@ function openTheAuthorFileEditor(): void {
         storyPlots: [],
         storyPlotsProgress: null,
         paragraphsInStoryPlots: [],
+        salientConceptSelected: null,
+        storyTextShown: null,
         findMatches: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
@@ -159,6 +170,8 @@ function openTheAuthorFileEditor(): void {
                 storyPlots={drawn.storyPlots}
                 storyPlotsProgress={drawn.storyPlotsProgress}
                 paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
+                salientConceptSelected={drawn.salientConceptSelected}
+                storyTextShown={drawn.storyTextShown}
                 findMatches={drawn.findMatches}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}

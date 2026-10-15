@@ -11,6 +11,12 @@ body {
     font-size: var(--vscode-font-size);
 }
 
+#authorship-panel-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
 .authorship-panel-tabs {
     display: flex;
     gap: 4px;
@@ -54,8 +60,11 @@ body {
 
 .authorship-panel-tab-body {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
+    overflow-y: auto;
     padding: 10px 10px 12px;
 }
 

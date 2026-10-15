@@ -7,23 +7,39 @@ import {
     AuthorshipPanelAsyncJobs,
     type AsyncJobStatus,
 } from "./AuthorshipPanelAsyncJobs";
+import { AuthorshipPanelSalientConcepts } from "./AuthorshipPanelSalientConcepts";
+import type {
+    SalientConceptInTheStory,
+    StoryTextSpan,
+} from "../../vscode_runtime/storydoc/story_words";
 import "./AuthorshipPanelCanvas.css";
 
 export type SendMessagesToVscode = (message: unknown) => void;
 
 const SERVING_STATUS_TAB = "Serving Status";
 const JOBS_STATUS_TAB = "Jobs Status";
-const AUTHORSHIP_PANEL_TABS = [SERVING_STATUS_TAB, JOBS_STATUS_TAB];
+const SALIENT_CONCEPTS_TAB = "Salient Concepts";
+const AUTHORSHIP_PANEL_TABS = [
+    SERVING_STATUS_TAB,
+    JOBS_STATUS_TAB,
+    SALIENT_CONCEPTS_TAB,
+];
 
 interface AuthorshipPanelCanvasProps {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
+    salientConcepts?: SalientConceptInTheStory[] | null;
+    salientConceptSelected?: string | null;
+    storyTextSelected?: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorshipPanelCanvas({
     models,
     jobs,
+    salientConcepts,
+    salientConceptSelected = null,
+    storyTextSelected = null,
     sendMessagesToVscode,
 }: AuthorshipPanelCanvasProps) {
     const [tabShown, showTab] = useState(SERVING_STATUS_TAB);
@@ -54,6 +70,15 @@ export function AuthorshipPanelCanvas({
                         sendMessagesToVscode={sendMessagesToVscode}
                     />
                 )}
+                {tabShown === SALIENT_CONCEPTS_TAB &&
+                    salientConcepts !== undefined && (
+                        <AuthorshipPanelSalientConcepts
+                            salientConcepts={salientConcepts}
+                            salientConceptSelected={salientConceptSelected}
+                            storyTextSelected={storyTextSelected}
+                            sendMessagesToVscode={sendMessagesToVscode}
+                        />
+                    )}
             </div>
         </>
     );

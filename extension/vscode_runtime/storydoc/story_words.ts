@@ -40,6 +40,7 @@ export interface StoryWordRangeInTheStory extends StoryWordRange {
 export interface SalientConceptInTheStory {
     conceptCellId: string;
     title: string;
+    description: string;
     storyWordRanges: StoryWordRangeInTheStory[];
 }
 
@@ -156,6 +157,7 @@ export function salientConceptsIn(
         .map((concept) => ({
             conceptCellId: concept.attrs[UNIQUE_CELL_ID],
             title: concept.attrs.title ?? "",
+            description: concept.source,
             storyWordRanges: storyWordRangesOf(concept).map((range) => ({
                 ...range,
                 cellId: storyWords[range.firstWord]?.cellId ?? "",

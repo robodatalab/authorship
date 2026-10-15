@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
+import { PublishView } from "../../../extension/vscode_runtime/publish/panel";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 vi.mock(
@@ -35,6 +36,7 @@ interface OpenEditor {
     documentText(): string;
     undoTheNewestEdit(): Promise<void>;
     redoTheNewestEdit(): Promise<void>;
+    selectTheSalientConcept(conceptCellId: string): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -47,6 +49,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider(
         { extensionUri: Uri.file("/extension") } as never,
         vscodeWindow.createOutputChannel("Authorship") as never,
+        new PublishView({ extensionUri: Uri.file("/extension") } as never),
     );
     const editsRecorded: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
@@ -74,6 +77,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
             },
         },
         onDidDispose: () => ({ dispose: () => undefined }),
+        onDidChangeViewState: () => ({ dispose: () => undefined }),
     };
     provider.resolveCustomEditor(session, panel as never);
 
@@ -128,6 +132,12 @@ async function openEditor(text: string): Promise<OpenEditor> {
         },
         theFileChangedOnDisk: async () => {
             await watchersOnTheFiles[0].theFileChanged();
+            await settle();
+        },
+        selectTheSalientConcept: async (conceptCellId: string) => {
+            await act(async () => {
+                session.selectTheSalientConcept(conceptCellId);
+            });
             await settle();
         },
     };
@@ -349,7 +359,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedBefore: "Companion knelt—head bowed.",
             keystrokes: [
                 { cursorAt: 18, typed: " " },
                 { cursorAt: 20, typed: " " },
@@ -359,7 +368,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 24 },
                 to: { lineNumber: 1, column: 51 },
             },
-            wordsListedAfter: "Companion knelt—head bowed.",
         },
         {
             edit: "a word typed before them",
@@ -368,7 +376,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedBefore: "Companion knelt—head bowed.",
             keystrokes: [
                 { cursorAt: 11, typed: "long " },
             ],
@@ -377,7 +384,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 27 },
                 to: { lineNumber: 1, column: 54 },
             },
-            wordsListedAfter: "Companion knelt—head bowed.",
         },
         {
             edit: "an em dash among them spaced apart",
@@ -386,7 +392,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedBefore: "Companion knelt—head bowed.",
             keystrokes: [
                 { cursorAt: 36, typed: " " },
                 { cursorAt: 38, typed: " " },
@@ -396,7 +401,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 51 },
             },
-            wordsListedAfter: "Companion knelt head bowed.",
         },
         {
             edit: "a word typed among them",
@@ -405,7 +409,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedBefore: "Companion knelt—head bowed.",
             keystrokes: [
                 { cursorAt: 31, typed: "slowly " },
             ],
@@ -414,7 +417,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 56 },
             },
-            wordsListedAfter: "Companion slowly knelt—head bowed.",
         },
         {
             edit: "a sentence typed after them",
@@ -423,7 +425,6 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedBefore: "Companion knelt—head bowed.",
             keystrokes: [
                 { cursorAt: 48, typed: " Then she smiled." },
             ],
@@ -433,18 +434,15 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            wordsListedAfter: "Companion knelt—head bowed.",
         },
     ])(
         "move with the concept's words after $edit",
         async ({
             textBefore,
             highlightBefore,
-            wordsListedBefore,
             keystrokes,
             textAfter,
             highlightAfter,
-            wordsListedAfter,
         }) => {
             editor = await openEditor(
                 [
@@ -458,21 +456,7 @@ describe("the words of a salient concept while the author types", () => {
                     "",
                 ].join("\n"),
             );
-            await act(async () => {
-                document
-                    .querySelector<HTMLButtonElement>(
-                        'button[aria-label="Show or hide the plots the story weaves"]',
-                    )!
-                    .click();
-            });
-            await settle();
-            const conceptDrawer = document.querySelector<HTMLDetailsElement>(
-                ".author-file-editor-salient-concept",
-            )!;
-            await act(async () => {
-                conceptDrawer.open = true;
-                conceptDrawer.dispatchEvent(new Event("toggle"));
-            });
+            await editor.selectTheSalientConcept("k1");
             await openTheCellForTyping();
 
             expect(theCellBeingTyped().marks()).toEqual([
@@ -484,11 +468,6 @@ describe("the words of a salient concept while the author types", () => {
                     },
                 },
             ]);
-            expect(
-                document.querySelector(
-                    ".author-file-editor-salient-concept-words-shown",
-                )?.textContent,
-            ).toBe(wordsListedBefore);
 
             for (const { cursorAt, typed } of keystrokes) {
                 theCellBeingTyped().putTheCursorAt(cursorAt);
@@ -505,11 +484,6 @@ describe("the words of a salient concept while the author types", () => {
                     },
                 },
             ]);
-            expect(
-                document.querySelector(
-                    ".author-file-editor-salient-concept-words-shown",
-                )?.textContent,
-            ).toBe(wordsListedAfter);
         },
     );
 });

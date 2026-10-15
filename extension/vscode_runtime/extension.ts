@@ -11,7 +11,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(new ModelServer(context, serverPort(), log));
 
-    const authorFileEditor = new AuthorFileEditorProvider(context, log);
+    const authorshipPanel = new PublishView(context);
+    const authorFileEditor = new AuthorFileEditorProvider(
+        context,
+        log,
+        authorshipPanel,
+    );
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
             AuthorFileEditorProvider.viewType,
@@ -26,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             "authorship.manuscript",
-            new PublishView(context),
+            authorshipPanel,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
     );

@@ -22,7 +22,13 @@ import {
     MutableAuthorDocument,
     type ImmutableCell,
 } from "./storydoc/model";
-import { synchronizeTheStoryWordRanges } from "./storydoc/story_words";
+import {
+    storyTextSpansOf,
+    storyWordsIn,
+    synchronizeTheStoryWordRanges,
+    type StoryTextSpan,
+    type StoryWordRange,
+} from "./storydoc/story_words";
 import { WordCounter } from "./storydoc/word_counter";
 
 export class AuthorFileEditorSession
@@ -52,6 +58,16 @@ export class AuthorFileEditorSession
         null;
 
     private burstBeingTyped: TypingBurst | null = null;
+
+    private salientConceptSelected: string | null = null;
+
+    private storyTextSelected: StoryTextSpan | null = null;
+
+    private readonly documentOrSelectionChanged =
+        new vscode.EventEmitter<void>();
+
+    readonly onDocumentOrSelectionChanged =
+        this.documentOrSelectionChanged.event;
 
     constructor(
         private documentAsItStands: ImmutableAuthorDocument,
@@ -88,6 +104,36 @@ export class AuthorFileEditorSession
 
     get document(): ImmutableAuthorDocument {
         return this.documentAsItStands;
+    }
+
+    get theSalientConceptSelected(): string | null {
+        return this.salientConceptSelected;
+    }
+
+    get theStoryTextSelected(): StoryTextSpan | null {
+        return this.storyTextSelected;
+    }
+
+    selectTheSalientConcept(conceptCellId: string | null): void {
+        this.salientConceptSelected = conceptCellId;
+        this.sendSalientConceptSelected();
+        this.documentOrSelectionChanged.fire();
+    }
+
+    theAuthorSelectedStoryText(storyTextSelected: StoryTextSpan | null): void {
+        this.storyTextSelected = storyTextSelected;
+        this.documentOrSelectionChanged.fire();
+    }
+
+    showTheStoryWordRange(storyWordRange: StoryWordRange): void {
+        const storyWords = storyWordsIn(this.documentAsItStands.cells);
+        const [storyTextShown] = storyTextSpansOf(storyWords, storyWordRange);
+        if (storyTextShown) {
+            void this.panel?.webview.postMessage({
+                type: "storyTextShown",
+                storyTextShown,
+            });
+        }
     }
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
@@ -314,6 +360,13 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendSalientConceptSelected(): void {
+        void this.panel?.webview.postMessage({
+            type: "salientConceptSelected",
+            salientConceptSelected: this.salientConceptSelected,
+        });
+    }
+
     sendFindMatches(): void {
         void this.panel?.webview.postMessage({
             type: "findMatches",
@@ -329,8 +382,10 @@ export class AuthorFileEditorSession
         });
         this.sendProseErrors();
         this.sendStoryPlots();
+        this.sendSalientConceptSelected();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.documentOrSelectionChanged.fire();
     }
 
     private sendWhatChanged(asItStoodBefore: ImmutableAuthorDocument): void {
@@ -379,6 +434,7 @@ export class AuthorFileEditorSession
         this.sendStoryPlots();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.documentOrSelectionChanged.fire();
     }
 }
 

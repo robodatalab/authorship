@@ -5,12 +5,19 @@ import {
 } from "./panel/AuthorshipPanelCanvas";
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
+import type {
+    SalientConceptInTheStory,
+    StoryTextSpan,
+} from "../vscode_runtime/storydoc/story_words";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
 interface WhatThePanelDraws {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
+    salientConcepts?: SalientConceptInTheStory[] | null;
+    salientConceptSelected?: string | null;
+    storyTextSelected?: StoryTextSpan | null;
 }
 
 function processMessageFromVscode(
@@ -21,6 +28,15 @@ function processMessageFromVscode(
         drawn.models = message.data.models as ModelServingStatus[] | null;
     } else if (message.data?.type === "jobs") {
         drawn.jobs = message.data.jobs as AsyncJobStatus[] | null;
+    } else if (message.data?.type === "salientConcepts") {
+        drawn.salientConcepts = message.data.salientConcepts as
+            | SalientConceptInTheStory[]
+            | null;
+        drawn.salientConceptSelected = message.data.salientConceptSelected as
+            | string
+            | null;
+        drawn.storyTextSelected = message.data
+            .storyTextSelected as StoryTextSpan | null;
     } else {
         return false;
     }
@@ -38,6 +54,9 @@ function openTheAuthorshipPanel(): void {
             <AuthorshipPanelCanvas
                 models={drawn.models}
                 jobs={drawn.jobs}
+                salientConcepts={drawn.salientConcepts}
+                salientConceptSelected={drawn.salientConceptSelected}
+                storyTextSelected={drawn.storyTextSelected}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,
         );

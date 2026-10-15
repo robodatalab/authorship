@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import type { AuthorFileEditorMessage } from "./message_queue_between_vscode_and_webview";
+import type { StoryTextSpan } from "./storydoc/story_words";
 
 export class ThePageIsReady implements AuthorFileEditorMessage {
     invoke(session: AuthorFileEditorSession): void {
@@ -25,6 +26,14 @@ export class TheAuthorIsEditingTheCell implements AuthorFileEditorMessage {
 
     invoke(session: AuthorFileEditorSession): void {
         session.theAuthorIsEditingTheCell(this.cellId);
+    }
+}
+
+export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
+    constructor(private readonly storyTextSelected: StoryTextSpan | null) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        session.theAuthorSelectedStoryText(this.storyTextSelected);
     }
 }
 
