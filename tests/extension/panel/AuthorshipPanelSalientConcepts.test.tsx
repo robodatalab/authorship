@@ -153,7 +153,7 @@ describe("the salient concepts tab", () => {
         ]);
     });
 
-    it("shows the selected concept's description and examples below the list", async () => {
+    it("shows the selected concept's title, description and examples below the list", async () => {
         await mountSalientConcepts({
             salientConcepts: [
                 {
@@ -180,15 +180,112 @@ describe("the salient concepts tab", () => {
         });
 
         expect(
-            document.querySelector(
+            document.querySelector<HTMLInputElement>(
+                ".authorship-panel-salient-concept-title-box",
+            )!.value,
+        ).toBe("Door");
+        expect(
+            document.querySelector<HTMLTextAreaElement>(
                 ".authorship-panel-salient-concept-description",
-            )?.textContent,
+            )!.value,
         ).toBe("What she saw.");
         expect(
             document.querySelector(
                 ".authorship-panel-salient-concept-example-shown",
             )?.textContent,
         ).toBe("the door.");
+    });
+
+    it("asks for the title to be replaced as the author types it", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [],
+                },
+            ],
+            salientConceptSelected: "k1",
+        });
+        const titleBox = document.querySelector<HTMLInputElement>(
+            ".authorship-panel-salient-concept-title-box",
+        )!;
+
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )!.set!.call(titleBox, "Doors");
+            titleBox.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "replaceAttribute",
+                commandArguments: {
+                    cellId: "k1",
+                    attributeName: "title",
+                    attributeValue: "Doors",
+                },
+            },
+        ]);
+    });
+
+    it("tells the host the description the author types", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [],
+                },
+            ],
+            salientConceptSelected: "k1",
+        });
+        const descriptionBox = document.querySelector<HTMLTextAreaElement>(
+            ".authorship-panel-salient-concept-description",
+        )!;
+
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLTextAreaElement.prototype,
+                "value",
+            )!.set!.call(descriptionBox, "What she opened.");
+            descriptionBox.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+
+        expect(posted).toEqual([
+            { type: "typed", cellId: "k1", markdown: "What she opened." },
+        ]);
+    });
+
+    it("asks for the selected concept to be deleted", async () => {
+        await mountSalientConcepts({
+            salientConcepts: [
+                {
+                    conceptCellId: "k1",
+                    title: "Door",
+                    description: "What she saw.",
+                    storyWordRanges: [],
+                },
+            ],
+            salientConceptSelected: "k1",
+        });
+
+        await click(
+            document.querySelector(".authorship-panel-salient-concept-deleted")!,
+        );
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "deleteCell",
+                commandArguments: { cellId: "k1" },
+            },
+        ]);
     });
 
     it("asks the host to show the words of an example", async () => {

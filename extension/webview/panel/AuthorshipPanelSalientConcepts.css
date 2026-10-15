@@ -46,6 +46,7 @@
 }
 
 .authorship-panel-salient-concept-assign,
+.authorship-panel-salient-concept-deleted,
 .authorship-panel-salient-concept-example-removed {
     display: inline-flex;
     align-items: center;
@@ -58,6 +59,7 @@
 }
 
 .authorship-panel-salient-concept-assign:hover:enabled,
+.authorship-panel-salient-concept-deleted:hover,
 .authorship-panel-salient-concept-example-shown:hover,
 .authorship-panel-salient-concept-example-removed:hover {
     background: var(
@@ -79,10 +81,34 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
-.authorship-panel-salient-concept-details h3 {
-    margin: 0 0 4px;
-    font-size: var(--vscode-font-size);
+.authorship-panel-salient-concept-heading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.authorship-panel-salient-concept-title-box,
+.authorship-panel-salient-concept-description {
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font: inherit;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, transparent);
+    border-radius: 2px;
+}
+
+.authorship-panel-salient-concept-title-box {
+    flex: 1;
+    min-width: 0;
     font-weight: 600;
+}
+
+.authorship-panel-salient-concept-title-box:focus,
+.authorship-panel-salient-concept-description:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
 }
 
 .authorship-panel-salient-concept-details h4 {
@@ -95,9 +121,9 @@
 }
 
 .authorship-panel-salient-concept-description {
-    margin: 0;
-    white-space: pre-wrap;
-    color: var(--vscode-descriptionForeground);
+    display: block;
+    width: 100%;
+    resize: vertical;
 }
 
 .authorship-panel-salient-concept-examples {

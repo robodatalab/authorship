@@ -40,6 +40,11 @@ export class PublishView implements vscode.WebviewViewProvider {
                 this.sessionFollowed?.selectTheSalientConcept(
                     message.conceptCellId as string | null,
                 );
+            } else if (message?.type === "typed") {
+                this.sessionFollowed?.theAuthorTypedInTheCell(
+                    message.cellId as string,
+                    message.markdown as string,
+                );
             } else if (message?.type === "showStoryWordRange") {
                 this.sessionFollowed?.showTheStoryWordRange({
                     firstWord: message.firstWord as number,
