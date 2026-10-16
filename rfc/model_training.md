@@ -3,8 +3,8 @@
 The first model to train is the story space model: Qwen3-8B with a rank-1 LoRA
 on every linear map plus a head, trained on the annotated story spans
 (`rfc/story_space.tex`, 3.4). This document sets out how training should work
-across cortexgrid, cortexgrid-infer and cortexgrid-train, then maps what each
-library is missing to get there.
+across cortexgrid and cortexgrid-train, then maps what each library is missing
+to get there.
 
 ## How models are defined
 
@@ -44,8 +44,14 @@ class StoryStateExtractionModel(torch.nn.Module):
         qwen_weights = cortexgrid.load_model(
             LONG_CONTEXT_QWEN.family, LONG_CONTEXT_QWEN.suffix, cortexgrid.IMPORTED
         )
-        qwen = CausalLMModule.from_weights(qwen_weights, dtype=torch.bfloat16)
-        self._adapted_qwen = attach_lora(qwen, rank=ADAPTER_RANK, alpha=ADAPTER_ALPHA)
+        self._tokenizer = AutoTokenizer.from_pretrained(qwen_weights)
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+        qwen = AutoModelForCausalLM.from_pretrained(qwen_weights, dtype=torch.bfloat16)
+        device = detect_device()
+        qwen.to(device)
+        adapter = LoraConfig(r=ADAPTER_RANK, lora_alpha=ADAPTER_ALPHA, target_modules="all-linear")
+        self._adapted_qwen = get_peft_model(qwen, adapter)
         self._head = ...
         entry = cortexgrid.model_registry_status(
             deployment.family, deployment.suffix, deployment.run_name
@@ -70,6 +76,14 @@ class StoryStateExtractionModel(torch.nn.Module):
   changes the base's own layers, and training needs gradients through them. So
   the model loads the base's weights itself, as `Linear` loads its own, and its
   `requirements` ask for a GPU of its own instead of `models=[Qwen]`.
+- **The base is loaded by a copy of `Text2Text`'s loading steps:** tokenizer,
+  pad token, model in a dtype, move to the device. `Text2Text` stays as it is.
+  `forward` tokenizes the texts and runs the adapted Qwen for its hidden states
+  itself.
+- **The LoRA is attached with peft directly.** `target_modules="all-linear"`
+  adapts every linear map in the transformer layers and leaves the output head
+  alone. That holds for every architecture, where Qwen's seven projection names
+  would not.
 - **One class, two entries.**
   - The untrained entry is registered with `register_model` and has no weights
     of its own, so `__init__` builds a fresh LoRA and head.
@@ -86,9 +100,9 @@ class StoryStateExtractionModel(torch.nn.Module):
 |---|---|---|
 | base class | none | `torch.nn.Module` |
 | `requirements()` | 1 GB of RAM and `models=[LONG_CONTEXT_QWEN_DEPLOYMENT]` | one GPU with the RAM and VRAM for Qwen3-8B, the LoRA and the head; no `models` |
-| `__init__` | takes a client of the deployed Qwen from `required_models` | loads Qwen's weights; builds `CausalLMModule`, attaches the LoRA, creates the head; loads the trained adapter and head when its entry has weights |
+| `__init__` | takes a client of the deployed Qwen from `required_models` | loads Qwen with a copy of `Text2Text`'s loading steps, attaches the LoRA, creates the head; loads the trained adapter and head when its entry has weights |
 | `deploy()` | registers the entry and deploys it under `IMPORTED` | the same, plus a `run_name` to deploy a trained entry |
-| `forward(texts)` | none | Qwen's hidden states through the head: each text's volume in the story space (open question 1) |
+| `forward(texts)` | none | tokenizes the texts, runs the adapted Qwen for its hidden states, and passes them through the head: each text's volume in the story space (open question 1) |
 | `save_weights(weights_dir)` | none | writes the adapter and head |
 | `encode_basis` | pools each paragraph's Qwen states with Gaussian layer weights, then takes each concept's axis as a difference of means | builds each concept's volume with `forward` (open question 1) |
 | `encode_from_state`, `encode_from_text` | pool the text's Qwen states, then project them onto the basis axes | place the text's `forward` output in the basis |
@@ -158,7 +172,6 @@ distributed training such as Ray Train is not needed.
 | 1 stage data | nothing for datasets | `save_dataset`, `load_dataset`, the run's dataset link | cortexgrid |
 | 2 submit | jobs reserve only `GPU`/`CPU`. The scheduler never pauses a model for a job. A job pending past Ray's 900 s start timeout fails. A deployed `Text2Text` holds `num_gpus=1`, so with Qwen deployed the job never starts | `requirements` on jobs; dependencies deployed and kept unpaused; the scheduler counting a pending job as waiting | cortexgrid |
 | 3.2 build the model | a model is built only by deploying it. `model_config(key)` needs a deployment record | `instantiate_model`; `model_config` for an instantiated key | cortexgrid |
-| | `Text2Text` builds Qwen inline from transformers; `train_sft`'s users call peft themselves | `CausalLMModule.from_weights`, `attach_lora` | cortexgrid-infer |
 | | `StoryStateExtractionModel` calls a deployed `Text2Text` and has no layers of its own | base, LoRA and head built in `__init__`; `forward`; `save_weights`; its own GPU | authorship |
 | 3.3 train | `train_sft` only: it calls `model(input_ids, attention_mask, labels)` and moves every batch value to the device. Checkpoints pickle the whole `state_dict`, 16 GB for Qwen3-8B | `train_from_model_output`, a peer of `train_sft`; checkpoints of trainable state only | cortexgrid-train |
 | | nothing | `volume_loss` (open question 1) | authorship |
@@ -201,38 +214,6 @@ caller gets back:
 `instantiate_model` places nothing. The model runs on whatever hardware the
 calling process was given, which for a training job is what its
 `requirements` reserved.
-
-### The base and the adapter (cortexgrid-infer)
-
-`CausalLMModule` turns a causal LM's weights directory into a torch module. It
-keeps the transformers model and tokenizer private:
-
-```python
-class CausalLMModule(torch.nn.Module):
-    @classmethod
-    def from_weights(cls, weights_dir: Path, dtype: torch.dtype) -> CausalLMModule: ...
-    def forward(self, texts: list[str]) -> CausalLMHiddenStates: ...
-    def architecture(self) -> CausalLMArchitecture: ...
-```
-
-- `CausalLMHiddenStates` holds every layer's per-token states (`[layers + 1,
-  texts, tokens, D]`) and the padding mask. They stay differentiable unless the
-  caller turns gradients off.
-- Every causal LM has per-layer states, so the type holds for Llama, Qwen,
-  DeepSeek, Kimi, Gemma and Mistral alike.
-- `from_weights` sets nothing that belongs to inference (compile, static cache,
-  `inference_mode`) and nothing that belongs to training (`train()`, adapters).
-- `Text2Text.__init__` builds its model through `from_weights` too, so serving
-  and training build Qwen the same way (open question 2).
-
-`attach_lora(module, rank, alpha)` adapts every `nn.Linear` inside the
-transformer layers and leaves the output head alone. "Every linear map" holds
-for every architecture; Qwen's seven projection names would not. peft stays
-inside cortexgrid-infer.
-
-Both live in cortexgrid-infer, not cortexgrid-train, because they are part of
-the model: every replica of `StoryStateExtractionModel` calls them in its
-`__init__`. In cortexgrid-train, serving would depend on the training library.
 
 ### The loop (cortexgrid-train)
 
@@ -317,14 +298,12 @@ That part lives in `volume_loss`, not in the loop.
 
 1. cortexgrid: `instantiate_model`, `model_config` for an instantiated key,
    `load_model` recording what it loads on the run.
-2. cortexgrid-infer: `CausalLMModule`, `attach_lora`; `Text2Text` builds its
-   model through `CausalLMModule.from_weights`.
-3. cortexgrid-train: `train_from_model_output`, checkpoints of trainable state
+2. cortexgrid-train: `train_from_model_output`, checkpoints of trainable state
    only. The parts it shares with `train_sft` are extracted afterwards.
-4. cortexgrid: job requirements, the scheduler pausing models for a pending
+3. cortexgrid: job requirements, the scheduler pausing models for a pending
    job, and `done()` and `result()` waiting for a `retry=True` job.
-5. cortexgrid: datasets.
-6. authorship: `StoryStateExtractionModel` as above; `volume_loss`.
+4. cortexgrid: datasets.
+5. authorship: `StoryStateExtractionModel` as above; `volume_loss`.
 
 The driver, `experiments/story_state_extraction_training/training.py`, is
 already written against all of these.
@@ -333,6 +312,3 @@ already written against all of these.
 
 1. The RFC never defines the volume of a text in the adapted space or the
    volume loss, so the head's output and `volume_loss` cannot be written yet.
-2. Building `Text2Text`'s model through `CausalLMModule` changes a serve app's
-   `__init__`, though not its endpoints. The alternative leaves serve apps
-   untouched and duplicates the loading code.
