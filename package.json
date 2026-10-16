@@ -2,7 +2,7 @@
     "name": "authorship",
     "displayName": "Authorship",
     "description": "Tools for creative writing",
-    "version": "0.1.12",
+    "version": "0.1.13",
     "publisher": "RoboDataLab",
     "repository": {
         "type": "git",
