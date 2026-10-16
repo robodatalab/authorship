@@ -2,9 +2,54 @@
 
 The first model to train is the story space model: Qwen3-8B with a rank-1 LoRA
 on every linear map plus a head, trained on the annotated story spans
-(`rfc/story_space.tex`, 3.4). This document sets out how training should work
+(`rfc/story_space.tex`, 3.5). This document sets out how training should work
 across cortexgrid and cortexgrid-train, then maps what each library is missing
 to get there.
+
+## What the model does
+
+The model takes a story as input. It returns the story's salient concepts, and
+from the story and those concepts, the story's plots:
+
+```python
+class TextSpan:
+  firstWordIndex: int
+  lastWordIndex: int
+
+class SalientConcept:
+  name: str
+  abstract: str
+  references: list[TextSpan]
+
+def salient_concepts(story: str) -> list[SalientConcept]
+
+class Plot:
+  name: str
+  abstract: str
+  causal_events_in_order: list[TextSpan]
+
+def plots(story: str, concepts: list[SalientConcept]) -> list[Plot]
+```
+
+- **Input:** a whole story, as text.
+- **Output of `salient_concepts`:** one `SalientConcept` per salient idea. Each
+  has a name, an abstract that describes the idea, and the spans of the story
+  that refer to it.
+- **Output of `plots`:** one `Plot` per plot. Each has a name, an abstract, and
+  the spans of the story that are its causal events, in story order.
+- **A `TextSpan`** is a range of the story's words, the first and the last
+  included, numbered as the `.author` files number them.
+
+**The training data is this output, written by the author.** Each annotated
+`.author` file is one input story with the output `salient_concepts` should
+return for it. Each salient-concept cell is one `SalientConcept`: the cell's
+title is the name, its text is the abstract, and its `words` ranges are the
+references.
+
+`encode_basis`, `encode_from_state` and `encode_from_text` were an experiment.
+They are not the model's API.
+
+The same API is in `rfc/story_space.tex`, section 1.
 
 ## How models are defined
 
@@ -68,7 +113,10 @@ class StoryStateExtractionModel(torch.nn.Module):
     def save_weights(self, weights_dir: Path) -> None: ...
 
     @serve.endpoint
-    async def encode_from_text(self, basis: StoryStateSpaceBasis, text: str) -> StoryStateVector: ...
+    async def salient_concepts(self, story: str) -> list[SalientConcept]: ...
+
+    @serve.endpoint
+    async def plots(self, story: str, concepts: list[SalientConcept]) -> list[Plot]: ...
 ```
 
 - **The base is part of the model, not a served dependency.** A served
@@ -102,13 +150,12 @@ class StoryStateExtractionModel(torch.nn.Module):
 | `requirements()` | 1 GB of RAM and `models=[LONG_CONTEXT_QWEN_DEPLOYMENT]` | one GPU with the RAM and VRAM for Qwen3-8B, the LoRA and the head; no `models` |
 | `__init__` | takes a client of the deployed Qwen from `required_models` | loads Qwen with a copy of `Text2Text`'s loading steps, attaches the LoRA, creates the head; loads the trained adapter and head when its entry has weights |
 | `deploy()` | registers the entry and deploys it under `IMPORTED` | the same, plus a `run_name` to deploy a trained entry |
-| `forward(texts)` | none | tokenizes the texts, runs the adapted Qwen for its hidden states, and passes them through the head: each text's volume in the story space (open question 1) |
+| `forward(texts)` | none | tokenizes the texts, runs the adapted Qwen for its hidden states, and passes them through the head: each text's point in the story space (`rfc/story_space.tex`, 3.3) |
 | `save_weights(weights_dir)` | none | writes the adapter and head |
-| `encode_basis` | pools each paragraph's Qwen states with Gaussian layer weights, then takes each concept's axis as a difference of means | builds each concept's volume with `forward` (open question 1) |
-| `encode_from_state`, `encode_from_text` | pool the text's Qwen states, then project them onto the basis axes | place the text's `forward` output in the basis |
-| `StoryStateSpaceBasis` | `origins` and `axes`, with `coordinates_of` | the concepts' volumes |
+| endpoints | `encode_basis`, `encode_from_state`, `encode_from_text`, an experiment | `salient_concepts(story)` and `plots(story, concepts)`, the model's API (open question 2) |
+| `StoryStateSpaceBasis`, `StoryState` | the experiment's types | removed with its endpoints |
+| `SalientConcept` | `name` and `paragraph_idxs` | the API's `SalientConcept`: `name`, `abstract`, `references`; with `TextSpan` and `Plot` beside it |
 | `gaussian_weights_of_layers`, `embedding_of_tokens`, `every_layer_idx`, `state_embedding`, `midpoint_and_direction` | the untrained geometry | removed; the head replaces them |
-| `StoryState`, `SalientConcept` | | unchanged |
 
 `volume_loss` is not part of the model. Like the dataset, it lives with the
 training code, in `experiments/story_state_extraction_training/`.
@@ -310,5 +357,11 @@ already written against all of these.
 
 ## Open questions
 
-1. The RFC never defines the volume of a text in the adapted space or the
-   volume loss, so the head's output and `volume_loss` cannot be written yet.
+1. `rfc/story_space.tex` defines the story space and the head in 3.3, but the
+   volume loss is only named, in the to-do table of 3.2.3, never defined, so
+   `volume_loss` cannot be written yet.
+2. The story space places a text at a point and says which concepts' caps
+   contain it, so it can find a concept's references once the concept is
+   known. It does not say how `salient_concepts` finds the concepts of a new
+   story or writes their names and abstracts, or how `plots` finds a plot's
+   causal events.

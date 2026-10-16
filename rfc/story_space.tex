@@ -105,12 +105,32 @@ Figure~\ref{fig:story-space} shows two overlapping concept volumes and a story m
 
 The story space is a conditioning of the general latent space of all texts: of all the places a text can occupy in the general space, the story picks out the region that it, its concepts and its states occupy.
 
-\paragraph{Tasks.}
-\begin{enumerate}
-  \item[(T1)] Define the story space for $s$, given $s$ and $C_s$: the operation \texttt{encode\_basis}.
-  \item[(T2)] Map a story state into the story space: the operation \texttt{encode\_from\_state}. States are described with arbitrary text, yet two states described with the same words must land on the same point.
-  \item[(T3)] Find the boundaries of the volumes of the salient concepts.
-\end{enumerate}
+\paragraph{What the model does.} The model takes a story as input and answers two questions about it:
+\begin{verbatim}
+class TextSpan:
+  firstWordIndex: int
+  lastWordIndex: int
+
+class SalientConcept:
+  name: str
+  abstract: str
+  references: list[TextSpan]
+
+def salient_concepts(story: str) -> list[SalientConcept]
+
+class Plot:
+  name: str
+  abstract: str
+  causal_events_in_order: list[TextSpan]
+
+def plots(story: str, concepts: list[SalientConcept]) -> list[Plot]
+\end{verbatim}
+\begin{itemize}
+  \item \texttt{salient\_concepts} takes a story and returns its salient concepts. Each concept has a name, an abstract that describes the idea, and the spans of the story that refer to it.
+  \item \texttt{plots} takes a story and its salient concepts and returns the story's plots. Each plot has a name, an abstract, and the spans of the story that are its causal events, in story order.
+  \item A \texttt{TextSpan} is a range of the story's words, the first and the last included, numbered as in Section~\ref{sec:data}.
+\end{itemize}
+An annotated \texttt{.author} file holds exactly what \texttt{salient\_concepts} returns for its story. Each salient-concept cell is one \texttt{SalientConcept}: the cell's title is the name, its text is the abstract, and its \texttt{words} ranges are the references.
 
 \paragraph{Requirements.}
 \begin{requirement}[Non-degenerate volume]\label{req:volume}
@@ -443,6 +463,78 @@ approach & to do \\
 LoRA adapter & 1. Train the adapter and a head on the labelled texts with the volume loss. 2. Serve with the adapter switched on per request. \\
 soft prompt & 1. Train the vectors and a head on the labelled texts with the volume loss. 2. Add an endpoint that accepts vectors in place of tokens. \\
 fully connected head & 1. Run every labelled text through Qwen once and store its points. 2. Train the head on them with the volume loss. 3. Test the relations on texts it was not trained on. \\
+\hline
+\end{tabular}
+\end{center}
+
+\FloatBarrier
+\subsection{The story space}\label{sec:space}
+
+\paragraph{Points on a hemisphere.} The adapted space is a hemisphere of the unit sphere in $\R^d$:
+\begin{equation}
+\mathcal{Z} = \{\, z \in \R^d : \|z\| = 1,\ z \cdot u > 0 \,\}, \qquad d = 64 .
+\end{equation}
+Every text $t$ is a point $z(t) \in \mathcal{Z}$, and so is every story state, $z(\sigma) = z(\tau(\sigma))$. Meaning lies in a point's direction, as it does in Qwen's own space (Section~\ref{sec:qwen}), and the hemisphere keeps the points on one side, as Qwen's own points crowd into one cone.
+\begin{symbols}
+\mathcal{Z} & the story space: the points of the unit sphere in $\R^d$ on the side of $u$ \\
+u & the pole of the hemisphere, a fixed unit vector \\
+z(t) & the point of text $t$ in the story space \\
+\end{symbols}
+
+\paragraph{Concepts are caps.} The volume of concept $c$ is a spherical cap, the points within an angle $\theta$ of its centre $a_c$:
+\begin{equation}
+B_c = \{\, z \in \mathcal{Z} : z \cdot a_c \ge \cos\theta \,\} .
+\end{equation}
+\begin{itemize}
+  \item \textbf{A cap is convex.} Every text about one concept must share one direction, from Madeline at breakfast to Madeline signing the contract, and that shared direction is what makes the concept salient. A region that need not be convex could grow around every annotated span and fit them all, and still say nothing about a new text that falls between them.
+  \item \textbf{Dimensions give the overlap.} Each concept is one direction, and the space has more dimensions than a story has concepts (49 at most in our stories). The caps of any combination of concepts can therefore meet, and a text about several concepts lies where their caps meet (Requirement~\ref{req:multi}). Two concepts are related when their caps meet, that is when the angle between $a_c$ and $a_{c'}$ is less than $2\theta$.
+  \item \textbf{A cap has width in every direction} of $\mathcal{Z}$ when $\theta > 0$ (Requirement~\ref{req:volume}).
+  \item \textbf{A cap comes from its story.} Its centre is the mean direction of the spans that refer to $c$ in the story, $a_c = \sum_{j \in c} z(p_j) \,/\, \|\sum_{j \in c} z(p_j)\|$.
+\end{itemize}
+\begin{symbols}
+a_c & the centre of concept $c$'s cap, a point of $\mathcal{Z}$ \\
+\theta & the angular radius of every cap, learned \\
+p_j & the $j$-th span of the story annotated with a salient concept \\
+j \in c & span $p_j$ is annotated with concept $c$ \\
+\end{symbols}
+
+\paragraph{From Qwen's states to a point.} A text $t$ is run through Qwen with the LoRA adapter (Section~\ref{sec:lora}), and a head turns its states into one point. Token $0$, the attention sink, is left out.
+\begin{enumerate}
+  \item \textbf{Mix the layers.} Each token's states, one per layer, are weighted by learned layer weights:
+  \begin{equation}
+  h_k(t) = \sum_{\ell=0}^{L} \softmax(\alpha)_\ell \, h_{\ell,k}(t) .
+  \end{equation}
+  \item \textbf{Pool the tokens.} A learned query weighs each token, and the text's state is the weighted mean:
+  \begin{equation}
+  g(t) = \sum_{k=1}^{n-1} \softmax_k\bigl(q \cdot h_k(t)\bigr) \, h_k(t) .
+  \end{equation}
+  An equal weight per token would break the second property of Section~\ref{sec:properties}: B's tokens must count for a lot, C's for almost nothing.
+  \item \textbf{Project into the story space:} $y(t) = W g(t)$.
+  \item \textbf{Put it on the hemisphere.} The coordinate along $u$ is made positive with $\softplus$, and the result is scaled to unit length:
+  \begin{equation}
+  z(t) = \frac{y'(t)}{\|y'(t)\|}, \qquad y'(t) = y(t) + \bigl(\softplus(u \cdot y(t)) - u \cdot y(t)\bigr)\, u .
+  \end{equation}
+\end{enumerate}
+The point depends only on the text, so equal texts land on the same point (Requirement~\ref{req:identity}).
+\begin{symbols}
+\alpha & the learned layer weights, one per layer \\
+h_k(t) & token $k$'s states, mixed over the layers \\
+q & the learned query that weighs the tokens, in $\R^D$ \\
+g(t) & the state of text $t$, pooled over its tokens \\
+W & the learned projection into the story space, $d \times D$ \\
+y(t),\ y'(t) & the projection of text $t$, before and after its coordinate along $u$ is made positive \\
+\end{symbols}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\hline
+trained part & parameters \\
+\hline
+LoRA adapter (Section~\ref{sec:lora}) & $2{,}727{,}936$ \\
+layer weights $\alpha$ & $37$ \\
+query $q$ & $4{,}096$ \\
+projection $W$ & $262{,}144$ \\
+cap radius $\theta$ & $1$ \\
 \hline
 \end{tabular}
 \end{center}
