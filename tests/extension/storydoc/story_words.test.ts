@@ -131,6 +131,7 @@ describe("a salient concept's words", () => {
             {
                 conceptCellId: "k1",
                 title: "Door",
+                description: "What she saw.",
                 storyWordRanges: [
                     {
                         firstWord: 2,

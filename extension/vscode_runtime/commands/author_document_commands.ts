@@ -1,8 +1,10 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddSalientConceptCommand } from "./add_salient_concept";
 import { AssignStoryTextCommand } from "./assign_story_text";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
+import { DeleteSalientConceptCommand } from "./delete_salient_concept";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
@@ -23,7 +25,6 @@ import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { RunAllCommand } from "./run_all";
-import { ToggleStoryPlotsCommand } from "./toggle_story_plots";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
@@ -61,6 +62,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceAttributeCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
+    new AddSalientConceptCommand(),
+    new DeleteSalientConceptCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),
@@ -70,7 +73,6 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
-    new ToggleStoryPlotsCommand(),
     new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),

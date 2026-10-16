@@ -527,6 +527,14 @@ function whereTheCursorStandsInTheNewText(
     if (shown.length === wanted.length) {
         return stoodAt;
     }
+    const besideTheEdit = whereTheCursorStandsBesideTextAddedOrTakenAtIt(
+        shown,
+        wanted,
+        stoodAt,
+    );
+    if (besideTheEdit !== null) {
+        return besideTheEdit;
+    }
     const wouldStandAt = Math.min(
         wanted.length,
         Math.round((stoodAt * wanted.length) / (shown.length || 1)),
@@ -541,6 +549,41 @@ function whereTheCursorStandsInTheNewText(
         wouldStandAt,
     );
     return neighbourhoodEndsAt < 0 ? wouldStandAt : neighbourhoodEndsAt;
+}
+
+function whereTheCursorStandsBesideTextAddedOrTakenAtIt(
+    shown: string,
+    wanted: string,
+    stoodAt: number,
+): number | null {
+    const shorter = Math.min(shown.length, wanted.length);
+    let sharedAtTheEnd = 0;
+    while (
+        sharedAtTheEnd < shorter &&
+        sharedAtTheEnd < shown.length - stoodAt &&
+        shown[shown.length - 1 - sharedAtTheEnd] ===
+            wanted[wanted.length - 1 - sharedAtTheEnd]
+    ) {
+        sharedAtTheEnd += 1;
+    }
+    let sharedAtTheStart = 0;
+    while (
+        sharedAtTheStart < shorter - sharedAtTheEnd &&
+        shown[sharedAtTheStart] === wanted[sharedAtTheStart]
+    ) {
+        sharedAtTheStart += 1;
+    }
+    if (sharedAtTheStart + sharedAtTheEnd !== shorter) {
+        return null;
+    }
+    const editEndsInTheShownText = shown.length - sharedAtTheEnd;
+    if (stoodAt === editEndsInTheShownText) {
+        return wanted.length - sharedAtTheEnd;
+    }
+    if (stoodAt === sharedAtTheStart) {
+        return stoodAt;
+    }
+    return null;
 }
 
 function whereTheNeighbourhoodEndsNow(
@@ -681,6 +724,8 @@ function MonacoMarkdownEditor({
                     ),
                 ) || undefined,
             wordWrap: "on",
+            wordWrapBreakAfterCharacters: " \t-–—",
+            wordWrapBreakBeforeCharacters: "",
             lineNumbers: "off",
             glyphMargin: false,
             folding: false,

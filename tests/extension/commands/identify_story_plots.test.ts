@@ -76,7 +76,7 @@ beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () => {
-    it("sends the document with the key and hands the page what came back", async () => {
+    it("sends the document, borders the page's paragraphs and keeps the plots it found", async () => {
         const asked = serverAnswers({
             storyScenes: [THE_SHOPPING],
             storyPlots: [THE_QUEST],
@@ -93,28 +93,14 @@ describe("IdentifyStoryPlotsCommand — finds the plots the story weaves", () =>
         });
         expect(asked[1].url).toContain("/analyze/plots/status?id=job-1");
         expect(sentToThePage).toEqual([
-            expect.objectContaining({
-                type: "storyPlots",
-                storyPlotsAreShown: false,
-                storyScenes: [],
-                storyPlots: [],
-                paragraphsInStoryPlots: [],
-            }),
-            expect.objectContaining({
-                type: "storyPlots",
-                storyPlotsAreShown: false,
-                storyScenes: [THE_SHOPPING],
-                storyPlots: [THE_QUEST],
+            {
+                type: "paragraphsInStoryPlots",
                 paragraphsInStoryPlots: [THE_DOOR],
-            }),
-            expect.objectContaining({
-                type: "storyPlots",
-                storyPlotsAreShown: false,
-                storyScenes: [THE_SHOPPING],
-                storyPlots: [THE_QUEST],
-                paragraphsInStoryPlots: [THE_DOOR],
-            }),
+            },
         ]);
+        expect(session.theStoryScenes).toEqual([THE_SHOPPING]);
+        expect(session.theStoryPlots).toEqual([THE_QUEST]);
+        expect(session.theStoryPlotsProgress).toBeNull();
     });
 
     it("says why it could not identify the plots", async () => {

@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
+import { salientConceptsIn } from "../storydoc/story_words";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -10,6 +13,8 @@ export class PublishView implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private statusPollTimer?: ReturnType<typeof setInterval>;
     private readonly whenEachJobFirstAppeared = new Map<string, number>();
+    private sessionFollowed?: AuthorFileEditorSession;
+    private followingTheSession?: vscode.Disposable;
 
     constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -27,8 +32,31 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.pollTheServer();
+                this.showSalientConcepts();
+                this.showStoryPlots();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
+            } else if (message?.type === "selectSalientConcept") {
+                this.sessionFollowed?.selectTheSalientConcept(
+                    message.conceptCellId as string | null,
+                );
+            } else if (message?.type === "typed") {
+                this.sessionFollowed?.theAuthorTypedInTheCell(
+                    message.cellId as string,
+                    message.markdown as string,
+                );
+            } else if (message?.type === "showStoryWordRange") {
+                this.sessionFollowed?.showTheStoryWordRange({
+                    firstWord: message.firstWord as number,
+                    lastWord: message.lastWord as number,
+                });
+            } else if (message?.type === "invoke" && this.sessionFollowed) {
+                void authorDocumentCommand(
+                    message.commandName as string,
+                )?.invoke(
+                    this.sessionFollowed,
+                    message.commandArguments as Record<string, unknown>,
+                );
             }
         });
 
@@ -44,6 +72,56 @@ export class PublishView implements vscode.WebviewViewProvider {
                 this.statusPollTimer = undefined;
             }
             this.view = undefined;
+        });
+    }
+
+    follow(session: AuthorFileEditorSession): void {
+        if (this.sessionFollowed === session) {
+            return;
+        }
+        this.followingTheSession?.dispose();
+        this.sessionFollowed = session;
+        this.followingTheSession = vscode.Disposable.from(
+            session.onDocumentOrSelectionChanged(() =>
+                this.showSalientConcepts(),
+            ),
+            session.onStoryPlotsChanged(() => this.showStoryPlots()),
+        );
+        this.showSalientConcepts();
+        this.showStoryPlots();
+    }
+
+    stopFollowing(session: AuthorFileEditorSession): void {
+        if (this.sessionFollowed !== session) {
+            return;
+        }
+        this.followingTheSession?.dispose();
+        this.followingTheSession = undefined;
+        this.sessionFollowed = undefined;
+        this.showSalientConcepts();
+        this.showStoryPlots();
+    }
+
+    private showSalientConcepts(): void {
+        const session = this.sessionFollowed;
+        const salientConcepts = session
+            ? salientConceptsIn(session.document.cells)
+            : null;
+        void this.view?.webview.postMessage({
+            type: "salientConcepts",
+            salientConcepts,
+            salientConceptSelected: session?.theSalientConceptSelected ?? null,
+            storyTextSelected: session?.theStoryTextSelected ?? null,
+        });
+    }
+
+    private showStoryPlots(): void {
+        const session = this.sessionFollowed;
+        void this.view?.webview.postMessage({
+            type: "storyPlots",
+            storyScenes: session?.theStoryScenes ?? null,
+            storyPlots: session?.theStoryPlots ?? null,
+            storyPlotsProgress: session?.theStoryPlotsProgress ?? null,
         });
     }
 
@@ -161,7 +239,7 @@ export class PublishView implements vscode.WebviewViewProvider {
 <head>
 	<meta charset="UTF-8">
 	<meta http-equiv="Content-Security-Policy"
-		content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+		content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link href="${style}" rel="stylesheet">
 	<title>Authorship</title>

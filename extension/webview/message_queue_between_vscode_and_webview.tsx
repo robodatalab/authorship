@@ -11,12 +11,8 @@ import {
 } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
-import type {
-    ParagraphInStoryPlots,
-    StoryPlot,
-    StoryScene,
-} from "../vscode_runtime/commands/identify_story_plots";
-import type { WorkProgress } from "../vscode_runtime/server/jobs";
+import type { ParagraphInStoryPlots } from "../vscode_runtime/commands/identify_story_plots";
+import type { StoryTextSpan } from "../vscode_runtime/storydoc/story_words";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -39,11 +35,9 @@ interface WhatTheWebviewDraws {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
-    storyPlotsAreShown: boolean;
-    storyScenes: StoryScene[];
-    storyPlots: StoryPlot[];
-    storyPlotsProgress: WorkProgress | null;
     paragraphsInStoryPlots: ParagraphInStoryPlots[];
+    salientConceptSelected: string | null;
+    storyTextShown: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -96,14 +90,15 @@ function processMessageFromVscode(
             .commands as WebviewAuthorDocumentCommandCard[];
     } else if (message.data?.type === "proseErrors") {
         drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
-    } else if (message.data?.type === "storyPlots") {
-        drawn.storyPlotsAreShown = message.data.storyPlotsAreShown as boolean;
-        drawn.storyScenes = message.data.storyScenes as StoryScene[];
-        drawn.storyPlots = message.data.storyPlots as StoryPlot[];
-        drawn.storyPlotsProgress = message.data
-            .storyPlotsProgress as WorkProgress | null;
+    } else if (message.data?.type === "paragraphsInStoryPlots") {
         drawn.paragraphsInStoryPlots = message.data
             .paragraphsInStoryPlots as ParagraphInStoryPlots[];
+    } else if (message.data?.type === "salientConceptSelected") {
+        drawn.salientConceptSelected = message.data.salientConceptSelected as
+            | string
+            | null;
+    } else if (message.data?.type === "storyTextShown") {
+        drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
     } else if (message.data?.type === "findMatches") {
         drawn.findMatches = message.data
             .findMatches as AuthorFileEditorFindMatch[];
@@ -134,11 +129,9 @@ function openTheAuthorFileEditor(): void {
         cells: [],
         commands: [],
         proseErrors: [],
-        storyPlotsAreShown: false,
-        storyScenes: [],
-        storyPlots: [],
-        storyPlotsProgress: null,
         paragraphsInStoryPlots: [],
+        salientConceptSelected: null,
+        storyTextShown: null,
         findMatches: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
@@ -154,11 +147,9 @@ function openTheAuthorFileEditor(): void {
                 sendMessagesToVscode={sendMessagesToVscode}
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
-                storyPlotsAreShown={drawn.storyPlotsAreShown}
-                storyScenes={drawn.storyScenes}
-                storyPlots={drawn.storyPlots}
-                storyPlotsProgress={drawn.storyPlotsProgress}
                 paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
+                salientConceptSelected={drawn.salientConceptSelected}
+                storyTextShown={drawn.storyTextShown}
                 findMatches={drawn.findMatches}
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}

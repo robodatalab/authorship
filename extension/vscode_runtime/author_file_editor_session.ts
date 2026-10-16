@@ -22,7 +22,13 @@ import {
     MutableAuthorDocument,
     type ImmutableCell,
 } from "./storydoc/model";
-import { synchronizeTheStoryWordRanges } from "./storydoc/story_words";
+import {
+    storyTextSpansOf,
+    storyWordsIn,
+    synchronizeTheStoryWordRanges,
+    type StoryTextSpan,
+    type StoryWordRange,
+} from "./storydoc/story_words";
 import { WordCounter } from "./storydoc/word_counter";
 
 export class AuthorFileEditorSession
@@ -35,7 +41,6 @@ export class AuthorFileEditorSession
     private readonly findMatches: AuthorFileEditorFindMatch[] = [];
     private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
         [];
-    private storyPlotsAreShown = false;
     private storyPlotsProgress: WorkProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
@@ -52,6 +57,20 @@ export class AuthorFileEditorSession
         null;
 
     private burstBeingTyped: TypingBurst | null = null;
+
+    private salientConceptSelected: string | null = null;
+
+    private storyTextSelected: StoryTextSpan | null = null;
+
+    private readonly documentOrSelectionChanged =
+        new vscode.EventEmitter<void>();
+
+    readonly onDocumentOrSelectionChanged =
+        this.documentOrSelectionChanged.event;
+
+    private readonly storyPlotsChanged = new vscode.EventEmitter<void>();
+
+    readonly onStoryPlotsChanged = this.storyPlotsChanged.event;
 
     constructor(
         private documentAsItStands: ImmutableAuthorDocument,
@@ -88,6 +107,48 @@ export class AuthorFileEditorSession
 
     get document(): ImmutableAuthorDocument {
         return this.documentAsItStands;
+    }
+
+    get theSalientConceptSelected(): string | null {
+        return this.salientConceptSelected;
+    }
+
+    get theStoryTextSelected(): StoryTextSpan | null {
+        return this.storyTextSelected;
+    }
+
+    get theStoryScenes(): StoryScene[] {
+        return this.storyScenes;
+    }
+
+    get theStoryPlots(): StoryPlot[] {
+        return this.storyPlots;
+    }
+
+    get theStoryPlotsProgress(): WorkProgress | null {
+        return this.storyPlotsProgress;
+    }
+
+    selectTheSalientConcept(conceptCellId: string | null): void {
+        this.salientConceptSelected = conceptCellId;
+        this.sendSalientConceptSelected();
+        this.documentOrSelectionChanged.fire();
+    }
+
+    theAuthorSelectedStoryText(storyTextSelected: StoryTextSpan | null): void {
+        this.storyTextSelected = storyTextSelected;
+        this.documentOrSelectionChanged.fire();
+    }
+
+    showTheStoryWordRange(storyWordRange: StoryWordRange): void {
+        const storyWords = storyWordsIn(this.documentAsItStands.cells);
+        const [storyTextShown] = storyTextSpansOf(storyWords, storyWordRange);
+        if (storyTextShown) {
+            void this.panel?.webview.postMessage({
+                type: "storyTextShown",
+                storyTextShown,
+            });
+        }
     }
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
@@ -225,7 +286,8 @@ export class AuthorFileEditorSession
             this.paragraphsInStoryPlots.length,
             ...paragraphsInStoryPlots,
         );
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
+        this.storyPlotsChanged.fire();
     }
 
     showFindMatches(findMatches: AuthorFileEditorFindMatch[]): void {
@@ -244,12 +306,7 @@ export class AuthorFileEditorSession
 
     identifyingStoryPlots(progress: WorkProgress | null): void {
         this.storyPlotsProgress = progress;
-        this.sendStoryPlots();
-    }
-
-    toggleStoryPlots(): void {
-        this.storyPlotsAreShown = !this.storyPlotsAreShown;
-        this.sendStoryPlots();
+        this.storyPlotsChanged.fire();
     }
 
     writingCell(cellId: string, howFarAlong: number): void {
@@ -303,14 +360,17 @@ export class AuthorFileEditorSession
         });
     }
 
-    sendStoryPlots(): void {
+    sendParagraphsInStoryPlots(): void {
         void this.panel?.webview.postMessage({
-            type: "storyPlots",
-            storyPlotsAreShown: this.storyPlotsAreShown,
-            storyScenes: this.storyScenes,
-            storyPlots: this.storyPlots,
-            storyPlotsProgress: this.storyPlotsProgress,
+            type: "paragraphsInStoryPlots",
             paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],
+        });
+    }
+
+    sendSalientConceptSelected(): void {
+        void this.panel?.webview.postMessage({
+            type: "salientConceptSelected",
+            salientConceptSelected: this.salientConceptSelected,
         });
     }
 
@@ -328,9 +388,11 @@ export class AuthorFileEditorSession
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
+        this.sendSalientConceptSelected();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.documentOrSelectionChanged.fire();
     }
 
     private sendWhatChanged(asItStoodBefore: ImmutableAuthorDocument): void {
@@ -376,9 +438,10 @@ export class AuthorFileEditorSession
             });
         }
         this.sendProseErrors();
-        this.sendStoryPlots();
+        this.sendParagraphsInStoryPlots();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.documentOrSelectionChanged.fire();
     }
 }
 
