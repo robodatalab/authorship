@@ -1,43 +1,30 @@
 from __future__ import annotations
 
+import shutil
+import tempfile
 from pathlib import Path
 
 import cortexgrid
-from cortexgrid_infer import detect_device
-from cortexgrid_train import train_with_loss
-from peft import LoraConfig, get_peft_model
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from cortexgrid_train import train_from_model_output
 
 from experiments.story_state_extraction_training.dataset import (
     AnnotatedStorySpansDataset,
 )
+from experiments.story_state_extraction_training.loss import volume_loss
 from server import storydoc
 from server.models import cluster
-from server.models.long_context_qwen import LONG_CONTEXT_QWEN
-from server.models.story_state_extraction_model import (
-    StorySpaceEncoder,
-    StoryStateExtractionModel,
-    volume_loss,
-)
+from server.models.story_state_extraction_model import StoryStateExtractionModel
 from server.storydoc import Document
 
 STORIES_REPOSITORY = Path.home() / "GitHub" / "smut"
 
-TRAINED_STORY_SPACE_DIRECTORY = "story_space"
+ANNOTATED_STORIES_DATASET = "annotated-stories"
 
-STORY_SPACE_ADAPTER = LoraConfig(
-    r=1,
-    lora_alpha=32,
-    target_modules=[
-        "q_proj",
-        "k_proj",
-        "v_proj",
-        "o_proj",
-        "gate_proj",
-        "up_proj",
-        "down_proj",
-    ],
+STORY_SPACE_FAMILY = "Authorship"
+STORY_SPACE_SUFFIX = "storystateextractionmodel"
+
+STORY_SPACE_TRAINING_REQUIREMENTS = cortexgrid.ModelRequirements(
+    num_gpus=1, ram_gb=20.0, vram_gb=32.0
 )
 
 LEARNING_RATE = 1e-4
@@ -45,50 +32,70 @@ BATCH_SIZE = 4
 EPOCHS = 3
 
 
-def train_story_space(annotated_stories: list[Document]) -> None:
-    qwen_weights = cortexgrid.load_model(
-        LONG_CONTEXT_QWEN.family, LONG_CONTEXT_QWEN.suffix, cortexgrid.IMPORTED
+def train_story_space() -> None:
+    annotated_stories_dir = cortexgrid.load_dataset(ANNOTATED_STORIES_DATASET)
+    annotated_story_files = annotated_stories_dir.rglob(f"*{storydoc.EXTENSION}")
+    annotated_stories = [Document.load(path) for path in annotated_story_files]
+    story_state_extraction_model = cortexgrid.instantiate_model(
+        STORY_SPACE_FAMILY, STORY_SPACE_SUFFIX, cortexgrid.IMPORTED
     )
-    tokenizer = AutoTokenizer.from_pretrained(qwen_weights)
-    qwen = AutoModelForCausalLM.from_pretrained(qwen_weights, dtype=torch.bfloat16)
-    device = detect_device()
-    qwen.to(device)
-    adapted_qwen = get_peft_model(qwen, STORY_SPACE_ADAPTER)
-    story_space_encoder = StorySpaceEncoder(adapted_qwen, tokenizer)
     annotated_story_spans = AnnotatedStorySpansDataset(annotated_stories)
-    trained_story_space_encoder = train_with_loss(
-        story_space_encoder,
+    trained_story_state_extraction_model = train_from_model_output(
+        story_state_extraction_model,
         annotated_story_spans,
-        loss_fn=volume_loss,
+        volume_loss,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
         lr=LEARNING_RATE,
     )
-    trained_story_space_encoder.save_pretrained(TRAINED_STORY_SPACE_DIRECTORY)
     requirements = StoryStateExtractionModel.requirements()
-    cortexgrid.save_model(
-        TRAINED_STORY_SPACE_DIRECTORY,
-        StoryStateExtractionModel,
-        family="Authorship",
-        suffix="storystateextractionmodel",
-        requirements=requirements,
-    )
+    with tempfile.TemporaryDirectory() as story_space_weights_dir:
+        trained_story_state_extraction_model.save_weights(story_space_weights_dir)
+        cortexgrid.save_model(
+            story_space_weights_dir,
+            StoryStateExtractionModel,
+            family=STORY_SPACE_FAMILY,
+            suffix=STORY_SPACE_SUFFIX,
+            requirements=requirements,
+        )
 
 
-def main() -> None:
-    cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
-    cluster.ensure_weights_imported(LONG_CONTEXT_QWEN)
+def save_annotated_stories_dataset() -> None:
     author_files = [
         path
         for path in STORIES_REPOSITORY.rglob(f"*{storydoc.EXTENSION}")
         if path.is_file()
     ]
     story_documents = [Document.load(path) for path in author_files]
-    annotated_stories = [
-        document for document in story_documents if document.salient_concepts()
+    annotated_story_files = [
+        path
+        for path, document in zip(author_files, story_documents)
+        if document.salient_concepts()
     ]
+    with tempfile.TemporaryDirectory() as annotated_stories_dir:
+        staging_root = Path(annotated_stories_dir)
+        for annotated_story_file in annotated_story_files:
+            path_in_the_repository = annotated_story_file.relative_to(STORIES_REPOSITORY)
+            staged_file = staging_root / path_in_the_repository
+            staged_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(annotated_story_file, staged_file)
+        cortexgrid.save_dataset(annotated_stories_dir, ANNOTATED_STORIES_DATASET)
+
+
+def main() -> None:
+    cortexgrid.Experiment.init(cluster.EXPERIMENT_NAME)
+    requirements = StoryStateExtractionModel.requirements()
+    cortexgrid.register_model(
+        StoryStateExtractionModel,
+        family=STORY_SPACE_FAMILY,
+        suffix=STORY_SPACE_SUFFIX,
+        requirements=requirements,
+    )
+    save_annotated_stories_dataset()
     training = cortexgrid.remote(
-        train_story_space, annotated_stories, num_gpus=1, retry=True
+        train_story_space,
+        requirements=STORY_SPACE_TRAINING_REQUIREMENTS,
+        retry=True,
     )
     training.result()
 
