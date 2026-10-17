@@ -636,7 +636,7 @@ For each concept $c$, with the story's texts unrelated to it $U_c$:
 P(t \in c) &= \sigma\bigl(\kappa\,(r_c^2 - \|z(t) - m_c\|^2)\bigr), \qquad \kappa = 50, \label{eq:loss-membership} \\
 \mathcal{L}_{\mathrm{class}}(c) &= \frac{1}{|U_c|} \sum_{u \in U_c} P(u \in c), \label{eq:loss-classification} \\
 \mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(e) - w\| - \mathbb{E}\,\|z(e) - z(e')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
-&\qquad e, e' \in E_c,\ e \ne e',\quad w, w' \text{ drawn uniformly from } B_c,\ w \ne w', \notag \\
+&\qquad e, e' \in E_c,\quad w, w' \text{ drawn uniformly from } B_c, \notag \\
 \mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c)\Bigr). \label{eq:loss}
 \end{align}
 \begin{symbols}
