@@ -604,7 +604,7 @@ For the concepts $C$ of a story, each with the examples $S_c$ that calculate its
 \begin{align}
 z(t) &= \frac{y(t)}{\|y(t)\|}, \label{eq:loss-point} \\
 m_c &= \frac{1}{|S_c|} \sum_{s \in S_c} z(s), \label{eq:loss-centre} \\
-r_c &= \min\Bigl(r_{\max},\ \max\bigl(r_{\min},\ \max_{s \in S_c} \|z(s) - m_c\|\bigr)\Bigr), \label{eq:loss-radius} \\
+r_c &= \min\Bigl(r_{\max},\ \max\bigl(r_{\min},\ \max_{s \in S_c} \|z(s) - m_c\|\bigr)\Bigr), \qquad 0 < r_{\min} < r_{\max} \le 1, \label{eq:loss-radius} \\
 B_c &= \{\, z \in \R^d : \|z\| = 1,\ \|z - m_c\| \le r_c \,\}. \label{eq:loss-area}
 \end{align}
 \begin{symbols}
@@ -626,10 +626,10 @@ The unrelated texts $U_c$ are the negative examples of $c$: texts the author tag
 For each concept $c$, with its abstract $A_c$ and the story's texts unrelated to it $U_c$:
 \begin{align}
 P(t \in c) &= \sigma\bigl(\kappa\,(r_c^2 - \|z(t) - m_c\|^2)\bigr), \label{eq:loss-membership} \\
-\mathcal{L}_{\mathrm{class}}(c) &= -\frac{1}{|Q_c|} \sum_{q \in Q_c} \log P(q \in c) \;-\; \frac{1}{|U_c|} \sum_{u \in U_c} \log\bigl(1 - P(u \in c)\bigr), \label{eq:loss-classification} \\
+\mathcal{L}_{\mathrm{class}}(c) &= \frac{1}{|Q_c|} \sum_{q \in Q_c} \bigl(1 - P(q \in c)\bigr) \;+\; \frac{1}{|U_c|} \sum_{u \in U_c} P(u \in c), \label{eq:loss-classification} \\
 \mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(q) - w\| - \mathbb{E}\,\|z(q) - z(q')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
-&\qquad q, q' \in Q_c,\quad w, w' \text{ drawn uniformly from } B_c, \notag \\
-\mathcal{L}_{\mathrm{abstract}}(c) &= \frac{\|z(A_c) - m_c\|^2}{r_c^2}, \label{eq:loss-abstract} \\
+&\qquad q, q' \in Q_c,\ q \ne q',\quad w, w' \text{ drawn uniformly from } B_c,\ w \ne w', \notag \\
+\mathcal{L}_{\mathrm{abstract}}(c) &= \frac{1}{r_c} \Bigl\| z(A_c) - \frac{m_c}{\|m_c\|} \Bigr\|, \label{eq:loss-abstract} \\
 \mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c) + \lambda\, \mathcal{L}_{\mathrm{abstract}}(c)\Bigr). \label{eq:loss}
 \end{align}
 \begin{symbols}
