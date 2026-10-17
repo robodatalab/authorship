@@ -1211,11 +1211,17 @@ describe("the plots the story weaves", () => {
 
         async function mountTheStoryOfTheDoor(
             passageSelected: number | null,
+            salientConceptSelected: string | null = null,
         ): Promise<void> {
             await mountCanvas({
                 cells: [
                     markdownCell("The door opens.", "m1"),
                     markdownCell("He heard it.", "m2"),
+                    {
+                        kind: "salient-concept",
+                        source: "What he heard.",
+                        attrs: { id: "k1", title: "Hearing", words: "3-4" },
+                    },
                     {
                         kind: "plot",
                         source: "The door opens to the bell.",
@@ -1237,6 +1243,7 @@ describe("the plots the story weaves", () => {
                 },
                 plotSelected: "p1",
                 passageSelected,
+                salientConceptSelected,
             });
         }
 
@@ -1356,6 +1363,54 @@ describe("the plots the story weaves", () => {
                 expect(arrowsOnTheRuler()).toEqual(arrows);
             },
         );
+
+        it("marks every example of the concept selected, in the concept's colour", async () => {
+            storyDrawnTwiceAsTallAsTheRuler();
+
+            await mountTheStoryOfTheDoor(null, "k1");
+
+            expect(marksOnTheRuler()).toEqual([
+                [
+                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                    "150",
+                    "9",
+                ],
+            ]);
+            expect(arrowsOnTheRuler()).toEqual([]);
+        });
+
+        it("draws the plot's passages over the concept's examples, with the arrows between the passages", async () => {
+            storyDrawnTwiceAsTallAsTheRuler();
+
+            await mountTheStoryOfTheDoor(1, "k1");
+
+            expect(marksOnTheRuler()).toEqual([
+                [
+                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                    "150",
+                    "9",
+                ],
+                [
+                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                    "0",
+                    "9",
+                ],
+                [
+                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                    "10",
+                    "9",
+                ],
+                [
+                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                    "150",
+                    "9",
+                ],
+            ]);
+            expect(arrowsOnTheRuler()).toEqual([
+                "M 16 14.5 H 22 V 4.5 H 16",
+                "M 16 4.5 H 28 V 154.5 H 16",
+            ]);
+        });
 
         it("is empty until a passage is selected", async () => {
             storyDrawnTwiceAsTallAsTheRuler();

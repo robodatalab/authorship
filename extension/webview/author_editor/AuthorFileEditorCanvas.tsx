@@ -158,6 +158,18 @@ export function AuthorFileEditorCanvas({
     const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
     const plots = useMemo(() => plotsIn(cells), [cells]);
     const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
+    const salientConceptColor = salientConcepts.findIndex(
+        (concept) => concept.conceptCellId === salientConceptSelected,
+    );
+    const examplesOfTheConceptSelected = useMemo(
+        () =>
+            (
+                salientConcepts[salientConceptColor]?.storyWordRanges ?? []
+            ).map((storyWordRange) =>
+                storyTextSpansOf(storyWords, storyWordRange),
+            ),
+        [salientConcepts, salientConceptColor, storyWords],
+    );
     const plotColor = plots.findIndex(
         (plot) => plot.plotCellId === plotSelected,
     );
@@ -191,21 +203,9 @@ export function AuthorFileEditorCanvas({
                 ]);
             }
         }
-        const salientConceptColor = salientConcepts.findIndex(
-            (concept) => concept.conceptCellId === salientConceptSelected,
+        examplesOfTheConceptSelected.forEach((example) =>
+            highlightTheStoryText(example, salientConceptColor, false),
         );
-        const concept = salientConcepts[salientConceptColor];
-        if (concept !== undefined) {
-            const spansOfTheConcept = concept.storyWordRanges.flatMap(
-                (storyWordRange) =>
-                    storyTextSpansOf(storyWords, storyWordRange),
-            );
-            highlightTheStoryText(
-                spansOfTheConcept,
-                salientConceptColor,
-                false,
-            );
-        }
         passagesOfThePlotSelected.forEach((passage, passageIndex) =>
             highlightTheStoryText(
                 passage,
@@ -215,16 +215,22 @@ export function AuthorFileEditorCanvas({
         );
         return byCellId;
     }, [
-        storyWords,
-        salientConcepts,
-        salientConceptSelected,
+        examplesOfTheConceptSelected,
+        salientConceptColor,
         passagesOfThePlotSelected,
         plotColor,
         passageSelected,
     ]);
-    const passagesAroundTheOneSelected = useMemo(() => {
+    const whatTheOverviewRulerShows = useMemo(() => {
         const marks: AuthorFileEditorOverviewRulerMark[] = [];
         const arrows: AuthorFileEditorOverviewRulerArrow[] = [];
+        for (const example of examplesOfTheConceptSelected) {
+            marks.push({
+                storyText: example,
+                highlightColor: salientConceptColor,
+                dimmed: false,
+            });
+        }
         if (passageSelected === null) {
             return { marks, arrows };
         }
@@ -236,6 +242,7 @@ export function AuthorFileEditorCanvas({
         if (passage.length === 0) {
             return { marks, arrows };
         }
+        const passageMark = marks.length;
         marks.push({
             storyText: passage,
             highlightColor: plotColor,
@@ -247,7 +254,7 @@ export function AuthorFileEditorCanvas({
                 highlightColor: plotColor,
                 dimmed: true,
             });
-            arrows.push({ fromMark: marks.length - 1, toMark: 0 });
+            arrows.push({ fromMark: marks.length - 1, toMark: passageMark });
         }
         if (passageAfter.length > 0) {
             marks.push({
@@ -255,10 +262,16 @@ export function AuthorFileEditorCanvas({
                 highlightColor: plotColor,
                 dimmed: true,
             });
-            arrows.push({ fromMark: 0, toMark: marks.length - 1 });
+            arrows.push({ fromMark: passageMark, toMark: marks.length - 1 });
         }
         return { marks, arrows };
-    }, [passagesOfThePlotSelected, passageSelected, plotColor]);
+    }, [
+        examplesOfTheConceptSelected,
+        salientConceptColor,
+        passagesOfThePlotSelected,
+        passageSelected,
+        plotColor,
+    ]);
 
     function selectThePassageClicked(cellId: string, clickedAt: number): void {
         const passageClicked = passagesOfThePlotSelected.findIndex((passage) =>
@@ -528,8 +541,8 @@ export function AuthorFileEditorCanvas({
                 {cellsInScope(sections, null)}
                 <AuthorFileEditorOverviewRuler
                     scrolledList={cellsOnThePage}
-                    marks={passagesAroundTheOneSelected.marks}
-                    arrows={passagesAroundTheOneSelected.arrows}
+                    marks={whatTheOverviewRulerShows.marks}
+                    arrows={whatTheOverviewRulerShows.arrows}
                 />
             </MarkdownEditorMediator>
         </div>
