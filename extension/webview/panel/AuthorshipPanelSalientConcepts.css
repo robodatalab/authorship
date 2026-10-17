@@ -102,7 +102,7 @@
 .authorship-panel-salient-concept-description {
     margin-top: 8px;
     padding: 3px 6px;
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    border: 1px solid var(--vscode-panel-border);
     border-radius: 3px;
 }
 
