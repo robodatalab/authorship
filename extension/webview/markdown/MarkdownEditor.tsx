@@ -120,6 +120,29 @@ function useMarkdownEditorBeingEdited(editorId: string) {
     };
 }
 
+export function useTimesTheHostRewroteIt(markdown: string): {
+    timesTheHostRewroteIt: number;
+    theAuthorTyped: (markdown: string) => void;
+} {
+    const typedAndNotYetEchoed = useRef<string[]>([]);
+    const [timesTheHostRewroteIt, countAHostRewrite] = useState(0);
+
+    useEffect(() => {
+        const echoed = typedAndNotYetEchoed.current.indexOf(markdown);
+        if (echoed >= 0) {
+            typedAndNotYetEchoed.current.splice(0, echoed + 1);
+            return;
+        }
+        typedAndNotYetEchoed.current = [];
+        countAHostRewrite((times) => times + 1);
+    }, [markdown]);
+
+    return {
+        timesTheHostRewroteIt,
+        theAuthorTyped: (typed) => typedAndNotYetEchoed.current.push(typed),
+    };
+}
+
 interface MarkdownEditorProps {
     cellId: string;
     markdown: string;

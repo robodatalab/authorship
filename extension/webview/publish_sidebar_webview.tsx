@@ -6,6 +6,7 @@ import {
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 import type {
+    PlotInTheStory,
     SalientConceptInTheStory,
     StoryTextSpan,
 } from "../vscode_runtime/storydoc/story_words";
@@ -17,6 +18,8 @@ interface WhatThePanelDraws {
     jobs?: AsyncJobStatus[] | null;
     salientConcepts?: SalientConceptInTheStory[] | null;
     salientConceptSelected?: string | null;
+    plots?: PlotInTheStory[] | null;
+    plotSelected?: string | null;
     storyTextSelected?: StoryTextSpan | null;
 }
 
@@ -35,6 +38,11 @@ function processMessageFromVscode(
         drawn.salientConceptSelected = message.data.salientConceptSelected as
             | string
             | null;
+        drawn.storyTextSelected = message.data
+            .storyTextSelected as StoryTextSpan | null;
+    } else if (message.data?.type === "plots") {
+        drawn.plots = message.data.plots as PlotInTheStory[] | null;
+        drawn.plotSelected = message.data.plotSelected as string | null;
         drawn.storyTextSelected = message.data
             .storyTextSelected as StoryTextSpan | null;
     } else {
@@ -56,6 +64,8 @@ function openTheAuthorshipPanel(): void {
                 jobs={drawn.jobs}
                 salientConcepts={drawn.salientConcepts}
                 salientConceptSelected={drawn.salientConceptSelected}
+                plots={drawn.plots}
+                plotSelected={drawn.plotSelected}
                 storyTextSelected={drawn.storyTextSelected}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,

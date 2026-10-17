@@ -11,6 +11,7 @@ import {
     MARKDOWN,
     NOTE,
     PART,
+    PLOT,
     RECAP,
     SALIENT_CONCEPT,
     TITLE_PAGE,
@@ -170,6 +171,13 @@ const CELL_KINDS: CellKind[] = [
         isKeptOutOfTheBook: true,
         blank: () =>
             new MutableCell(SALIENT_CONCEPT, "", { title: "Untitled" }),
+    },
+    {
+        cellKind: PLOT,
+        label: "Plot",
+        fields: [{ attributeName: "title", label: "Title" }],
+        isKeptOutOfTheBook: true,
+        blank: () => new MutableCell(PLOT, "", { title: "Untitled" }),
     },
 ];
 

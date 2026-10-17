@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import {
     MarkdownEditor,
     MarkdownEditorMediator,
+    useTimesTheHostRewroteIt,
 } from "../markdown/MarkdownEditor";
 import { fieldsOfCellKind } from "../../vscode_runtime/storydoc/cell_kinds";
 import { SALIENT_CONCEPT } from "../../vscode_runtime/storydoc/model";
@@ -135,29 +135,6 @@ interface AuthorshipPanelSalientConceptDetailsProps {
     concept: SalientConceptInTheStory;
     storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
-}
-
-function useTimesTheHostRewroteIt(markdown: string): {
-    timesTheHostRewroteIt: number;
-    theAuthorTyped: (markdown: string) => void;
-} {
-    const typedAndNotYetEchoed = useRef<string[]>([]);
-    const [timesTheHostRewroteIt, countAHostRewrite] = useState(0);
-
-    useEffect(() => {
-        const echoed = typedAndNotYetEchoed.current.indexOf(markdown);
-        if (echoed >= 0) {
-            typedAndNotYetEchoed.current.splice(0, echoed + 1);
-            return;
-        }
-        typedAndNotYetEchoed.current = [];
-        countAHostRewrite((times) => times + 1);
-    }, [markdown]);
-
-    return {
-        timesTheHostRewroteIt,
-        theAuthorTyped: (typed) => typedAndNotYetEchoed.current.push(typed),
-    };
 }
 
 function AuthorshipPanelSalientConceptDetails({

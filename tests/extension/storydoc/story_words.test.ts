@@ -5,6 +5,7 @@ import {
     MutableAuthorDocument,
 } from "../../../extension/vscode_runtime/storydoc/model";
 import {
+    plotsIn,
     salientConceptsIn,
     storyTextSpansOf,
     storyWordRangesOf,
@@ -200,5 +201,60 @@ describe("a salient concept's words", () => {
         session.theAuthorTypedInTheCell("c2", "She saw the old door.");
 
         expect(session.document.cellWithId("k1")?.attrs.words).toBe("7-8");
+    });
+});
+
+describe("a plot's trajectory", () => {
+    const STORY_OF_THE_BELL = [
+        '<!-- cell: markdown id="c2" -->',
+        "",
+        "She saw the door.",
+        "",
+        '<!-- cell: markdown id="c3" -->',
+        "",
+        "He heard the bell.",
+        "",
+        '<!-- cell: plot title="The bell" words="6-7, 2-3" id="p1" -->',
+        "",
+        "He hears the bell, so she opens the door.",
+        "",
+    ].join("\n");
+
+    it("is listed with the plot's title and abstract, in the order it is written", () => {
+        const story = ImmutableAuthorDocument.fromText(STORY_OF_THE_BELL);
+
+        const plotsInTheStory = plotsIn(story.cells);
+
+        expect(plotsInTheStory).toEqual([
+            {
+                plotCellId: "p1",
+                title: "The bell",
+                abstract: "He hears the bell, so she opens the door.",
+                trajectory: [
+                    {
+                        firstWord: 6,
+                        lastWord: 7,
+                        cellId: "c3",
+                        wordsItCovers: "the bell.",
+                    },
+                    {
+                        firstWord: 2,
+                        lastWord: 3,
+                        cellId: "c2",
+                        wordsItCovers: "the door.",
+                    },
+                ],
+            },
+        ]);
+    });
+
+    it("moves on as the author types", () => {
+        const session = openStory(STORY_OF_THE_BELL);
+
+        session.theAuthorTypedInTheCell("c2", "She saw the old door.");
+
+        const trajectoryAsItIsWritten =
+            session.document.cellWithId("p1")?.attrs.words;
+        expect(trajectoryAsItIsWritten).toBe("7-8, 2-4");
     });
 });

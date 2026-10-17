@@ -1,5 +1,6 @@
 import {
     MARKDOWN,
+    PLOT,
     SALIENT_CONCEPT,
     UNIQUE_CELL_ID,
     type ImmutableAuthorDocument,
@@ -42,6 +43,13 @@ export interface SalientConceptInTheStory {
     title: string;
     description: string;
     storyWordRanges: StoryWordRangeInTheStory[];
+}
+
+export interface PlotInTheStory {
+    plotCellId: string;
+    title: string;
+    abstract: string;
+    trajectory: StoryWordRangeInTheStory[];
 }
 
 interface WordsAnEditReplaced {
@@ -125,9 +133,9 @@ export function storyWordRangeBetween(
 }
 
 export function storyWordRangesOf(
-    concept: Pick<ImmutableCell, "attrs">,
+    cell: Pick<ImmutableCell, "attrs">,
 ): StoryWordRange[] {
-    return (concept.attrs[STORY_WORD_RANGES] ?? "")
+    return (cell.attrs[STORY_WORD_RANGES] ?? "")
         .split(",")
         .map((said) => /^\s*(\d+)-(\d+)\s*$/.exec(said))
         .filter((range) => range !== null)
@@ -148,25 +156,55 @@ export function storyWordRangesAsTheyAreWritten(
         .join(", ");
 }
 
+function storyWordRangesInTheStory(
+    cell: StoryDocumentCell,
+    storyWords: readonly StoryWord[],
+): StoryWordRangeInTheStory[] {
+    return storyWordRangesOf(cell).map((range) => ({
+        ...range,
+        cellId: storyWords[range.firstWord]?.cellId ?? "",
+        wordsItCovers: storyWords
+            .slice(range.firstWord, range.lastWord + 1)
+            .map((word) => word.text)
+            .join(" "),
+    }));
+}
+
 export function salientConceptsIn(
     cells: readonly StoryDocumentCell[],
 ): SalientConceptInTheStory[] {
     const storyWords = storyWordsIn(cells);
     return cells
         .filter((cell) => cell.kind === SALIENT_CONCEPT)
-        .map((concept) => ({
-            conceptCellId: concept.attrs[UNIQUE_CELL_ID],
-            title: concept.attrs.title ?? "",
-            description: concept.source,
-            storyWordRanges: storyWordRangesOf(concept).map((range) => ({
-                ...range,
-                cellId: storyWords[range.firstWord]?.cellId ?? "",
-                wordsItCovers: storyWords
-                    .slice(range.firstWord, range.lastWord + 1)
-                    .map((word) => word.text)
-                    .join(" "),
-            })),
-        }));
+        .map((concept) => {
+            const storyWordRanges = storyWordRangesInTheStory(
+                concept,
+                storyWords,
+            );
+            return {
+                conceptCellId: concept.attrs[UNIQUE_CELL_ID],
+                title: concept.attrs.title ?? "",
+                description: concept.source,
+                storyWordRanges,
+            };
+        });
+}
+
+export function plotsIn(
+    cells: readonly StoryDocumentCell[],
+): PlotInTheStory[] {
+    const storyWords = storyWordsIn(cells);
+    return cells
+        .filter((cell) => cell.kind === PLOT)
+        .map((plot) => {
+            const trajectory = storyWordRangesInTheStory(plot, storyWords);
+            return {
+                plotCellId: plot.attrs[UNIQUE_CELL_ID],
+                title: plot.attrs.title ?? "",
+                abstract: plot.source,
+                trajectory,
+            };
+        });
 }
 
 function firstStoryWordOfEachCell(
@@ -299,20 +337,18 @@ export function synchronizeTheStoryWordRanges(
     before: ImmutableAuthorDocument,
     after: MutableAuthorDocument,
 ): void {
-    const concepts = after.cells.filter(
-        (cell) =>
-            cell.kind === SALIENT_CONCEPT &&
-            cell.attrs[STORY_WORD_RANGES] !== undefined,
+    const cellsHoldingStoryWords = after.cells.filter(
+        (cell) => cell.attrs[STORY_WORD_RANGES] !== undefined,
     );
-    if (concepts.length === 0) {
+    if (cellsHoldingStoryWords.length === 0) {
         return;
     }
     const whereTheWordsWent = whereTheStoryWordsWent(before.cells, after.cells);
-    for (const concept of concepts) {
-        const rangesKeptInStep = storyWordRangesOf(concept)
+    for (const cell of cellsHoldingStoryWords) {
+        const rangesKeptInStep = storyWordRangesOf(cell)
             .map((range) => theRangeKeptInStep(range, whereTheWordsWent))
             .filter((range) => range !== null);
-        concept.replaceAttribute(
+        cell.replaceAttribute(
             STORY_WORD_RANGES,
             storyWordRangesAsTheyAreWritten(rangesKeptInStep),
         );

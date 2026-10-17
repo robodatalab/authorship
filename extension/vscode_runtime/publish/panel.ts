@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
-import { salientConceptsIn } from "../storydoc/story_words";
+import { plotsIn, salientConceptsIn } from "../storydoc/story_words";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -33,11 +33,16 @@ export class PublishView implements vscode.WebviewViewProvider {
             if (message?.type === "ready") {
                 void this.pollTheServer();
                 this.showSalientConcepts();
+                this.showPlots();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
             } else if (message?.type === "selectSalientConcept") {
                 this.sessionFollowed?.selectTheSalientConcept(
                     message.conceptCellId as string | null,
+                );
+            } else if (message?.type === "selectPlot") {
+                this.sessionFollowed?.selectThePlot(
+                    message.plotCellId as string | null,
                 );
             } else if (message?.type === "typed") {
                 this.sessionFollowed?.theAuthorTypedInTheCell(
@@ -81,11 +86,13 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession?.dispose();
         this.sessionFollowed = session;
         this.followingTheSession = vscode.Disposable.from(
-            session.onDocumentOrSelectionChanged(() =>
-                this.showSalientConcepts(),
-            ),
+            session.onDocumentOrSelectionChanged(() => {
+                this.showSalientConcepts();
+                this.showPlots();
+            }),
         );
         this.showSalientConcepts();
+        this.showPlots();
     }
 
     stopFollowing(session: AuthorFileEditorSession): void {
@@ -96,6 +103,7 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession = undefined;
         this.sessionFollowed = undefined;
         this.showSalientConcepts();
+        this.showPlots();
     }
 
     private showSalientConcepts(): void {
@@ -107,6 +115,17 @@ export class PublishView implements vscode.WebviewViewProvider {
             type: "salientConcepts",
             salientConcepts,
             salientConceptSelected: session?.theSalientConceptSelected ?? null,
+            storyTextSelected: session?.theStoryTextSelected ?? null,
+        });
+    }
+
+    private showPlots(): void {
+        const session = this.sessionFollowed;
+        const plots = session ? plotsIn(session.document.cells) : null;
+        void this.view?.webview.postMessage({
+            type: "plots",
+            plots,
+            plotSelected: session?.thePlotSelected ?? null,
             storyTextSelected: session?.theStoryTextSelected ?? null,
         });
     }

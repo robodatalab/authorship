@@ -8,7 +8,9 @@ import {
     type AsyncJobStatus,
 } from "./AuthorshipPanelAsyncJobs";
 import { AuthorshipPanelSalientConcepts } from "./AuthorshipPanelSalientConcepts";
+import { AuthorshipPanelPlots } from "./AuthorshipPanelPlots";
 import type {
+    PlotInTheStory,
     SalientConceptInTheStory,
     StoryTextSpan,
 } from "../../vscode_runtime/storydoc/story_words";
@@ -33,10 +35,15 @@ const SALIENT_CONCEPTS_TAB: AuthorshipPanelTab = {
     label: "Salient Concepts",
     iconClassName: "codicon codicon-tag",
 };
+const PLOTS_TAB: AuthorshipPanelTab = {
+    label: "Plots",
+    iconClassName: "codicon codicon-layers",
+};
 const AUTHORSHIP_PANEL_TABS = [
-    SERVING_STATUS_TAB,
-    JOBS_STATUS_TAB,
     SALIENT_CONCEPTS_TAB,
+    PLOTS_TAB,
+    JOBS_STATUS_TAB,
+    SERVING_STATUS_TAB,
 ];
 
 interface AuthorshipPanelCanvasProps {
@@ -44,6 +51,8 @@ interface AuthorshipPanelCanvasProps {
     jobs?: AsyncJobStatus[] | null;
     salientConcepts?: SalientConceptInTheStory[] | null;
     salientConceptSelected?: string | null;
+    plots?: PlotInTheStory[] | null;
+    plotSelected?: string | null;
     storyTextSelected?: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -53,10 +62,12 @@ export function AuthorshipPanelCanvas({
     jobs,
     salientConcepts,
     salientConceptSelected = null,
+    plots,
+    plotSelected = null,
     storyTextSelected = null,
     sendMessagesToVscode,
 }: AuthorshipPanelCanvasProps) {
-    const [tabShown, showTab] = useState(SERVING_STATUS_TAB);
+    const [tabShown, showTab] = useState(SALIENT_CONCEPTS_TAB);
 
     return (
         <>
@@ -77,15 +88,6 @@ export function AuthorshipPanelCanvas({
                 ))}
             </div>
             <div className="authorship-panel-tab-body" role="tabpanel">
-                {tabShown === SERVING_STATUS_TAB && models !== undefined && (
-                    <AuthorshipPanelServingStatus models={models} />
-                )}
-                {tabShown === JOBS_STATUS_TAB && jobs !== undefined && (
-                    <AuthorshipPanelAsyncJobs
-                        jobs={jobs}
-                        sendMessagesToVscode={sendMessagesToVscode}
-                    />
-                )}
                 {tabShown === SALIENT_CONCEPTS_TAB &&
                     salientConcepts !== undefined && (
                         <AuthorshipPanelSalientConcepts
@@ -95,6 +97,23 @@ export function AuthorshipPanelCanvas({
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
                     )}
+                {tabShown === PLOTS_TAB && plots !== undefined && (
+                    <AuthorshipPanelPlots
+                        plots={plots}
+                        plotSelected={plotSelected}
+                        storyTextSelected={storyTextSelected}
+                        sendMessagesToVscode={sendMessagesToVscode}
+                    />
+                )}
+                {tabShown === JOBS_STATUS_TAB && jobs !== undefined && (
+                    <AuthorshipPanelAsyncJobs
+                        jobs={jobs}
+                        sendMessagesToVscode={sendMessagesToVscode}
+                    />
+                )}
+                {tabShown === SERVING_STATUS_TAB && models !== undefined && (
+                    <AuthorshipPanelServingStatus models={models} />
+                )}
             </div>
         </>
     );

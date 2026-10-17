@@ -49,6 +49,8 @@ export class AuthorFileEditorSession
 
     private salientConceptSelected: string | null = null;
 
+    private plotSelected: string | null = null;
+
     private storyTextSelected: StoryTextSpan | null = null;
 
     private readonly documentOrSelectionChanged =
@@ -95,6 +97,10 @@ export class AuthorFileEditorSession
         return this.salientConceptSelected;
     }
 
+    get thePlotSelected(): string | null {
+        return this.plotSelected;
+    }
+
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
     }
@@ -102,6 +108,11 @@ export class AuthorFileEditorSession
     selectTheSalientConcept(conceptCellId: string | null): void {
         this.salientConceptSelected = conceptCellId;
         this.sendSalientConceptSelected();
+        this.documentOrSelectionChanged.fire();
+    }
+
+    selectThePlot(plotCellId: string | null): void {
+        this.plotSelected = plotCellId;
         this.documentOrSelectionChanged.fire();
     }
 
