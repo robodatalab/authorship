@@ -7,16 +7,14 @@ from torch.utils.data import Dataset
 
 from server.storydoc import Document, SalientConceptInTheStory, StoryWordRange
 
-EXAMPLES_PER_HALF = 4
 UNRELATED_TEXTS_PER_CONCEPT = 8
-FEWEST_EXAMPLES = 4
+FEWEST_EXAMPLES = 1
 
 
 @dataclass(frozen=True)
 class SalientConceptExamples:
     abstract: str
-    hypersphere_examples: list[str]
-    held_out_examples: list[str]
+    related_examples: list[str]
     unrelated_texts: list[str]
 
 
@@ -78,15 +76,11 @@ class SalientConceptsDataset(Dataset[SalientConceptExamples]):
 
     def __getitem__(self, concept_idx: int) -> SalientConceptExamples:
         concept = self._concepts[concept_idx]
-        example_count = min(len(concept.examples), 2 * EXAMPLES_PER_HALF)
-        drawn_examples = self._rng.sample(concept.examples, example_count)
-        half = example_count // 2
         unrelated_count = min(len(concept.unrelated_texts), UNRELATED_TEXTS_PER_CONCEPT)
         drawn_unrelated_texts = self._rng.sample(concept.unrelated_texts, unrelated_count)
         salient_concept_examples = SalientConceptExamples(
             concept.abstract,
-            drawn_examples[:half],
-            drawn_examples[half:],
+            concept.examples,
             drawn_unrelated_texts,
         )
         return salient_concept_examples

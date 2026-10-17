@@ -598,16 +598,16 @@ This gives a set of points in the latent space. The loss then measures:
   \item whether the point of the concept's abstract is the centroid of that area.
 \end{itemize}
 
-\paragraph{The construction of the LoRA latent space.} Every text is run through Qwen with the LoRA adapter, which gives each of its tokens a state after every layer. Each token's states are mixed over the layers with learned weights $\alpha$~\eqref{eq:loss-layers}. The tokens are then pooled into one state, weighted by how much a learned query $q$ attends to each of them, leaving out token $0$, the attention sink~\eqref{eq:loss-tokens}. A learned matrix $W$ projects that state into the $d$ dimensions of the LoRA latent space~\eqref{eq:loss-projection}, and the projection is embedded on the unit sphere~\eqref{eq:loss-point}. Each concept is a hypersphere in that space, calculated from half of the concept's examples, $S_c$; the other half, $Q_c$, is kept for the loss. The halves are drawn at random, anew at every training step, so that over the course of training every example both calculates its concept's hypersphere and tests it. The hypersphere's centre is the centroid of the embeddings of $S_c$~\eqref{eq:loss-centre}, and its radius is the distance from that centre to the farthest of them, bounded so that it is never smaller than $r_{\min}$ or larger than $r_{\max}$~\eqref{eq:loss-radius}. The concept's area $B_c$ is the part of the unit sphere that lies inside its hypersphere~\eqref{eq:loss-area}.
+\paragraph{The construction of the LoRA latent space.} Every text is run through Qwen with the LoRA adapter, which gives each of its tokens a state after every layer. Each token's states are mixed over the layers with learned weights $\alpha$~\eqref{eq:loss-layers}. The tokens are then pooled into one state, weighted by how much a learned query $q$ attends to each of them, leaving out token $0$, the attention sink~\eqref{eq:loss-tokens}. A learned matrix $W$ projects that state into the $d$ dimensions of the LoRA latent space~\eqref{eq:loss-projection}, and the projection is embedded on the unit sphere~\eqref{eq:loss-point}. Each concept is a hypersphere in that space. Its centre is the embedding of the concept's abstract~\eqref{eq:loss-centre}, and its radius is the distance from that centre to the farthest of the concept's examples $E_c$~\eqref{eq:loss-radius}, so every example lies inside it. A single example is enough to set the radius. The concept's area $B_c$ is the part of the unit sphere that lies inside its hypersphere~\eqref{eq:loss-area}.
 
-For a text $t$ of $n$ tokens, and for the concepts $C$ of a story, each with the examples $S_c$ that calculate its hypersphere:
+For a text $t$ of $n$ tokens, and for the concepts $C$ of a story, each with its abstract $A_c$ and its examples $E_c$:
 \begin{align}
 h_k(t) &= \sum_{\ell=0}^{L} \softmax(\alpha)_\ell \, h_{\ell,k}(t), \label{eq:loss-layers} \\
 g(t) &= \sum_{k=1}^{n-1} \softmax_k\bigl(q \cdot h_k(t)\bigr) \, h_k(t), \label{eq:loss-tokens} \\
 y(t) &= W g(t), \label{eq:loss-projection} \\
 z(t) &= \frac{y(t)}{\|y(t)\|}, \label{eq:loss-point} \\
-m_c &= \frac{1}{|S_c|} \sum_{s \in S_c} z(s), \label{eq:loss-centre} \\
-r_c &= \min\Bigl(r_{\max},\ \max\bigl(r_{\min},\ \max_{s \in S_c} \|z(s) - m_c\|\bigr)\Bigr), \qquad 0 < r_{\min} < r_{\max} \le 1, \label{eq:loss-radius} \\
+m_c &= z(A_c), \label{eq:loss-centre} \\
+r_c &= \max_{e \in E_c} \|z(e) - m_c\|, \label{eq:loss-radius} \\
 B_c &= \{\, z \in \R^d : \|z\| = 1,\ \|z - m_c\| \le r_c \,\}. \label{eq:loss-area}
 \end{align}
 \begin{symbols}
@@ -618,39 +618,35 @@ q & the learned query that weighs the tokens, in $\R^D$ \\
 g(t) & the state of text $t$, pooled over its tokens \\
 W & the learned projection into the LoRA latent space, $d \times D$ \\
 C & the concepts of the story \\
-S_c & the examples of concept $c$ that calculate its hypersphere \\
-Q_c & the examples of $c$ kept for the loss \\
+E_c & the examples of concept $c$ \\
 y(t) & the projection of text $t$ into the LoRA latent space \\
 z(t) & the embedding of text $t$, on the unit sphere \\
-m_c & the centre of $c$'s hypersphere \\
+A_c & the abstract of concept $c$ \\
+m_c & the centre of $c$'s hypersphere: the embedding of its abstract \\
 r_c & the radius of $c$'s hypersphere \\
-r_{\min},\ r_{\max} & the bounds of every radius \\
 B_c & the area of $c$: the part of the unit sphere inside its hypersphere \\
 \end{symbols}
 
-\paragraph{The loss.} The loss~\eqref{eq:loss} quantifies whether a concept's examples form a convex area in the LoRA latent space, uniformly distributed, with the concept's abstract at its centre. It tests each hypersphere only on texts that did not calculate it. It measures how many of the examples in $Q_c$ lie inside the hypersphere, and how many of the story's unrelated texts $U_c$ lie outside it~\eqref{eq:loss-membership}, \eqref{eq:loss-classification}. It measures how evenly the examples in $Q_c$ are spread over the area $B_c$, by their energy distance to points drawn uniformly from it~\eqref{eq:loss-spread}. The distance is $0$ only when the examples are spread over $B_c$ as evenly as those points are. In $d$ dimensions most of an area like $B_c$ lies near its edge, so evenly spread examples lie mostly near the edge too. It also measures how far the abstract's embedding lies from the centre, in units of the radius~\eqref{eq:loss-abstract}.
+\paragraph{The loss.} The loss~\eqref{eq:loss} quantifies whether a concept's examples form a convex area in the LoRA latent space, uniformly distributed, with the concept's abstract at its centre. Every example lies inside its hypersphere by construction, so the loss measures how many of the story's unrelated texts $U_c$ lie outside it~\eqref{eq:loss-membership}, \eqref{eq:loss-classification}. It measures how evenly the examples are spread over the area $B_c$, by their energy distance to points drawn uniformly from it~\eqref{eq:loss-spread}; a concept with a single example has no spread to measure, and the term is $0$. The distance is $0$ only when the examples are spread over $B_c$ as evenly as those points are. In $d$ dimensions most of an area like $B_c$ lies near its edge, so evenly spread examples lie mostly near the edge too.
 
-The unrelated texts $U_c$ are the negative examples of $c$: texts the author tagged as examples of the story's other concepts, but not of $c$. They never calculate $c$'s hypersphere, so they are not split. They are a random sample of those texts, drawn anew at every training step.
+The unrelated texts $U_c$ are the negative examples of $c$: texts the author tagged as examples of the story's other concepts, but not of $c$. They are a random sample of those texts, drawn anew at every training step.
 
-For each concept $c$, with its abstract $A_c$ and the story's texts unrelated to it $U_c$:
+For each concept $c$, with the story's texts unrelated to it $U_c$:
 \begin{align}
 P(t \in c) &= \sigma\bigl(\kappa\,(r_c^2 - \|z(t) - m_c\|^2)\bigr), \qquad \kappa = 50, \label{eq:loss-membership} \\
-\mathcal{L}_{\mathrm{class}}(c) &= \frac{1}{|Q_c|} \sum_{q \in Q_c} \bigl(1 - P(q \in c)\bigr) \;+\; \frac{1}{|U_c|} \sum_{u \in U_c} P(u \in c), \label{eq:loss-classification} \\
-\mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(q) - w\| - \mathbb{E}\,\|z(q) - z(q')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
-&\qquad q, q' \in Q_c,\ q \ne q',\quad w, w' \text{ drawn uniformly from } B_c,\ w \ne w', \notag \\
-\mathcal{L}_{\mathrm{abstract}}(c) &= \frac{1}{r_c} \Bigl\| z(A_c) - \frac{m_c}{\|m_c\|} \Bigr\|, \label{eq:loss-abstract} \\
-\mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c) + \lambda\, \mathcal{L}_{\mathrm{abstract}}(c)\Bigr). \label{eq:loss}
+\mathcal{L}_{\mathrm{class}}(c) &= \frac{1}{|U_c|} \sum_{u \in U_c} P(u \in c), \label{eq:loss-classification} \\
+\mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(e) - w\| - \mathbb{E}\,\|z(e) - z(e')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
+&\qquad e, e' \in E_c,\ e \ne e',\quad w, w' \text{ drawn uniformly from } B_c,\ w \ne w', \notag \\
+\mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c)\Bigr). \label{eq:loss}
 \end{align}
 \begin{symbols}
-A_c & the abstract of concept $c$ \\
 U_c & the story's texts unrelated to $c$ \\
 \kappa & how steeply $P(t \in c)$ drops across the hypersphere's surface \\
 \sigma & the logistic function, $\sigma(x) = 1 / (1 + e^{-x})$ \\
 P(t \in c) & the probability that text $t$ lies inside $c$'s hypersphere \\
 w,\ w' & points drawn uniformly from $B_c$ \\
-\mathbb{E} & the mean over the examples in $Q_c$ and the drawn points \\
+\mathbb{E} & the mean over the examples in $E_c$ and the drawn points \\
 \gamma & the weight of the spread term \\
-\lambda & the weight of the abstract's term \\
 \end{symbols}
 
 \begin{thebibliography}{9}
