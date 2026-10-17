@@ -10,7 +10,7 @@ from cortexgrid_train import train_from_model_output
 from experiments.story_state_extraction_training.dataset import (
     AnnotatedStorySpansDataset,
 )
-from experiments.story_state_extraction_training.loss import volume_loss
+from experiments.story_state_extraction_training.loss import salient_point_classification_loss
 from server import storydoc
 from server.models import cluster
 from server.models.story_state_extraction_model import StoryStateExtractionModel
@@ -43,7 +43,7 @@ def train_story_space() -> None:
     trained_story_state_extraction_model = train_from_model_output(
         story_state_extraction_model,
         annotated_story_spans,
-        volume_loss,
+        salient_point_classification_loss,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
         lr=LEARNING_RATE,

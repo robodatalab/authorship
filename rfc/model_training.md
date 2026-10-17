@@ -2,14 +2,15 @@
 
 The first model to train is the story space model: Qwen3-8B with a rank-1 LoRA
 on every linear map plus a head, trained on the annotated story spans
-(`rfc/story_space.tex`, 3.5). This document sets out how training should work
+(`rfc/story_space.tex`, 3.4). This document sets out how training should work
 across cortexgrid and cortexgrid-train, then maps what each library is missing
 to get there.
 
-## What the model does
+## What the models do
 
-The model takes a story as input. It returns the story's salient concepts, and
-from the story and those concepts, the story's plots:
+Two models take a story as input. The first returns the story's salient
+concepts. The second takes the story and those concepts and returns the story's
+plots:
 
 ```python
 class TextSpan:
@@ -40,6 +41,11 @@ def plots(story: str, concepts: list[SalientConcept]) -> list[Plot]
 - **A `TextSpan`** is a range of the story's words, the first and the last
   included, numbered as the `.author` files number them.
 
+**They are two models because `plots` depends on `salient_concepts`:** it takes
+the concepts as input. It is trained on its own data, and nothing is annotated
+for plots yet. This document trains `salient_concepts` only. That model is
+`StoryStateExtractionModel`, the story space model.
+
 **The training data is this output, written by the author.** Each annotated
 `.author` file is one input story with the output `salient_concepts` should
 return for it. Each salient-concept cell is one `SalientConcept`: the cell's
@@ -47,7 +53,7 @@ title is the name, its text is the abstract, and its `words` ranges are the
 references.
 
 `encode_basis`, `encode_from_state` and `encode_from_text` were an experiment.
-They are not the model's API.
+They are not the models' API.
 
 The same API is in `rfc/story_space.tex`, section 1.
 
@@ -114,9 +120,6 @@ class StoryStateExtractionModel(torch.nn.Module):
 
     @serve.endpoint
     async def salient_concepts(self, story: str) -> list[SalientConcept]: ...
-
-    @serve.endpoint
-    async def plots(self, story: str, concepts: list[SalientConcept]) -> list[Plot]: ...
 ```
 
 - **The base is part of the model, not a served dependency.** A served
@@ -150,14 +153,14 @@ class StoryStateExtractionModel(torch.nn.Module):
 | `requirements()` | 1 GB of RAM and `models=[LONG_CONTEXT_QWEN_DEPLOYMENT]` | one GPU with the RAM and VRAM for Qwen3-8B, the LoRA and the head; no `models` |
 | `__init__` | takes a client of the deployed Qwen from `required_models` | loads Qwen with a copy of `Text2Text`'s loading steps, attaches the LoRA, creates the head; loads the trained adapter and head when its entry has weights |
 | `deploy()` | registers the entry and deploys it under `IMPORTED` | the same, plus a `run_name` to deploy a trained entry |
-| `forward(texts)` | none | tokenizes the texts, runs the adapted Qwen for its hidden states, and passes them through the head: each text's point in the story space (`rfc/story_space.tex`, 3.3) |
+| `forward(texts)` | none | tokenizes the texts, runs the adapted Qwen for its hidden states, and passes them through the head: each text's point in the story space (`rfc/story_space.tex`, 3.6) |
 | `save_weights(weights_dir)` | none | writes the adapter and head |
-| endpoints | `encode_basis`, `encode_from_state`, `encode_from_text`, an experiment | `salient_concepts(story)` and `plots(story, concepts)`, the model's API (open question 2) |
+| endpoints | `encode_basis`, `encode_from_state`, `encode_from_text`, an experiment | `salient_concepts(story)` only (open question 1); `plots` belongs to the other model |
 | `StoryStateSpaceBasis`, `StoryState` | the experiment's types | removed with its endpoints |
-| `SalientConcept` | `name` and `paragraph_idxs` | the API's `SalientConcept`: `name`, `abstract`, `references`; with `TextSpan` and `Plot` beside it |
+| `SalientConcept` | `name` and `paragraph_idxs` | the API's `SalientConcept`: `name`, `abstract`, `references`; with `TextSpan` beside it |
 | `gaussian_weights_of_layers`, `embedding_of_tokens`, `every_layer_idx`, `state_embedding`, `midpoint_and_direction` | the untrained geometry | removed; the head replaces them |
 
-`volume_loss` is not part of the model. Like the dataset, it lives with the
+`salient_point_classification_loss` is not part of the model. Like the dataset, it lives with the
 training code, in `experiments/story_state_extraction_training/`.
 
 ### The flow
@@ -177,7 +180,7 @@ training code, in `experiments/story_state_extraction_training/`.
    2. `cortexgrid.instantiate_model("Authorship", "storystateextractionmodel", IMPORTED)`
       builds `StoryStateExtractionModel` in the job from the untrained entry,
       running the same `__init__` a replica runs.
-   3. `train_from_model_output(model, AnnotatedStorySpansDataset(stories), volume_loss, ...)`.
+   3. `train_from_model_output(model, AnnotatedStorySpansDataset(stories), salient_point_classification_loss, ...)`.
       It resumes from the job's checkpoint, logs metrics to the run, and
       checkpoints after each epoch only what trains: adapter, head and
       optimizer.
@@ -221,7 +224,7 @@ distributed training such as Ray Train is not needed.
 | 3.2 build the model | a model is built only by deploying it. `model_config(key)` needs a deployment record | `instantiate_model`; `model_config` for an instantiated key | cortexgrid |
 | | `StoryStateExtractionModel` calls a deployed `Text2Text` and has no layers of its own | base, LoRA and head built in `__init__`; `forward`; `save_weights`; its own GPU | authorship |
 | 3.3 train | `train_sft` only: it calls `model(input_ids, attention_mask, labels)` and moves every batch value to the device. Checkpoints pickle the whole `state_dict`, 16 GB for Qwen3-8B | `train_from_model_output`, a peer of `train_sft`; checkpoints of trainable state only | cortexgrid-train |
-| | nothing | `volume_loss` (open question 1) | authorship |
+| | nothing | `salient_point_classification_loss`, as `rfc/story_space.tex` 3.7 defines it; batches of 32 spans from one story | authorship |
 | 4 wait | cortexgrid has no way to wait for a `retry=True` job, because a failure that causes a retry immediately shows up in `done()` as the job having finished, and `result()` refuses such a job | `done()` and `result()` that wait until a `retry=True` job has finished, however many times it is retried | cortexgrid |
 | 6 lineage | cortexgrid cannot say which data and which base model a trained model came from, because it records only the models a run imports, not the ones it loads, and nothing reads even that record | when a job loads a dataset or a model's weights, cortexgrid records it on the job's run, and can list what a run loaded | cortexgrid |
 
@@ -317,9 +320,10 @@ reused.
 **The method is supervised learning:** a model, labelled examples, and a loss
 over the model's output and the labels. SFT is its special case for a causal LM
 with next-token cross-entropy as the loss. What the story space does with it is
-supervised metric learning, more precisely region (box) embedding learning:
-spans that share a concept must overlap, and spans that share none must not.
-That part lives in `volume_loss`, not in the loop.
+classification: the salient point classification loss asks each span's point to
+lie inside the caps of the concepts it refers to, and outside the others
+(`rfc/story_space.tex`, 3.7). That part lives in
+`salient_point_classification_loss`, not in the loop.
 
 ### Job requirements (cortexgrid)
 
@@ -350,18 +354,15 @@ That part lives in `volume_loss`, not in the loop.
 3. cortexgrid: job requirements, the scheduler pausing models for a pending
    job, and `done()` and `result()` waiting for a `retry=True` job.
 4. cortexgrid: datasets.
-5. authorship: `StoryStateExtractionModel` as above; `volume_loss`.
+5. authorship: `StoryStateExtractionModel` as above; `salient_point_classification_loss`.
 
 The driver, `experiments/story_state_extraction_training/training.py`, is
 already written against all of these.
 
 ## Open questions
 
-1. `rfc/story_space.tex` defines the story space and the head in 3.3, but the
-   volume loss is only named, in the to-do table of 3.2.3, never defined, so
-   `volume_loss` cannot be written yet.
-2. The story space places a text at a point and says which concepts' caps
+1. The story space places a text at a point and says which concepts' caps
    contain it, so it can find a concept's references once the concept is
-   known. It does not say how `salient_concepts` finds the concepts of a new
-   story or writes their names and abstracts, or how `plots` finds a plot's
-   causal events.
+   known. It does not say how `salient_concepts` finds the concepts of a story
+   that has no annotations, or how it writes their names and abstracts, which
+   takes a generative model on top of the story space.

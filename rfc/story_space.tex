@@ -5,9 +5,12 @@
 \usepackage{graphicx}
 \usepackage[section]{placeins}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,calc,decorations.pathreplacing}
+\usetikzlibrary{arrows.meta,calc,decorations.pathreplacing,positioning}
 \definecolor{conceptone}{RGB}{42,120,214}
 \definecolor{concepttwo}{RGB}{235,104,52}
+\definecolor{conceptthree}{RGB}{46,160,90}
+\definecolor{conceptred}{RGB}{214,69,65}
+\definecolor{conceptgreen}{RGB}{56,150,70}
 
 \newtheorem{definition}{Definition}
 \newtheorem{requirement}{Requirement}
@@ -130,6 +133,8 @@ def plots(story: str, concepts: list[SalientConcept]) -> list[Plot]
   \item \texttt{plots} takes a story and its salient concepts and returns the story's plots. Each plot has a name, an abstract, and the spans of the story that are its causal events, in story order.
   \item A \texttt{TextSpan} is a range of the story's words, the first and the last included, numbered as in Section~\ref{sec:data}.
 \end{itemize}
+These are two models. \texttt{plots} takes the concepts that \texttt{salient\_concepts} returns, so it is a separate model, trained on its own data. The rest of this document is about \texttt{salient\_concepts} only.
+
 An annotated \texttt{.author} file holds exactly what \texttt{salient\_concepts} returns for its story. Each salient-concept cell is one \texttt{SalientConcept}: the cell's title is the name, its text is the abstract, and its \texttt{words} ranges are the references.
 
 \paragraph{Requirements.}
@@ -460,81 +465,9 @@ retraining all of Qwen & all of Qwen's weights learned anew & no & our few label
 \hline
 approach & to do \\
 \hline
-LoRA adapter & 1. Train the adapter and a head on the labelled texts with the volume loss. 2. Serve with the adapter switched on per request. \\
-soft prompt & 1. Train the vectors and a head on the labelled texts with the volume loss. 2. Add an endpoint that accepts vectors in place of tokens. \\
-fully connected head & 1. Run every labelled text through Qwen once and store its points. 2. Train the head on them with the volume loss. 3. Test the relations on texts it was not trained on. \\
-\hline
-\end{tabular}
-\end{center}
-
-\FloatBarrier
-\subsection{The story space}\label{sec:space}
-
-\paragraph{Points on a hemisphere.} The adapted space is a hemisphere of the unit sphere in $\R^d$:
-\begin{equation}
-\mathcal{Z} = \{\, z \in \R^d : \|z\| = 1,\ z \cdot u > 0 \,\}, \qquad d = 64 .
-\end{equation}
-Every text $t$ is a point $z(t) \in \mathcal{Z}$, and so is every story state, $z(\sigma) = z(\tau(\sigma))$. Meaning lies in a point's direction, as it does in Qwen's own space (Section~\ref{sec:qwen}), and the hemisphere keeps the points on one side, as Qwen's own points crowd into one cone.
-\begin{symbols}
-\mathcal{Z} & the story space: the points of the unit sphere in $\R^d$ on the side of $u$ \\
-u & the pole of the hemisphere, a fixed unit vector \\
-z(t) & the point of text $t$ in the story space \\
-\end{symbols}
-
-\paragraph{Concepts are caps.} The volume of concept $c$ is a spherical cap, the points within an angle $\theta$ of its centre $a_c$:
-\begin{equation}
-B_c = \{\, z \in \mathcal{Z} : z \cdot a_c \ge \cos\theta \,\} .
-\end{equation}
-\begin{itemize}
-  \item \textbf{A cap is convex.} Every text about one concept must share one direction, from Madeline at breakfast to Madeline signing the contract, and that shared direction is what makes the concept salient. A region that need not be convex could grow around every annotated span and fit them all, and still say nothing about a new text that falls between them.
-  \item \textbf{Dimensions give the overlap.} Each concept is one direction, and the space has more dimensions than a story has concepts (49 at most in our stories). The caps of any combination of concepts can therefore meet, and a text about several concepts lies where their caps meet (Requirement~\ref{req:multi}). Two concepts are related when their caps meet, that is when the angle between $a_c$ and $a_{c'}$ is less than $2\theta$.
-  \item \textbf{A cap has width in every direction} of $\mathcal{Z}$ when $\theta > 0$ (Requirement~\ref{req:volume}).
-  \item \textbf{A cap comes from its story.} Its centre is the mean direction of the spans that refer to $c$ in the story, $a_c = \sum_{j \in c} z(p_j) \,/\, \|\sum_{j \in c} z(p_j)\|$.
-\end{itemize}
-\begin{symbols}
-a_c & the centre of concept $c$'s cap, a point of $\mathcal{Z}$ \\
-\theta & the angular radius of every cap, learned \\
-p_j & the $j$-th span of the story annotated with a salient concept \\
-j \in c & span $p_j$ is annotated with concept $c$ \\
-\end{symbols}
-
-\paragraph{From Qwen's states to a point.} A text $t$ is run through Qwen with the LoRA adapter (Section~\ref{sec:lora}), and a head turns its states into one point. Token $0$, the attention sink, is left out.
-\begin{enumerate}
-  \item \textbf{Mix the layers.} Each token's states, one per layer, are weighted by learned layer weights:
-  \begin{equation}
-  h_k(t) = \sum_{\ell=0}^{L} \softmax(\alpha)_\ell \, h_{\ell,k}(t) .
-  \end{equation}
-  \item \textbf{Pool the tokens.} A learned query weighs each token, and the text's state is the weighted mean:
-  \begin{equation}
-  g(t) = \sum_{k=1}^{n-1} \softmax_k\bigl(q \cdot h_k(t)\bigr) \, h_k(t) .
-  \end{equation}
-  An equal weight per token would break the second property of Section~\ref{sec:properties}: B's tokens must count for a lot, C's for almost nothing.
-  \item \textbf{Project into the story space:} $y(t) = W g(t)$.
-  \item \textbf{Put it on the hemisphere.} The coordinate along $u$ is made positive with $\softplus$, and the result is scaled to unit length:
-  \begin{equation}
-  z(t) = \frac{y'(t)}{\|y'(t)\|}, \qquad y'(t) = y(t) + \bigl(\softplus(u \cdot y(t)) - u \cdot y(t)\bigr)\, u .
-  \end{equation}
-\end{enumerate}
-The point depends only on the text, so equal texts land on the same point (Requirement~\ref{req:identity}).
-\begin{symbols}
-\alpha & the learned layer weights, one per layer \\
-h_k(t) & token $k$'s states, mixed over the layers \\
-q & the learned query that weighs the tokens, in $\R^D$ \\
-g(t) & the state of text $t$, pooled over its tokens \\
-W & the learned projection into the story space, $d \times D$ \\
-y(t),\ y'(t) & the projection of text $t$, before and after its coordinate along $u$ is made positive \\
-\end{symbols}
-
-\begin{center}
-\begin{tabular}{@{}lr@{}}
-\hline
-trained part & parameters \\
-\hline
-LoRA adapter (Section~\ref{sec:lora}) & $2{,}727{,}936$ \\
-layer weights $\alpha$ & $37$ \\
-query $q$ & $4{,}096$ \\
-projection $W$ & $262{,}144$ \\
-cap radius $\theta$ & $1$ \\
+LoRA adapter & 1. Train the adapter and a head on the labelled texts with the salient point classification loss. 2. Serve with the adapter switched on per request. \\
+soft prompt & 1. Train the vectors and a head on the labelled texts with the salient point classification loss. 2. Add an endpoint that accepts vectors in place of tokens. \\
+fully connected head & 1. Run every labelled text through Qwen once and store its points. 2. Train the head on them with the salient point classification loss. 3. Test the relations on texts it was not trained on. \\
 \hline
 \end{tabular}
 \end{center}
@@ -590,6 +523,126 @@ batch size & small & LoRA tolerates large batches worse~\cite{thinkingmachines} 
 \paragraph{Metric: pair accuracy.} Take two annotated spans from a story the adapter was not trained on. The adapter is right when their volumes overlap exactly when the two spans share a salient concept. Pair accuracy is the share of such pairs it gets right, over equal numbers of pairs that share a concept and pairs that do not, so guessing scores $0.5$.
 
 \paragraph{Predicted value.} It cannot be predicted from published results: the smallest dataset they report, $1{,}000$ clinical conversations of about $3{,}700$ words each~\cite{baseten}, holds $37$ times more text than these $10$ stories. It has to be measured: train on $9$ stories, measure pair accuracy on the $10$th, and repeat for each of the $10$.
+
+\FloatBarrier
+\subsection{The story space}\label{sec:space}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm, >={Stealth[length=2.6mm]}, font=\small]
+  \draw[thick, rounded corners=8pt] (0,0) rectangle (4.6,5.0);
+  \foreach \y/\layer in {0.55/1, 1.75/2, 3.95/L} {
+    \draw[thick, rounded corners=3pt] (0.45,\y) rectangle (4.15,\y+0.6);
+    \node at (2.3,\y+0.3) {layer $\layer$};
+  }
+  \node at (2.3,3.1) {$\vdots$};
+  \node[font=\small] (text) at (2.3,-0.95) {Bob and Alice met in a caf\'e \dots};
+  \draw[->, thick] (text.north) -- (2.3,0);
+  \draw[->, thick] (2.3,5.0) -- (2.3,5.65);
+
+  \draw[->, thick] (0.6,5.9) -- (4.8,5.9);
+  \draw[->, thick] (0.6,5.9) -- (0.6,10.1);
+  \filldraw[conceptred, fill=conceptred!25, thick] plot[smooth cycle, tension=0.6] coordinates {(1.2,9.25) (1.7,9.55) (3.4,9.6) (3.65,9.2) (3.35,9.05) (2.85,9.25) (2.4,9.15) (2.3,8.45) (1.85,8.45) (1.95,9.0) (1.45,8.95)};
+  \filldraw[conceptred, fill=conceptred!25, thick] (1.05,7.95) ellipse (0.3 and 0.22);
+  \filldraw[conceptred, fill=conceptred!25, thick] plot[smooth cycle, tension=0.6] coordinates {(1.95,6.6) (2.55,6.45) (3.05,6.25) (3.25,6.1) (2.95,6.55) (2.65,6.95) (2.5,7.15) (2.35,6.75) (1.9,6.8)};
+  \filldraw[conceptgreen, fill=conceptgreen!25, thick] (3.3,8.75) ellipse (0.17 and 0.27);
+  \filldraw[conceptgreen, fill=conceptgreen!25, thick] plot[smooth cycle, tension=0.6] coordinates {(1.25,7.3) (2.05,7.45) (2.3,7.75) (2.35,8.2) (2.55,7.9) (2.95,7.3) (3.05,6.95) (2.85,7.05) (2.6,7.35) (2.2,7.1) (1.3,7.05)};
+  \node[text width=6.6cm, align=left, black!65, anchor=north west] at (5.1,9.9) {Qwen's latent space holds each concept in scattered regions of no particular shape, which cannot be extracted or reasoned about.};
+
+  \draw[thick, rounded corners=8pt] (5.55,1.2) rectangle (6.65,3.8);
+  \node at (6.1,2.5) {LoRA};
+  \draw[->, thick] (4.6,2.5) -- (5.55,2.5);
+  \draw[->, thick] (6.65,2.5) -- (7.55,2.5);
+
+  \draw[->, thick] (7.7,0.3) -- (12.9,0.3);
+  \draw[->, thick] (7.7,0.3) -- (7.7,4.9);
+  \filldraw[conceptred, fill=conceptred!25, thick] (9.7,3.25) ellipse (1.35 and 0.95);
+  \filldraw[conceptgreen, fill=conceptgreen!25, thick, fill opacity=0.85] (10.35,1.65) circle (1.2);
+  \node[conceptred] at (9.55,3.55) {concept 1};
+  \node[conceptgreen] at (10.45,1.45) {concept 2};
+  \node[text width=6.2cm, align=left, black!65, anchor=north west] at (7.6,-0.15) {The LoRA we train disentangles the concepts into convex regions, the caps of the story space; two concepts overlap where texts refer to both.};
+\end{tikzpicture}
+\caption{Illustration, not computed from data. A story's text runs through Qwen's layers. In Qwen's own latent space (top), the texts about a concept land in scattered regions of no particular shape, interleaved with other concepts' regions. The LoRA we train changes what the layers compute so that in the story space (right) each concept is one convex region, its cap (Section~\ref{sec:space}). The salient point classification loss is what moves each text into the caps of the concepts it refers to.}
+\label{fig:space}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\hline
+trained part & parameters \\
+\hline
+LoRA adapter (Section~\ref{sec:lora}) & $2{,}727{,}936$ \\
+layer weights $\alpha$ & $37$ \\
+query $q$ & $4{,}096$ \\
+projection $W$ & $262{,}144$ \\
+cap radius $\theta$ & $1$ \\
+cap sharpness $\kappa$ (Section~\ref{sec:loss}) & $1$ \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{The salient point classification loss}\label{sec:loss}
+
+Qwen does not model anything as manifolds. The manifolds are implied, but the latent space cannot be decompiled to see how they are shaped: all Qwen gives is a cloud of points in its latent space.
+
+The goal is, given a concept's name, its abstract and sample points, to change how the model projects the relevant points so that they form a convex, contiguous area in the space.
+
+The loss therefore:
+\begin{enumerate}
+  \item embeds the abstract of a concept;
+  \item embeds all texts that are examples of that concept.
+\end{enumerate}
+This gives a set of points in the latent space. The loss then measures:
+\begin{itemize}
+  \item whether those points form a convex area;
+  \item whether the point of the concept's abstract is the centroid of that area.
+\end{itemize}
+
+\paragraph{The construction of the LoRA latent space.} Every text is embedded on the unit sphere~\eqref{eq:loss-point}. Each concept is a hypersphere in that space, calculated from half of the concept's examples, $S_c$; the other half, $Q_c$, is kept for the loss. The halves are drawn at random, anew at every training step, so that over the course of training every example both calculates its concept's hypersphere and tests it. The hypersphere's centre is the centroid of the embeddings of $S_c$~\eqref{eq:loss-centre}, and its radius is the distance from that centre to the farthest of them, bounded so that it is never smaller than $r_{\min}$ or larger than $r_{\max}$~\eqref{eq:loss-radius}. The concept's area $B_c$ is the part of the unit sphere that lies inside its hypersphere~\eqref{eq:loss-area}.
+
+For the concepts $C$ of a story, each with the examples $S_c$ that calculate its hypersphere:
+\begin{align}
+z(t) &= \frac{y(t)}{\|y(t)\|}, \label{eq:loss-point} \\
+m_c &= \frac{1}{|S_c|} \sum_{s \in S_c} z(s), \label{eq:loss-centre} \\
+r_c &= \min\Bigl(r_{\max},\ \max\bigl(r_{\min},\ \max_{s \in S_c} \|z(s) - m_c\|\bigr)\Bigr), \label{eq:loss-radius} \\
+B_c &= \{\, z \in \R^d : \|z\| = 1,\ \|z - m_c\| \le r_c \,\}. \label{eq:loss-area}
+\end{align}
+\begin{symbols}
+C & the concepts of the story \\
+S_c & the examples of concept $c$ that calculate its hypersphere \\
+Q_c & the examples of $c$ kept for the loss \\
+y(t) & the model's projection of text $t$ \\
+z(t) & the embedding of text $t$, on the unit sphere \\
+m_c & the centre of $c$'s hypersphere \\
+r_c & the radius of $c$'s hypersphere \\
+r_{\min},\ r_{\max} & the bounds of every radius \\
+B_c & the area of $c$: the part of the unit sphere inside its hypersphere \\
+\end{symbols}
+
+\paragraph{The loss.} The loss~\eqref{eq:loss} quantifies whether a concept's examples form a convex area in the LoRA latent space, uniformly distributed, with the concept's abstract at its centre. It tests each hypersphere only on texts that did not calculate it. It measures how many of the examples in $Q_c$ lie inside the hypersphere, and how many of the story's unrelated texts $U_c$ lie outside it~\eqref{eq:loss-membership}, \eqref{eq:loss-classification}. It measures how evenly the examples in $Q_c$ are spread over the area $B_c$, by their energy distance to points drawn uniformly from it~\eqref{eq:loss-spread}. The distance is $0$ only when the examples are spread over $B_c$ as evenly as those points are. In $d$ dimensions most of an area like $B_c$ lies near its edge, so evenly spread examples lie mostly near the edge too. It also measures how far the abstract's embedding lies from the centre, in units of the radius~\eqref{eq:loss-abstract}.
+
+The unrelated texts $U_c$ are the negative examples of $c$: texts the author tagged as examples of the story's other concepts, but not of $c$. They never calculate $c$'s hypersphere, so they are not split. They are a random sample of those texts, drawn anew at every training step.
+
+For each concept $c$, with its abstract $A_c$ and the story's texts unrelated to it $U_c$:
+\begin{align}
+P(t \in c) &= \sigma\bigl(\kappa\,(r_c^2 - \|z(t) - m_c\|^2)\bigr), \label{eq:loss-membership} \\
+\mathcal{L}_{\mathrm{class}}(c) &= -\frac{1}{|Q_c|} \sum_{q \in Q_c} \log P(q \in c) \;-\; \frac{1}{|U_c|} \sum_{u \in U_c} \log\bigl(1 - P(u \in c)\bigr), \label{eq:loss-classification} \\
+\mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(q) - w\| - \mathbb{E}\,\|z(q) - z(q')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
+&\qquad q, q' \in Q_c,\quad w, w' \text{ drawn uniformly from } B_c, \notag \\
+\mathcal{L}_{\mathrm{abstract}}(c) &= \frac{\|z(A_c) - m_c\|^2}{r_c^2}, \label{eq:loss-abstract} \\
+\mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c) + \lambda\, \mathcal{L}_{\mathrm{abstract}}(c)\Bigr). \label{eq:loss}
+\end{align}
+\begin{symbols}
+A_c & the abstract of concept $c$ \\
+U_c & the story's texts unrelated to $c$ \\
+\kappa & the sharpness of a hypersphere's edge \\
+\sigma & the logistic function, $\sigma(x) = 1 / (1 + e^{-x})$ \\
+P(t \in c) & the probability that text $t$ lies inside $c$'s hypersphere \\
+w,\ w' & points drawn uniformly from $B_c$ \\
+\mathbb{E} & the mean over the examples in $Q_c$ and the drawn points \\
+\gamma & the weight of the spread term \\
+\lambda & the weight of the abstract's term \\
+\end{symbols}
 
 \begin{thebibliography}{9}
 \bibitem{baseten} Baseten. Practical LoRA research. October 2025. \texttt{labs.baseten.co/\allowbreak articles/\allowbreak practical-lora-research}.
