@@ -943,35 +943,90 @@ describe("showing a salient concept's words", () => {
 });
 
 describe("clicking the text", () => {
-    it("says where in the markdown the word the author clicked begins", async () => {
-        const clicked = vi.fn();
-        root = createRoot(emptyBody());
-        await act(async () => {
-            root.render(
-                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
-                    <MarkdownEditor
-                        cellId="c1"
-                        markdown="She saw **the** door."
-                        onMarkdownCommitted={committedSpy()}
-                        onTextClicked={clicked}
-                    />
-                </MarkdownEditorMediator>,
+    it.each([
+        {
+            clicked: "inside a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 0,
+            caretAt: 5,
+            clickedAt: 4,
+        },
+        {
+            clicked: "on the first letter of a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 2,
+            caretAt: 1,
+            clickedAt: 16,
+        },
+        {
+            clicked: "just past the last letter of a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 0,
+            caretAt: 7,
+            clickedAt: 4,
+        },
+        {
+            clicked: "inside a word drawn bold",
+            markdown: "She saw **the** door.",
+            textDrawn: 1,
+            caretAt: 1,
+            clickedAt: 8,
+        },
+        {
+            clicked: "past the end of the line",
+            markdown: "She saw **the** door.",
+            textDrawn: 2,
+            caretAt: 6,
+            clickedAt: 16,
+        },
+        {
+            clicked: "between two spaces after a word",
+            markdown: "She saw  the door.",
+            textDrawn: 0,
+            caretAt: 8,
+            clickedAt: 8,
+        },
+    ])(
+        "says which word of the markdown the author clicked $clicked",
+        async ({ markdown, textDrawn, caretAt, clickedAt }) => {
+            const clicked = vi.fn();
+            root = createRoot(emptyBody());
+            await act(async () => {
+                root.render(
+                    <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                        <MarkdownEditor
+                            cellId="c1"
+                            markdown={markdown}
+                            onMarkdownCommitted={committedSpy()}
+                            onTextClicked={clicked}
+                        />
+                    </MarkdownEditorMediator>,
+                );
+            });
+            const rendered = document.querySelector(".markdown-rendered")!;
+            const textNodes: Text[] = [];
+            const walking = document.createTreeWalker(
+                rendered,
+                NodeFilter.SHOW_TEXT,
             );
-        });
-        const rendered = document.querySelector(".markdown-rendered")!;
-        const doorDrawnIn = rendered.querySelector("p")!.lastChild as Text;
-        const caret = document.createRange();
-        caret.setStart(doorDrawnIn, 3);
-        caret.collapse(true);
+            while (walking.nextNode()) {
+                textNodes.push(walking.currentNode as Text);
+            }
+            const caret = document.createRange();
+            caret.setStart(textNodes[textDrawn], caretAt);
+            caret.collapse(true);
 
-        await act(async () => {
-            document.getSelection()!.removeAllRanges();
-            document.getSelection()!.addRange(caret);
-            rendered.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        });
+            await act(async () => {
+                document.getSelection()!.removeAllRanges();
+                document.getSelection()!.addRange(caret);
+                rendered.dispatchEvent(
+                    new MouseEvent("click", { bubbles: true }),
+                );
+            });
 
-        expect(clicked).toHaveBeenCalledWith(16);
-    });
+            expect(clicked).toHaveBeenCalledWith(clickedAt);
+        },
+    );
 
     it("says where in the markdown the author clicked while typing", async () => {
         const clicked = vi.fn();

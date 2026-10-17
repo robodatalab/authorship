@@ -362,13 +362,13 @@ export function MarkdownEditor({
         if (!clicked.collapsed || !rendered.contains(clicked.startContainer)) {
             return;
         }
-        const wordClicked = whereTheRenderedSelectionStandsInTheMarkdown(
+        const clickedAt = whereTheRenderedCaretStandsInTheMarkdown(
             markdownShown,
             rendered,
             clicked,
         );
-        if (wordClicked.from < wordClicked.to) {
-            onTextClicked(wordClicked.from);
+        if (clickedAt !== null) {
+            onTextClicked(clickedAt);
         }
     }
 
@@ -604,6 +604,42 @@ function textOnScreenOf(range: Range): MarkdownEditorTextOnScreen | null {
         },
         endsAt: { x: lastLine.right, top: lastLine.top, bottom: lastLine.bottom },
     };
+}
+
+function whereTheRenderedCaretStandsInTheMarkdown(
+    markdown: string,
+    rendered: HTMLElement,
+    caret: Range,
+): number | null {
+    const caretAt = renderedCharactersBefore(
+        rendered,
+        caret.startContainer,
+        caret.startOffset,
+    );
+    const markdownWords = storyWordSpansIn(markdown);
+    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownWordOfEach = markdownWordOfEachRenderedWord(
+        renderedWords,
+        markdownWords,
+    );
+    const wordsUpToTheCaret = renderedWords
+        .map((renderedWord, renderedWordIndex) => ({
+            renderedWord,
+            markdownWord: markdownWordOfEach[renderedWordIndex],
+        }))
+        .filter(
+            ({ renderedWord, markdownWord }) =>
+                markdownWord !== null &&
+                renderedWord.startCharacterOffsetInCell <= caretAt,
+        );
+    const wordAtTheCaret = wordsUpToTheCaret[wordsUpToTheCaret.length - 1];
+    if (!wordAtTheCaret || wordAtTheCaret.markdownWord === null) {
+        return null;
+    }
+    const markdownWord = markdownWords[wordAtTheCaret.markdownWord];
+    return caretAt <= wordAtTheCaret.renderedWord.endCharacterOffsetInCell
+        ? markdownWord.startCharacterOffsetInCell
+        : markdownWord.endCharacterOffsetInCell + 1;
 }
 
 function whereTheRenderedSelectionStandsInTheMarkdown(
