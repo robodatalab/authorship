@@ -1,20 +1,39 @@
 from __future__ import annotations
 
-import torch
+import random
+from dataclasses import dataclass
+
 from torch.utils.data import Dataset
 
 from server.storydoc import Document, SalientConceptInTheStory, StoryWordRange
 
+EXAMPLES_PER_HALF = 4
+UNRELATED_TEXTS_PER_CONCEPT = 8
+FEWEST_EXAMPLES = 4
 
-def spans_annotated_in(concepts: list[SalientConceptInTheStory]) -> list[StoryWordRange]:
-    annotated_ranges = {
-        (word_range.first_word, word_range.last_word): word_range
-        for concept in concepts
-        for word_range in concept.story_word_ranges
+
+@dataclass(frozen=True)
+class SalientConceptExamples:
+    abstract: str
+    hypersphere_examples: list[str]
+    held_out_examples: list[str]
+    unrelated_texts: list[str]
+
+
+@dataclass(frozen=True)
+class SalientConceptTexts:
+    abstract: str
+    examples: list[str]
+    unrelated_texts: list[str]
+
+
+def distinct_ranges(word_ranges: list[StoryWordRange]) -> list[StoryWordRange]:
+    ranges_by_words = {
+        (word_range.first_word, word_range.last_word): word_range for word_range in word_ranges
     }
-    ranges_in_reading_order = sorted(annotated_ranges)
-    spans = [annotated_ranges[word_range] for word_range in ranges_in_reading_order]
-    return spans
+    words_in_reading_order = sorted(ranges_by_words)
+    ranges = [ranges_by_words[words] for words in words_in_reading_order]
+    return ranges
 
 
 def concept_covers(concept: SalientConceptInTheStory, span: StoryWordRange) -> bool:
@@ -24,32 +43,50 @@ def concept_covers(concept: SalientConceptInTheStory, span: StoryWordRange) -> b
     )
 
 
-class AnnotatedStorySpansDataset(Dataset[dict[str, str | torch.Tensor]]):
+def salient_concept_texts(
+    concept: SalientConceptInTheStory, concepts_of_the_story: list[SalientConceptInTheStory]
+) -> SalientConceptTexts:
+    own_ranges = distinct_ranges(concept.story_word_ranges)
+    examples = [word_range.text for word_range in own_ranges]
+    ranges_of_the_story = [
+        word_range for other in concepts_of_the_story for word_range in other.story_word_ranges
+    ]
+    distinct_ranges_of_the_story = distinct_ranges(ranges_of_the_story)
+    unrelated_texts = [
+        word_range.text
+        for word_range in distinct_ranges_of_the_story
+        if not concept_covers(concept, word_range)
+    ]
+    texts = SalientConceptTexts(concept.abstract, examples, unrelated_texts)
+    return texts
 
-    def __init__(self, annotated_stories: list[Document]) -> None:
-        concepts_of_each_story = [story.salient_concepts() for story in annotated_stories]
-        concept_count = sum(len(concepts) for concepts in concepts_of_each_story)
-        self._spans: list[dict[str, str | torch.Tensor]] = []
-        first_concept_of_the_story = 0
-        for concepts in concepts_of_each_story:
-            last_concept_of_the_story = first_concept_of_the_story + len(concepts)
-            spans = spans_annotated_in(concepts)
-            for span in spans:
-                covering_concepts = [concept_covers(concept, span) for concept in concepts]
-                concepts_of_the_story_covering_the_span = torch.tensor(covering_concepts, dtype=torch.bool)
-                salient_concepts = torch.zeros(concept_count, dtype=torch.bool)
-                salient_concepts[first_concept_of_the_story:last_concept_of_the_story] = (
-                    concepts_of_the_story_covering_the_span
-                )
-                annotated_span: dict[str, str | torch.Tensor] = {
-                    "text": span.text,
-                    "salient_concepts": salient_concepts,
-                }
-                self._spans.append(annotated_span)
-            first_concept_of_the_story = last_concept_of_the_story
+
+class SalientConceptsDataset(Dataset[SalientConceptExamples]):
+
+    def __init__(self, annotated_stories: list[Document], rng: random.Random) -> None:
+        self._rng = rng
+        self._concepts: list[SalientConceptTexts] = []
+        for story in annotated_stories:
+            concepts_of_the_story = story.salient_concepts()
+            for concept in concepts_of_the_story:
+                texts = salient_concept_texts(concept, concepts_of_the_story)
+                if len(texts.examples) >= FEWEST_EXAMPLES and texts.unrelated_texts:
+                    self._concepts.append(texts)
 
     def __len__(self) -> int:
-        return len(self._spans)
+        return len(self._concepts)
 
-    def __getitem__(self, span_idx: int) -> dict[str, str | torch.Tensor]:
-        return self._spans[span_idx]
+    def __getitem__(self, concept_idx: int) -> SalientConceptExamples:
+        concept = self._concepts[concept_idx]
+        example_count = min(len(concept.examples), 2 * EXAMPLES_PER_HALF)
+        drawn_examples = self._rng.sample(concept.examples, example_count)
+        half = example_count // 2
+        unrelated_count = min(len(concept.unrelated_texts), UNRELATED_TEXTS_PER_CONCEPT)
+        drawn_unrelated_texts = self._rng.sample(concept.unrelated_texts, unrelated_count)
+        salient_concept_examples = SalientConceptExamples(
+            concept.abstract,
+            drawn_examples[:half],
+            drawn_examples[half:],
+            drawn_unrelated_texts,
+        )
+        return salient_concept_examples

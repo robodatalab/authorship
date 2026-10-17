@@ -1,14 +1,16 @@
+import random
 import unittest
 
 from parameterized import parameterized
 
 from experiments.story_state_extraction_training.dataset import (
-    AnnotatedStorySpansDataset,
+    SalientConceptExamples,
+    SalientConceptsDataset,
 )
 from server.storydoc import Document
 
 
-class AnnotatedStorySpansDatasetTests(unittest.TestCase):
+class SalientConceptsDatasetTests(unittest.TestCase):
     @parameterized.expand([
         (
             "no_stories",
@@ -16,322 +18,168 @@ class AnnotatedStorySpansDatasetTests(unittest.TestCase):
             0,
         ),
         (
-            "a_story_without_concepts",
+            "a_concept_with_four_examples_and_unrelated_texts",
             [
                 '<!-- cell: markdown -->\n'
                 '\n'
-                'She saw the door.\n',
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+                '\n'
+                '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3, 4-5" -->\n'
+                '\n'
+                '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n',
+            ],
+            1,
+        ),
+        (
+            "a_concept_with_fewer_than_four_examples_is_left_out",
+            [
+                '<!-- cell: markdown -->\n'
+                '\n'
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+                '\n'
+                '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3" -->\n'
+                '\n'
+                '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n',
             ],
             0,
         ),
         (
-            "a_concept_without_word_ranges",
+            "a_range_written_twice_is_one_example",
             [
                 '<!-- cell: markdown -->\n'
                 '\n'
-                'She saw the door.\n'
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
                 '\n'
-                '<!-- cell: salient-concept title="Door" -->\n',
+                '<!-- cell: salient-concept title="Door" words="0-0, 0-0, 1-1, 2-3" -->\n'
+                '\n'
+                '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n',
             ],
             0,
         ),
         (
-            "one_range",
+            "a_concept_alone_in_its_story_has_no_unrelated_texts",
             [
                 '<!-- cell: markdown -->\n'
                 '\n'
-                'She saw the door.\n'
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+                '\n'
+                '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3, 4-5" -->\n',
+            ],
+            0,
+        ),
+        (
+            "the_concepts_of_every_story",
+            [
+                '<!-- cell: markdown -->\n'
+                '\n'
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+                '\n'
+                '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3, 4-5" -->\n'
+                '\n'
+                '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n',
+                '<!-- cell: markdown -->\n'
+                '\n'
+                'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+                '\n'
+                '<!-- cell: salient-concept title="Bell" words="4-5, 6-7, 8-10, 11-12" -->\n'
                 '\n'
                 '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-            ],
-            1,
-        ),
-        (
-            "the_same_range_of_two_concepts_is_one_span",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="2-3" -->\n',
-            ],
-            1,
-        ),
-        (
-            "the_same_range_written_twice_is_one_span",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3, 2-3" -->\n',
-            ],
-            1,
-        ),
-        (
-            "different_ranges_are_different_spans",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n',
-            ],
-            2,
-        ),
-        (
-            "the_same_range_in_two_stories_is_two_spans",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" words="2-3" -->\n',
             ],
             2,
         ),
     ])
-    def test_hold_one_span_per_range_annotated_in_a_story(
-        self, _, story_texts: list[str], expected_span_count: int
+    def test_hold_one_item_per_concept_with_enough_examples_and_unrelated_texts(
+        self, _, story_texts: list[str], expected_concept_count: int
     ) -> None:
         annotated_stories = [Document(story_text) for story_text in story_texts]
 
-        annotated_story_spans = AnnotatedStorySpansDataset(annotated_stories)
+        salient_concepts = SalientConceptsDataset(annotated_stories, random.Random(0))
 
-        self.assertEqual(len(annotated_story_spans), expected_span_count)
+        self.assertEqual(len(salient_concepts), expected_concept_count)
 
     @parameterized.expand([
         (
-            "one_concept",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-            ],
-            0,
-            "the door.",
-            [True],
+            "the_examples_are_split_in_two_and_the_unrelated_texts_drawn",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3, 4-5" -->\n'
+            '\n'
+            'What she saw.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n'
+            '\n'
+            'What he heard.\n',
+            SalientConceptExamples(
+                abstract="What she saw.",
+                hypersphere_examples=["He heard", "saw"],
+                held_out_examples=["She", "the door."],
+                unrelated_texts=["Nobody came.", "It rang twice.", "the bell."],
+            ),
         ),
         (
-            "the_same_range_of_two_concepts_is_about_both",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="2-3" -->\n',
-            ],
-            0,
-            "the door.",
-            [True, True],
-        ),
-        (
-            "a_span_enclosing_another_concept_range_is_not_about_that_concept",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n',
-            ],
-            0,
-            "She saw the door.",
-            [False, True],
-        ),
-        (
-            "a_span_inside_another_concept_range_is_about_that_concept",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n',
-            ],
-            1,
-            "the door.",
-            [True, True],
-        ),
-        (
-            "a_span_overlapping_another_concept_range_is_not_about_that_concept",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-4" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n',
-            ],
-            1,
-            "the door.\n\nHe",
-            [True, False],
-        ),
-        (
-            "a_span_apart_from_another_concept_range_is_not_about_that_concept",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" words="6-7" -->\n',
-            ],
-            1,
-            "the bell.",
-            [False, True],
-        ),
-        (
-            "spans_come_in_reading_order_first",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Arrival" words="4-7, 0-1" -->\n',
-            ],
-            0,
-            "She saw",
-            [True],
-        ),
-        (
-            "spans_come_in_reading_order_second",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Arrival" words="4-7, 0-1" -->\n',
-            ],
-            1,
-            "He rang the bell.",
-            [True],
-        ),
-        (
-            "spans_starting_together_come_shorter_first",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Her" words="0-0" -->\n',
-            ],
-            0,
-            "She",
-            [True, True],
-        ),
-        (
-            "the_first_story_takes_the_first_concepts",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Ringing" words="1-3" -->\n',
-            ],
-            0,
-            "the door.",
-            [True, False, False],
-        ),
-        (
-            "the_next_story_takes_the_concepts_after_those_of_the_stories_before",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" words="2-3" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Ringing" words="1-3" -->\n',
-            ],
-            2,
-            "the bell.",
-            [False, True, True],
-        ),
-        (
-            "a_story_without_concepts_takes_none",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n',
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'He rang the bell.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" words="2-3" -->\n',
-            ],
-            0,
-            "the bell.",
-            [True],
-        ),
-        (
-            "a_concept_without_word_ranges_is_about_no_span",
-            [
-                '<!-- cell: markdown -->\n'
-                '\n'
-                'She saw the door.\n'
-                '\n'
-                '<!-- cell: salient-concept title="Bell" -->\n'
-                '\n'
-                '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
-            ],
-            0,
-            "the door.",
-            [False, True],
+            "a_text_inside_one_of_the_concepts_ranges_is_not_unrelated_to_it",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Door" words="0-3, 4-5, 6-7, 8-10" -->\n'
+            '\n'
+            'What she saw.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Seeing" words="2-3, 11-12" -->\n'
+            '\n'
+            'Looking.\n',
+            SalientConceptExamples(
+                abstract="What she saw.",
+                hypersphere_examples=["It rang twice.", "He heard"],
+                held_out_examples=["She saw the door.", "the bell."],
+                unrelated_texts=["Nobody came."],
+            ),
         ),
     ])
-    def test_carry_their_text_and_the_concepts_whose_ranges_contain_them(
-        self,
-        _,
-        story_texts: list[str],
-        span_idx: int,
-        expected_text: str,
-        expected_salient_concepts: list[bool],
+    def test_draw_the_concepts_examples_and_unrelated_texts(
+        self, _, story_text: str, expected: SalientConceptExamples
     ) -> None:
-        annotated_stories = [Document(story_text) for story_text in story_texts]
+        annotated_story = Document(story_text)
 
-        annotated_story_spans = AnnotatedStorySpansDataset(annotated_stories)
+        salient_concepts = SalientConceptsDataset([annotated_story], random.Random(0))
 
-        annotated_story_span = annotated_story_spans[span_idx]
-        salient_concepts = annotated_story_span["salient_concepts"].tolist()
-        self.assertEqual(annotated_story_span["text"], expected_text)
-        self.assertEqual(salient_concepts, expected_salient_concepts)
+        self.assertEqual(salient_concepts[0], expected)
+
+    def test_draw_anew_every_time_a_concept_is_fetched(self) -> None:
+        annotated_story = Document(
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door. He heard the bell. It rang twice. Nobody came.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Door" words="0-0, 1-1, 2-3, 4-5" -->\n'
+            '\n'
+            'What she saw.\n'
+            '\n'
+            '<!-- cell: salient-concept title="Bell" words="6-7, 8-10, 11-12" -->\n'
+        )
+        salient_concepts = SalientConceptsDataset([annotated_story], random.Random(0))
+
+        first_draw = salient_concepts[0]
+        second_draw = salient_concepts[0]
+
+        self.assertEqual(
+            first_draw,
+            SalientConceptExamples(
+                abstract="What she saw.",
+                hypersphere_examples=["He heard", "saw"],
+                held_out_examples=["She", "the door."],
+                unrelated_texts=["Nobody came.", "It rang twice.", "the bell."],
+            ),
+        )
+        self.assertEqual(
+            second_draw,
+            SalientConceptExamples(
+                abstract="What she saw.",
+                hypersphere_examples=["the door.", "saw"],
+                held_out_examples=["He heard", "She"],
+                unrelated_texts=["Nobody came.", "the bell.", "It rang twice."],
+            ),
+        )

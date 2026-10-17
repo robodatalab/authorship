@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import shutil
 import tempfile
 from pathlib import Path
@@ -8,7 +9,7 @@ import cortexgrid
 from cortexgrid_train import train_from_model_output
 
 from experiments.story_state_extraction_training.dataset import (
-    AnnotatedStorySpansDataset,
+    SalientConceptsDataset,
 )
 from experiments.story_state_extraction_training.loss import salient_point_classification_loss
 from server import storydoc
@@ -39,10 +40,11 @@ def train_story_space() -> None:
     story_state_extraction_model = cortexgrid.instantiate_model(
         STORY_SPACE_FAMILY, STORY_SPACE_SUFFIX, cortexgrid.IMPORTED
     )
-    annotated_story_spans = AnnotatedStorySpansDataset(annotated_stories)
+    drawing_examples = random.Random()
+    salient_concepts = SalientConceptsDataset(annotated_stories, drawing_examples)
     trained_story_state_extraction_model = train_from_model_output(
         story_state_extraction_model,
-        annotated_story_spans,
+        salient_concepts,
         salient_point_classification_loss,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,

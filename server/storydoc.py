@@ -113,6 +113,7 @@ class StoryWordRange:
 @dataclass(frozen=True)
 class SalientConceptInTheStory:
     title: str
+    abstract: str
     story_word_ranges: list[StoryWordRange]
 
 
@@ -300,7 +301,9 @@ def _salient_concept_in_the_story(
         story_text = _story_text_of(story_words, first_word, last_word)
         story_word_range = StoryWordRange(first_word, last_word, story_text)
         story_word_ranges.append(story_word_range)
-    salient_concept = SalientConceptInTheStory(concept_cell.title, story_word_ranges)
+    salient_concept = SalientConceptInTheStory(
+        concept_cell.title, concept_cell.source, story_word_ranges
+    )
     return salient_concept
 
 

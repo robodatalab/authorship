@@ -180,7 +180,7 @@ training code, in `experiments/story_state_extraction_training/`.
    2. `cortexgrid.instantiate_model("Authorship", "storystateextractionmodel", IMPORTED)`
       builds `StoryStateExtractionModel` in the job from the untrained entry,
       running the same `__init__` a replica runs.
-   3. `train_from_model_output(model, AnnotatedStorySpansDataset(stories), salient_point_classification_loss, ...)`.
+   3. `train_from_model_output(model, SalientConceptsDataset(stories, rng), salient_point_classification_loss, ...)`.
       It resumes from the job's checkpoint, logs metrics to the run, and
       checkpoints after each epoch only what trains: adapter, head and
       optimizer.
@@ -205,8 +205,8 @@ no serve equivalent for training is needed.
 Components that run beside the trainer split into two kinds:
 
 - **A component that only feeds the trainer** (sampling, collating) runs inside
-  the job, as DataLoader workers. It needs no lifecycle of its own. Our 6,785
-  spans fit in memory.
+  the job, as DataLoader workers. It needs no lifecycle of its own. Our 304
+  concepts and their examples fit in memory.
 - **A component that serves traffic the trainer depends on** (a teacher, a judge,
   an evaluator) is a served model. The job declares it in `requirements.models`.
   cortexgrid brings it up before the job, the same way it already brings up a
@@ -224,7 +224,7 @@ distributed training such as Ray Train is not needed.
 | 3.2 build the model | a model is built only by deploying it. `model_config(key)` needs a deployment record | `instantiate_model`; `model_config` for an instantiated key | cortexgrid |
 | | `StoryStateExtractionModel` calls a deployed `Text2Text` and has no layers of its own | base, LoRA and head built in `__init__`; `forward`; `save_weights`; its own GPU | authorship |
 | 3.3 train | `train_sft` only: it calls `model(input_ids, attention_mask, labels)` and moves every batch value to the device. Checkpoints pickle the whole `state_dict`, 16 GB for Qwen3-8B | `train_from_model_output`, a peer of `train_sft`; checkpoints of trainable state only | cortexgrid-train |
-| | nothing | `salient_point_classification_loss`, as `rfc/story_space.tex` 3.7 defines it; batches of 32 spans from one story | authorship |
+| | nothing | `salient_point_classification_loss`, as `rfc/story_space.tex` 3.7 defines it; `SalientConceptsDataset`, one item per concept: its abstract, its examples split in two at random, and a random sample of its unrelated texts | authorship |
 | 4 wait | cortexgrid has no way to wait for a `retry=True` job, because a failure that causes a retry immediately shows up in `done()` as the job having finished, and `result()` refuses such a job | `done()` and `result()` that wait until a `retry=True` job has finished, however many times it is retried | cortexgrid |
 | 6 lineage | cortexgrid cannot say which data and which base model a trained model came from, because it records only the models a run imports, not the ones it loads, and nothing reads even that record | when a job loads a dataset or a model's weights, cortexgrid records it on the job's run, and can list what a run loaded | cortexgrid |
 
