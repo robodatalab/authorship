@@ -7,6 +7,7 @@ export interface MonacoEditorOnThePage {
     point(offset: number | null): void;
     pointAway(): void;
     select(selectedFrom: number, selectedTo: number): void;
+    click(offset: number): void;
     marks(): { range: unknown; options: { inlineClassName: string } }[];
 }
 
@@ -41,6 +42,7 @@ export function monacoEditorApi(): unknown {
                 let pointed: (event: unknown) => void = () => {};
                 let pointedAway = (): void => {};
                 let selected = (_changed: unknown): void => {};
+                let released: (event: unknown) => void = () => {};
                 const collections: {
                     range: unknown;
                     options: { inlineClassName: string };
@@ -88,6 +90,10 @@ export function monacoEditorApi(): unknown {
                         selected = listener;
                         return disposable;
                     },
+                    onMouseUp: (listener: (event: unknown) => void) => {
+                        released = listener;
+                        return disposable;
+                    },
                     createDecorationsCollection: () => {
                         const drawn = collections.length;
                         collections.push([]);
@@ -126,6 +132,12 @@ export function monacoEditorApi(): unknown {
                             },
                         }),
                     pointAway: () => pointedAway(),
+                    click: (offset: number) =>
+                        released({
+                            target: {
+                                position: { lineNumber: 1, column: offset + 1 },
+                            },
+                        }),
                     select: (selectedFrom: number, selectedTo: number) =>
                         selected({
                             selection: {

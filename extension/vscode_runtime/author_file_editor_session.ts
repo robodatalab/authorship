@@ -51,6 +51,8 @@ export class AuthorFileEditorSession
 
     private plotSelected: string | null = null;
 
+    private passageSelected: number | null = null;
+
     private storyTextSelected: StoryTextSpan | null = null;
 
     private readonly documentOrSelectionChanged =
@@ -101,6 +103,10 @@ export class AuthorFileEditorSession
         return this.plotSelected;
     }
 
+    get thePassageSelected(): number | null {
+        return this.passageSelected;
+    }
+
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
     }
@@ -113,7 +119,15 @@ export class AuthorFileEditorSession
 
     selectThePlot(plotCellId: string | null): void {
         this.plotSelected = plotCellId;
+        this.passageSelected = null;
         this.sendPlotSelected();
+        this.sendPassageSelected();
+        this.documentOrSelectionChanged.fire();
+    }
+
+    selectThePassage(passage: number | null): void {
+        this.passageSelected = passage;
+        this.sendPassageSelected();
         this.documentOrSelectionChanged.fire();
     }
 
@@ -331,6 +345,13 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendPassageSelected(): void {
+        void this.panel?.webview.postMessage({
+            type: "passageSelected",
+            passageSelected: this.passageSelected,
+        });
+    }
+
     sendFindMatches(): void {
         void this.panel?.webview.postMessage({
             type: "findMatches",
@@ -347,6 +368,7 @@ export class AuthorFileEditorSession
         this.sendProseErrors();
         this.sendSalientConceptSelected();
         this.sendPlotSelected();
+        this.sendPassageSelected();
         this.sendFindMatches();
         this.sendWordCounts();
         this.documentOrSelectionChanged.fire();

@@ -58,6 +58,7 @@ interface AuthorFileEditorCellStateProps {
     howFarTheCellHasBeenWritten?: number;
     wordsInTheSection?: number;
     onStoryTextSelected?: (selectedFrom: number, selectedTo: number) => void;
+    onStoryTextClicked?: (clickedAt: number) => void;
     onStoryTextShownAt?: (top: number, bottom: number) => void;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
@@ -78,6 +79,7 @@ const AuthorFileEditorCellStateContext = createContext<
     howFarTheCellHasBeenWritten: undefined,
     wordsInTheSection: undefined,
     onStoryTextSelected: () => undefined,
+    onStoryTextClicked: () => undefined,
     onStoryTextShownAt: () => undefined,
     sendMessagesToVscode: () => undefined,
 });
@@ -95,6 +97,7 @@ export function AuthorFileEditorCellState({
     howFarTheCellHasBeenWritten,
     wordsInTheSection,
     onStoryTextSelected = () => undefined,
+    onStoryTextClicked = () => undefined,
     onStoryTextShownAt = () => undefined,
     sendMessagesToVscode,
     children,
@@ -114,6 +117,7 @@ export function AuthorFileEditorCellState({
                 howFarTheCellHasBeenWritten,
                 wordsInTheSection,
                 onStoryTextSelected,
+                onStoryTextClicked,
                 onStoryTextShownAt,
                 sendMessagesToVscode,
             }}
@@ -247,6 +251,15 @@ export function useAuthorFileEditorCellStoryTextSelected(): (
 ) => void {
     return (
         useContext(AuthorFileEditorCellStateContext).onStoryTextSelected ??
+        (() => undefined)
+    );
+}
+
+export function useAuthorFileEditorCellStoryTextClicked(): (
+    clickedAt: number,
+) => void {
+    return (
+        useContext(AuthorFileEditorCellStateContext).onStoryTextClicked ??
         (() => undefined)
     );
 }

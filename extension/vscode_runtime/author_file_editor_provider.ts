@@ -11,6 +11,7 @@ import {
     ReadTheDocumentBackFromItsFile,
     TheAuthorIsEditingTheCell,
     TheAuthorSelectedStoryText,
+    TheAuthorSelectedThePassage,
     TheAuthorTypedInTheCell,
     ThePageIsReady,
     WriteTheDocumentTo,
@@ -106,6 +107,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 commandArguments?: Record<string, unknown>;
                 markdown?: string;
                 storyTextSelected?: StoryTextSpan | null;
+                passageSelected?: number | null;
             }) => {
                 if (message?.type === "typed" && message.cellId) {
                     void documentChangesMessageQueue.post(
@@ -122,6 +124,12 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                     void documentChangesMessageQueue.post(
                         new TheAuthorSelectedStoryText(
                             message.storyTextSelected ?? null,
+                        ),
+                    );
+                } else if (message?.type === "selectPassage") {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorSelectedThePassage(
+                            message.passageSelected ?? null,
                         ),
                     );
                 } else if (message?.type === "ready") {

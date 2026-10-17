@@ -10,6 +10,11 @@ import {
     AuthorFileEditorFindBar,
     useAuthorFileEditorFind,
 } from "./AuthorFileEditorFindBar";
+import {
+    AuthorFileEditorOverviewRuler,
+    type AuthorFileEditorOverviewRulerArrow,
+    type AuthorFileEditorOverviewRulerMark,
+} from "./AuthorFileEditorOverviewRuler";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
@@ -26,7 +31,6 @@ import {
     storyTextSpansOf,
     storyWordsIn,
     type StoryTextSpan,
-    type StoryWordRange,
 } from "../../vscode_runtime/storydoc/story_words";
 import {
     MarkdownEditorMediator,
@@ -120,6 +124,7 @@ interface AuthorFileEditorCanvasProps {
     proseErrors?: ProseCheckError[];
     salientConceptSelected?: string | null;
     plotSelected?: string | null;
+    passageSelected?: number | null;
     storyTextShown?: StoryTextSpan | null;
     findMatches?: AuthorFileEditorFindMatch[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
@@ -136,6 +141,7 @@ export function AuthorFileEditorCanvas({
     proseErrors = [],
     salientConceptSelected = null,
     plotSelected = null,
+    passageSelected = null,
     storyTextShown = null,
     findMatches = [],
     cellsBeingWritten = {},
@@ -152,29 +158,37 @@ export function AuthorFileEditorCanvas({
     const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
     const plots = useMemo(() => plotsIn(cells), [cells]);
     const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
+    const plotColor = plots.findIndex(
+        (plot) => plot.plotCellId === plotSelected,
+    );
+    const passagesOfThePlotSelected = useMemo(
+        () =>
+            (plots[plotColor]?.trajectory ?? []).map((storyWordRange) =>
+                storyTextSpansOf(storyWords, storyWordRange),
+            ),
+        [plots, plotColor, storyWords],
+    );
     const storyTextHighlightsByCellId = useMemo(() => {
         const byCellId = new Map<
             string,
             MarkdownEditorStoryTextHighlight[]
         >();
-        function highlightTheStoryWords(
-            storyWordRanges: StoryWordRange[],
+        function highlightTheStoryText(
+            spans: StoryTextSpan[],
             highlightColor: number,
+            emphasized: boolean,
         ): void {
-            for (const storyWordRange of storyWordRanges) {
-                const spans = storyTextSpansOf(storyWords, storyWordRange);
-                for (const span of spans) {
-                    byCellId.set(span.cellId, [
-                        ...(byCellId.get(span.cellId) ?? []),
-                        {
-                            startCharacterOffsetInCell:
-                                span.startCharacterOffsetInCell,
-                            endCharacterOffsetInCell:
-                                span.endCharacterOffsetInCell,
-                            highlightColor,
-                        },
-                    ]);
-                }
+            for (const span of spans) {
+                byCellId.set(span.cellId, [
+                    ...(byCellId.get(span.cellId) ?? []),
+                    {
+                        startCharacterOffsetInCell:
+                            span.startCharacterOffsetInCell,
+                        endCharacterOffsetInCell: span.endCharacterOffsetInCell,
+                        highlightColor,
+                        emphasized,
+                    },
+                ]);
             }
         }
         const salientConceptColor = salientConcepts.findIndex(
@@ -182,26 +196,86 @@ export function AuthorFileEditorCanvas({
         );
         const concept = salientConcepts[salientConceptColor];
         if (concept !== undefined) {
-            highlightTheStoryWords(
-                concept.storyWordRanges,
+            const spansOfTheConcept = concept.storyWordRanges.flatMap(
+                (storyWordRange) =>
+                    storyTextSpansOf(storyWords, storyWordRange),
+            );
+            highlightTheStoryText(
+                spansOfTheConcept,
                 salientConceptColor,
+                false,
             );
         }
-        const plotColor = plots.findIndex(
-            (plot) => plot.plotCellId === plotSelected,
+        passagesOfThePlotSelected.forEach((passage, passageIndex) =>
+            highlightTheStoryText(
+                passage,
+                plotColor,
+                passageIndex === passageSelected,
+            ),
         );
-        const plot = plots[plotColor];
-        if (plot !== undefined) {
-            highlightTheStoryWords(plot.trajectory, plotColor);
-        }
         return byCellId;
     }, [
         storyWords,
         salientConcepts,
         salientConceptSelected,
-        plots,
-        plotSelected,
+        passagesOfThePlotSelected,
+        plotColor,
+        passageSelected,
     ]);
+    const passagesAroundTheOneSelected = useMemo(() => {
+        const marks: AuthorFileEditorOverviewRulerMark[] = [];
+        const arrows: AuthorFileEditorOverviewRulerArrow[] = [];
+        if (passageSelected === null) {
+            return { marks, arrows };
+        }
+        const passage = passagesOfThePlotSelected[passageSelected] ?? [];
+        const passageBefore =
+            passagesOfThePlotSelected[passageSelected - 1] ?? [];
+        const passageAfter =
+            passagesOfThePlotSelected[passageSelected + 1] ?? [];
+        if (passage.length === 0) {
+            return { marks, arrows };
+        }
+        marks.push({
+            storyText: passage,
+            highlightColor: plotColor,
+            dimmed: false,
+        });
+        if (passageBefore.length > 0) {
+            marks.push({
+                storyText: passageBefore,
+                highlightColor: plotColor,
+                dimmed: true,
+            });
+            arrows.push({ fromMark: marks.length - 1, toMark: 0 });
+        }
+        if (passageAfter.length > 0) {
+            marks.push({
+                storyText: passageAfter,
+                highlightColor: plotColor,
+                dimmed: true,
+            });
+            arrows.push({ fromMark: 0, toMark: marks.length - 1 });
+        }
+        return { marks, arrows };
+    }, [passagesOfThePlotSelected, passageSelected, plotColor]);
+
+    function selectThePassageClicked(cellId: string, clickedAt: number): void {
+        const passageClicked = passagesOfThePlotSelected.findIndex((passage) =>
+            passage.some(
+                (span) =>
+                    span.cellId === cellId &&
+                    span.startCharacterOffsetInCell <= clickedAt &&
+                    clickedAt < span.endCharacterOffsetInCell,
+            ),
+        );
+        if (passageClicked >= 0) {
+            sendMessagesToVscode({
+                type: "selectPassage",
+                passageSelected: passageClicked,
+            });
+        }
+    }
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
@@ -363,6 +437,12 @@ export function AuthorFileEditorCanvas({
                                         ? storyTextShown
                                         : undefined
                                 }
+                                onStoryTextClicked={(clickedAt) =>
+                                    selectThePassageClicked(
+                                        cell.attrs.id,
+                                        clickedAt,
+                                    )
+                                }
                                 onStoryTextShownAt={bringTheStoryTextIntoView}
                                 findMatches={findMatchesByCellId.get(
                                     cell.attrs.id,
@@ -446,6 +526,11 @@ export function AuthorFileEditorCanvas({
                 }
             >
                 {cellsInScope(sections, null)}
+                <AuthorFileEditorOverviewRuler
+                    scrolledList={cellsOnThePage}
+                    marks={passagesAroundTheOneSelected.marks}
+                    arrows={passagesAroundTheOneSelected.arrows}
+                />
             </MarkdownEditorMediator>
         </div>
     );

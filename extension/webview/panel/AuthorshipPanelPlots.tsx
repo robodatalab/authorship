@@ -16,6 +16,7 @@ import "./AuthorshipPanelPlots.css";
 interface AuthorshipPanelPlotsProps {
     plots: PlotInTheStory[] | null;
     plotSelected: string | null;
+    passageSelected: number | null;
     storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -23,6 +24,7 @@ interface AuthorshipPanelPlotsProps {
 export function AuthorshipPanelPlots({
     plots,
     plotSelected,
+    passageSelected,
     storyTextSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotsProps) {
@@ -117,6 +119,7 @@ export function AuthorshipPanelPlots({
                         <AuthorshipPanelPlotDetails
                             key={plotShown.plotCellId}
                             plot={plotShown}
+                            passageSelected={passageSelected}
                             storyTextSelected={storyTextSelected}
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
@@ -129,18 +132,19 @@ export function AuthorshipPanelPlots({
 
 interface AuthorshipPanelPlotDetailsProps {
     plot: PlotInTheStory;
+    passageSelected: number | null;
     storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorshipPanelPlotDetails({
     plot,
+    passageSelected,
     storyTextSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotDetailsProps) {
     const abstract = useTimesTheHostRewroteIt(plot.abstract);
     const plotFields = fieldsOfCellKind(PLOT);
-    const trajectoryNewestFirst = [...plot.trajectory].reverse();
 
     return (
         <section className="authorship-panel-plot-details">
@@ -198,28 +202,37 @@ function AuthorshipPanelPlotDetails({
                     <i className="codicon codicon-add" />
                 </button>
             </div>
-            {trajectoryNewestFirst.length === 0 ? (
+            {plot.trajectory.length === 0 ? (
                 <div className="authorship-panel-idle">
                     No words in the trajectory yet
                 </div>
             ) : (
                 <ul className="authorship-panel-plot-trajectory">
-                    {trajectoryNewestFirst.map((storyWordRange) => (
+                    {plot.trajectory.map((storyWordRange, passage) => (
                         <li
                             key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
-                            className="authorship-panel-plot-span"
+                            className={
+                                passage === passageSelected
+                                    ? "authorship-panel-plot-span authorship-panel-plot-span-selected"
+                                    : "authorship-panel-plot-span"
+                            }
                         >
                             <button
                                 type="button"
                                 className="authorship-panel-plot-span-shown"
                                 title={storyWordRange.wordsItCovers}
-                                onClick={() =>
+                                aria-pressed={passage === passageSelected}
+                                onClick={() => {
+                                    sendMessagesToVscode({
+                                        type: "selectPassage",
+                                        passageSelected: passage,
+                                    });
                                     sendMessagesToVscode({
                                         type: "showStoryWordRange",
                                         firstWord: storyWordRange.firstWord,
                                         lastWord: storyWordRange.lastWord,
-                                    })
-                                }
+                                    });
+                                }}
                             >
                                 {storyWordRange.wordsItCovers}
                             </button>

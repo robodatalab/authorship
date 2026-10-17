@@ -7,6 +7,7 @@ import {
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
     useAuthorFileEditorCellStoryTextHighlights,
+    useAuthorFileEditorCellStoryTextClicked,
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../author_editor/AuthorFileEditorCell";
@@ -34,6 +35,7 @@ export function MarkdownCell({
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+    const storyTextClicked = useAuthorFileEditorCellStoryTextClicked();
     const storyTextHighlights =
         useAuthorFileEditorCellStoryTextHighlights();
     const { storyTextShown, onStoryTextShownAt } =
@@ -49,6 +51,7 @@ export function MarkdownCell({
                     storyTextHighlights={storyTextHighlights}
                     storyTextShown={storyTextShown}
                     onTextSelected={storyTextSelected}
+                    onTextClicked={storyTextClicked}
                     onStoryTextShownAt={onStoryTextShownAt}
                     markdown={cell.source}
                     timesTheHostWroteIt={cell.timesTheHostWroteIt}

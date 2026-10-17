@@ -132,6 +132,15 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    border-radius: 3px;
+}
+
+.authorship-panel-plot-span-selected {
+    background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.authorship-panel-plot-span-selected .authorship-panel-plot-span-shown {
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
 }
 
 .authorship-panel-plot-span-shown {

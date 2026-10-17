@@ -37,6 +37,14 @@ export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
     }
 }
 
+export class TheAuthorSelectedThePassage implements AuthorFileEditorMessage {
+    constructor(private readonly passageSelected: number | null) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        session.selectThePassage(this.passageSelected);
+    }
+}
+
 export class TheFileChangedUnderneath implements AuthorFileEditorMessage {
     constructor(private readonly savedText: string) {}
 

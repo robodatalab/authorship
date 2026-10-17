@@ -37,6 +37,7 @@ describe("the plots tab", () => {
     interface WhatTheTabIsGiven {
         plots: PlotInTheStory[] | null;
         plotSelected?: string | null;
+        passageSelected?: number | null;
         storyTextSelected?: StoryTextSpan | null;
     }
 
@@ -56,6 +57,7 @@ describe("the plots tab", () => {
                 <AuthorshipPanelPlots
                     plots={options.plots}
                     plotSelected={options.plotSelected ?? null}
+                    passageSelected={options.passageSelected ?? null}
                     storyTextSelected={options.storyTextSelected ?? null}
                     sendMessagesToVscode={(message) => posted.push(message)}
                 />,
@@ -399,7 +401,7 @@ describe("the plots tab", () => {
         expect(spansCounted).toEqual(["2", "0"]);
     });
 
-    it("lists the trajectory's spans newest first", async () => {
+    it("lists the trajectory's spans in the order of the trajectory", async () => {
         await mountPlots({
             plots: [
                 {
@@ -428,10 +430,10 @@ describe("the plots tab", () => {
         const spansListed = [
             ...document.querySelectorAll(".authorship-panel-plot-span-shown"),
         ].map((span) => span.textContent);
-        expect(spansListed).toEqual(["the bell.", "the door."]);
+        expect(spansListed).toEqual(["the door.", "the bell."]);
     });
 
-    it("asks the host to show the words of a span", async () => {
+    it("asks the host to select the passage of the span clicked, and to show its words", async () => {
         await mountPlots({
             plots: [
                 {
@@ -445,20 +447,60 @@ describe("the plots tab", () => {
                             cellId: "c2",
                             wordsItCovers: "the door.",
                         },
+                        {
+                            firstWord: 6,
+                            lastWord: 7,
+                            cellId: "c3",
+                            wordsItCovers: "the bell.",
+                        },
                     ],
                 },
             ],
             plotSelected: "p1",
         });
-        const span = document.querySelector(
+        const secondSpan = document.querySelectorAll(
             ".authorship-panel-plot-span-shown",
-        )!;
+        )[1];
 
-        await click(span);
+        await click(secondSpan);
 
         expect(posted).toEqual([
-            { type: "showStoryWordRange", firstWord: 2, lastWord: 3 },
+            { type: "selectPassage", passageSelected: 1 },
+            { type: "showStoryWordRange", firstWord: 6, lastWord: 7 },
         ]);
+    });
+
+    it("marks the passage selected", async () => {
+        await mountPlots({
+            plots: [
+                {
+                    plotCellId: "p1",
+                    title: "The door",
+                    abstract: "She finds the door.",
+                    trajectory: [
+                        {
+                            firstWord: 2,
+                            lastWord: 3,
+                            cellId: "c2",
+                            wordsItCovers: "the door.",
+                        },
+                        {
+                            firstWord: 6,
+                            lastWord: 7,
+                            cellId: "c3",
+                            wordsItCovers: "the bell.",
+                        },
+                    ],
+                },
+            ],
+            plotSelected: "p1",
+            passageSelected: 0,
+        });
+
+        const spansMarked = [
+            ...document.querySelectorAll(".authorship-panel-plot-span-shown"),
+        ].map((span) => span.getAttribute("aria-pressed"));
+        expect(spansMarked).toEqual(["true", "false"]);
     });
 
     it("asks for a span's words to be taken out of the trajectory", async () => {

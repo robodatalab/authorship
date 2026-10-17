@@ -114,6 +114,14 @@
     );
 }
 
+.markdown-editor-story-text-highlight-emphasized {
+    background-color: color-mix(
+        in srgb,
+        var(--markdown-editor-story-text-highlight-color) 65%,
+        transparent
+    );
+}
+
 ::highlight(markdown-editor-story-text-highlight-0) {
     background-color: color-mix(
         in srgb,
@@ -158,6 +166,54 @@
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-yellow, #cca700) 30%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-0) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-blue, #3794ff) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-1) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-orange, #d18616) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-2) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-green, #89d185) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-3) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-purple, #b180d7) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-4) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-red, #f14c4c) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-5) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-yellow, #cca700) 65%,
         transparent
     );
 }

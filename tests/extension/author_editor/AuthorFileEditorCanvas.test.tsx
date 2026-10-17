@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -6,6 +6,7 @@ import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
+    useAuthorFileEditorCellStoryTextClicked,
     useAuthorFileEditorCellStoryTextHighlights,
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
@@ -17,6 +18,7 @@ import type {
     WebviewAuthorDocumentCommandCard,
     WebviewCell,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import { MarkdownEditor } from "../../../extension/webview/markdown/MarkdownEditor";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -69,6 +71,7 @@ async function mountCanvas(options: {
     cellRenderers?: AuthorDocumentCellRenderers;
     salientConceptSelected?: string | null;
     plotSelected?: string | null;
+    passageSelected?: number | null;
     storyTextShown?: StoryTextSpan | null;
 }): Promise<void> {
     posted = [];
@@ -89,6 +92,7 @@ async function mountCanvas(options: {
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 salientConceptSelected={options.salientConceptSelected}
                 plotSelected={options.plotSelected}
+                passageSelected={options.passageSelected}
                 storyTextShown={options.storyTextShown}
             />,
         );
@@ -968,6 +972,7 @@ describe("the salient concepts the story holds", () => {
                 startCharacterOffsetInCell: 4,
                 endCharacterOffsetInCell: 15,
                 highlightColor: 0,
+                emphasized: false,
             },
         ]);
     });
@@ -1069,12 +1074,345 @@ describe("the plots the story weaves", () => {
                 startCharacterOffsetInCell: 9,
                 endCharacterOffsetInCell: 15,
                 highlightColor: 1,
+                emphasized: false,
             },
             {
                 startCharacterOffsetInCell: 0,
                 endCharacterOffsetInCell: 8,
                 highlightColor: 1,
+                emphasized: false,
             },
         ]);
+    });
+
+    it("emphasizes the passage selected", async () => {
+        await mountCanvas({
+            cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
+            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+            plotSelected: "p2",
+            passageSelected: 1,
+        });
+
+        const highlightsDrawn = document.querySelector<HTMLElement>(
+            ".test-highlights",
+        )!.dataset.highlights!;
+        expect(JSON.parse(highlightsDrawn)).toEqual([
+            {
+                startCharacterOffsetInCell: 9,
+                endCharacterOffsetInCell: 15,
+                highlightColor: 1,
+                emphasized: false,
+            },
+            {
+                startCharacterOffsetInCell: 0,
+                endCharacterOffsetInCell: 8,
+                highlightColor: 1,
+                emphasized: true,
+            },
+        ]);
+    });
+
+    function ClicksTheStoryText({ clickedAt }: { clickedAt: number }) {
+        const storyTextClicked = useAuthorFileEditorCellStoryTextClicked();
+        return (
+            <button
+                className="test-click-the-story-text"
+                onClick={() => storyTextClicked(clickedAt)}
+            />
+        );
+    }
+
+    it.each([
+        { clicked: "inside the plot's first passage", clickedAt: 10, passage: 0 },
+        { clicked: "inside the plot's second passage", clickedAt: 2, passage: 1 },
+    ])(
+        "asks the host to select the passage when the author clicks $clicked",
+        async ({ clickedAt, passage }) => {
+            await mountCanvas({
+                cells: [
+                    markdownCell("The door opens.", "m1"),
+                    THE_BELL,
+                    THE_DOOR,
+                ],
+                cellRenderers: {
+                    markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
+                },
+                plotSelected: "p2",
+            });
+            const storyText = document.querySelector(
+                ".test-click-the-story-text",
+            )!;
+
+            await click(storyText);
+
+            expect(posted).toEqual([
+                { type: "selectPassage", passageSelected: passage },
+            ]);
+        },
+    );
+
+    it.each([
+        { clicked: "outside every passage of the plot", plotSelected: "p1", clickedAt: 10 },
+        { clicked: "with no plot selected", plotSelected: null, clickedAt: 10 },
+    ])(
+        "selects no passage when the author clicks $clicked",
+        async ({ plotSelected, clickedAt }) => {
+            await mountCanvas({
+                cells: [
+                    markdownCell("The door opens.", "m1"),
+                    THE_BELL,
+                    THE_DOOR,
+                ],
+                cellRenderers: {
+                    markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
+                },
+                plotSelected,
+            });
+            const storyText = document.querySelector(
+                ".test-click-the-story-text",
+            )!;
+
+            await click(storyText);
+
+            expect(posted).toEqual([]);
+        },
+    );
+
+    describe("the overview ruler beside the story", () => {
+        const WHERE_THE_WORDS_ARE_DRAWN: Record<string, DOMRect[]> = {
+            "opens.": [
+                { left: 100, right: 150, top: 20, bottom: 38 } as DOMRect,
+            ],
+            "The door": [
+                { left: 0, right: 60, top: 0, bottom: 18 } as DOMRect,
+            ],
+            "He heard": [
+                { left: 10, right: 70, top: 300, bottom: 318 } as DOMRect,
+            ],
+        };
+
+        afterEach(() => vi.restoreAllMocks());
+
+        function storyDrawnTwiceAsTallAsTheRuler(): void {
+            vi.spyOn(Range.prototype, "getClientRects").mockImplementation(
+                function (this: Range) {
+                    const wordsDrawn = this.toString();
+                    return (WHERE_THE_WORDS_ARE_DRAWN[wordsDrawn] ??
+                        []) as unknown as DOMRectList;
+                },
+            );
+            vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+                { left: 0, top: 0, width: 32, height: 500 } as DOMRect,
+            );
+            vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(
+                1000,
+            );
+        }
+
+        async function mountTheStoryOfTheDoor(
+            passageSelected: number | null,
+        ): Promise<void> {
+            await mountCanvas({
+                cells: [
+                    markdownCell("The door opens.", "m1"),
+                    markdownCell("He heard it.", "m2"),
+                    {
+                        kind: "plot",
+                        source: "The door opens to the bell.",
+                        attrs: {
+                            id: "p1",
+                            title: "The door",
+                            words: "2-2, 0-1, 3-4",
+                        },
+                    },
+                ],
+                cellRenderers: {
+                    markdown: (cell, cellId) => (
+                        <MarkdownEditor
+                            cellId={cellId}
+                            markdown={cell.source}
+                            onMarkdownCommitted={() => undefined}
+                        />
+                    ),
+                },
+                plotSelected: "p1",
+                passageSelected,
+            });
+        }
+
+        function marksOnTheRuler(): (string | null)[][] {
+            const marks = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-overview-ruler-mark",
+                ),
+            ];
+            return marks.map((mark) => [
+                mark.getAttribute("class"),
+                mark.getAttribute("y"),
+                mark.getAttribute("height"),
+            ]);
+        }
+
+        function arrowsOnTheRuler(): (string | null)[] {
+            const arrows = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-overview-ruler-arrow-line",
+                ),
+            ];
+            return arrows.map((arrow) => arrow.getAttribute("d"));
+        }
+
+        it.each([
+            {
+                passage: "the first",
+                passageSelected: 0,
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                        "10",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                        "0",
+                        "9",
+                    ],
+                ],
+            },
+            {
+                passage: "the second",
+                passageSelected: 1,
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                        "0",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                        "10",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                        "150",
+                        "9",
+                    ],
+                ],
+            },
+            {
+                passage: "the last",
+                passageSelected: 2,
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                        "150",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                        "0",
+                        "9",
+                    ],
+                ],
+            },
+        ])(
+            "marks $passage passage in the plot's colour, and the passages either side of it dimmed",
+            async ({ passageSelected, marks }) => {
+                storyDrawnTwiceAsTallAsTheRuler();
+
+                await mountTheStoryOfTheDoor(passageSelected);
+
+                expect(marksOnTheRuler()).toEqual(marks);
+            },
+        );
+
+        it.each([
+            {
+                passage: "the first",
+                passageSelected: 0,
+                arrows: ["M 16 14.5 H 22 V 4.5 H 16"],
+            },
+            {
+                passage: "the second",
+                passageSelected: 1,
+                arrows: [
+                    "M 16 14.5 H 22 V 4.5 H 16",
+                    "M 16 4.5 H 28 V 154.5 H 16",
+                ],
+            },
+            {
+                passage: "the last",
+                passageSelected: 2,
+                arrows: ["M 16 4.5 H 22 V 154.5 H 16"],
+            },
+        ])(
+            "points into $passage passage from the one before it and out of it to the one after",
+            async ({ passageSelected, arrows }) => {
+                storyDrawnTwiceAsTallAsTheRuler();
+
+                await mountTheStoryOfTheDoor(passageSelected);
+
+                expect(arrowsOnTheRuler()).toEqual(arrows);
+            },
+        );
+
+        it("is empty until a passage is selected", async () => {
+            storyDrawnTwiceAsTallAsTheRuler();
+
+            await mountTheStoryOfTheDoor(null);
+
+            expect(marksOnTheRuler()).toEqual([]);
+            expect(arrowsOnTheRuler()).toEqual([]);
+        });
+
+        function areaInViewOnTheRuler(): (string | null)[] {
+            const areaInView = document.querySelector(
+                ".author-file-editor-overview-ruler-area-in-view",
+            )!;
+            return [
+                areaInView.getAttribute("y"),
+                areaInView.getAttribute("height"),
+            ];
+        }
+
+        it("shows the part of the story in view", async () => {
+            storyDrawnTwiceAsTallAsTheRuler();
+            vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockReturnValue(
+                200,
+            );
+            vi.spyOn(
+                HTMLElement.prototype,
+                "clientHeight",
+                "get",
+            ).mockReturnValue(400);
+
+            await mountTheStoryOfTheDoor(null);
+
+            expect(areaInViewOnTheRuler()).toEqual(["100", "200"]);
+        });
+
+        it("follows the story as the author scrolls it", async () => {
+            storyDrawnTwiceAsTallAsTheRuler();
+            const scrolledTo = vi
+                .spyOn(HTMLElement.prototype, "scrollTop", "get")
+                .mockReturnValue(0);
+            vi.spyOn(
+                HTMLElement.prototype,
+                "clientHeight",
+                "get",
+            ).mockReturnValue(400);
+            await mountTheStoryOfTheDoor(null);
+            const story = document.querySelector(
+                ".author-file-editor-canvas > ul",
+            )!;
+
+            scrolledTo.mockReturnValue(600);
+            await act(async () => {
+                story.dispatchEvent(new Event("scroll"));
+            });
+
+            expect(areaInViewOnTheRuler()).toEqual(["300", "200"]);
+        });
     });
 });

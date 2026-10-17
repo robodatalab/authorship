@@ -53,6 +53,7 @@ interface AuthorshipPanelCanvasProps {
     salientConceptSelected?: string | null;
     plots?: PlotInTheStory[] | null;
     plotSelected?: string | null;
+    passageSelected?: number | null;
     storyTextSelected?: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -64,6 +65,7 @@ export function AuthorshipPanelCanvas({
     salientConceptSelected = null,
     plots,
     plotSelected = null,
+    passageSelected = null,
     storyTextSelected = null,
     sendMessagesToVscode,
 }: AuthorshipPanelCanvasProps) {
@@ -101,6 +103,7 @@ export function AuthorshipPanelCanvas({
                     <AuthorshipPanelPlots
                         plots={plots}
                         plotSelected={plotSelected}
+                        passageSelected={passageSelected}
                         storyTextSelected={storyTextSelected}
                         sendMessagesToVscode={sendMessagesToVscode}
                     />

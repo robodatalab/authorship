@@ -44,6 +44,10 @@ export class PublishView implements vscode.WebviewViewProvider {
                 this.sessionFollowed?.selectThePlot(
                     message.plotCellId as string | null,
                 );
+            } else if (message?.type === "selectPassage") {
+                this.sessionFollowed?.selectThePassage(
+                    message.passageSelected as number | null,
+                );
             } else if (message?.type === "typed") {
                 this.sessionFollowed?.theAuthorTypedInTheCell(
                     message.cellId as string,
@@ -126,6 +130,7 @@ export class PublishView implements vscode.WebviewViewProvider {
             type: "plots",
             plots,
             plotSelected: session?.thePlotSelected ?? null,
+            passageSelected: session?.thePassageSelected ?? null,
             storyTextSelected: session?.theStoryTextSelected ?? null,
         });
     }

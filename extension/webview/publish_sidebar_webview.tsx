@@ -20,6 +20,7 @@ interface WhatThePanelDraws {
     salientConceptSelected?: string | null;
     plots?: PlotInTheStory[] | null;
     plotSelected?: string | null;
+    passageSelected?: number | null;
     storyTextSelected?: StoryTextSpan | null;
 }
 
@@ -43,6 +44,7 @@ function processMessageFromVscode(
     } else if (message.data?.type === "plots") {
         drawn.plots = message.data.plots as PlotInTheStory[] | null;
         drawn.plotSelected = message.data.plotSelected as string | null;
+        drawn.passageSelected = message.data.passageSelected as number | null;
         drawn.storyTextSelected = message.data
             .storyTextSelected as StoryTextSpan | null;
     } else {
@@ -66,6 +68,7 @@ function openTheAuthorshipPanel(): void {
                 salientConceptSelected={drawn.salientConceptSelected}
                 plots={drawn.plots}
                 plotSelected={drawn.plotSelected}
+                passageSelected={drawn.passageSelected}
                 storyTextSelected={drawn.storyTextSelected}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,
