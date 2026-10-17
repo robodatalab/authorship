@@ -144,3 +144,37 @@ class SalientPointClassificationLossTests(unittest.TestCase):
         loss = loss_for_uneven_distribution_of_related_examples_inside_sphere(examples, centre, radius)
 
         self.assertAlmostEqual(loss.item(), expected_loss, places=1)
+
+    @parameterized.expand([
+        ("1 example, unrelated example outside", 1, 2.0, 0.0),
+        ("2 examples, unrelated example outside", 2, 2.0, 0.0),
+        ("10 examples, unrelated example outside", 10, 2.0, 0.0),
+        ("100 examples, unrelated example outside", 100, 2.0, 0.0),
+        ("1 example, unrelated example on the surface", 1, 1.0, 0.5),
+        ("2 examples, unrelated example on the surface", 2, 1.0, 0.5),
+        ("10 examples, unrelated example on the surface", 10, 1.0, 0.5),
+        ("100 examples, unrelated example on the surface", 100, 1.0, 0.5),
+        ("1 example, unrelated example inside", 1, 0.5, 1.0),
+        ("2 examples, unrelated example inside", 2, 0.5, 1.0),
+        ("10 examples, unrelated example inside", 10, 0.5, 1.0),
+        ("100 examples, unrelated example inside", 100, 0.5, 1.0),
+    ])
+    def test_loss_is_the_same_whatever_the_number_of_related_examples(
+        self, _, example_count: int, distance_in_radii: float, expected_loss: float
+    ) -> None:
+        abstract = torch.tensor([0.0, 0.0])
+        ranks = torch.arange(example_count, dtype=torch.float32)
+        distances = torch.sqrt((ranks + 0.5) / example_count)
+        angles = ranks * 2.399963
+        related_examples = torch.stack([distances * torch.cos(angles), distances * torch.sin(angles)], dim=-1)
+        radius = radius_of_concept_sphere(abstract, related_examples)
+        unrelated_example = torch.tensor([[distance_in_radii * radius.item(), 0.0]])
+        concept = ConceptEmbeddings(
+            abstract=abstract,
+            related_examples=related_examples,
+            unrelated_examples=unrelated_example,
+        )
+
+        loss = salient_point_classification_loss([concept])
+
+        self.assertAlmostEqual(loss.item(), expected_loss, places=1)

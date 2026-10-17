@@ -627,26 +627,44 @@ r_c & the radius of $c$'s hypersphere \\
 B_c & the area of $c$: the part of the unit sphere inside its hypersphere \\
 \end{symbols}
 
-\paragraph{The loss.} The loss~\eqref{eq:loss} quantifies whether a concept's examples form a convex area in the LoRA latent space, uniformly distributed, with the concept's abstract at its centre. Every example lies inside its hypersphere by construction, so the loss measures how many of the story's unrelated texts $U_c$ lie outside it~\eqref{eq:loss-membership}, \eqref{eq:loss-classification}. It measures how evenly the examples are spread over the area $B_c$, by their energy distance to points drawn uniformly from it~\eqref{eq:loss-spread}; a concept with a single example has no spread to measure, and the term is $0$. The distance is $0$ only when the examples are spread over $B_c$ as evenly as those points are. In $d$ dimensions most of an area like $B_c$ lies near its edge, so evenly spread examples lie mostly near the edge too.
+\paragraph{The loss.} The loss~\eqref{eq:loss} quantifies whether a concept's examples form a convex area in the LoRA latent space, uniformly distributed, with the concept's abstract at its centre. Every example lies inside its hypersphere by construction, so the loss measures how many of the story's unrelated texts $U_c$ lie outside it~\eqref{eq:loss-membership}, \eqref{eq:loss-classification}. It measures how far inside the hypersphere the examples lie~\eqref{eq:loss-inside}, and how far they are from uniformly distributed inside it~\eqref{eq:loss-uneven}.
 
 The unrelated texts $U_c$ are the negative examples of $c$: texts the author tagged as examples of the story's other concepts, but not of $c$. They are a random sample of those texts, drawn anew at every training step.
+
+\paragraph{The uneven distribution of the examples.} Examples uniformly distributed inside the hypersphere do not lean to one side of its centre, so the mean of their directions $u_e$ from the centre is $0$~\eqref{eq:loss-imbalance}. They do not lie along a line or a plane, so their directions spread equally along every axis, and their scatter is $I/d$~\eqref{eq:loss-anisotropy}. And they crowd neither the centre nor the surface: the radial fraction $f_e$~\eqref{eq:loss-direction}, the share of the hypersphere's volume closer to its centre than $e$, is uniformly distributed between $0$ and $1$ for them, in any number of dimensions, so their sorted radial fractions are evenly spaced~\eqref{eq:loss-radial}. In $d$ dimensions most of that volume lies near the surface, so uniformly distributed examples lie mostly near the surface too.
+
+\paragraph{Why the loss is scaled.} The loss must not depend on how many examples $N_c$ a concept has, nor on the number of dimensions $d$. Two of its terms did. The farthest example sets the radius, so it always lies on the surface, where $P = 1/2$; it added $1/(2N_c)$ to $\mathcal{L}_{\mathrm{inside}}$, $0.5$ for one example and $0.05$ for ten. The uneven distribution compares every example with itself as well as with the others, and those self-comparisons add a fixed amount whatever the arrangement: $1/N_c$ to the imbalance and $(1 - 1/d)/N_c$ to the anisotropy. The radial fractions of uniformly distributed examples, other than the farthest, are uniformly distributed, so they add $(2N_c + 1)/(12N_c^2)$ to the radial unevenness. Uniformly distributed examples therefore scored $\mu_{N_c}$ on average~\eqref{eq:loss-uniform-mean}: in $64$ dimensions $2.2$ for one example, $1.1$ for two, $0.22$ for ten and $0.02$ for a hundred. Unscaled, the loss punished a concept for having few examples, not for how they are arranged, and no arrangement of a handful of examples could satisfy it.
+
+The scaled $\hat{\mathcal{L}}_{\mathrm{inside}}$~\eqref{eq:loss-inside-scaled} takes the farthest example's $1/2$ out and averages over the other examples. The scaled $\hat{\mathcal{L}}_{\mathrm{uneven}}$~\eqref{eq:loss-uneven-scaled} subtracts what uniformly distributed examples score on average, $\mu_{N_c}$, and divides by the most that can be added to it, $\Delta_{N_c}$~\eqref{eq:loss-uneven-range}, reached when all the examples lie in one place. It then runs from $0$, for uniformly distributed examples, to $1$, for examples in one place, whatever their number and the number of dimensions. It comes out below $0$ when the examples are spread more evenly than a uniform draw would be; nothing then needs correcting, so it is cut off at $0$. Because it cannot go below $0$, uniformly drawn examples do not average exactly $0$, and a small excess remains for a handful of them: in $64$ dimensions $0.03$ for two examples, $0.01$ for four and $0.004$ for ten. A concept with a single example has nothing to measure besides the radius it sets, and both scaled terms are $0$.
 
 For each concept $c$, with the story's texts unrelated to it $U_c$:
 \begin{align}
 P(t \in c) &= \sigma\bigl(\kappa\,(r_c^2 - \|z(t) - m_c\|^2)\bigr), \qquad \kappa = 50, \label{eq:loss-membership} \\
 \mathcal{L}_{\mathrm{class}}(c) &= \frac{1}{|U_c|} \sum_{u \in U_c} P(u \in c), \label{eq:loss-classification} \\
-\mathcal{L}_{\mathrm{spread}}(c) &= 2\,\mathbb{E}\,\|z(e) - w\| - \mathbb{E}\,\|z(e) - z(e')\| - \mathbb{E}\,\|w - w'\|, \label{eq:loss-spread} \\
-&\qquad e, e' \in E_c,\quad w, w' \text{ drawn uniformly from } B_c, \notag \\
-\mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\mathcal{L}_{\mathrm{class}}(c) + \gamma\, \mathcal{L}_{\mathrm{spread}}(c)\Bigr). \label{eq:loss}
+u_e &= \frac{z(e) - m_c}{\|z(e) - m_c\|}, \qquad f_e = \biggl(\frac{\|z(e) - m_c\|}{r_c}\biggr)^{d}, \label{eq:loss-direction} \\
+\mathcal{L}_{\mathrm{inside}}(c) &= \frac{1}{N_c} \sum_{e \in E_c} \bigl(1 - P(e \in c)\bigr), \label{eq:loss-inside} \\
+\mathcal{L}_{\mathrm{imbalance}}(c) &= \Bigl\|\frac{1}{N_c} \sum_{e \in E_c} u_e\Bigr\|^2, \label{eq:loss-imbalance} \\
+\mathcal{L}_{\mathrm{anisotropy}}(c) &= \Bigl\|\frac{1}{N_c} \sum_{e \in E_c} u_e u_e^{\top} - \frac{I}{d}\Bigr\|_F^2, \label{eq:loss-anisotropy} \\
+\mathcal{L}_{\mathrm{radial}}(c) &= \frac{1}{N_c} \sum_{i=1}^{N_c} \Bigl(f_{(i)} - \frac{i - 1/2}{N_c}\Bigr)^2, \label{eq:loss-radial} \\
+\mathcal{L}_{\mathrm{uneven}}(c) &= \mathcal{L}_{\mathrm{imbalance}}(c) + \mathcal{L}_{\mathrm{anisotropy}}(c) + \mathcal{L}_{\mathrm{radial}}(c), \label{eq:loss-uneven} \\
+\mu_{N} &= \frac{2 - 1/d}{N} + \frac{2N + 1}{12N^2}, \label{eq:loss-uniform-mean} \\
+\Delta_{N} &= \frac{\max(N - 1, 1)}{N} \Bigl(2 - \frac{1}{d} + \frac{2N + 1}{6N}\Bigr), \label{eq:loss-uneven-range} \\
+\hat{\mathcal{L}}_{\mathrm{inside}}(c) &= \frac{N_c\,\mathcal{L}_{\mathrm{inside}}(c) - 1/2}{\max(N_c - 1, 1)}, \label{eq:loss-inside-scaled} \\
+\hat{\mathcal{L}}_{\mathrm{uneven}}(c) &= \max\Bigl(0,\ \frac{\mathcal{L}_{\mathrm{uneven}}(c) - \mu_{N_c}}{\Delta_{N_c}}\Bigr), \label{eq:loss-uneven-scaled} \\
+\mathcal{L} &= \frac{1}{|C|} \sum_{c \in C} \Bigl(\hat{\mathcal{L}}_{\mathrm{inside}}(c) + \mathcal{L}_{\mathrm{class}}(c) + \hat{\mathcal{L}}_{\mathrm{uneven}}(c)\Bigr). \label{eq:loss}
 \end{align}
 \begin{symbols}
 U_c & the story's texts unrelated to $c$ \\
 \kappa & how steeply $P(t \in c)$ drops across the hypersphere's surface \\
 \sigma & the logistic function, $\sigma(x) = 1 / (1 + e^{-x})$ \\
 P(t \in c) & the probability that text $t$ lies inside $c$'s hypersphere \\
-w,\ w' & points drawn uniformly from $B_c$ \\
-\mathbb{E} & the mean over the examples in $E_c$ and the drawn points \\
-\gamma & the weight of the spread term \\
+N_c & the number of examples of $c$, $|E_c|$ \\
+u_e & the direction of example $e$ from the centre $m_c$ \\
+f_e & the radial fraction of $e$: the share of the hypersphere's volume closer to its centre than $e$ \\
+f_{(i)} & the $i$-th smallest radial fraction of the examples of $c$ \\
+I & the $d \times d$ identity matrix \\
+\mu_N & what $N$ uniformly distributed examples score on average in $\mathcal{L}_{\mathrm{uneven}}$ \\
+\Delta_N & the most $N$ examples can score in $\mathcal{L}_{\mathrm{uneven}}$ above $\mu_N$: all of them in one place \\
 \end{symbols}
 
 \begin{thebibliography}{9}
