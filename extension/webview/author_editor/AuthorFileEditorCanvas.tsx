@@ -14,7 +14,6 @@ import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/autho
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
-import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
@@ -117,7 +116,6 @@ interface AuthorFileEditorCanvasProps {
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
-    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
     findMatches?: AuthorFileEditorFindMatch[];
@@ -133,7 +131,6 @@ export function AuthorFileEditorCanvas({
     sendMessagesToVscode,
     cellRenderers,
     proseErrors = [],
-    paragraphsInStoryPlots = [],
     salientConceptSelected = null,
     storyTextShown = null,
     findMatches = [],
@@ -329,11 +326,6 @@ export function AuthorFileEditorCanvas({
                                     (proseError) =>
                                         proseError.cellId === cell.attrs.id &&
                                         proseError.isVisible,
-                                )}
-                                paragraphsInStoryPlots={paragraphsInStoryPlots.filter(
-                                    (paragraph) =>
-                                        paragraph.cellId === cell.attrs.id &&
-                                        paragraph.isVisible,
                                 )}
                                 salientConceptHighlights={salientConceptHighlightsByCellId.get(
                                     cell.attrs.id,

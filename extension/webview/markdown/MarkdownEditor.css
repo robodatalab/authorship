@@ -1,6 +1,5 @@
 :root {
     --markdown-editor-line-height-to-font-size: 1.5;
-    --markdown-editor-story-plot-gutter: 32px;
 }
 
 .markdown-editor {
@@ -55,7 +54,6 @@
 .markdown-rendered {
     flex: 1 1 auto;
     min-height: 1.4em;
-    padding-right: var(--markdown-editor-story-plot-gutter);
     font-family: var(--vscode-editor-font-family);
     font-size: var(--vscode-editor-font-size);
     font-weight: var(--vscode-editor-font-weight);
@@ -84,67 +82,34 @@
     max-width: 100%;
 }
 
-.markdown-rendered-paragraph-in-story-plots {
-    position: relative;
-    margin-right: calc(-1 * var(--markdown-editor-story-plot-gutter));
-    padding-right: var(--markdown-editor-story-plot-gutter);
+.markdown-editor-salient-concept-0 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-blue, #3794ff);
 }
 
-.markdown-rendered-paragraph-in-story-plots > :first-child {
-    margin: 0;
+.markdown-editor-salient-concept-1 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-orange, #d18616);
 }
 
-.markdown-rendered-paragraph-in-story-plots
-    > .markdown-editor-story-plot-border {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+.markdown-editor-salient-concept-2 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-green, #89d185);
 }
 
-.markdown-editor-story-plot-border::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: calc(var(--markdown-editor-story-plot-lane) * 5px);
-    width: 3px;
-    background: var(--markdown-editor-story-plot-color);
+.markdown-editor-salient-concept-3 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-purple, #b180d7);
 }
 
-.markdown-editor-story-plot-0 {
-    --markdown-editor-story-plot-lane: 0;
-    --markdown-editor-story-plot-color: var(--vscode-charts-blue, #3794ff);
+.markdown-editor-salient-concept-4 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-red, #f14c4c);
 }
 
-.markdown-editor-story-plot-1 {
-    --markdown-editor-story-plot-lane: 1;
-    --markdown-editor-story-plot-color: var(--vscode-charts-orange, #d18616);
-}
-
-.markdown-editor-story-plot-2 {
-    --markdown-editor-story-plot-lane: 2;
-    --markdown-editor-story-plot-color: var(--vscode-charts-green, #89d185);
-}
-
-.markdown-editor-story-plot-3 {
-    --markdown-editor-story-plot-lane: 3;
-    --markdown-editor-story-plot-color: var(--vscode-charts-purple, #b180d7);
-}
-
-.markdown-editor-story-plot-4 {
-    --markdown-editor-story-plot-lane: 4;
-    --markdown-editor-story-plot-color: var(--vscode-charts-red, #f14c4c);
-}
-
-.markdown-editor-story-plot-5 {
-    --markdown-editor-story-plot-lane: 5;
-    --markdown-editor-story-plot-color: var(--vscode-charts-yellow, #cca700);
+.markdown-editor-salient-concept-5 {
+    --markdown-editor-salient-concept-color: var(--vscode-charts-yellow, #cca700);
 }
 
 .markdown-editor-salient-concept {
     background-color: color-mix(
         in srgb,
-        var(--markdown-editor-story-plot-color) 30%,
+        var(--markdown-editor-salient-concept-color) 30%,
         transparent
     );
 }

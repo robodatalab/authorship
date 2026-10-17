@@ -33,7 +33,6 @@ export class PublishView implements vscode.WebviewViewProvider {
             if (message?.type === "ready") {
                 void this.pollTheServer();
                 this.showSalientConcepts();
-                this.showStoryPlots();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
             } else if (message?.type === "selectSalientConcept") {
@@ -85,10 +84,8 @@ export class PublishView implements vscode.WebviewViewProvider {
             session.onDocumentOrSelectionChanged(() =>
                 this.showSalientConcepts(),
             ),
-            session.onStoryPlotsChanged(() => this.showStoryPlots()),
         );
         this.showSalientConcepts();
-        this.showStoryPlots();
     }
 
     stopFollowing(session: AuthorFileEditorSession): void {
@@ -99,7 +96,6 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession = undefined;
         this.sessionFollowed = undefined;
         this.showSalientConcepts();
-        this.showStoryPlots();
     }
 
     private showSalientConcepts(): void {
@@ -112,16 +108,6 @@ export class PublishView implements vscode.WebviewViewProvider {
             salientConcepts,
             salientConceptSelected: session?.theSalientConceptSelected ?? null,
             storyTextSelected: session?.theStoryTextSelected ?? null,
-        });
-    }
-
-    private showStoryPlots(): void {
-        const session = this.sessionFollowed;
-        void this.view?.webview.postMessage({
-            type: "storyPlots",
-            storyScenes: session?.theStoryScenes ?? null,
-            storyPlots: session?.theStoryPlots ?? null,
-            storyPlotsProgress: session?.theStoryPlotsProgress ?? null,
         });
     }
 

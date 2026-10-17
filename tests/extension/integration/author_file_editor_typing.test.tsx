@@ -485,7 +485,7 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightBefore,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                            "markdown-editor-salient-concept markdown-editor-salient-concept-0",
                     },
                 },
             ]);
@@ -501,7 +501,7 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightAfter,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                            "markdown-editor-salient-concept markdown-editor-salient-concept-0",
                     },
                 },
             ]);

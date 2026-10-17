@@ -6,7 +6,6 @@ import {
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
-    useAuthorFileEditorCellParagraphsInStoryPlots,
     useAuthorFileEditorCellSalientConceptHighlights,
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
@@ -34,8 +33,6 @@ export function MarkdownCell({
 }: MarkdownCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
-    const paragraphsInStoryPlots =
-        useAuthorFileEditorCellParagraphsInStoryPlots();
     const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
     const salientConceptHighlights =
         useAuthorFileEditorCellSalientConceptHighlights();
@@ -49,7 +46,6 @@ export function MarkdownCell({
                 <MarkdownEditor
                     cellId={cellId}
                     highlights={findHighlights}
-                    paragraphsInStoryPlots={paragraphsInStoryPlots}
                     salientConceptHighlights={salientConceptHighlights}
                     storyTextShown={storyTextShown}
                     onTextSelected={storyTextSelected}

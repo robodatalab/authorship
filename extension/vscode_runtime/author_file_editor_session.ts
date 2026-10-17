@@ -6,15 +6,9 @@ import type {
     AuthorFileEditorFindMatchInTheProse,
 } from "./commands/find_in_the_document";
 import type {
-    ParagraphInStoryPlots,
-    StoryPlot,
-    StoryScene,
-} from "./commands/identify_story_plots";
-import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
-import type { WorkProgress } from "./server/jobs";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocDiff } from "./storydoc/diff";
 import {
@@ -35,16 +29,11 @@ export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
 {
     private readonly proseErrors: ProseCheckError[] = [];
-    private storyScenes: StoryScene[] = [];
-    private storyPlots: StoryPlot[] = [];
-    private readonly paragraphsInStoryPlots: ParagraphInStoryPlots[] = [];
     private readonly findMatches: AuthorFileEditorFindMatch[] = [];
     private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
         [];
-    private storyPlotsProgress: WorkProgress | null = null;
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
-    private readonly paragraphsInStoryPlotsSynchronizer: AuthorDocSynchronizer<ParagraphInStoryPlots>;
     private readonly findMatchesInTheProseSynchronizer: AuthorDocSynchronizer<AuthorFileEditorFindMatchInTheProse>;
     private readonly wordCounter = new WordCounter();
     private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
@@ -68,10 +57,6 @@ export class AuthorFileEditorSession
     readonly onDocumentOrSelectionChanged =
         this.documentOrSelectionChanged.event;
 
-    private readonly storyPlotsChanged = new vscode.EventEmitter<void>();
-
-    readonly onStoryPlotsChanged = this.storyPlotsChanged.event;
-
     constructor(
         private documentAsItStands: ImmutableAuthorDocument,
         private readonly edited: vscode.EventEmitter<
@@ -80,9 +65,6 @@ export class AuthorFileEditorSession
     ) {
         this.proseErrorsSynchronizer = new AuthorDocSynchronizer(
             this.proseErrors,
-        );
-        this.paragraphsInStoryPlotsSynchronizer = new AuthorDocSynchronizer(
-            this.paragraphsInStoryPlots,
         );
         this.findMatchesInTheProseSynchronizer = new AuthorDocSynchronizer(
             this.findMatchesInTheProse,
@@ -115,18 +97,6 @@ export class AuthorFileEditorSession
 
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
-    }
-
-    get theStoryScenes(): StoryScene[] {
-        return this.storyScenes;
-    }
-
-    get theStoryPlots(): StoryPlot[] {
-        return this.storyPlots;
-    }
-
-    get theStoryPlotsProgress(): WorkProgress | null {
-        return this.storyPlotsProgress;
     }
 
     selectTheSalientConcept(conceptCellId: string | null): void {
@@ -274,22 +244,6 @@ export class AuthorFileEditorSession
         this.sendProseErrors();
     }
 
-    showStoryPlots(
-        storyScenes: StoryScene[],
-        storyPlots: StoryPlot[],
-        paragraphsInStoryPlots: ParagraphInStoryPlots[],
-    ): void {
-        this.storyScenes = storyScenes;
-        this.storyPlots = storyPlots;
-        this.paragraphsInStoryPlots.splice(
-            0,
-            this.paragraphsInStoryPlots.length,
-            ...paragraphsInStoryPlots,
-        );
-        this.sendParagraphsInStoryPlots();
-        this.storyPlotsChanged.fire();
-    }
-
     showFindMatches(findMatches: AuthorFileEditorFindMatch[]): void {
         this.findMatches.splice(0, this.findMatches.length, ...findMatches);
         const findMatchesInTheProse = findMatches.filter(
@@ -304,11 +258,6 @@ export class AuthorFileEditorSession
         this.sendFindMatches();
     }
 
-    identifyingStoryPlots(progress: WorkProgress | null): void {
-        this.storyPlotsProgress = progress;
-        this.storyPlotsChanged.fire();
-    }
-
     writingCell(cellId: string, howFarAlong: number): void {
         this.howFarEachCellHasBeenWritten.set(cellId, howFarAlong);
         this.sendCellsBeingWritten();
@@ -321,10 +270,6 @@ export class AuthorFileEditorSession
 
     private synchronizeTheRepresentations(): void {
         this.proseErrorsSynchronizer.synchronize(
-            this.documentAsTheLastSynchronizationLeftIt,
-            this.documentAsItStands,
-        );
-        this.paragraphsInStoryPlotsSynchronizer.synchronize(
             this.documentAsTheLastSynchronizationLeftIt,
             this.documentAsItStands,
         );
@@ -360,13 +305,6 @@ export class AuthorFileEditorSession
         });
     }
 
-    sendParagraphsInStoryPlots(): void {
-        void this.panel?.webview.postMessage({
-            type: "paragraphsInStoryPlots",
-            paragraphsInStoryPlots: [...this.paragraphsInStoryPlots],
-        });
-    }
-
     sendSalientConceptSelected(): void {
         void this.panel?.webview.postMessage({
             type: "salientConceptSelected",
@@ -388,7 +326,6 @@ export class AuthorFileEditorSession
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
-        this.sendParagraphsInStoryPlots();
         this.sendSalientConceptSelected();
         this.sendFindMatches();
         this.sendWordCounts();
@@ -438,7 +375,6 @@ export class AuthorFileEditorSession
             });
         }
         this.sendProseErrors();
-        this.sendParagraphsInStoryPlots();
         this.sendFindMatches();
         this.sendWordCounts();
         this.documentOrSelectionChanged.fire();

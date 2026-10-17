@@ -6,12 +6,10 @@ import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
-    useAuthorFileEditorCellParagraphsInStoryPlots,
     useAuthorFileEditorCellSalientConceptHighlights,
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { ParagraphInStoryPlots } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/story_words";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
@@ -69,7 +67,6 @@ async function mountCanvas(options: {
     commands?: WebviewAuthorDocumentCommandCard[];
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
-    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
 }): Promise<void> {
@@ -89,7 +86,6 @@ async function mountCanvas(options: {
                     posted.push(message as Invocation)
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
-                paragraphsInStoryPlots={options.paragraphsInStoryPlots}
                 salientConceptSelected={options.salientConceptSelected}
                 storyTextShown={options.storyTextShown}
             />,
@@ -914,37 +910,6 @@ describe("a folded cell", () => {
                 item.classList.contains("author-file-editor-cell-folded"),
             ),
         ).toEqual([false, false, true]);
-    });
-});
-
-describe("the plots the story weaves", () => {
-    function StoryPlotBordersDrawn() {
-        return (
-            <div className="test-story-plot-borders">
-                {useAuthorFileEditorCellParagraphsInStoryPlots().length}
-            </div>
-        );
-    }
-
-    it("borders the paragraphs of every plot", async () => {
-        await mountCanvas({
-            cells: [markdownCell("The door.", "m1")],
-            cellRenderers: { markdown: () => <StoryPlotBordersDrawn /> },
-            paragraphsInStoryPlots: [
-                {
-                    cellId: "m1",
-                    startCharacterOffsetInCell: 0,
-                    endCharacterOffsetInCell: 9,
-                    wordsInTheCell: "The door.",
-                    isVisible: true,
-                    storyPlotIndices: [0],
-                },
-            ],
-        });
-
-        expect(
-            document.querySelector(".test-story-plot-borders")?.textContent,
-        ).toBe("1");
     });
 });
 

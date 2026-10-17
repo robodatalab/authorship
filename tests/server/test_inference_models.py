@@ -23,7 +23,6 @@ class DeployingTheInferenceModels(unittest.TestCase):
             cluster=mock.DEFAULT,
             Hosted=mock.DEFAULT,
             HuggingFaceImporter=mock.DEFAULT,
-            deploy_causal_event_trajectory_classifier=mock.DEFAULT,
         )
         self.patched = patched.start()
         self.addCleanup(patched.stop)

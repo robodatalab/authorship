@@ -16,7 +16,6 @@ import { FixProseCommand } from "./fix_prose";
 import { FixStyleCommand } from "./fix_style";
 import { FoldAllCommand } from "./fold_all";
 import { FoldCellCommand } from "./fold_cell";
-import { IdentifyStoryPlotsCommand } from "./identify_story_plots";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
@@ -73,7 +72,6 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
-    new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),
     new WriteStorySoFarCommand(),

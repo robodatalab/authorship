@@ -6,7 +6,6 @@ import {
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
-import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import type { AuthorFileEditorFindHighlight } from "./AuthorFileEditorFind";
 import type {
     AuthorFileEditorFindMatch,
@@ -52,7 +51,6 @@ interface AuthorFileEditorCellStateProps {
     cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
-    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
     salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
     findMatches?: AuthorFileEditorFindMatch[];
@@ -73,7 +71,6 @@ const AuthorFileEditorCellStateContext = createContext<
     cellId: "",
     cellAttributes: {},
     proseErrors: [],
-    paragraphsInStoryPlots: [],
     salientConceptHighlights: undefined,
     storyTextShown: undefined,
     findMatches: [],
@@ -91,7 +88,6 @@ export function AuthorFileEditorCellState({
     cellId,
     cellAttributes,
     proseErrors = [],
-    paragraphsInStoryPlots = [],
     salientConceptHighlights,
     storyTextShown,
     findMatches = [],
@@ -111,7 +107,6 @@ export function AuthorFileEditorCellState({
                 cellId,
                 cellAttributes,
                 proseErrors,
-                paragraphsInStoryPlots,
                 salientConceptHighlights,
                 storyTextShown,
                 findMatches,
@@ -253,13 +248,6 @@ export function useAuthorFileEditorCellStoryTextSelected(): (
     return (
         useContext(AuthorFileEditorCellStateContext).onStoryTextSelected ??
         (() => undefined)
-    );
-}
-
-export function useAuthorFileEditorCellParagraphsInStoryPlots(): ParagraphInStoryPlots[] {
-    return (
-        useContext(AuthorFileEditorCellStateContext).paragraphsInStoryPlots ??
-        []
     );
 }
 

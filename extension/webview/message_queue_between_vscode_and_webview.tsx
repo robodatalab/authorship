@@ -11,7 +11,6 @@ import {
 } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
-import type { ParagraphInStoryPlots } from "../vscode_runtime/commands/identify_story_plots";
 import type { StoryTextSpan } from "../vscode_runtime/storydoc/story_words";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -35,7 +34,6 @@ interface WhatTheWebviewDraws {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
-    paragraphsInStoryPlots: ParagraphInStoryPlots[];
     salientConceptSelected: string | null;
     storyTextShown: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
@@ -90,9 +88,6 @@ function processMessageFromVscode(
             .commands as WebviewAuthorDocumentCommandCard[];
     } else if (message.data?.type === "proseErrors") {
         drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
-    } else if (message.data?.type === "paragraphsInStoryPlots") {
-        drawn.paragraphsInStoryPlots = message.data
-            .paragraphsInStoryPlots as ParagraphInStoryPlots[];
     } else if (message.data?.type === "salientConceptSelected") {
         drawn.salientConceptSelected = message.data.salientConceptSelected as
             | string
@@ -129,7 +124,6 @@ function openTheAuthorFileEditor(): void {
         cells: [],
         commands: [],
         proseErrors: [],
-        paragraphsInStoryPlots: [],
         salientConceptSelected: null,
         storyTextShown: null,
         findMatches: [],
@@ -147,7 +141,6 @@ function openTheAuthorFileEditor(): void {
                 sendMessagesToVscode={sendMessagesToVscode}
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
-                paragraphsInStoryPlots={drawn.paragraphsInStoryPlots}
                 salientConceptSelected={drawn.salientConceptSelected}
                 storyTextShown={drawn.storyTextShown}
                 findMatches={drawn.findMatches}

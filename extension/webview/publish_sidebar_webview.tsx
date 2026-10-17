@@ -6,11 +6,6 @@ import {
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 import type {
-    StoryPlot,
-    StoryScene,
-} from "../vscode_runtime/commands/identify_story_plots";
-import type { WorkProgress } from "../vscode_runtime/server/jobs";
-import type {
     SalientConceptInTheStory,
     StoryTextSpan,
 } from "../vscode_runtime/storydoc/story_words";
@@ -23,9 +18,6 @@ interface WhatThePanelDraws {
     salientConcepts?: SalientConceptInTheStory[] | null;
     salientConceptSelected?: string | null;
     storyTextSelected?: StoryTextSpan | null;
-    storyScenes?: StoryScene[] | null;
-    storyPlots?: StoryPlot[] | null;
-    storyPlotsProgress?: WorkProgress | null;
 }
 
 function processMessageFromVscode(
@@ -45,11 +37,6 @@ function processMessageFromVscode(
             | null;
         drawn.storyTextSelected = message.data
             .storyTextSelected as StoryTextSpan | null;
-    } else if (message.data?.type === "storyPlots") {
-        drawn.storyScenes = message.data.storyScenes as StoryScene[] | null;
-        drawn.storyPlots = message.data.storyPlots as StoryPlot[] | null;
-        drawn.storyPlotsProgress = message.data
-            .storyPlotsProgress as WorkProgress | null;
     } else {
         return false;
     }
@@ -70,9 +57,6 @@ function openTheAuthorshipPanel(): void {
                 salientConcepts={drawn.salientConcepts}
                 salientConceptSelected={drawn.salientConceptSelected}
                 storyTextSelected={drawn.storyTextSelected}
-                storyScenes={drawn.storyScenes}
-                storyPlots={drawn.storyPlots}
-                storyPlotsProgress={drawn.storyPlotsProgress}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,
         );

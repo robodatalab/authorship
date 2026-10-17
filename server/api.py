@@ -12,7 +12,6 @@ from server import log
 from server.publishing.epub_exporter import Report, build_epub, report_of
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
-from server.story_analysis.plots import StoryPlotsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
 from server.models.inference_models import deploy_inference_models
@@ -305,37 +304,4 @@ def check_errors_status(id: str) -> dict[str, Any]:
         "cancelled": job.cancelled,
         "error": job.error,
         "findings": job.findings,
-    }
-
-
-class StoryPlotsRequest(BaseModel):
-    path: str
-    text: str
-
-
-@app.post("/analyze/plots", status_code=202)
-def identify_story_plots(request: StoryPlotsRequest) -> dict[str, Any]:
-    document = Document(request.text, Path(request.path))
-    job = StoryPlotsJob(
-        _deployed("causal_model"),
-        _deployed("causal_event_trajectory_classifier"),
-        document,
-    )
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/analyze/plots/status")
-def identify_story_plots_status(id: str) -> dict[str, Any]:
-    job = app.state.jobs.get(id)
-    if not isinstance(job, StoryPlotsJob):
-        raise HTTPException(status_code=404, detail=f"No plot identification for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "storyScenes": job.scenes,
-        "storyPlots": job.plots,
-        "paragraphsInStoryPlots": [],
-        "progress": job.progress.reported(),
     }
