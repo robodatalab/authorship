@@ -21,14 +21,16 @@ import {
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
 import {
+    plotsIn,
     salientConceptsIn,
     storyTextSpansOf,
     storyWordsIn,
     type StoryTextSpan,
+    type StoryWordRange,
 } from "../../vscode_runtime/storydoc/story_words";
 import {
     MarkdownEditorMediator,
-    type MarkdownEditorSalientConceptHighlight,
+    type MarkdownEditorStoryTextHighlight,
 } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCanvas.css";
 
@@ -117,6 +119,7 @@ interface AuthorFileEditorCanvasProps {
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
     salientConceptSelected?: string | null;
+    plotSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
     findMatches?: AuthorFileEditorFindMatch[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
@@ -132,6 +135,7 @@ export function AuthorFileEditorCanvas({
     cellRenderers,
     proseErrors = [],
     salientConceptSelected = null,
+    plotSelected = null,
     storyTextShown = null,
     findMatches = [],
     cellsBeingWritten = {},
@@ -146,34 +150,58 @@ export function AuthorFileEditorCanvas({
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
     const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
+    const plots = useMemo(() => plotsIn(cells), [cells]);
     const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
-    const salientConceptHighlightsByCellId = useMemo(() => {
+    const storyTextHighlightsByCellId = useMemo(() => {
         const byCellId = new Map<
             string,
-            MarkdownEditorSalientConceptHighlight[]
+            MarkdownEditorStoryTextHighlight[]
         >();
+        function highlightTheStoryWords(
+            storyWordRanges: StoryWordRange[],
+            highlightColor: number,
+        ): void {
+            for (const storyWordRange of storyWordRanges) {
+                const spans = storyTextSpansOf(storyWords, storyWordRange);
+                for (const span of spans) {
+                    byCellId.set(span.cellId, [
+                        ...(byCellId.get(span.cellId) ?? []),
+                        {
+                            startCharacterOffsetInCell:
+                                span.startCharacterOffsetInCell,
+                            endCharacterOffsetInCell:
+                                span.endCharacterOffsetInCell,
+                            highlightColor,
+                        },
+                    ]);
+                }
+            }
+        }
         const salientConceptColor = salientConcepts.findIndex(
             (concept) => concept.conceptCellId === salientConceptSelected,
         );
         const concept = salientConcepts[salientConceptColor];
-        if (concept === undefined) {
-            return byCellId;
+        if (concept !== undefined) {
+            highlightTheStoryWords(
+                concept.storyWordRanges,
+                salientConceptColor,
+            );
         }
-        for (const storyWordRange of concept.storyWordRanges) {
-            for (const span of storyTextSpansOf(storyWords, storyWordRange)) {
-                byCellId.set(span.cellId, [
-                    ...(byCellId.get(span.cellId) ?? []),
-                    {
-                        startCharacterOffsetInCell:
-                            span.startCharacterOffsetInCell,
-                        endCharacterOffsetInCell: span.endCharacterOffsetInCell,
-                        salientConceptColor,
-                    },
-                ]);
-            }
+        const plotColor = plots.findIndex(
+            (plot) => plot.plotCellId === plotSelected,
+        );
+        const plot = plots[plotColor];
+        if (plot !== undefined) {
+            highlightTheStoryWords(plot.trajectory, plotColor);
         }
         return byCellId;
-    }, [storyWords, salientConcepts, salientConceptSelected]);
+    }, [
+        storyWords,
+        salientConcepts,
+        salientConceptSelected,
+        plots,
+        plotSelected,
+    ]);
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
@@ -327,7 +355,7 @@ export function AuthorFileEditorCanvas({
                                         proseError.cellId === cell.attrs.id &&
                                         proseError.isVisible,
                                 )}
-                                salientConceptHighlights={salientConceptHighlightsByCellId.get(
+                                storyTextHighlights={storyTextHighlightsByCellId.get(
                                     cell.attrs.id,
                                 )}
                                 storyTextShown={

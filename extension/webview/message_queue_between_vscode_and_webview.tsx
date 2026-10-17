@@ -35,6 +35,7 @@ interface WhatTheWebviewDraws {
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
     salientConceptSelected: string | null;
+    plotSelected: string | null;
     storyTextShown: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
@@ -92,6 +93,8 @@ function processMessageFromVscode(
         drawn.salientConceptSelected = message.data.salientConceptSelected as
             | string
             | null;
+    } else if (message.data?.type === "plotSelected") {
+        drawn.plotSelected = message.data.plotSelected as string | null;
     } else if (message.data?.type === "storyTextShown") {
         drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
     } else if (message.data?.type === "findMatches") {
@@ -125,6 +128,7 @@ function openTheAuthorFileEditor(): void {
         commands: [],
         proseErrors: [],
         salientConceptSelected: null,
+        plotSelected: null,
         storyTextShown: null,
         findMatches: [],
         cellsBeingWritten: {},
@@ -142,6 +146,7 @@ function openTheAuthorFileEditor(): void {
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
                 salientConceptSelected={drawn.salientConceptSelected}
+                plotSelected={drawn.plotSelected}
                 storyTextShown={drawn.storyTextShown}
                 findMatches={drawn.findMatches}
                 cellsBeingWritten={drawn.cellsBeingWritten}

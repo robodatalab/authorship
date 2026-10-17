@@ -6,7 +6,7 @@ import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor
 import {
     AuthorFileEditorCell,
     AuthorFileEditorCellRun,
-    useAuthorFileEditorCellSalientConceptHighlights,
+    useAuthorFileEditorCellStoryTextHighlights,
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
@@ -68,6 +68,7 @@ async function mountCanvas(options: {
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
     salientConceptSelected?: string | null;
+    plotSelected?: string | null;
     storyTextShown?: StoryTextSpan | null;
 }): Promise<void> {
     posted = [];
@@ -87,6 +88,7 @@ async function mountCanvas(options: {
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
                 salientConceptSelected={options.salientConceptSelected}
+                plotSelected={options.plotSelected}
                 storyTextShown={options.storyTextShown}
             />,
         );
@@ -922,13 +924,13 @@ describe("the salient concepts the story holds", () => {
 
     function SelectsTheDoor() {
         const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
-        const salientConceptHighlights =
-            useAuthorFileEditorCellSalientConceptHighlights();
+        const storyTextHighlights =
+            useAuthorFileEditorCellStoryTextHighlights();
         const { storyTextShown } = useAuthorFileEditorCellStoryTextShown();
         return (
             <button
                 className="test-select-the-door"
-                data-highlights={JSON.stringify(salientConceptHighlights ?? [])}
+                data-highlights={JSON.stringify(storyTextHighlights ?? [])}
                 data-shown={JSON.stringify(storyTextShown ?? null)}
                 onClick={() => storyTextSelected(4, 8)}
             />
@@ -965,7 +967,7 @@ describe("the salient concepts the story holds", () => {
             {
                 startCharacterOffsetInCell: 4,
                 endCharacterOffsetInCell: 15,
-                salientConceptColor: 0,
+                highlightColor: 0,
             },
         ]);
     });
@@ -1012,6 +1014,66 @@ describe("the salient concepts the story holds", () => {
                     startCharacterOffsetInCell: 4,
                     endCharacterOffsetInCell: 8,
                 },
+            },
+        ]);
+    });
+});
+
+describe("the plots the story weaves", () => {
+    const THE_BELL: WebviewCell = {
+        kind: "plot",
+        source: "He hears the bell.",
+        attrs: { id: "p1", title: "The bell", words: "0-0" },
+    };
+    const THE_DOOR: WebviewCell = {
+        kind: "plot",
+        source: "She opens the door.",
+        attrs: { id: "p2", title: "The door", words: "2-2, 0-1" },
+    };
+
+    function ShowsTheHighlights() {
+        const storyTextHighlights =
+            useAuthorFileEditorCellStoryTextHighlights();
+        return (
+            <div
+                className="test-highlights"
+                data-highlights={JSON.stringify(storyTextHighlights ?? [])}
+            />
+        );
+    }
+
+    it("highlights none of the words until a plot is selected", async () => {
+        await mountCanvas({
+            cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
+            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+        });
+
+        const highlightsDrawn = document.querySelector<HTMLElement>(
+            ".test-highlights",
+        )!.dataset.highlights!;
+        expect(JSON.parse(highlightsDrawn)).toEqual([]);
+    });
+
+    it("highlights every span of the selected plot's trajectory in its colour", async () => {
+        await mountCanvas({
+            cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
+            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+            plotSelected: "p2",
+        });
+
+        const highlightsDrawn = document.querySelector<HTMLElement>(
+            ".test-highlights",
+        )!.dataset.highlights!;
+        expect(JSON.parse(highlightsDrawn)).toEqual([
+            {
+                startCharacterOffsetInCell: 9,
+                endCharacterOffsetInCell: 15,
+                highlightColor: 1,
+            },
+            {
+                startCharacterOffsetInCell: 0,
+                endCharacterOffsetInCell: 8,
+                highlightColor: 1,
             },
         ]);
     });

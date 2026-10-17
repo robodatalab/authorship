@@ -37,6 +37,7 @@ interface OpenEditor {
     undoTheNewestEdit(): Promise<void>;
     redoTheNewestEdit(): Promise<void>;
     selectTheSalientConcept(conceptCellId: string): Promise<void>;
+    selectThePlot(plotCellId: string): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -137,6 +138,12 @@ async function openEditor(text: string): Promise<OpenEditor> {
         selectTheSalientConcept: async (conceptCellId: string) => {
             await act(async () => {
                 session.selectTheSalientConcept(conceptCellId);
+            });
+            await settle();
+        },
+        selectThePlot: async (plotCellId: string) => {
+            await act(async () => {
+                session.selectThePlot(plotCellId);
             });
             await settle();
         },
@@ -485,7 +492,7 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightBefore,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-salient-concept-0",
+                            "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-0",
                     },
                 },
             ]);
@@ -501,12 +508,61 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightAfter,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-salient-concept-0",
+                            "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-0",
                     },
                 },
             ]);
         },
     );
+});
+
+describe("the trajectory of a plot while the author types", () => {
+    it("moves with the plot's words, each span highlighted in the plot's colour", async () => {
+        editor = await openEditor(
+            [
+                '<!-- cell: markdown id="m1" -->',
+                "",
+                "She waited for him. A Companion knelt.",
+                "",
+                '<!-- cell: plot id="p1" title="The vigil" words="0-0" -->',
+                "",
+                "She keeps watch.",
+                "",
+                '<!-- cell: plot id="p2" title="The Companion" words="5-6, 0-2" -->',
+                "",
+                "He kneels before her.",
+                "",
+            ].join("\n"),
+        );
+        await editor.selectThePlot("p2");
+        await openTheCellForTyping();
+        theCellBeingTyped().putTheCursorAt(0);
+        await typeCharacter("So ");
+
+        const marksDrawn = theCellBeingTyped().marks();
+        expect(marksDrawn).toEqual([
+            {
+                range: {
+                    from: { lineNumber: 1, column: 26 },
+                    to: { lineNumber: 1, column: 42 },
+                },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
+                },
+            },
+            {
+                range: {
+                    from: { lineNumber: 1, column: 4 },
+                    to: { lineNumber: 1, column: 18 },
+                },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
+                },
+            },
+        ]);
+    });
 });
 
 describe("the words found while the author types", () => {

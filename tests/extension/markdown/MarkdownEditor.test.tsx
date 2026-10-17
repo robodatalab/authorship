@@ -780,7 +780,7 @@ describe("the words of a salient concept", () => {
         {
             startCharacterOffsetInCell: 8,
             endCharacterOffsetInCell: 21,
-            salientConceptColor: 1,
+            highlightColor: 1,
         },
     ];
 
@@ -793,7 +793,7 @@ describe("the words of a salient concept", () => {
                         cellId="c1"
                         markdown="She saw **the** door."
                         onMarkdownCommitted={committedSpy()}
-                        salientConceptHighlights={THE_DOOR_HIGHLIGHTED}
+                        storyTextHighlights={THE_DOOR_HIGHLIGHTED}
                     />
                 </MarkdownEditorMediator>,
             );
@@ -809,7 +809,7 @@ describe("the words of a salient concept", () => {
 
         expect(
             [
-                ...(highlights.get("markdown-editor-salient-concept-1") ?? []),
+                ...(highlights.get("markdown-editor-story-text-highlight-1") ?? []),
             ].map((range) => range.toString()),
         ).toEqual(["the door."]);
         vi.unstubAllGlobals();
@@ -826,7 +826,7 @@ describe("the words of a salient concept", () => {
             },
             options: {
                 inlineClassName:
-                    "markdown-editor-salient-concept markdown-editor-salient-concept-1",
+                    "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
             },
         });
     });

@@ -82,39 +82,39 @@
     max-width: 100%;
 }
 
-.markdown-editor-salient-concept-0 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-blue, #3794ff);
+.markdown-editor-story-text-highlight-0 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-blue, #3794ff);
 }
 
-.markdown-editor-salient-concept-1 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-orange, #d18616);
+.markdown-editor-story-text-highlight-1 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-orange, #d18616);
 }
 
-.markdown-editor-salient-concept-2 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-green, #89d185);
+.markdown-editor-story-text-highlight-2 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-green, #89d185);
 }
 
-.markdown-editor-salient-concept-3 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-purple, #b180d7);
+.markdown-editor-story-text-highlight-3 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-purple, #b180d7);
 }
 
-.markdown-editor-salient-concept-4 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-red, #f14c4c);
+.markdown-editor-story-text-highlight-4 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-red, #f14c4c);
 }
 
-.markdown-editor-salient-concept-5 {
-    --markdown-editor-salient-concept-color: var(--vscode-charts-yellow, #cca700);
+.markdown-editor-story-text-highlight-5 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-yellow, #cca700);
 }
 
-.markdown-editor-salient-concept {
+.markdown-editor-story-text-highlight {
     background-color: color-mix(
         in srgb,
-        var(--markdown-editor-salient-concept-color) 30%,
+        var(--markdown-editor-story-text-highlight-color) 30%,
         transparent
     );
 }
 
-::highlight(markdown-editor-salient-concept-0) {
+::highlight(markdown-editor-story-text-highlight-0) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-blue, #3794ff) 30%,
@@ -122,7 +122,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-1) {
+::highlight(markdown-editor-story-text-highlight-1) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-orange, #d18616) 30%,
@@ -130,7 +130,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-2) {
+::highlight(markdown-editor-story-text-highlight-2) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-green, #89d185) 30%,
@@ -138,7 +138,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-3) {
+::highlight(markdown-editor-story-text-highlight-3) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-purple, #b180d7) 30%,
@@ -146,7 +146,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-4) {
+::highlight(markdown-editor-story-text-highlight-4) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-red, #f14c4c) 30%,
@@ -154,7 +154,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-5) {
+::highlight(markdown-editor-story-text-highlight-5) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-yellow, #cca700) 30%,

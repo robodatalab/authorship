@@ -50,17 +50,16 @@ monaco.editor.addKeybindingRules([
 
 const HOLD_TOOLTIP_MS = 200;
 const MONACO_THEME_FROM_VSCODE = "author-file-editor";
-const SALIENT_CONCEPT_COLORS_THE_STYLESHEET_DEFINES = 6;
+const STORY_TEXT_HIGHLIGHT_COLORS_THE_STYLESHEET_DEFINES = 6;
 const MARKDOWN_WORDS_A_RENDERED_WORD_MAY_SKIP = 8;
 
-export interface MarkdownEditorSalientConceptHighlight {
+export interface MarkdownEditorStoryTextHighlight {
     startCharacterOffsetInCell: number;
     endCharacterOffsetInCell: number;
-    salientConceptColor: number;
+    highlightColor: number;
 }
 
-const NO_SALIENT_CONCEPT_HIGHLIGHTS: MarkdownEditorSalientConceptHighlight[] =
-    [];
+const NO_STORY_TEXT_HIGHLIGHTS: MarkdownEditorStoryTextHighlight[] = [];
 
 export interface MarkdownEditorStoryTextShown {
     startCharacterOffsetInCell: number;
@@ -150,7 +149,7 @@ interface MarkdownEditorProps {
     onMarkdownCommitted: (markdown: string) => void;
     errors?: ProseCheckError[];
     highlights?: AuthorFileEditorFindHighlight[];
-    salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
+    storyTextHighlights?: MarkdownEditorStoryTextHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
     onFixAsked?: (error: ProseCheckError) => void;
     onTextSelected?: (selectedFrom: number, selectedTo: number) => void;
@@ -165,7 +164,7 @@ export function MarkdownEditor({
     onMarkdownCommitted,
     errors = [],
     highlights = [],
-    salientConceptHighlights = NO_SALIENT_CONCEPT_HIGHLIGHTS,
+    storyTextHighlights = NO_STORY_TEXT_HIGHLIGHTS,
     storyTextShown,
     onFixAsked = () => undefined,
     onTextSelected,
@@ -254,12 +253,12 @@ export function MarkdownEditor({
             isEditing ||
             children ||
             !rendered ||
-            salientConceptHighlights.length === 0 ||
+            storyTextHighlights.length === 0 ||
             typeof Highlight === "undefined"
         ) {
             return;
         }
-        const drawn = salientConceptHighlights.flatMap((highlighted) => {
+        const drawn = storyTextHighlights.flatMap((highlighted) => {
             const range = renderedRangeOfTheMarkdown(
                 markdownShown,
                 rendered,
@@ -269,8 +268,8 @@ export function MarkdownEditor({
             return range
                 ? [
                       {
-                          highlight: salientConceptHighlightOfColor(
-                              highlighted.salientConceptColor,
+                          highlight: storyTextHighlightOfColor(
+                              highlighted.highlightColor,
                           ),
                           range,
                       },
@@ -290,7 +289,7 @@ export function MarkdownEditor({
         children,
         markdownShown,
         renderedHtml,
-        salientConceptHighlights,
+        storyTextHighlights,
     ]);
 
     if (!isEditing && children) {
@@ -317,7 +316,7 @@ export function MarkdownEditor({
             markdown={markdownShown}
             errors={errors}
             highlights={highlights}
-            salientConceptHighlights={salientConceptHighlights}
+            storyTextHighlights={storyTextHighlights}
             storyTextShown={storyTextShown}
             onFixAsked={onFixAsked}
             onTextSelected={onTextSelected ?? (() => undefined)}
@@ -371,8 +370,8 @@ function markdownWordOfEachRenderedWord(
     });
 }
 
-function salientConceptHighlightOfColor(salientConceptColor: number): Highlight {
-    const highlightName = `markdown-editor-salient-concept-${salientConceptColor % SALIENT_CONCEPT_COLORS_THE_STYLESHEET_DEFINES}`;
+function storyTextHighlightOfColor(highlightColor: number): Highlight {
+    const highlightName = `markdown-editor-story-text-highlight-${highlightColor % STORY_TEXT_HIGHLIGHT_COLORS_THE_STYLESHEET_DEFINES}`;
     const registered = CSS.highlights.get(highlightName);
     if (registered) {
         return registered;
@@ -583,7 +582,7 @@ interface MonacoMarkdownEditorProps {
     markdown: string;
     errors: ProseCheckError[];
     highlights: AuthorFileEditorFindHighlight[];
-    salientConceptHighlights: MarkdownEditorSalientConceptHighlight[];
+    storyTextHighlights: MarkdownEditorStoryTextHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
     onFixAsked: (error: ProseCheckError) => void;
     onTextSelected: (selectedFrom: number, selectedTo: number) => void;
@@ -602,7 +601,7 @@ function MonacoMarkdownEditor({
     markdown,
     errors,
     highlights,
-    salientConceptHighlights,
+    storyTextHighlights,
     storyTextShown,
     onFixAsked,
     onTextSelected,
@@ -618,7 +617,7 @@ function MonacoMarkdownEditor({
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const drawnHighlights =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
-    const drawnSalientConceptHighlights =
+    const drawnStoryTextHighlights =
         useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
     const errorsNow = useRef(errors);
     errorsNow.current = errors;
@@ -722,7 +721,7 @@ function MonacoMarkdownEditor({
 
         drawnMarks.current = editor.createDecorationsCollection([]);
         drawnHighlights.current = editor.createDecorationsCollection([]);
-        drawnSalientConceptHighlights.current =
+        drawnStoryTextHighlights.current =
             editor.createDecorationsCollection([]);
 
         const errorUnderPointer = (
@@ -886,18 +885,18 @@ function MonacoMarkdownEditor({
         if (!model) {
             return;
         }
-        drawnSalientConceptHighlights.current?.set(
-            salientConceptHighlights.map((highlighted) => ({
+        drawnStoryTextHighlights.current?.set(
+            storyTextHighlights.map((highlighted) => ({
                 range: monaco.Range.fromPositions(
                     model.getPositionAt(highlighted.startCharacterOffsetInCell),
                     model.getPositionAt(highlighted.endCharacterOffsetInCell),
                 ),
                 options: {
-                    inlineClassName: `markdown-editor-salient-concept markdown-editor-salient-concept-${highlighted.salientConceptColor % SALIENT_CONCEPT_COLORS_THE_STYLESHEET_DEFINES}`,
+                    inlineClassName: `markdown-editor-story-text-highlight markdown-editor-story-text-highlight-${highlighted.highlightColor % STORY_TEXT_HIGHLIGHT_COLORS_THE_STYLESHEET_DEFINES}`,
                 },
             })),
         );
-    }, [salientConceptHighlights, markdown]);
+    }, [storyTextHighlights, markdown]);
 
     useEffect(() => {
         const editor = monacoEditor.current;

@@ -12,7 +12,7 @@ import type {
     AuthorFileEditorFindMatchInTheProse,
 } from "../../vscode_runtime/commands/find_in_the_document";
 import type {
-    MarkdownEditorSalientConceptHighlight,
+    MarkdownEditorStoryTextHighlight,
     MarkdownEditorStoryTextShown,
 } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCell.css";
@@ -51,7 +51,7 @@ interface AuthorFileEditorCellStateProps {
     cellId: string;
     cellAttributes: Readonly<Record<string, string>>;
     proseErrors?: ProseCheckError[];
-    salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
+    storyTextHighlights?: MarkdownEditorStoryTextHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
     findMatches?: AuthorFileEditorFindMatch[];
     currentFindMatch?: AuthorFileEditorFindMatch | null;
@@ -71,7 +71,7 @@ const AuthorFileEditorCellStateContext = createContext<
     cellId: "",
     cellAttributes: {},
     proseErrors: [],
-    salientConceptHighlights: undefined,
+    storyTextHighlights: undefined,
     storyTextShown: undefined,
     findMatches: [],
     currentFindMatch: null,
@@ -88,7 +88,7 @@ export function AuthorFileEditorCellState({
     cellId,
     cellAttributes,
     proseErrors = [],
-    salientConceptHighlights,
+    storyTextHighlights,
     storyTextShown,
     findMatches = [],
     currentFindMatch = null,
@@ -107,7 +107,7 @@ export function AuthorFileEditorCellState({
                 cellId,
                 cellAttributes,
                 proseErrors,
-                salientConceptHighlights,
+                storyTextHighlights,
                 storyTextShown,
                 findMatches,
                 currentFindMatch,
@@ -222,10 +222,10 @@ export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
 }
 
-export function useAuthorFileEditorCellSalientConceptHighlights():
-    MarkdownEditorSalientConceptHighlight[] | undefined {
+export function useAuthorFileEditorCellStoryTextHighlights():
+    MarkdownEditorStoryTextHighlight[] | undefined {
     return useContext(AuthorFileEditorCellStateContext)
-        .salientConceptHighlights;
+        .storyTextHighlights;
 }
 
 export function useAuthorFileEditorCellStoryTextShown(): {

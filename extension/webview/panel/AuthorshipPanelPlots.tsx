@@ -54,7 +54,7 @@ export function AuthorshipPanelPlots({
                 <div className="authorship-panel-idle">No plots yet</div>
             ) : (
                 <>
-                    <ul className="authorship-panel-plots-list">
+                    <ul className="authorship-panel-plots-list authorship-panel-swatches">
                         {plots.map((plot) => (
                             <li
                                 key={plot.plotCellId}
@@ -78,6 +78,7 @@ export function AuthorshipPanelPlots({
                                         })
                                     }
                                 >
+                                    <span className="authorship-panel-swatch" />
                                     {plot.title}
                                 </button>
                                 <span

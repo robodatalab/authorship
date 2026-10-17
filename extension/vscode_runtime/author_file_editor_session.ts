@@ -113,6 +113,7 @@ export class AuthorFileEditorSession
 
     selectThePlot(plotCellId: string | null): void {
         this.plotSelected = plotCellId;
+        this.sendPlotSelected();
         this.documentOrSelectionChanged.fire();
     }
 
@@ -323,6 +324,13 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendPlotSelected(): void {
+        void this.panel?.webview.postMessage({
+            type: "plotSelected",
+            plotSelected: this.plotSelected,
+        });
+    }
+
     sendFindMatches(): void {
         void this.panel?.webview.postMessage({
             type: "findMatches",
@@ -338,6 +346,7 @@ export class AuthorFileEditorSession
         });
         this.sendProseErrors();
         this.sendSalientConceptSelected();
+        this.sendPlotSelected();
         this.sendFindMatches();
         this.sendWordCounts();
         this.documentOrSelectionChanged.fire();
