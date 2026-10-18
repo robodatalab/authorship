@@ -426,6 +426,10 @@ export class Document {
         return this.cells.filter((cell) => cell.kind === MARKDOWN);
     }
 
+    cellWithId(cellId: string): Cell | undefined {
+        return this.cells.find((cell) => cell.uniqueId === cellId);
+    }
+
     /**
      * The story itself, line by line: the prose of the markdown cells,
      * by the line of the document each is written on.

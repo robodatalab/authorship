@@ -349,6 +349,9 @@ class Document:
     def markdown_cells(self) -> list[Cell]:
         return [cell for cell in self.cells if cell.kind == MARKDOWN]
 
+    def cell_with_id(self, cell_id: str) -> Cell | None:
+        return next((cell for cell in self.cells if cell.unique_id == cell_id), None)
+
     def story_lines(
         self, start: int = 0, end: int | None = None
     ) -> Iterator[tuple[int, str]]:

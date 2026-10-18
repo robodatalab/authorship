@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { MARKDOWN, type ImmutableAuthorDocument } from "../storydoc/model";
+import { MARKDOWN } from "../storydoc/storydoc";
 
 const STYLE_FIX_STATUS = "/fix/style/status";
 
@@ -29,9 +29,15 @@ function putCorrectedSectionsIn(
     let anySectionChanged = false;
     session.changeTheDocument((story) => {
         for (const { cellId, source } of corrected) {
-            const cell = story.cellWithId(cellId);
-            if (cell?.kind === MARKDOWN && cell.source !== source) {
-                cell.replaceMarkdown(source);
+            const cellIndex = story.cells.findIndex(
+                (cell) => cell.uniqueId === cellId,
+            );
+            if (cellIndex === -1) {
+                continue;
+            }
+            const cell = story.cells[cellIndex];
+            if (cell.kind === MARKDOWN && cell.source !== source) {
+                story.cells[cellIndex] = cell.withSource(source);
                 anySectionChanged = true;
             }
         }
@@ -65,7 +71,7 @@ export class FixStyleCommand implements AuthorDocumentCommand {
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         try {
             const jobId = await startServerJob("/fix/style", {
-                path: session.document.uri.fsPath,
+                path: session.document.path,
                 text: session.document.text,
             });
             const pass = await awaitServerJob<StyleFixJob>(

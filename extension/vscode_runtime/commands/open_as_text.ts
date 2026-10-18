@@ -1,7 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class OpenAsTextCommand implements AuthorDocumentCommand {
@@ -13,7 +12,7 @@ export class OpenAsTextCommand implements AuthorDocumentCommand {
     invoke(session: AuthorFileEditorSession): void {
         void vscode.commands.executeCommand(
             "vscode.openWith",
-            session.document.uri,
+            session.uri,
             "default",
         );
     }

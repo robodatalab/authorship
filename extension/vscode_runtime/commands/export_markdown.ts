@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { toMarkdown } from "../markdown/exporter";
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 
 function markdownFileBeside(authorFile: vscode.Uri): vscode.Uri {
     return authorFile.with({
@@ -19,13 +18,13 @@ export class ExportMarkdownCommand implements AuthorDocumentCommand {
         "Export Markdown — write this session.document out as one plain markdown manuscript";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
-        const manuscript = markdownFileBeside(session.document.uri);
+        const manuscript = markdownFileBeside(session.uri);
         await vscode.workspace.fs.writeFile(
             manuscript,
             new TextEncoder().encode(toMarkdown(session.document.cells)),
         );
         void vscode.window.showInformationMessage(
-            `Exported ${vscode.workspace.asRelativePath(session.document.uri)} to ${vscode.workspace.asRelativePath(manuscript)}`,
+            `Exported ${vscode.workspace.asRelativePath(session.uri)} to ${vscode.workspace.asRelativePath(manuscript)}`,
         );
     }
 }

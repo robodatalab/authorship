@@ -26,7 +26,7 @@ export class CheckProseCommand implements AuthorDocumentCommand {
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         try {
             const jobId = await startServerJob("/check/errors", {
-                path: session.document.uri.fsPath,
+                path: session.document.path,
                 text: session.document.text,
             });
             const checked = await awaitServerJob<CheckErrorsJob>(

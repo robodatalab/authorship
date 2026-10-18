@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { BLURB, type ImmutableAuthorDocument } from "../storydoc/model";
+import { BLURB } from "../storydoc/storydoc";
 
 interface WrittenSection extends ServerJob {
     text: string;
@@ -36,7 +36,7 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
         try {
             session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/blurb", {
-                path: session.document.uri.fsPath,
+                path: session.document.path,
                 text: session.document.text,
             });
             const blurb = await awaitServerJob<WrittenSection>(
@@ -44,9 +44,16 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
-            session?.changeTheDocument((story) =>
-                story.cellWithId(cellId)?.replaceMarkdown(blurb.text),
-            );
+            session?.changeTheDocument((story) => {
+                const cellIndex = story.cells.findIndex(
+                    (cell) => cell.uniqueId === cellId,
+                );
+                if (cellIndex === -1) {
+                    return;
+                }
+                const cell = story.cells[cellIndex];
+                story.cells[cellIndex] = cell.withSource(blurb.text);
+            });
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot write the blurb — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,

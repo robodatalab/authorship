@@ -1,6 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 
 export class RunAllCommand implements AuthorDocumentCommand {
     readonly commandName = "runAll";
