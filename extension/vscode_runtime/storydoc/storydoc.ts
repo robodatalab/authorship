@@ -315,7 +315,10 @@ function splitComments(
         // left nothing of is a comment line. A blank line the author wrote is not.
         if (commented && !remainder.join("").trim()) {
             if (keptIndices.length > 0) {
-                ranges.push([keptIndices[0], keptIndices[keptIndices.length - 1]]);
+                ranges.push([
+                    keptIndices[0],
+                    keptIndices[keptIndices.length - 1],
+                ]);
                 keptIndices = [];
             }
         } else {
@@ -386,21 +389,21 @@ function plotInTheStory(plotCell: Cell): PlotInTheStory {
 
 /** An .author document */
 export class Document {
-    text!: string;
-    lines!: string[];
-    cells!: Cell[];
+    cells: Cell[];
 
     constructor(
         text: string,
         readonly path: string | null = null,
     ) {
-        this.read(text);
+        this.cells = parse(text);
     }
 
-    private read(text: string): void {
-        this.text = text;
-        this.lines = splitlines(text);
-        this.cells = parse(text);
+    get text(): string {
+        return dumps(this.cells);
+    }
+
+    get lines(): string[] {
+        return splitlines(this.text);
     }
 
     static load(path: string): Document {
@@ -574,7 +577,7 @@ export class Document {
         // Where the cells fall is a reading of the lines, so a document that has
         // been written in is read again rather than adjusted.
         const endsWithNewline = this.text.endsWith("\n");
-        this.read(lines.join("\n") + (endsWithNewline ? "\n" : ""));
+        this.cells = parse(lines.join("\n") + (endsWithNewline ? "\n" : ""));
     }
 }
 

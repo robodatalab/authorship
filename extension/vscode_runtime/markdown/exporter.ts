@@ -1,12 +1,10 @@
 import {
     ABOUT,
-    ImmutableAuthorDocument,
-    MutableAuthorDocument,
-    MutableCell,
     BLURB,
+    Cell,
     CHAPTER,
     DIVIDER,
-    ImmutableCell,
+    Document,
     IMAGE,
     MARKDOWN,
     NOTE,
@@ -14,7 +12,7 @@ import {
     RECAP,
     SALIENT_CONCEPT,
     TITLE_PAGE,
-} from "../storydoc/model";
+} from "../storydoc/storydoc";
 
 const KINDS_WRITTEN_AS_HEADINGS: string[] = [TITLE_PAGE, PART, CHAPTER];
 
@@ -44,7 +42,7 @@ function insideAnHtmlComment(prose: string): string {
     return `<!--\n${prose.replace(/-->/g, "--&gt;")}\n-->`;
 }
 
-function titlePageMarkdown(cell: ImmutableCell): string[] {
+function titlePageMarkdown(cell: Cell): string[] {
     const lines = [
         `${headingHashesFor(TITLE_PAGE)} ${cell.attrs.title || "Untitled"}`,
     ];
@@ -60,7 +58,7 @@ function titlePageMarkdown(cell: ImmutableCell): string[] {
     return lines;
 }
 
-function aboutTheAuthorMarkdown(cell: ImmutableCell): string[] {
+function aboutTheAuthorMarkdown(cell: Cell): string[] {
     const lines: string[] = [];
     const links = AUTHOR_LINK_ATTRIBUTES.filter(
         ([attributeName]) => cell.attrs[attributeName],
@@ -79,45 +77,7 @@ function aboutTheAuthorMarkdown(cell: ImmutableCell): string[] {
         : [];
 }
 
-export function fromMarkdown(markdown: string): string {
-    const document = MutableAuthorDocument.fromText("");
-    for (const cell of cellsReadFromMarkdown(markdown)) {
-        document.insertAt(document.cells.length, cell);
-    }
-    return document.text;
-}
-
-function cellsReadFromMarkdown(markdown: string): MutableCell[] {
-    const cells: MutableCell[] = [];
-    let proseSinceTheLastHeading: string[] = [];
-
-    const closeTheProseCell = (): void => {
-        const prose = proseSinceTheLastHeading.join("\n").trim();
-        if (prose) {
-            cells.push(new MutableCell(MARKDOWN, prose, {}));
-        }
-        proseSinceTheLastHeading = [];
-    };
-
-    for (const line of markdown.split("\n")) {
-        const heading = MARKDOWN_HEADING.exec(line.trim());
-        if (!heading) {
-            proseSinceTheLastHeading.push(line);
-            continue;
-        }
-        const [, hashes, headingText] = heading;
-        closeTheProseCell();
-        cells.push(
-            new MutableCell(KINDS_WRITTEN_AS_HEADINGS[hashes.length - 1], "", {
-                title: headingText.trim(),
-            }),
-        );
-    }
-    closeTheProseCell();
-    return cells;
-}
-
-export function toMarkdown(cells: readonly ImmutableCell[]): string {
+export function toMarkdown(cells: readonly Cell[]): string {
     const manuscript: string[] = [];
     for (const cell of cells) {
         if (KINDS_WRITTEN_AS_COMMENTS.includes(cell.kind)) {
@@ -159,4 +119,42 @@ export function toMarkdown(cells: readonly ImmutableCell[]): string {
         }
     }
     return manuscript.join("\n\n") + (manuscript.length > 0 ? "\n" : "");
+}
+
+export function fromMarkdown(markdown: string): string {
+    const document = new Document("");
+    for (const cell of cellsReadFromMarkdown(markdown)) {
+        document.cells.push(cell);
+    }
+    return document.text;
+}
+
+function cellsReadFromMarkdown(markdown: string): Cell[] {
+    const cells: Cell[] = [];
+    let proseSinceTheLastHeading: string[] = [];
+
+    const closeTheProseCell = (): void => {
+        const prose = proseSinceTheLastHeading.join("\n").trim();
+        if (prose) {
+            cells.push(new Cell(MARKDOWN, prose, {}));
+        }
+        proseSinceTheLastHeading = [];
+    };
+
+    for (const line of markdown.split("\n")) {
+        const heading = MARKDOWN_HEADING.exec(line.trim());
+        if (!heading) {
+            proseSinceTheLastHeading.push(line);
+            continue;
+        }
+        const [, hashes, headingText] = heading;
+        closeTheProseCell();
+        cells.push(
+            new Cell(KINDS_WRITTEN_AS_HEADINGS[hashes.length - 1], "", {
+                title: headingText.trim(),
+            }),
+        );
+    }
+    closeTheProseCell();
+    return cells;
 }

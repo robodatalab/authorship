@@ -5,12 +5,12 @@ import {
     toMarkdown,
 } from "../../../extension/vscode_runtime/markdown/exporter";
 import {
-    MutableAuthorDocument,
-    MutableCell,
-} from "../../../extension/vscode_runtime/storydoc/model";
+    Cell,
+    Document,
+} from "../../../extension/vscode_runtime/storydoc/storydoc";
 
-function cellsOf(text: string): MutableCell[] {
-    return MutableAuthorDocument.fromText(text).cells;
+function cellsOf(text: string): Cell[] {
+    return new Document(text).cells;
 }
 
 function markdownOf(text: string): string {

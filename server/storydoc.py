@@ -321,12 +321,15 @@ class Document:
 
     def __init__(self, text: str, path: Path | None = None) -> None:
         self.path = path
-        self._read(text)
-
-    def _read(self, text: str) -> None:
-        self.text = text
-        self.lines = text.splitlines()
         self.cells = parse(text)
+
+    @property
+    def text(self) -> str:
+        return dumps(self.cells)
+
+    @property
+    def lines(self) -> list[str]:
+        return self.text.splitlines()
 
     @classmethod
     def load(cls, path: Path) -> "Document":
@@ -454,7 +457,7 @@ class Document:
         # Where the cells fall is a reading of the lines, so a document that has
         # been written in is read again rather than adjusted.
         ends_with_newline = self.text.endswith("\n")
-        self._read("\n".join(lines) + ("\n" if ends_with_newline else ""))
+        self.cells = parse("\n".join(lines) + ("\n" if ends_with_newline else ""))
 
 
 def _read_attrs(text: str) -> dict[str, str]:
