@@ -1,8 +1,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import { labelOfCellKind } from "../storydoc/cell_kinds";
-import { PLOT, SALIENT_CONCEPT } from "../storydoc/model";
+import { PLOT, SALIENT_CONCEPT } from "../storydoc/storydoc";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 const DELETE = "Delete";
@@ -27,9 +26,8 @@ export class DeleteStoryAnnotationCommand implements AuthorDocumentCommand {
         if (!annotation) {
             return;
         }
-        const nameOfTheKind = labelOfCellKind(annotation.kind).toLowerCase();
         const answer = await vscode.window.showWarningMessage(
-            `Delete the ${nameOfTheKind} “${annotation.attrs.title ?? ""}”?`,
+            `Delete the ${annotation.kind} “${annotation.attrs.title ?? ""}”?`,
             {
                 modal: true,
                 detail: WHAT_GOES_WITH_THE_ANNOTATION[annotation.kind],
@@ -39,8 +37,10 @@ export class DeleteStoryAnnotationCommand implements AuthorDocumentCommand {
         if (answer !== DELETE) {
             return;
         }
-        session.changeTheDocument((story) =>
-            story.removeCell(annotationCellId),
-        );
+        session.changeTheDocument((story) => {
+            story.cells = story.cells.filter(
+                (cell) => cell.uniqueId !== annotationCellId,
+            );
+        });
     }
 }

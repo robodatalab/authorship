@@ -1,30 +1,25 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import { labelOfCellKind } from "../storydoc/cell_kinds";
-import type { ImmutableAuthorDocument, ImmutableCell } from "../storydoc/model";
+import type { Cell, Document } from "../storydoc/storydoc";
 import {
     cellsBySection,
     cellsWithinASection,
     removeTheSection,
     whereACellStands,
     type CellsInASection,
-} from "../storydoc/sections";
+} from "../storydoc/story_sections";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 const EVERYTHING_UNDER_IT = "Delete All";
 const THE_CELL_ALONE = "Only This One";
 
-function nameOf(cell: ImmutableCell): string {
-    return cell.attrs.title || labelOfCellKind(cell.kind);
-}
-
 async function theAuthorWantsTheWholeSectionGone(
-    section: CellsInASection<ImmutableCell>,
+    section: CellsInASection<Cell>,
 ): Promise<boolean | undefined> {
     const held = cellsWithinASection(section).length - 1;
     const answer = await vscode.window.showWarningMessage(
-        `Delete “${nameOf(section.cell)}” and the ${held} ${held === 1 ? "section" : "sections"} under it?`,
+        `Delete “${section.cell.title}” and the ${held} ${held === 1 ? "section" : "sections"} under it?`,
         {
             modal: true,
             detail: "Delete it alone and they stay where they are.",
@@ -55,7 +50,11 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
         }
 
         if (standing.section.within.length === 0) {
-            session?.changeTheDocument((story) => story.removeCell(cellId));
+            session?.changeTheDocument((story) => {
+                story.cells = story.cells.filter(
+                    (cell) => cell.uniqueId !== cellId,
+                );
+            });
             return;
         }
         const withEverythingUnderIt = await theAuthorWantsTheWholeSectionGone(
@@ -70,6 +69,10 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
             );
             return;
         }
-        session?.changeTheDocument((story) => story.removeCell(cellId));
+        session?.changeTheDocument((story) => {
+            story.cells = story.cells.filter(
+                (cell) => cell.uniqueId !== cellId,
+            );
+        });
     }
 }
