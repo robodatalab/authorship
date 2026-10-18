@@ -15,14 +15,15 @@ from pathlib import Path
 from server.storydoc import (
     ABOUT,
     BLURB,
-    GENERATED_CELLS,
     CHAPTER,
     TABLE_OF_CONTENTS,
     DISCLAIMER,
     IMAGE,
     PART,
-    PUBLISHING_METADATA_CELLS,
-    STORY_ANNOTATION_CELLS,
+    RECAP,
+    DIVIDER,
+    NOTE,
+    SALIENT_CONCEPT,
     TITLE_PAGE,
     Cell,
     Document,
@@ -31,6 +32,9 @@ from server.storydoc import (
 
 # A cell whose text is neither a page of the book nor part of one: built from the
 # document, or kept beside it and published nowhere.
+GENERATED_CELLS = frozenset({TABLE_OF_CONTENTS})
+PUBLISHING_METADATA_CELLS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
+STORY_ANNOTATION_CELLS = frozenset({SALIENT_CONCEPT})
 UNPRINTED = GENERATED_CELLS | PUBLISHING_METADATA_CELLS | STORY_ANNOTATION_CELLS
 
 # What the book opens with, in the order it opens with it, and what closes it.

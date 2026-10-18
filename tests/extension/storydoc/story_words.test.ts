@@ -5,6 +5,7 @@ import {
     MutableAuthorDocument,
 } from "../../../extension/vscode_runtime/storydoc/model";
 import {
+    plotsIn,
     storyAnnotationsIn,
     storyTextSpansOf,
     storyWordRangesOf,
@@ -260,5 +261,91 @@ describe("a plot's trajectory", () => {
         const trajectoryAsItIsWritten =
             session.document.cellWithId("p1")?.attrs.words;
         expect(trajectoryAsItIsWritten).toBe("7-8, 2-4");
+    });
+});
+
+describe("a plot", () => {
+    it.each([
+        {
+            plot: "without nodes or edges",
+            marker: '<!-- cell: plot title="The door" id="p1" -->',
+            nodes: [],
+            edges: [],
+        },
+        {
+            plot: "with nodes in the order they are written",
+            marker: '<!-- cell: plot title="The door" nodes="n-bell:6-7, n-door:2-3" id="p1" -->',
+            nodes: [
+                {
+                    nodeId: "n-bell",
+                    storyWordRange: { firstWord: 6, lastWord: 7 },
+                },
+                {
+                    nodeId: "n-door",
+                    storyWordRange: { firstWord: 2, lastWord: 3 },
+                },
+            ],
+            edges: [],
+        },
+        {
+            plot: "with edges from one node to another",
+            marker: '<!-- cell: plot title="The door" nodes="n-she:0-0, n-door:2-3" edges="e-1:n-she>n-door, e-2:n-door>n-she" id="p1" -->',
+            nodes: [
+                {
+                    nodeId: "n-she",
+                    storyWordRange: { firstWord: 0, lastWord: 0 },
+                },
+                {
+                    nodeId: "n-door",
+                    storyWordRange: { firstWord: 2, lastWord: 3 },
+                },
+            ],
+            edges: [
+                { edgeId: "e-1", fromNodeId: "n-she", toNodeId: "n-door" },
+                { edgeId: "e-2", fromNodeId: "n-door", toNodeId: "n-she" },
+            ],
+        },
+        {
+            plot: "with entries that are not nodes or edges",
+            marker: '<!-- cell: plot title="The door" nodes="n-she:0-0, 2-3" edges="e-1:n-she, e-2:n-she>n-she" id="p1" -->',
+            nodes: [
+                {
+                    nodeId: "n-she",
+                    storyWordRange: { firstWord: 0, lastWord: 0 },
+                },
+            ],
+            edges: [
+                { edgeId: "e-2", fromNodeId: "n-she", toNodeId: "n-she" },
+            ],
+        },
+    ])("is read $plot", ({ marker, nodes, edges }) => {
+        const story = ImmutableAuthorDocument.fromText(
+            [
+                '<!-- cell: markdown id="c2" -->',
+                "",
+                "She saw the door.",
+                "",
+                '<!-- cell: markdown id="c3" -->',
+                "",
+                "He heard the bell.",
+                "",
+                marker,
+                "",
+                "She finds the door.",
+                "",
+            ].join("\n"),
+        );
+
+        const plotsInTheStory = plotsIn(story.cells);
+
+        expect(plotsInTheStory).toEqual([
+            {
+                plotCellId: "p1",
+                title: "The door",
+                abstract: "She finds the door.",
+                nodes,
+                edges,
+            },
+        ]);
     });
 });

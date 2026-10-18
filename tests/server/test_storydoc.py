@@ -6,7 +6,15 @@ from pathlib import Path
 from parameterized import parameterized
 
 from server import storydoc
-from server.storydoc import Cell, Document, SalientConceptInTheStory, StoryWordRange
+from server.storydoc import (
+    Cell,
+    Document,
+    PlotEdge,
+    PlotInTheStory,
+    PlotNode,
+    SalientConceptInTheStory,
+    StoryWordRange,
+)
 
 CORPUS = json.loads(
     (Path(__file__).parents[1] / "storydoc_corpus.json").read_text(encoding="utf-8")
@@ -426,3 +434,100 @@ class SalientConcepts(unittest.TestCase):
         salient_concepts = document.salient_concepts()
 
         self.assertEqual(salient_concepts, expected)
+
+
+class Plots(unittest.TestCase):
+    @parameterized.expand([
+        (
+            "no_plots",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door.\n',
+            [],
+        ),
+        (
+            "a_plot_without_nodes_or_edges",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door.\n'
+            '\n'
+            '<!-- cell: plot title="The door" -->\n'
+            '\n'
+            'She finds the door.\n',
+            [PlotInTheStory("The door", "She finds the door.", [], [])],
+        ),
+        (
+            "nodes_in_the_order_they_are_written",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door.\n'
+            '\n'
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'He heard the bell.\n'
+            '\n'
+            '<!-- cell: plot title="The bell" nodes="n-bell:6-7, n-door:2-3" -->\n'
+            '\n'
+            'He hears the bell.\n',
+            [
+                PlotInTheStory(
+                    "The bell",
+                    "He hears the bell.",
+                    [
+                        PlotNode("n-bell", StoryWordRange(6, 7)),
+                        PlotNode("n-door", StoryWordRange(2, 3)),
+                    ],
+                    [],
+                )
+            ],
+        ),
+        (
+            "edges_from_one_node_to_another",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door.\n'
+            '\n'
+            '<!-- cell: plot title="Seeing" nodes="n-she:0-0, n-saw:1-1, n-door:2-3" '
+            'edges="e-1:n-she>n-saw, e-2:n-she>n-door, e-3:n-saw>n-door" -->\n',
+            [
+                PlotInTheStory(
+                    "Seeing",
+                    "",
+                    [
+                        PlotNode("n-she", StoryWordRange(0, 0)),
+                        PlotNode("n-saw", StoryWordRange(1, 1)),
+                        PlotNode("n-door", StoryWordRange(2, 3)),
+                    ],
+                    [
+                        PlotEdge("e-1", "n-she", "n-saw"),
+                        PlotEdge("e-2", "n-she", "n-door"),
+                        PlotEdge("e-3", "n-saw", "n-door"),
+                    ],
+                )
+            ],
+        ),
+        (
+            "entries_that_are_not_nodes_or_edges_are_left_out",
+            '<!-- cell: markdown -->\n'
+            '\n'
+            'She saw the door.\n'
+            '\n'
+            '<!-- cell: plot title="Seeing" nodes="n-she:0-0, 2-3" edges="e-1:n-she, e-2:n-she>n-she" -->\n',
+            [
+                PlotInTheStory(
+                    "Seeing",
+                    "",
+                    [PlotNode("n-she", StoryWordRange(0, 0))],
+                    [PlotEdge("e-2", "n-she", "n-she")],
+                )
+            ],
+        ),
+    ])
+    def test_are_read_with_their_nodes_and_edges(
+        self, _, text: str, expected: list[PlotInTheStory]
+    ) -> None:
+        document = Document(text)
+
+        plots = document.plots()
+
+        self.assertEqual(plots, expected)

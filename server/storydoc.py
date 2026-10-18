@@ -32,7 +32,6 @@ marker opens a new cell. Markdown has the same bargain with fences.
 
 from __future__ import annotations
 
-import itertools
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
@@ -53,6 +52,7 @@ BLURB = "blurb"
 NOTE = "note"
 RECAP = "recap"
 SALIENT_CONCEPT = "salient-concept"
+PLOT = "plot"
 
 # What an attribute says when the answer to it is no.
 NO = "no"
@@ -67,9 +67,13 @@ _COMMENT_CLOSE = "-->"
 
 STORY_WORD_RANGES = "words"
 
-_STORY_WORD = re.compile(r"\S+")
-_WORD_CHARACTER = re.compile(r"\w", re.ASCII)
 _STORY_WORD_RANGE = re.compile(r"^\s*(\d+)-(\d+)\s*$")
+
+PLOT_NODES = "nodes"
+PLOT_EDGES = "edges"
+
+_PLOT_NODE = re.compile(r"^\s*([^:\s]+):(\d+)-(\d+)\s*$")
+_PLOT_EDGE = re.compile(r"^\s*([^:\s]+):([^>\s]+)>(\S+)\s*$")
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,6 @@ class Cell:
 class StoryWordRange:
     first_word: int
     last_word: int
-    text: str
 
 
 @dataclass(frozen=True)
@@ -118,10 +121,24 @@ class SalientConceptInTheStory:
 
 
 @dataclass(frozen=True)
-class _StoryWord:
-    cell: Cell
-    start_character_offset_in_cell: int
-    end_character_offset_in_cell: int
+class PlotNode:
+    node_id: str
+    story_word_range: StoryWordRange
+
+
+@dataclass(frozen=True)
+class PlotEdge:
+    edge_id: str
+    from_node_id: str
+    to_node_id: str
+
+
+@dataclass(frozen=True)
+class PlotInTheStory:
+    title: str
+    abstract: str
+    nodes: list[PlotNode]
+    edges: list[PlotEdge]
 
 
 def parse(text: str) -> list[Cell]:
@@ -256,40 +273,8 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
 
     return ranges
 
-GENERATED_CELLS = frozenset({TABLE_OF_CONTENTS})
-PUBLISHING_METADATA_CELLS = frozenset({BLURB, NOTE, RECAP, DIVIDER})
-STORY_ANNOTATION_CELLS = frozenset({SALIENT_CONCEPT})
 
-
-def _story_words_in(markdown_cells: list[Cell]) -> list[_StoryWord]:
-    story_words: list[_StoryWord] = []
-    for cell in markdown_cells:
-        for run in _STORY_WORD.finditer(cell.source):
-            if _WORD_CHARACTER.search(run.group()):
-                story_word = _StoryWord(cell, run.start(), run.end())
-                story_words.append(story_word)
-    return story_words
-
-
-def _story_text_of(story_words: list[_StoryWord], first_word: int, last_word: int) -> str:
-    words_it_covers = story_words[first_word : last_word + 1]
-    words_by_cell = itertools.groupby(words_it_covers, key=lambda word: id(word.cell))
-    texts_of_the_cells: list[str] = []
-    for _, words_of_the_cell in words_by_cell:
-        words_in_the_cell = list(words_of_the_cell)
-        first_word_in_the_cell = words_in_the_cell[0]
-        last_word_in_the_cell = words_in_the_cell[-1]
-        text_of_the_cell = first_word_in_the_cell.cell.source[
-            first_word_in_the_cell.start_character_offset_in_cell : last_word_in_the_cell.end_character_offset_in_cell
-        ]
-        texts_of_the_cells.append(text_of_the_cell)
-    story_text = "\n\n".join(texts_of_the_cells)
-    return story_text
-
-
-def _salient_concept_in_the_story(
-    concept_cell: Cell, story_words: list[_StoryWord]
-) -> SalientConceptInTheStory:
+def _salient_concept_in_the_story(concept_cell: Cell) -> SalientConceptInTheStory:
     written_ranges = concept_cell.attrs.get(STORY_WORD_RANGES, "").split(",")
     story_word_ranges: list[StoryWordRange] = []
     for written_range in written_ranges:
@@ -298,8 +283,7 @@ def _salient_concept_in_the_story(
             continue
         first_word = int(read_range.group(1))
         last_word = int(read_range.group(2))
-        story_text = _story_text_of(story_words, first_word, last_word)
-        story_word_range = StoryWordRange(first_word, last_word, story_text)
+        story_word_range = StoryWordRange(first_word, last_word)
         story_word_ranges.append(story_word_range)
     salient_concept = SalientConceptInTheStory(
         concept_cell.title, concept_cell.source, story_word_ranges
@@ -307,15 +291,26 @@ def _salient_concept_in_the_story(
     return salient_concept
 
 
-def _prose_of(lines: list[tuple[int, str]]) -> str:
-    written: list[str] = []
-    previous: int | None = None
-    for index, said in lines:
-        if previous is not None and index != previous + 1:
-            written.append("")
-        written.append(said)
-        previous = index
-    return "\n".join(written)
+def _plot_in_the_story(plot_cell: Cell) -> PlotInTheStory:
+    nodes: list[PlotNode] = []
+    for written_node in plot_cell.attrs.get(PLOT_NODES, "").split(","):
+        read_node = _PLOT_NODE.match(written_node)
+        if read_node is None:
+            continue
+        first_word = int(read_node.group(2))
+        last_word = int(read_node.group(3))
+        story_word_range = StoryWordRange(first_word, last_word)
+        node = PlotNode(read_node.group(1), story_word_range)
+        nodes.append(node)
+    edges: list[PlotEdge] = []
+    for written_edge in plot_cell.attrs.get(PLOT_EDGES, "").split(","):
+        read_edge = _PLOT_EDGE.match(written_edge)
+        if read_edge is None:
+            continue
+        edge = PlotEdge(read_edge.group(1), read_edge.group(2), read_edge.group(3))
+        edges.append(edge)
+    plot = PlotInTheStory(plot_cell.title, plot_cell.source, nodes, edges)
+    return plot
 
 
 class Document:
@@ -377,17 +372,26 @@ class Document:
                 found.append((cell.title or f"Chapter {len(found) + 1}", []))
             elif found and cell.at:
                 found[-1][1].extend(self.story_lines(*cell.at))
-        return [(title, _prose_of(lines)) for title, lines in found if lines]
+
+        chapter_lines: list[tuple[str, str]] = []
+        for title, numbered_lines in found:
+            unnumbered_lines = "\n".join([line for _, line in numbered_lines])
+            chapter_lines.append((title, unnumbered_lines))
+
+        return chapter_lines
 
     def salient_concepts(self) -> list[SalientConceptInTheStory]:
-        markdown_cells = self.markdown_cells()
-        story_words = _story_words_in(markdown_cells)
         concept_cells = [cell for cell in self.cells if cell.kind == SALIENT_CONCEPT]
         salient_concepts = [
-            _salient_concept_in_the_story(concept_cell, story_words)
+            _salient_concept_in_the_story(concept_cell)
             for concept_cell in concept_cells
         ]
         return salient_concepts
+
+    def plots(self) -> list[PlotInTheStory]:
+        plot_cells = [cell for cell in self.cells if cell.kind == PLOT]
+        plots = [_plot_in_the_story(plot_cell) for plot_cell in plot_cells]
+        return plots
 
     def __str__(self) -> str:
         return self.text
