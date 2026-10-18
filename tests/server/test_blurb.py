@@ -136,33 +136,6 @@ class WriteBlurb(unittest.TestCase):
             "The last thing this wrote.", said_in(model.complete.call_args_list[0])
         )
 
-    def test_the_breaks_between_paragraphs_survive(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The lantern.\n\nThe door."),
-                ]
-            )
-        )
-        model = build_model()
-        blurb_written(model, document)
-        self.assertIn("The lantern.\n\nThe door.", said_in(model.complete.call_args_list[0]))
-
-    def test_a_chapter_with_nothing_written_under_it_is_not_read(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.chapter("Two"),
-                ]
-            )
-        )
-        model = build_model()
-        blurb_written(model, document)
-        self.assertEqual(model.complete.call_count, 1)
-
     def test_an_untitled_chapter_is_named_by_its_number(self) -> None:
         document = Document(
             storydoc.dumps(

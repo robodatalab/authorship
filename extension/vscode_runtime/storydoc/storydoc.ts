@@ -67,6 +67,9 @@ export const STORY_WORD_RANGES = "words";
 
 const STORY_WORD_RANGE = /^\s*(\d+)-(\d+)\s*$/;
 
+const STORY_WORD = /\S+/g;
+const WORD_CHARACTER = /\w/;
+
 export const PLOT_NODES = "nodes";
 export const PLOT_EDGES = "edges";
 
@@ -455,6 +458,34 @@ export class Document {
                 }
             }
         }
+    }
+
+    storyText(startWordIdx: number, endWordIdx: number): string {
+        const textsOfTheCells: string[] = [];
+        let wordsBefore = 0;
+        for (const cell of this.markdownCells()) {
+            const wordsOfTheCell = Array.from(
+                cell.source.matchAll(STORY_WORD),
+            ).filter((run) => WORD_CHARACTER.test(run[0]));
+            const firstWordIdxOfTheCell = wordsBefore;
+            const covered = wordsOfTheCell.filter(
+                (_, offset) =>
+                    startWordIdx <= firstWordIdxOfTheCell + offset &&
+                    firstWordIdxOfTheCell + offset <= endWordIdx,
+            );
+            wordsBefore += wordsOfTheCell.length;
+            if (covered.length > 0) {
+                const firstWord = covered[0];
+                const lastWord = covered[covered.length - 1];
+                const textOfTheCell = cell.source.slice(
+                    firstWord.index,
+                    lastWord.index + lastWord[0].length,
+                );
+                textsOfTheCells.push(textOfTheCell);
+            }
+        }
+        const storyText = textsOfTheCells.join("\n\n");
+        return storyText;
     }
 
     /** The raw contents of chapters - stripped of comments and any other information */

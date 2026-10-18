@@ -69,6 +69,9 @@ STORY_WORD_RANGES = "words"
 
 _STORY_WORD_RANGE = re.compile(r"^\s*(\d+)-(\d+)\s*$")
 
+_STORY_WORD = re.compile(r"\S+")
+_WORD_CHARACTER = re.compile(r"\w", re.ASCII)
+
 PLOT_NODES = "nodes"
 PLOT_EDGES = "edges"
 
@@ -362,6 +365,27 @@ class Document:
                 for index in range(max(kept_first, start), min(kept_last, last) + 1):
                     if self.lines[index].strip():
                         yield index, self.lines[index]
+
+    def story_text(self, start_word_idx: int, end_word_idx: int) -> str:
+        texts_of_the_cells: list[str] = []
+        words_before = 0
+        for cell in self.markdown_cells():
+            words_of_the_cell = [
+                run
+                for run in _STORY_WORD.finditer(cell.source)
+                if _WORD_CHARACTER.search(run.group())
+            ]
+            covered = [
+                word
+                for word_idx, word in enumerate(words_of_the_cell, start=words_before)
+                if start_word_idx <= word_idx <= end_word_idx
+            ]
+            words_before += len(words_of_the_cell)
+            if covered:
+                text_of_the_cell = cell.source[covered[0].start() : covered[-1].end()]
+                texts_of_the_cells.append(text_of_the_cell)
+        story_text = "\n\n".join(texts_of_the_cells)
+        return story_text
 
     @property
     def chapters(self) -> list[tuple[str, str]]:

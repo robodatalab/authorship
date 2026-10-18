@@ -42,18 +42,20 @@ def concept_covers(concept: SalientConceptInTheStory, span: StoryWordRange) -> b
 
 
 def salient_concept_texts(
-    concept: SalientConceptInTheStory, concepts_of_the_story: list[SalientConceptInTheStory]
-) -> SalientConceptTexts:
+        document: Document,
+        concept: SalientConceptInTheStory,
+        concepts_of_the_story: list[SalientConceptInTheStory]
+        ) -> SalientConceptTexts:
     own_ranges = distinct_ranges(concept.story_word_ranges)
-    examples = [word_range.text for word_range in own_ranges]
+    examples = [document.story_text(r.first_word, r.last_word) for r in own_ranges]
     ranges_of_the_story = [
         word_range for other in concepts_of_the_story for word_range in other.story_word_ranges
     ]
     distinct_ranges_of_the_story = distinct_ranges(ranges_of_the_story)
     unrelated_texts = [
-        word_range.text
-        for word_range in distinct_ranges_of_the_story
-        if not concept_covers(concept, word_range)
+        document.story_text(r.first_word, r.last_word)
+        for r in distinct_ranges_of_the_story
+        if not concept_covers(concept, r)
     ]
     texts = SalientConceptTexts(concept.abstract, examples, unrelated_texts)
     return texts
@@ -67,7 +69,7 @@ class SalientConceptsDataset(Dataset[SalientConceptExamples]):
         for story in annotated_stories:
             concepts_of_the_story = story.salient_concepts()
             for concept in concepts_of_the_story:
-                texts = salient_concept_texts(concept, concepts_of_the_story)
+                texts = salient_concept_texts(story, concept, concepts_of_the_story)
                 if len(texts.examples) >= FEWEST_EXAMPLES and texts.unrelated_texts:
                     self._concepts.append(texts)
 
