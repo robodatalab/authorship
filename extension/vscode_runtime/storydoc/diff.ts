@@ -1,10 +1,4 @@
-import {
-    ImmutableAuthorDocument,
-    ImmutableCell,
-    MutableAuthorDocument,
-    MutableCell,
-    UNIQUE_CELL_ID,
-} from "./model";
+import { Cell, Document, dumps } from "./storydoc";
 
 const NO_ATTRIBUTES: Readonly<Record<string, string | undefined>> =
     Object.freeze({});
@@ -22,8 +16,8 @@ export class AuthorDocCellDiff {
     ) {}
 
     static between(
-        cellInLhs: ImmutableCell,
-        cellInRhs: ImmutableCell,
+        cellInLhs: Cell,
+        cellInRhs: Cell,
     ): AuthorDocCellDiff | undefined {
         const attributesChanged = attributesWhereTheyDiffer(
             cellInLhs,
@@ -78,7 +72,7 @@ export class AuthorDocCellDiff {
         );
     }
 
-    static takingTheCellOut(cell: ImmutableCell): AuthorDocCellDiff {
+    static takingTheCellOut(cell: Cell): AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             cell.uniqueId,
             0,
@@ -112,30 +106,35 @@ export class AuthorDocCellDiff {
         );
     }
 
-    writeInto(document: MutableAuthorDocument): void {
+    writeInto(cells: Cell[]): Cell[] {
         if (this.kindInRhs === undefined) {
-            document.removeCell(this.cellId);
-            return;
+            return cells.filter((cell) => cell.uniqueId !== this.cellId);
         }
-        const cell =
-            document.cellWithId(this.cellId) ??
-            document.insertAt(
-                document.cells.length,
-                new MutableCell(this.kindInRhs, "", {
-                    [UNIQUE_CELL_ID]: this.cellId,
-                }),
-            );
-        cell.kind = this.kindInRhs;
-        cell.replaceMarkdown(
-            cell.source.slice(0, this.theyDifferFromCharacter) +
-                this.textInRhs +
-                cell.source.slice(this.theyDifferToCharacterInLhs),
-        );
+        const cellInLhs =
+            cells.find((cell) => cell.uniqueId === this.cellId) ??
+            new Cell(this.kindInRhs, "", { id: this.cellId });
+        const attributes: Record<string, string> = { ...cellInLhs.attrs };
         for (const [attributeName, attributeValue] of Object.entries(
             this.attributesInRhs,
         )) {
-            cell.replaceAttribute(attributeName, attributeValue);
+            if (attributeValue === undefined) {
+                delete attributes[attributeName];
+            } else {
+                attributes[attributeName] = attributeValue;
+            }
         }
+        const cellInRhs = new Cell(
+            this.kindInRhs,
+            cellInLhs.source.slice(0, this.theyDifferFromCharacter) +
+                this.textInRhs +
+                cellInLhs.source.slice(this.theyDifferToCharacterInLhs),
+            attributes,
+        );
+        return cells.some((cell) => cell.uniqueId === this.cellId)
+            ? cells.map((cell) =>
+                  cell.uniqueId === this.cellId ? cellInRhs : cell,
+              )
+            : [...cells, cellInRhs];
     }
 }
 
@@ -146,18 +145,19 @@ export class AuthorDocDiff {
         readonly cellIdsInRhs: readonly string[] | undefined,
     ) {}
 
-    static diff(
-        lhs: ImmutableAuthorDocument,
-        rhs: ImmutableAuthorDocument,
-    ): AuthorDocDiff {
+    static diff(lhs: Document, rhs: Document): AuthorDocDiff {
         const cells: AuthorDocCellDiff[] = [];
         for (const cellInLhs of lhs.cells) {
-            if (!rhs.cellWithId(cellInLhs.uniqueId)) {
+            if (
+                !rhs.cells.some((cell) => cell.uniqueId === cellInLhs.uniqueId)
+            ) {
                 cells.push(AuthorDocCellDiff.takingTheCellOut(cellInLhs));
             }
         }
         for (const cellInRhs of rhs.cells) {
-            const cellInLhs = lhs.cellWithId(cellInRhs.uniqueId);
+            const cellInLhs = lhs.cells.find(
+                (cell) => cell.uniqueId === cellInRhs.uniqueId,
+            );
             if (!cellInLhs) {
                 cells.push(
                     AuthorDocCellDiff.takingTheCellOut(cellInRhs).invert(),
@@ -194,33 +194,33 @@ export class AuthorDocDiff {
         );
     }
 
-    applyTheDiff(document: ImmutableAuthorDocument): ImmutableAuthorDocument {
-        const documentBeingChanged = new MutableAuthorDocument(
-            document.uri,
-            document.text,
-        );
+    applyTheDiff(document: Document): Document {
+        let cells = [...document.cells];
         for (const cellDiff of this.cells) {
-            cellDiff.writeInto(documentBeingChanged);
+            cells = cellDiff.writeInto(cells);
         }
         for (const [standing, cellId] of this.cellIdsInRhs?.entries() ?? []) {
-            const standsAt = documentBeingChanged.cells.findIndex(
-                (cell) => cell.uniqueId === cellId,
-            );
+            const standsAt = cells.findIndex((cell) => cell.uniqueId === cellId);
             if (standsAt !== standing) {
-                documentBeingChanged.moveCellsAt(standsAt, 1, standing);
+                const moved = cells.splice(standsAt, 1);
+                cells.splice(
+                    standing > standsAt ? standing - 1 : standing,
+                    0,
+                    ...moved,
+                );
             }
         }
-        return documentBeingChanged.toImmutable();
+        return new Document(dumps(cells), document.path);
     }
 }
 
-function cellIdsOf(document: ImmutableAuthorDocument): string[] {
+function cellIdsOf(document: Document): string[] {
     return document.cells.map((cell) => cell.uniqueId);
 }
 
 function attributesWhereTheyDiffer(
-    cellInLhs: ImmutableCell,
-    cellInRhs: ImmutableCell,
+    cellInLhs: Cell,
+    cellInRhs: Cell,
 ): {
     inLhs: Record<string, string | undefined>;
     inRhs: Record<string, string | undefined>;

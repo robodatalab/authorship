@@ -1,5 +1,5 @@
 import { AuthorDocDiff } from "./diff";
-import type { ImmutableAuthorDocument } from "./model";
+import type { Document } from "./storydoc";
 
 export interface SynchronizedRepresentation {
     cellId: string;
@@ -23,12 +23,15 @@ export class AuthorDocSynchronizer<
 > {
     constructor(private readonly representations: Representation[]) {}
 
-    synchronize(
-        docBefore: ImmutableAuthorDocument,
-        docAfter: ImmutableAuthorDocument,
-    ): void {
+    synchronize(docBefore: Document, docAfter: Document): void {
         for (const cellDiff of AuthorDocDiff.diff(docBefore, docAfter).cells) {
-            const markdownAfter = docAfter.cellWithId(cellDiff.cellId)?.source;
+            const cellBefore = docBefore.cells.find(
+                (cell) => cell.uniqueId === cellDiff.cellId,
+            );
+            const cellAfter = docAfter.cells.find(
+                (cell) => cell.uniqueId === cellDiff.cellId,
+            );
+            const markdownAfter = cellAfter?.source;
             const charactersAdded =
                 cellDiff.textInRhs.length - cellDiff.textInLhs.length;
 
@@ -43,8 +46,8 @@ export class AuthorDocSynchronizer<
                 }
 
                 const endOfTheCell = Math.max(
-                    docBefore.numCharactersInCell(cellDiff.cellId),
-                    docAfter.numCharactersInCell(cellDiff.cellId),
+                    cellBefore?.source.length ?? 0,
+                    cellAfter?.source.length ?? 0,
                 );
                 if (
                     rangeOverlaps(

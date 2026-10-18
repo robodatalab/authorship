@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MutableAuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
-import { WordCounter } from "../../../extension/vscode_runtime/storydoc/word_counter";
+import { WordCounter } from "../../../extension/webview/author_editor/word_counter";
 
 const A_STORY_IN_TWO_PARTS = `
 <!-- cell: part title="The Morning" id="p1" -->

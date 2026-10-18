@@ -4,7 +4,7 @@ import {
     AuthorDocSynchronizer,
     type SynchronizedRepresentation,
 } from "../../../extension/vscode_runtime/storydoc/author_doc_synch";
-import { MutableAuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
+import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const SHE_SAW_NOTHING = '<!-- cell: markdown id="c1" -->\n\nShe  the door.\n';
@@ -37,8 +37,8 @@ describe("a cell and text added to an empty document", () => {
         const representations: SynchronizedRepresentation[] = [];
 
         new AuthorDocSynchronizer(representations).synchronize(
-            MutableAuthorDocument.fromText(""),
-            MutableAuthorDocument.fromText(SHE_SAW),
+            new Document(""),
+            new Document(SHE_SAW),
         );
 
         expect(representations).toEqual([]);
@@ -50,8 +50,8 @@ describe("the words a representation stands on being deleted", () => {
         const representations = [markOnSaw()];
 
         new AuthorDocSynchronizer(representations).synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW),
-            MutableAuthorDocument.fromText(SHE_SAW_NOTHING),
+            new Document(SHE_SAW),
+            new Document(SHE_SAW_NOTHING),
         );
 
         expect(representations).toEqual([{ ...markOnSaw(), isVisible: false }]);
@@ -62,12 +62,12 @@ describe("the words a representation stands on being deleted", () => {
         const synchronizer = new AuthorDocSynchronizer(representations);
 
         synchronizer.synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW),
-            MutableAuthorDocument.fromText(SHE_SAW_NOTHING),
+            new Document(SHE_SAW),
+            new Document(SHE_SAW_NOTHING),
         );
         synchronizer.synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW_NOTHING),
-            MutableAuthorDocument.fromText(SHE_SAW),
+            new Document(SHE_SAW_NOTHING),
+            new Document(SHE_SAW),
         );
 
         expect(representations).toEqual([markOnSaw()]);
@@ -79,8 +79,8 @@ describe("words written before the ones a representation stands on", () => {
         const representations = [markOnSaw()];
 
         new AuthorDocSynchronizer(representations).synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW),
-            MutableAuthorDocument.fromText(SLOWLY_SHE_SAW),
+            new Document(SHE_SAW),
+            new Document(SLOWLY_SHE_SAW),
         );
 
         expect(representations).toEqual([
@@ -98,8 +98,8 @@ describe("a cell added before the one a representation stands in", () => {
         const representations = [markOnSaw()];
 
         new AuthorDocSynchronizer(representations).synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW),
-            MutableAuthorDocument.fromText(HE_HEARD + "\n" + SHE_SAW),
+            new Document(SHE_SAW),
+            new Document(HE_HEARD + "\n" + SHE_SAW),
         );
 
         expect(representations).toEqual([markOnSaw()]);
@@ -111,8 +111,8 @@ describe("the cell a representation stands in being deleted", () => {
         const representations = [markOnSaw(), markOnBell()];
 
         new AuthorDocSynchronizer(representations).synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
-            MutableAuthorDocument.fromText(HE_HEARD),
+            new Document(SHE_SAW + "\n" + HE_HEARD),
+            new Document(HE_HEARD),
         );
 
         expect(representations).toEqual([
@@ -126,12 +126,12 @@ describe("the cell a representation stands in being deleted", () => {
         const synchronizer = new AuthorDocSynchronizer(representations);
 
         synchronizer.synchronize(
-            MutableAuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
-            MutableAuthorDocument.fromText(HE_HEARD),
+            new Document(SHE_SAW + "\n" + HE_HEARD),
+            new Document(HE_HEARD),
         );
         synchronizer.synchronize(
-            MutableAuthorDocument.fromText(HE_HEARD),
-            MutableAuthorDocument.fromText(SHE_SAW + "\n" + HE_HEARD),
+            new Document(HE_HEARD),
+            new Document(SHE_SAW + "\n" + HE_HEARD),
         );
 
         expect(representations).toEqual([markOnSaw(), markOnBell()]);

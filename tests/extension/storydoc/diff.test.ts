@@ -4,7 +4,7 @@ import {
     AuthorDocCellDiff,
     AuthorDocDiff,
 } from "../../../extension/vscode_runtime/storydoc/diff";
-import { ImmutableAuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
+import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const HE_HEARD = '<!-- cell: markdown id="c2" -->\n\nHe heard the bell.\n';
@@ -13,8 +13,8 @@ const THE_STORY = THE_CHAPTER + "\n" + SHE_SAW + "\n" + HE_HEARD;
 
 function theDifferenceBetween(lhsText: string, rhsText: string): AuthorDocDiff {
     return AuthorDocDiff.diff(
-        ImmutableAuthorDocument.fromText(lhsText),
-        ImmutableAuthorDocument.fromText(rhsText),
+        new Document(lhsText),
+        new Document(rhsText),
     );
 }
 
@@ -187,8 +187,8 @@ describe("inverting a difference", () => {
 });
 
 function turningOneIntoTheOther(lhsText: string, rhsText: string): void {
-    const lhs = ImmutableAuthorDocument.fromText(lhsText);
-    const rhs = ImmutableAuthorDocument.fromText(rhsText);
+    const lhs = new Document(lhsText);
+    const rhs = new Document(rhsText);
     const change = AuthorDocDiff.diff(lhs, rhs);
 
     expect(change.applyTheDiff(lhs).text).toEqual(rhs.text);
