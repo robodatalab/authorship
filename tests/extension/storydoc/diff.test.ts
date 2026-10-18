@@ -75,7 +75,7 @@ describe("diff — what would have to change to turn one document into the other
                         "",
                         "He heard the bell.",
                         {},
-                        { id: "c2" },
+                        {},
                     ),
                 ],
                 ["c1"],
@@ -95,7 +95,7 @@ describe("diff — what would have to change to turn one document into the other
                 undefined,
                 "She saw the door.",
                 "",
-                { id: "c1" },
+                {},
                 {},
             ),
         ]);
