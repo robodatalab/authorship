@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { blankCellOfKind } from "../storydoc/cell_kinds";
+import { Cell } from "../storydoc/storydoc";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class AddStoryAnnotationCommand implements AuthorDocumentCommand {
@@ -13,10 +13,8 @@ export class AddStoryAnnotationCommand implements AuthorDocumentCommand {
         commandArguments: Record<string, unknown>,
     ): void {
         const cellKind = commandArguments.cellKind as string;
-        const annotation = blankCellOfKind(cellKind);
-        session.changeTheDocument((story) =>
-            story.insertBefore(null, annotation),
-        );
+        const annotation = new Cell(cellKind);
+        session.changeTheDocument((story) => story.cells.push(annotation));
         session.selectTheStoryAnnotation(cellKind, annotation.uniqueId);
     }
 }

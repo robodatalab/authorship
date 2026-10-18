@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MutableAuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
+import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
 import { WordCounter } from "../../../extension/webview/author_editor/word_counter";
 
 const A_STORY_IN_TWO_PARTS = `
@@ -33,9 +33,7 @@ They drank.
 
 function counterOver(text: string): WordCounter {
     const counter = new WordCounter();
-    counter.synchronize(
-        MutableAuthorDocument.fromText(text.replace(/^\n/, "")),
-    );
+    counter.synchronize(new Document(text.replace(/^\n/, "")));
     return counter;
 }
 
@@ -91,13 +89,14 @@ A woman loses her name.
     });
 
     it("counts again once the author has written more", () => {
-        const document = MutableAuthorDocument.fromText(
+        const document = new Document(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
         );
         const counter = new WordCounter();
         counter.synchronize(document);
 
-        document.cellWithId("m1")?.replaceMarkdown("She saw the door open.");
+        const sheSaw = document.cells[1];
+        document.cells[1] = sheSaw.withSource("She saw the door open.");
         counter.synchronize(document);
 
         expect(counter.wordsInTheDocument).toBe(5);
@@ -105,13 +104,13 @@ A woman loses her name.
     });
 
     it("forgets a section the author has deleted", () => {
-        const document = MutableAuthorDocument.fromText(
+        const document = new Document(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
         );
         const counter = new WordCounter();
         counter.synchronize(document);
 
-        document.removeCell("c1");
+        document.cells.splice(0, 1);
         counter.synchronize(document);
 
         expect(counter.wordsInTheSection("c1")).toBeUndefined();

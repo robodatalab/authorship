@@ -1,20 +1,20 @@
 import {
     MARKDOWN,
-    type ImmutableAuthorDocument,
-    type ImmutableCell,
-} from "./model";
+    type Cell,
+    type Document,
+} from "../../vscode_runtime/storydoc/storydoc";
 import {
     cellsBySection,
     cellsWithinASection,
     opensASection,
     type CellsInASection,
-} from "./sections";
+} from "../../vscode_runtime/storydoc/story_sections";
 
 export function numberOfWords(markdown: string): number {
     return markdown.split(/\s+/).filter((word) => /\w/.test(word)).length;
 }
 
-function wordsInTheCells(cells: readonly ImmutableCell[]): number {
+function wordsInTheCells(cells: readonly Cell[]): number {
     return cells
         .filter((cell) => cell.kind === MARKDOWN)
         .reduce((words, cell) => words + numberOfWords(cell.source), 0);
@@ -24,13 +24,13 @@ export class WordCounter {
     private wordsInEachSection = new Map<string, number>();
     private wordsInTheWholeDocument = 0;
 
-    synchronize(document: ImmutableAuthorDocument): void {
+    synchronize(document: Document): void {
         this.wordsInEachSection = new Map<string, number>();
         this.countSections(cellsBySection(document.cells));
         this.wordsInTheWholeDocument = wordsInTheCells(document.cells);
     }
 
-    private countSections(sections: CellsInASection<ImmutableCell>[]): void {
+    private countSections(sections: CellsInASection<Cell>[]): void {
         for (const section of sections) {
             if (opensASection(section.cell.kind)) {
                 this.wordsInEachSection.set(

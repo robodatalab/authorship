@@ -9,7 +9,6 @@ import {
     type BookLayoutReport,
 } from "../publish/book_layout_report";
 import { fetchFromServer } from "../server/fetch";
-import { ImmutableAuthorDocument, MutableCell } from "../storydoc/model";
 
 function fileNameOf(file: vscode.Uri): string {
     return file.path.split("/").pop() ?? file.path;
@@ -38,7 +37,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
             const report = await fetchFromServer<BookLayoutReport>(
                 "/export/epub",
                 {
-                    path: session.document.uri.fsPath,
+                    path: session.document.path,
                     text: session.document.text,
                     force: bindWhateverIsThere,
                 },
@@ -61,7 +60,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         session: AuthorFileEditorSession,
         report: BookLayoutReport,
     ): Promise<void> {
-        const fileName = fileNameOf(session.document.uri);
+        const fileName = fileNameOf(session.uri);
         const { message, detail } = askedBeforeBinding(fileName, report);
         const answer = await vscode.window.showWarningMessage(
             message,
@@ -78,13 +77,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         }
         const laidOut = cellsLaidOutByPlan(session.document.cells, report.plan);
         session.changeTheDocument((story) => {
-            story.removeCellsAt(0, story.cells.length);
-            laidOut.forEach((cell, cellIndex) =>
-                story.insertAt(
-                    cellIndex,
-                    new MutableCell(cell.kind, cell.source, cell.attrs),
-                ),
-            );
+            story.cells = laidOut;
         });
         void vscode.window.showInformationMessage(
             saidAfterLayingOut(fileName, report),
