@@ -18,8 +18,8 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
         commandArguments: Record<string, unknown>,
     ): void {
         session.changeTheDocument((story) => {
-            const concept = story.cellWithId(
-                commandArguments.conceptCellId as string,
+            const annotation = story.cellWithId(
+                commandArguments.annotationCellId as string,
             );
             const wordsAssigned = storyWordRangeBetween(
                 story.cells,
@@ -27,10 +27,10 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
                 commandArguments.startCharacterOffsetInCell as number,
                 commandArguments.endCharacterOffsetInCell as number,
             );
-            if (concept === undefined || wordsAssigned === null) {
+            if (annotation === undefined || wordsAssigned === null) {
                 return;
             }
-            const rangesItHolds = storyWordRangesOf(concept);
+            const rangesItHolds = storyWordRangesOf(annotation);
             if (
                 rangesItHolds.some(
                     (range) =>
@@ -40,7 +40,7 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
             ) {
                 return;
             }
-            concept.replaceAttribute(
+            annotation.replaceAttribute(
                 STORY_WORD_RANGES,
                 storyWordRangesAsTheyAreWritten([
                     ...rangesItHolds,

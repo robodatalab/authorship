@@ -107,7 +107,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 commandArguments?: Record<string, unknown>;
                 markdown?: string;
                 storyTextSelected?: StoryTextSpan | null;
-                passageSelected?: number | null;
+                cellKind?: string;
+                passage?: number | null;
             }) => {
                 if (message?.type === "typed" && message.cellId) {
                     void documentChangesMessageQueue.post(
@@ -126,10 +127,14 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                             message.storyTextSelected ?? null,
                         ),
                     );
-                } else if (message?.type === "selectPassage") {
+                } else if (
+                    message?.type === "selectPassage" &&
+                    message.cellKind
+                ) {
                     void documentChangesMessageQueue.post(
                         new TheAuthorSelectedThePassage(
-                            message.passageSelected ?? null,
+                            message.cellKind,
+                            message.passage ?? null,
                         ),
                     );
                 } else if (message?.type === "ready") {

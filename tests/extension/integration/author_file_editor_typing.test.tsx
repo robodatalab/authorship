@@ -36,8 +36,10 @@ interface OpenEditor {
     documentText(): string;
     undoTheNewestEdit(): Promise<void>;
     redoTheNewestEdit(): Promise<void>;
-    selectTheSalientConcept(conceptCellId: string): Promise<void>;
-    selectThePlot(plotCellId: string): Promise<void>;
+    selectTheStoryAnnotation(
+        cellKind: string,
+        annotationCellId: string,
+    ): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -135,15 +137,12 @@ async function openEditor(text: string): Promise<OpenEditor> {
             await watchersOnTheFiles[0].theFileChanged();
             await settle();
         },
-        selectTheSalientConcept: async (conceptCellId: string) => {
+        selectTheStoryAnnotation: async (
+            cellKind: string,
+            annotationCellId: string,
+        ) => {
             await act(async () => {
-                session.selectTheSalientConcept(conceptCellId);
-            });
-            await settle();
-        },
-        selectThePlot: async (plotCellId: string) => {
-            await act(async () => {
-                session.selectThePlot(plotCellId);
+                session.selectTheStoryAnnotation(cellKind, annotationCellId);
             });
             await settle();
         },
@@ -484,7 +483,7 @@ describe("the words of a salient concept while the author types", () => {
                     "",
                 ].join("\n"),
             );
-            await editor.selectTheSalientConcept("k1");
+            await editor.selectTheStoryAnnotation("salient-concept", "k1");
             await openTheCellForTyping();
 
             expect(theCellBeingTyped().marks()).toEqual([
@@ -534,7 +533,7 @@ describe("the trajectory of a plot while the author types", () => {
                 "",
             ].join("\n"),
         );
-        await editor.selectThePlot("p2");
+        await editor.selectTheStoryAnnotation("plot", "p2");
         await openTheCellForTyping();
         theCellBeingTyped().putTheCursorAt(0);
         await typeCharacter("So ");

@@ -19,17 +19,19 @@ import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/autho
 import type { CellAttributeCondition } from "../../vscode_runtime/commands/author_document_command";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
-import { FOLDED, PART } from "../../vscode_runtime/storydoc/model";
+import { FOLDED, PART, PLOT } from "../../vscode_runtime/storydoc/model";
 import {
     cellsBySection,
     opensASection,
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
 import {
-    plotsIn,
-    salientConceptsIn,
+    NO_STORY_ANNOTATION_SELECTED,
+    STORY_ANNOTATION_KINDS,
+    storyAnnotationsIn,
     storyTextSpansOf,
     storyWordsIn,
+    type StoryAnnotationSelected,
     type StoryTextSpan,
 } from "../../vscode_runtime/storydoc/story_words";
 import {
@@ -122,9 +124,7 @@ interface AuthorFileEditorCanvasProps {
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderers: AuthorDocumentCellRenderers;
     proseErrors?: ProseCheckError[];
-    salientConceptSelected?: string | null;
-    plotSelected?: string | null;
-    passageSelected?: number | null;
+    storyAnnotationsSelected?: Readonly<Record<string, StoryAnnotationSelected>>;
     storyTextShown?: StoryTextSpan | null;
     findMatches?: AuthorFileEditorFindMatch[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
@@ -139,9 +139,7 @@ export function AuthorFileEditorCanvas({
     sendMessagesToVscode,
     cellRenderers,
     proseErrors = [],
-    salientConceptSelected = null,
-    plotSelected = null,
-    passageSelected = null,
+    storyAnnotationsSelected = {},
     storyTextShown = null,
     findMatches = [],
     cellsBeingWritten = {},
@@ -155,138 +153,113 @@ export function AuthorFileEditorCanvas({
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
-    const salientConcepts = useMemo(() => salientConceptsIn(cells), [cells]);
-    const plots = useMemo(() => plotsIn(cells), [cells]);
     const storyWords = useMemo(() => storyWordsIn(cells), [cells]);
-    const salientConceptColor = salientConcepts.findIndex(
-        (concept) => concept.conceptCellId === salientConceptSelected,
-    );
-    const examplesOfTheConceptSelected = useMemo(
+    const storyAnnotationsShown = useMemo(
         () =>
-            (
-                salientConcepts[salientConceptColor]?.storyWordRanges ?? []
-            ).map((storyWordRange) =>
-                storyTextSpansOf(storyWords, storyWordRange),
-            ),
-        [salientConcepts, salientConceptColor, storyWords],
-    );
-    const plotColor = plots.findIndex(
-        (plot) => plot.plotCellId === plotSelected,
-    );
-    const passagesOfThePlotSelected = useMemo(
-        () =>
-            (plots[plotColor]?.trajectory ?? []).map((storyWordRange) =>
-                storyTextSpansOf(storyWords, storyWordRange),
-            ),
-        [plots, plotColor, storyWords],
+            STORY_ANNOTATION_KINDS.map((cellKind) => {
+                const annotations = storyAnnotationsIn(cells, cellKind);
+                const selected =
+                    storyAnnotationsSelected[cellKind] ??
+                    NO_STORY_ANNOTATION_SELECTED;
+                const highlightColor = annotations.findIndex(
+                    (annotation) =>
+                        annotation.annotationCellId ===
+                        selected.annotationCellId,
+                );
+                const passages = (
+                    annotations[highlightColor]?.passages ?? []
+                ).map((storyWordRange) =>
+                    storyTextSpansOf(storyWords, storyWordRange),
+                );
+                return {
+                    cellKind,
+                    highlightColor,
+                    passages,
+                    passageSelected: selected.passage,
+                };
+            }),
+        [cells, storyWords, storyAnnotationsSelected],
     );
     const storyTextHighlightsByCellId = useMemo(() => {
         const byCellId = new Map<
             string,
             MarkdownEditorStoryTextHighlight[]
         >();
-        function highlightTheStoryText(
-            spans: StoryTextSpan[],
-            highlightColor: number,
-            emphasized: boolean,
-        ): void {
-            for (const span of spans) {
-                byCellId.set(span.cellId, [
-                    ...(byCellId.get(span.cellId) ?? []),
-                    {
-                        startCharacterOffsetInCell:
-                            span.startCharacterOffsetInCell,
-                        endCharacterOffsetInCell: span.endCharacterOffsetInCell,
-                        highlightColor,
-                        emphasized,
-                    },
-                ]);
-            }
+        for (const annotation of storyAnnotationsShown) {
+            annotation.passages.forEach((passage, passageIndex) => {
+                for (const span of passage) {
+                    byCellId.set(span.cellId, [
+                        ...(byCellId.get(span.cellId) ?? []),
+                        {
+                            startCharacterOffsetInCell:
+                                span.startCharacterOffsetInCell,
+                            endCharacterOffsetInCell:
+                                span.endCharacterOffsetInCell,
+                            highlightColor: annotation.highlightColor,
+                            emphasized:
+                                passageIndex === annotation.passageSelected,
+                        },
+                    ]);
+                }
+            });
         }
-        examplesOfTheConceptSelected.forEach((example) =>
-            highlightTheStoryText(example, salientConceptColor, false),
-        );
-        passagesOfThePlotSelected.forEach((passage, passageIndex) =>
-            highlightTheStoryText(
-                passage,
-                plotColor,
-                passageIndex === passageSelected,
-            ),
-        );
         return byCellId;
-    }, [
-        examplesOfTheConceptSelected,
-        salientConceptColor,
-        passagesOfThePlotSelected,
-        plotColor,
-        passageSelected,
-    ]);
+    }, [storyAnnotationsShown]);
     const whatTheOverviewRulerShows = useMemo(() => {
         const marks: AuthorFileEditorOverviewRulerMark[] = [];
         const arrows: AuthorFileEditorOverviewRulerArrow[] = [];
-        for (const example of examplesOfTheConceptSelected) {
-            marks.push({
-                storyText: example,
-                highlightColor: salientConceptColor,
-                dimmed: false,
-            });
-        }
-        if (passageSelected === null) {
-            return { marks, arrows };
-        }
-        const passage = passagesOfThePlotSelected[passageSelected] ?? [];
-        const passageBefore =
-            passagesOfThePlotSelected[passageSelected - 1] ?? [];
-        const passageAfter =
-            passagesOfThePlotSelected[passageSelected + 1] ?? [];
-        if (passage.length === 0) {
-            return { marks, arrows };
-        }
-        const passageMark = marks.length;
-        marks.push({
-            storyText: passage,
-            highlightColor: plotColor,
-            dimmed: false,
-        });
-        if (passageBefore.length > 0) {
-            marks.push({
-                storyText: passageBefore,
-                highlightColor: plotColor,
-                dimmed: true,
-            });
-            arrows.push({ fromMark: marks.length - 1, toMark: passageMark });
-        }
-        if (passageAfter.length > 0) {
-            marks.push({
-                storyText: passageAfter,
-                highlightColor: plotColor,
-                dimmed: true,
-            });
-            arrows.push({ fromMark: passageMark, toMark: marks.length - 1 });
+        for (const annotation of storyAnnotationsShown) {
+            const firstMark = marks.length;
+            annotation.passages.forEach((passage, passageIndex) =>
+                marks.push({
+                    storyText: passage,
+                    highlightColor: annotation.highlightColor,
+                    dimmed:
+                        annotation.passageSelected !== null &&
+                        passageIndex !== annotation.passageSelected,
+                }),
+            );
+            const passageSelected = annotation.passageSelected;
+            if (
+                annotation.cellKind !== PLOT ||
+                passageSelected === null ||
+                annotation.passages[passageSelected] === undefined
+            ) {
+                continue;
+            }
+            if (annotation.passages[passageSelected - 1] !== undefined) {
+                arrows.push({
+                    fromMark: firstMark + passageSelected - 1,
+                    toMark: firstMark + passageSelected,
+                });
+            }
+            if (annotation.passages[passageSelected + 1] !== undefined) {
+                arrows.push({
+                    fromMark: firstMark + passageSelected,
+                    toMark: firstMark + passageSelected + 1,
+                });
+            }
         }
         return { marks, arrows };
-    }, [
-        examplesOfTheConceptSelected,
-        salientConceptColor,
-        passagesOfThePlotSelected,
-        passageSelected,
-        plotColor,
-    ]);
+    }, [storyAnnotationsShown]);
 
-    function selectThePassageClicked(cellId: string, clickedAt: number): void {
-        const passageClicked = passagesOfThePlotSelected.findIndex((passage) =>
-            passage.some(
-                (span) =>
-                    span.cellId === cellId &&
-                    span.startCharacterOffsetInCell <= clickedAt &&
-                    clickedAt < span.endCharacterOffsetInCell,
-            ),
-        );
-        if (passageClicked >= 0) {
-            sendMessagesToVscode({
-                type: "selectPassage",
-                passageSelected: passageClicked,
-            });
+    function selectThePassagesClicked(cellId: string, clickedAt: number): void {
+        for (const annotation of storyAnnotationsShown) {
+            const passageClicked = annotation.passages.findIndex((passage) =>
+                passage.some(
+                    (span) =>
+                        span.cellId === cellId &&
+                        span.startCharacterOffsetInCell <= clickedAt &&
+                        clickedAt < span.endCharacterOffsetInCell,
+                ),
+            );
+            if (passageClicked >= 0) {
+                sendMessagesToVscode({
+                    type: "selectPassage",
+                    cellKind: annotation.cellKind,
+                    passage: passageClicked,
+                });
+            }
         }
     }
 
@@ -451,7 +424,7 @@ export function AuthorFileEditorCanvas({
                                         : undefined
                                 }
                                 onStoryTextClicked={(clickedAt) =>
-                                    selectThePassageClicked(
+                                    selectThePassagesClicked(
                                         cell.attrs.id,
                                         clickedAt,
                                     )

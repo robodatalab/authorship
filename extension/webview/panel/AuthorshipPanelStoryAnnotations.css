@@ -1,11 +1,11 @@
-.authorship-panel-salient-concepts {
+.authorship-panel-story-annotations {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-height: 0;
 }
 
-.authorship-panel-salient-concepts-list {
+.authorship-panel-story-annotations-list {
     flex: 1 1 50%;
     min-height: 0;
     margin: 0;
@@ -14,23 +14,23 @@
     list-style: none;
 }
 
-.authorship-panel-salient-concept {
+.authorship-panel-story-annotation {
     display: flex;
     align-items: center;
     border-radius: 3px;
 }
 
-.authorship-panel-salient-concept:hover {
+.authorship-panel-story-annotation:hover {
     background: var(--vscode-list-hoverBackground);
 }
 
-.authorship-panel-salient-concept-selected,
-.authorship-panel-salient-concept-selected:hover {
+.authorship-panel-story-annotation-selected,
+.authorship-panel-story-annotation-selected:hover {
     color: var(--vscode-list-activeSelectionForeground, inherit);
     background: var(--vscode-list-activeSelectionBackground);
 }
 
-.authorship-panel-salient-concept-title {
+.authorship-panel-story-annotation-title {
     flex: 1;
     min-width: 0;
     padding: 4px 0;
@@ -45,9 +45,9 @@
     cursor: pointer;
 }
 
-.authorship-panel-salient-concept-assign,
-.authorship-panel-salient-concept-deleted,
-.authorship-panel-salient-concept-example-removed {
+.authorship-panel-story-annotation-assign,
+.authorship-panel-story-annotation-deleted,
+.authorship-panel-story-annotation-passage-removed {
     display: inline-flex;
     align-items: center;
     padding: 2px 4px;
@@ -58,17 +58,17 @@
     cursor: pointer;
 }
 
-.authorship-panel-salient-concept-assign:hover:enabled,
-.authorship-panel-salient-concept-deleted:hover,
-.authorship-panel-salient-concept-example-shown:hover,
-.authorship-panel-salient-concept-example-removed:hover {
+.authorship-panel-story-annotation-assign:hover:enabled,
+.authorship-panel-story-annotation-deleted:hover,
+.authorship-panel-story-annotation-passage-shown:hover,
+.authorship-panel-story-annotation-passage-removed:hover {
     background: var(
         --vscode-toolbar-hoverBackground,
         var(--vscode-list-hoverBackground)
     );
 }
 
-.authorship-panel-salient-concept-examples-count {
+.authorship-panel-story-annotation-passages-count {
     min-width: 3ch;
     padding: 0 6px;
     font-size: calc(var(--vscode-font-size) - 1px);
@@ -77,21 +77,22 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.authorship-panel-salient-concept-deleted {
+.authorship-panel-story-annotation-deleted {
     visibility: hidden;
 }
 
-.authorship-panel-salient-concept:hover .authorship-panel-salient-concept-deleted,
-.authorship-panel-salient-concept-deleted:focus-visible {
+.authorship-panel-story-annotation:hover
+    .authorship-panel-story-annotation-deleted,
+.authorship-panel-story-annotation-deleted:focus-visible {
     visibility: visible;
 }
 
-.authorship-panel-salient-concept-assign:disabled {
+.authorship-panel-story-annotation-assign:disabled {
     opacity: 0.4;
     cursor: default;
 }
 
-.authorship-panel-salient-concept-details {
+.authorship-panel-story-annotation-details {
     flex: 1 1 50%;
     min-height: 0;
     padding-top: 8px;
@@ -99,21 +100,21 @@
     border-top: 1px solid var(--vscode-panel-border);
 }
 
-.authorship-panel-salient-concept-description {
+.authorship-panel-story-annotation-description {
     margin-top: 8px;
     padding: 3px 6px;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 3px;
 }
 
-.authorship-panel-salient-concept-examples-heading {
+.authorship-panel-story-annotation-passages-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 12px 0 4px;
 }
 
-.authorship-panel-salient-concept-details h4 {
+.authorship-panel-story-annotation-details h4 {
     margin: 0;
     font-size: calc(var(--vscode-font-size) - 1px);
     font-weight: 600;
@@ -122,19 +123,24 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.authorship-panel-salient-concept-examples {
+.authorship-panel-story-annotation-passages {
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.authorship-panel-salient-concept-example {
+.authorship-panel-story-annotation-passage {
     display: flex;
     align-items: center;
     gap: 4px;
+    border-radius: 3px;
 }
 
-.authorship-panel-salient-concept-example-shown {
+.authorship-panel-story-annotation-passage-selected {
+    background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.authorship-panel-story-annotation-passage-shown {
     flex: 1;
     min-width: 0;
     padding: 2px 4px;
@@ -148,4 +154,9 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+}
+
+.authorship-panel-story-annotation-passage-selected
+    .authorship-panel-story-annotation-passage-shown {
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
 }

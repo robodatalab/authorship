@@ -20,7 +20,7 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
         const session = storyWithTheDoor("");
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
@@ -33,7 +33,7 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
         const session = storyWithTheDoor('words="0-0"');
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
@@ -44,11 +44,25 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
         );
     });
 
+    it("leaves the words as they are when they are assigned already", () => {
+        const session = storyWithTheDoor('words="1-3"');
+
+        new AssignStoryTextCommand().invoke(session, {
+            annotationCellId: "k1",
+            cellId: "c1",
+            startCharacterOffsetInCell: 5,
+            endCharacterOffsetInCell: 13,
+        });
+
+        const wordsAssigned = session.document.cellWithId("k1")?.attrs.words;
+        expect(wordsAssigned).toBe("1-3");
+    });
+
     it("assigns nothing when the selection touches no word", () => {
         const session = storyWithTheDoor("");
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 3,
             endCharacterOffsetInCell: 4,

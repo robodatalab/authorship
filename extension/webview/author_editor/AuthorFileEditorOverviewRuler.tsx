@@ -9,6 +9,8 @@ const MARKS_START_AT_PX = 4;
 const MARK_WIDTH_PX = 10;
 const ARROWS_START_AT_PX = MARKS_START_AT_PX + MARK_WIDTH_PX + 2;
 const ARROW_LANE_WIDTH_PX = 6;
+const WHERE_AN_ARROW_LEAVES_A_MARK = 0.75;
+const WHERE_AN_ARROW_ARRIVES_AT_A_MARK = 0.25;
 
 export interface AuthorFileEditorOverviewRulerMark {
     storyText: StoryTextSpan[];
@@ -25,6 +27,13 @@ interface AuthorFileEditorOverviewRulerProps {
     scrolledList: RefObject<HTMLElement | null>;
     marks: AuthorFileEditorOverviewRulerMark[];
     arrows: AuthorFileEditorOverviewRulerArrow[];
+}
+
+interface ArrowOnTheRuler {
+    leavesAt: number;
+    arrivesAt: number;
+    lane: number;
+    highlightColor: number;
 }
 
 interface DrawnOnTheRuler {
@@ -133,6 +142,42 @@ export function AuthorFileEditorOverviewRuler({
         };
     }, [marks, scrolledList, whereTheTextIsDrawn, timesTheEditorsWereDrawn]);
 
+    const arrowsBetweenMarks = arrows.flatMap((arrow) => {
+        const leaves = marksOnTheRuler[arrow.fromMark];
+        const arrives = marksOnTheRuler[arrow.toMark];
+        const markArrivedAt = marks[arrow.toMark];
+        if (!leaves || !arrives || !markArrivedAt) {
+            return [];
+        }
+        return [
+            {
+                leavesAt:
+                    leaves.top + leaves.height * WHERE_AN_ARROW_LEAVES_A_MARK,
+                arrivesAt:
+                    arrives.top +
+                    arrives.height * WHERE_AN_ARROW_ARRIVES_AT_A_MARK,
+                highlightColor: markArrivedAt.highlightColor,
+            },
+        ];
+    });
+    const arrowsOnTheRuler: ArrowOnTheRuler[] = [];
+    for (const arrow of arrowsBetweenMarks) {
+        const top = Math.min(arrow.leavesAt, arrow.arrivesAt);
+        const bottom = Math.max(arrow.leavesAt, arrow.arrivesAt);
+        const lanesTaken = arrowsOnTheRuler
+            .filter(
+                (drawn) =>
+                    Math.min(drawn.leavesAt, drawn.arrivesAt) <= bottom &&
+                    top <= Math.max(drawn.leavesAt, drawn.arrivesAt),
+            )
+            .map((drawn) => drawn.lane);
+        let lane = ARROWS_START_AT_PX + ARROW_LANE_WIDTH_PX;
+        while (lanesTaken.includes(lane)) {
+            lane += ARROW_LANE_WIDTH_PX;
+        }
+        arrowsOnTheRuler.push({ ...arrow, lane });
+    }
+
     return (
         <div
             ref={drawnOn}
@@ -170,37 +215,21 @@ export function AuthorFileEditorOverviewRuler({
                         />
                     );
                 })}
-                {arrows.map((arrow, arrowIndex) => {
-                    const leaves = marksOnTheRuler[arrow.fromMark];
-                    const arrives = marksOnTheRuler[arrow.toMark];
-                    const markArrivedAt = marks[arrow.toMark];
-                    if (!leaves || !arrives || !markArrivedAt) {
-                        return null;
-                    }
-                    const leavesAt = leaves.top + leaves.height / 2;
-                    const arrivesAt = arrives.top + arrives.height / 2;
-                    const lane =
-                        ARROWS_START_AT_PX +
-                        ARROW_LANE_WIDTH_PX * (arrowIndex + 1);
-                    const arrowColor = colorClassName(
-                        markArrivedAt.highlightColor,
-                    );
-                    return (
-                        <g
-                            key={arrowIndex}
-                            className={`author-file-editor-overview-ruler-arrow ${arrowColor}`}
-                        >
-                            <path
-                                className="author-file-editor-overview-ruler-arrow-line"
-                                d={`M ${ARROWS_START_AT_PX} ${leavesAt} H ${lane} V ${arrivesAt} H ${ARROWS_START_AT_PX}`}
-                            />
-                            <path
-                                className="author-file-editor-overview-ruler-arrowhead"
-                                d={`M ${ARROWS_START_AT_PX} ${arrivesAt} l 5 -3 v 6 z`}
-                            />
-                        </g>
-                    );
-                })}
+                {arrowsOnTheRuler.map((arrow, arrowIndex) => (
+                    <g
+                        key={arrowIndex}
+                        className={`author-file-editor-overview-ruler-arrow ${colorClassName(arrow.highlightColor)}`}
+                    >
+                        <path
+                            className="author-file-editor-overview-ruler-arrow-line"
+                            d={`M ${ARROWS_START_AT_PX} ${arrow.leavesAt} H ${arrow.lane} V ${arrow.arrivesAt} H ${ARROWS_START_AT_PX}`}
+                        />
+                        <path
+                            className="author-file-editor-overview-ruler-arrowhead"
+                            d={`M ${ARROWS_START_AT_PX} ${arrow.arrivesAt} l 5 -3 v 6 z`}
+                        />
+                    </g>
+                ))}
             </svg>
         </div>
     );

@@ -17,9 +17,12 @@ import {
     type ImmutableCell,
 } from "./storydoc/model";
 import {
+    NO_STORY_ANNOTATION_SELECTED,
+    STORY_ANNOTATION_KINDS,
     storyTextSpansOf,
     storyWordsIn,
     synchronizeTheStoryWordRanges,
+    type StoryAnnotationSelected,
     type StoryTextSpan,
     type StoryWordRange,
 } from "./storydoc/story_words";
@@ -47,11 +50,10 @@ export class AuthorFileEditorSession
 
     private burstBeingTyped: TypingBurst | null = null;
 
-    private salientConceptSelected: string | null = null;
-
-    private plotSelected: string | null = null;
-
-    private passageSelected: number | null = null;
+    private readonly storyAnnotationsSelected = new Map<
+        string,
+        StoryAnnotationSelected
+    >();
 
     private storyTextSelected: StoryTextSpan | null = null;
 
@@ -95,39 +97,40 @@ export class AuthorFileEditorSession
         return this.documentAsItStands;
     }
 
-    get theSalientConceptSelected(): string | null {
-        return this.salientConceptSelected;
-    }
-
-    get thePlotSelected(): string | null {
-        return this.plotSelected;
-    }
-
-    get thePassageSelected(): number | null {
-        return this.passageSelected;
+    get theStoryAnnotationsSelected(): Record<string, StoryAnnotationSelected> {
+        const selectedOfEachKind = STORY_ANNOTATION_KINDS.map((cellKind) => [
+            cellKind,
+            this.storyAnnotationsSelected.get(cellKind) ??
+                NO_STORY_ANNOTATION_SELECTED,
+        ]);
+        return Object.fromEntries(selectedOfEachKind);
     }
 
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
     }
 
-    selectTheSalientConcept(conceptCellId: string | null): void {
-        this.salientConceptSelected = conceptCellId;
-        this.sendSalientConceptSelected();
+    selectTheStoryAnnotation(
+        cellKind: string,
+        annotationCellId: string | null,
+    ): void {
+        this.storyAnnotationsSelected.set(cellKind, {
+            annotationCellId,
+            passage: null,
+        });
+        this.sendStoryAnnotationsSelected();
         this.documentOrSelectionChanged.fire();
     }
 
-    selectThePlot(plotCellId: string | null): void {
-        this.plotSelected = plotCellId;
-        this.passageSelected = null;
-        this.sendPlotSelected();
-        this.sendPassageSelected();
-        this.documentOrSelectionChanged.fire();
-    }
-
-    selectThePassage(passage: number | null): void {
-        this.passageSelected = passage;
-        this.sendPassageSelected();
+    selectThePassage(cellKind: string, passage: number | null): void {
+        const annotationSelected =
+            this.storyAnnotationsSelected.get(cellKind) ??
+            NO_STORY_ANNOTATION_SELECTED;
+        this.storyAnnotationsSelected.set(cellKind, {
+            annotationCellId: annotationSelected.annotationCellId,
+            passage,
+        });
+        this.sendStoryAnnotationsSelected();
         this.documentOrSelectionChanged.fire();
     }
 
@@ -331,24 +334,10 @@ export class AuthorFileEditorSession
         });
     }
 
-    sendSalientConceptSelected(): void {
+    sendStoryAnnotationsSelected(): void {
         void this.panel?.webview.postMessage({
-            type: "salientConceptSelected",
-            salientConceptSelected: this.salientConceptSelected,
-        });
-    }
-
-    sendPlotSelected(): void {
-        void this.panel?.webview.postMessage({
-            type: "plotSelected",
-            plotSelected: this.plotSelected,
-        });
-    }
-
-    sendPassageSelected(): void {
-        void this.panel?.webview.postMessage({
-            type: "passageSelected",
-            passageSelected: this.passageSelected,
+            type: "storyAnnotationsSelected",
+            storyAnnotationsSelected: this.theStoryAnnotationsSelected,
         });
     }
 
@@ -366,9 +355,7 @@ export class AuthorFileEditorSession
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
         this.sendProseErrors();
-        this.sendSalientConceptSelected();
-        this.sendPlotSelected();
-        this.sendPassageSelected();
+        this.sendStoryAnnotationsSelected();
         this.sendFindMatches();
         this.sendWordCounts();
         this.documentOrSelectionChanged.fire();

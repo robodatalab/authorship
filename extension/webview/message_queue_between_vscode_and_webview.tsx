@@ -11,7 +11,10 @@ import {
 } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
-import type { StoryTextSpan } from "../vscode_runtime/storydoc/story_words";
+import type {
+    StoryAnnotationSelected,
+    StoryTextSpan,
+} from "../vscode_runtime/storydoc/story_words";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -34,9 +37,7 @@ interface WhatTheWebviewDraws {
     cells: WebviewCell[];
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
-    salientConceptSelected: string | null;
-    plotSelected: string | null;
-    passageSelected: number | null;
+    storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
     storyTextShown: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
@@ -90,14 +91,9 @@ function processMessageFromVscode(
             .commands as WebviewAuthorDocumentCommandCard[];
     } else if (message.data?.type === "proseErrors") {
         drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
-    } else if (message.data?.type === "salientConceptSelected") {
-        drawn.salientConceptSelected = message.data.salientConceptSelected as
-            | string
-            | null;
-    } else if (message.data?.type === "plotSelected") {
-        drawn.plotSelected = message.data.plotSelected as string | null;
-    } else if (message.data?.type === "passageSelected") {
-        drawn.passageSelected = message.data.passageSelected as number | null;
+    } else if (message.data?.type === "storyAnnotationsSelected") {
+        drawn.storyAnnotationsSelected = message.data
+            .storyAnnotationsSelected as Record<string, StoryAnnotationSelected>;
     } else if (message.data?.type === "storyTextShown") {
         drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
     } else if (message.data?.type === "findMatches") {
@@ -130,9 +126,7 @@ function openTheAuthorFileEditor(): void {
         cells: [],
         commands: [],
         proseErrors: [],
-        salientConceptSelected: null,
-        plotSelected: null,
-        passageSelected: null,
+        storyAnnotationsSelected: {},
         storyTextShown: null,
         findMatches: [],
         cellsBeingWritten: {},
@@ -149,9 +143,7 @@ function openTheAuthorFileEditor(): void {
                 sendMessagesToVscode={sendMessagesToVscode}
                 cellRenderers={authorDocumentCellRenderers()}
                 proseErrors={drawn.proseErrors}
-                salientConceptSelected={drawn.salientConceptSelected}
-                plotSelected={drawn.plotSelected}
-                passageSelected={drawn.passageSelected}
+                storyAnnotationsSelected={drawn.storyAnnotationsSelected}
                 storyTextShown={drawn.storyTextShown}
                 findMatches={drawn.findMatches}
                 cellsBeingWritten={drawn.cellsBeingWritten}

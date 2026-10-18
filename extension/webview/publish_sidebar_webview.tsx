@@ -6,8 +6,8 @@ import {
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 import type {
-    PlotInTheStory,
-    SalientConceptInTheStory,
+    StoryAnnotationInTheStory,
+    StoryAnnotationSelected,
     StoryTextSpan,
 } from "../vscode_runtime/storydoc/story_words";
 
@@ -16,11 +16,8 @@ declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 interface WhatThePanelDraws {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
-    salientConcepts?: SalientConceptInTheStory[] | null;
-    salientConceptSelected?: string | null;
-    plots?: PlotInTheStory[] | null;
-    plotSelected?: string | null;
-    passageSelected?: number | null;
+    storyAnnotations?: Record<string, StoryAnnotationInTheStory[]> | null;
+    storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextSelected?: StoryTextSpan | null;
 }
 
@@ -32,19 +29,13 @@ function processMessageFromVscode(
         drawn.models = message.data.models as ModelServingStatus[] | null;
     } else if (message.data?.type === "jobs") {
         drawn.jobs = message.data.jobs as AsyncJobStatus[] | null;
-    } else if (message.data?.type === "salientConcepts") {
-        drawn.salientConcepts = message.data.salientConcepts as
-            | SalientConceptInTheStory[]
-            | null;
-        drawn.salientConceptSelected = message.data.salientConceptSelected as
-            | string
-            | null;
-        drawn.storyTextSelected = message.data
-            .storyTextSelected as StoryTextSpan | null;
-    } else if (message.data?.type === "plots") {
-        drawn.plots = message.data.plots as PlotInTheStory[] | null;
-        drawn.plotSelected = message.data.plotSelected as string | null;
-        drawn.passageSelected = message.data.passageSelected as number | null;
+    } else if (message.data?.type === "storyAnnotations") {
+        drawn.storyAnnotations = message.data.storyAnnotations as Record<
+            string,
+            StoryAnnotationInTheStory[]
+        > | null;
+        drawn.storyAnnotationsSelected = message.data
+            .storyAnnotationsSelected as Record<string, StoryAnnotationSelected>;
         drawn.storyTextSelected = message.data
             .storyTextSelected as StoryTextSpan | null;
     } else {
@@ -64,11 +55,8 @@ function openTheAuthorshipPanel(): void {
             <AuthorshipPanelCanvas
                 models={drawn.models}
                 jobs={drawn.jobs}
-                salientConcepts={drawn.salientConcepts}
-                salientConceptSelected={drawn.salientConceptSelected}
-                plots={drawn.plots}
-                plotSelected={drawn.plotSelected}
-                passageSelected={drawn.passageSelected}
+                storyAnnotations={drawn.storyAnnotations}
+                storyAnnotationsSelected={drawn.storyAnnotationsSelected}
                 storyTextSelected={drawn.storyTextSelected}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,

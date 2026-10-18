@@ -20,7 +20,7 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
         const session = storyWithTheDoor("1-1, 2-3");
 
         new RemoveStoryWordRangeCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             firstWord: 2,
             lastWord: 3,
         });
@@ -28,11 +28,24 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
         expect(session.document.cellWithId("k1")?.attrs.words).toBe("1-1");
     });
 
+    it("keeps the ranges it was not asked to remove in the order they are written", () => {
+        const session = storyWithTheDoor("3-3, 1-1, 0-0");
+
+        new RemoveStoryWordRangeCommand().invoke(session, {
+            annotationCellId: "k1",
+            firstWord: 1,
+            lastWord: 1,
+        });
+
+        const wordsKept = session.document.cellWithId("k1")?.attrs.words;
+        expect(wordsKept).toBe("3-3, 0-0");
+    });
+
     it("leaves the concept without words once its last range is removed", () => {
         const session = storyWithTheDoor("2-3");
 
         new RemoveStoryWordRangeCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             firstWord: 2,
             lastWord: 3,
         });

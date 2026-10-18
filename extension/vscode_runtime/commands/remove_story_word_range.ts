@@ -17,18 +17,18 @@ export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
         commandArguments: Record<string, unknown>,
     ): void {
         session.changeTheDocument((story) => {
-            const concept = story.cellWithId(
-                commandArguments.conceptCellId as string,
+            const annotation = story.cellWithId(
+                commandArguments.annotationCellId as string,
             );
-            if (concept === undefined) {
+            if (annotation === undefined) {
                 return;
             }
-            const rangesKept = storyWordRangesOf(concept).filter(
+            const rangesKept = storyWordRangesOf(annotation).filter(
                 (range) =>
                     range.firstWord !== commandArguments.firstWord ||
                     range.lastWord !== commandArguments.lastWord,
             );
-            concept.replaceAttribute(
+            annotation.replaceAttribute(
                 STORY_WORD_RANGES,
                 storyWordRangesAsTheyAreWritten(rangesKept),
             );

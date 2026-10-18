@@ -38,10 +38,13 @@ export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
 }
 
 export class TheAuthorSelectedThePassage implements AuthorFileEditorMessage {
-    constructor(private readonly passageSelected: number | null) {}
+    constructor(
+        private readonly cellKind: string,
+        private readonly passage: number | null,
+    ) {}
 
     invoke(session: AuthorFileEditorSession): void {
-        session.selectThePassage(this.passageSelected);
+        session.selectThePassage(this.cellKind, this.passage);
     }
 }
 

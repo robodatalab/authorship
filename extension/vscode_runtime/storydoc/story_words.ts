@@ -12,6 +12,8 @@ type StoryDocumentCell = Pick<ImmutableCell, "kind" | "source" | "attrs">;
 
 export const STORY_WORD_RANGES = "words";
 
+export const STORY_ANNOTATION_KINDS = [SALIENT_CONCEPT, PLOT];
+
 export interface StoryWordSpan {
     text: string;
     startCharacterOffsetInCell: number;
@@ -38,19 +40,22 @@ export interface StoryWordRangeInTheStory extends StoryWordRange {
     wordsItCovers: string;
 }
 
-export interface SalientConceptInTheStory {
-    conceptCellId: string;
+export interface StoryAnnotationInTheStory {
+    annotationCellId: string;
     title: string;
     description: string;
-    storyWordRanges: StoryWordRangeInTheStory[];
+    passages: StoryWordRangeInTheStory[];
 }
 
-export interface PlotInTheStory {
-    plotCellId: string;
-    title: string;
-    abstract: string;
-    trajectory: StoryWordRangeInTheStory[];
+export interface StoryAnnotationSelected {
+    annotationCellId: string | null;
+    passage: number | null;
 }
+
+export const NO_STORY_ANNOTATION_SELECTED: StoryAnnotationSelected = {
+    annotationCellId: null,
+    passage: null,
+};
 
 interface WordsAnEditReplaced {
     firstOldWord: number;
@@ -170,39 +175,20 @@ function storyWordRangesInTheStory(
     }));
 }
 
-export function salientConceptsIn(
+export function storyAnnotationsIn(
     cells: readonly StoryDocumentCell[],
-): SalientConceptInTheStory[] {
+    cellKind: string,
+): StoryAnnotationInTheStory[] {
     const storyWords = storyWordsIn(cells);
     return cells
-        .filter((cell) => cell.kind === SALIENT_CONCEPT)
-        .map((concept) => {
-            const storyWordRanges = storyWordRangesInTheStory(
-                concept,
-                storyWords,
-            );
+        .filter((cell) => cell.kind === cellKind)
+        .map((annotation) => {
+            const passages = storyWordRangesInTheStory(annotation, storyWords);
             return {
-                conceptCellId: concept.attrs[UNIQUE_CELL_ID],
-                title: concept.attrs.title ?? "",
-                description: concept.source,
-                storyWordRanges,
-            };
-        });
-}
-
-export function plotsIn(
-    cells: readonly StoryDocumentCell[],
-): PlotInTheStory[] {
-    const storyWords = storyWordsIn(cells);
-    return cells
-        .filter((cell) => cell.kind === PLOT)
-        .map((plot) => {
-            const trajectory = storyWordRangesInTheStory(plot, storyWords);
-            return {
-                plotCellId: plot.attrs[UNIQUE_CELL_ID],
-                title: plot.attrs.title ?? "",
-                abstract: plot.source,
-                trajectory,
+                annotationCellId: annotation.attrs[UNIQUE_CELL_ID],
+                title: annotation.attrs.title ?? "",
+                description: annotation.source,
+                passages,
             };
         });
 }

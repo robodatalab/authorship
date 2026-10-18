@@ -3,7 +3,10 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
-import { plotsIn, salientConceptsIn } from "../storydoc/story_words";
+import {
+    STORY_ANNOTATION_KINDS,
+    storyAnnotationsIn,
+} from "../storydoc/story_words";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -32,21 +35,18 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.pollTheServer();
-                this.showSalientConcepts();
-                this.showPlots();
+                this.showStoryAnnotations();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
-            } else if (message?.type === "selectSalientConcept") {
-                this.sessionFollowed?.selectTheSalientConcept(
-                    message.conceptCellId as string | null,
-                );
-            } else if (message?.type === "selectPlot") {
-                this.sessionFollowed?.selectThePlot(
-                    message.plotCellId as string | null,
+            } else if (message?.type === "selectStoryAnnotation") {
+                this.sessionFollowed?.selectTheStoryAnnotation(
+                    message.cellKind as string,
+                    message.annotationCellId as string | null,
                 );
             } else if (message?.type === "selectPassage") {
                 this.sessionFollowed?.selectThePassage(
-                    message.passageSelected as number | null,
+                    message.cellKind as string,
+                    message.passage as number | null,
                 );
             } else if (message?.type === "typed") {
                 this.sessionFollowed?.theAuthorTypedInTheCell(
@@ -90,13 +90,11 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession?.dispose();
         this.sessionFollowed = session;
         this.followingTheSession = vscode.Disposable.from(
-            session.onDocumentOrSelectionChanged(() => {
-                this.showSalientConcepts();
-                this.showPlots();
-            }),
+            session.onDocumentOrSelectionChanged(() =>
+                this.showStoryAnnotations(),
+            ),
         );
-        this.showSalientConcepts();
-        this.showPlots();
+        this.showStoryAnnotations();
     }
 
     stopFollowing(session: AuthorFileEditorSession): void {
@@ -106,31 +104,24 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession?.dispose();
         this.followingTheSession = undefined;
         this.sessionFollowed = undefined;
-        this.showSalientConcepts();
-        this.showPlots();
+        this.showStoryAnnotations();
     }
 
-    private showSalientConcepts(): void {
+    private showStoryAnnotations(): void {
         const session = this.sessionFollowed;
-        const salientConcepts = session
-            ? salientConceptsIn(session.document.cells)
+        const annotationsOfEachKind = session
+            ? STORY_ANNOTATION_KINDS.map((cellKind) => [
+                  cellKind,
+                  storyAnnotationsIn(session.document.cells, cellKind),
+              ])
+            : null;
+        const storyAnnotations = annotationsOfEachKind
+            ? Object.fromEntries(annotationsOfEachKind)
             : null;
         void this.view?.webview.postMessage({
-            type: "salientConcepts",
-            salientConcepts,
-            salientConceptSelected: session?.theSalientConceptSelected ?? null,
-            storyTextSelected: session?.theStoryTextSelected ?? null,
-        });
-    }
-
-    private showPlots(): void {
-        const session = this.sessionFollowed;
-        const plots = session ? plotsIn(session.document.cells) : null;
-        void this.view?.webview.postMessage({
-            type: "plots",
-            plots,
-            plotSelected: session?.thePlotSelected ?? null,
-            passageSelected: session?.thePassageSelected ?? null,
+            type: "storyAnnotations",
+            storyAnnotations,
+            storyAnnotationsSelected: session?.theStoryAnnotationsSelected ?? {},
             storyTextSelected: session?.theStoryTextSelected ?? null,
         });
     }

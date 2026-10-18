@@ -11,7 +11,10 @@ import {
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/story_words";
+import type {
+    StoryAnnotationSelected,
+    StoryTextSpan,
+} from "../../../extension/vscode_runtime/storydoc/story_words";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,
@@ -69,9 +72,7 @@ async function mountCanvas(options: {
     commands?: WebviewAuthorDocumentCommandCard[];
     cellTypes?: AuthorDocumentCellType[];
     cellRenderers?: AuthorDocumentCellRenderers;
-    salientConceptSelected?: string | null;
-    plotSelected?: string | null;
-    passageSelected?: number | null;
+    storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextShown?: StoryTextSpan | null;
 }): Promise<void> {
     posted = [];
@@ -90,9 +91,7 @@ async function mountCanvas(options: {
                     posted.push(message as Invocation)
                 }
                 cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
-                salientConceptSelected={options.salientConceptSelected}
-                plotSelected={options.plotSelected}
-                passageSelected={options.passageSelected}
+                storyAnnotationsSelected={options.storyAnnotationsSelected}
                 storyTextShown={options.storyTextShown}
             />,
         );
@@ -964,7 +963,9 @@ describe("the salient concepts the story holds", () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
             cellRenderers: { markdown: () => <SelectsTheDoor /> },
-            salientConceptSelected: "k1",
+            storyAnnotationsSelected: {
+                "salient-concept": { annotationCellId: "k1", passage: null },
+            },
         });
 
         expect(highlightsDrawnOnTheStory()).toEqual([
@@ -1063,7 +1064,9 @@ describe("the plots the story weaves", () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
             cellRenderers: { markdown: () => <ShowsTheHighlights /> },
-            plotSelected: "p2",
+            storyAnnotationsSelected: {
+                plot: { annotationCellId: "p2", passage: null },
+            },
         });
 
         const highlightsDrawn = document.querySelector<HTMLElement>(
@@ -1089,8 +1092,9 @@ describe("the plots the story weaves", () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
             cellRenderers: { markdown: () => <ShowsTheHighlights /> },
-            plotSelected: "p2",
-            passageSelected: 1,
+            storyAnnotationsSelected: {
+                plot: { annotationCellId: "p2", passage: 1 },
+            },
         });
 
         const highlightsDrawn = document.querySelector<HTMLElement>(
@@ -1137,7 +1141,9 @@ describe("the plots the story weaves", () => {
                 cellRenderers: {
                     markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
                 },
-                plotSelected: "p2",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p2", passage: null },
+                },
             });
             const storyText = document.querySelector(
                 ".test-click-the-story-text",
@@ -1146,17 +1152,63 @@ describe("the plots the story weaves", () => {
             await click(storyText);
 
             expect(posted).toEqual([
-                { type: "selectPassage", passageSelected: passage },
+                { type: "selectPassage", cellKind: "plot", passage },
             ]);
         },
     );
 
-    it.each([
-        { clicked: "outside every passage of the plot", plotSelected: "p1", clickedAt: 10 },
-        { clicked: "with no plot selected", plotSelected: null, clickedAt: 10 },
+    it("asks the host to select the passage of every annotation selected that the author clicks", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("The door opens.", "m1"),
+                {
+                    kind: "salient-concept",
+                    source: "What she saw.",
+                    attrs: { id: "k1", title: "Door", words: "0-1" },
+                },
+                THE_BELL,
+                THE_DOOR,
+            ],
+            cellRenderers: {
+                markdown: () => <ClicksTheStoryText clickedAt={2} />,
+            },
+            storyAnnotationsSelected: {
+                "salient-concept": { annotationCellId: "k1", passage: null },
+                plot: { annotationCellId: "p2", passage: null },
+            },
+        });
+        const storyText = document.querySelector(
+            ".test-click-the-story-text",
+        )!;
+
+        await click(storyText);
+
+        expect(posted).toEqual([
+            { type: "selectPassage", cellKind: "salient-concept", passage: 0 },
+            { type: "selectPassage", cellKind: "plot", passage: 1 },
+        ]);
+    });
+
+    it.each<{
+        clicked: string;
+        storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
+        clickedAt: number;
+    }>([
+        {
+            clicked: "outside every passage of the plot",
+            storyAnnotationsSelected: {
+                plot: { annotationCellId: "p1", passage: null },
+            },
+            clickedAt: 10,
+        },
+        {
+            clicked: "with no plot selected",
+            storyAnnotationsSelected: {},
+            clickedAt: 10,
+        },
     ])(
         "selects no passage when the author clicks $clicked",
-        async ({ plotSelected, clickedAt }) => {
+        async ({ storyAnnotationsSelected, clickedAt }) => {
             await mountCanvas({
                 cells: [
                     markdownCell("The door opens.", "m1"),
@@ -1166,7 +1218,7 @@ describe("the plots the story weaves", () => {
                 cellRenderers: {
                     markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
                 },
-                plotSelected,
+                storyAnnotationsSelected,
             });
             const storyText = document.querySelector(
                 ".test-click-the-story-text",
@@ -1179,6 +1231,9 @@ describe("the plots the story weaves", () => {
     );
 
     describe("the overview ruler beside the story", () => {
+        const MARKED = "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0";
+        const MARKED_DIMMED =
+            "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0";
         const WHERE_THE_WORDS_ARE_DRAWN: Record<string, DOMRect[]> = {
             "opens.": [
                 { left: 100, right: 150, top: 20, bottom: 38 } as DOMRect,
@@ -1210,8 +1265,7 @@ describe("the plots the story weaves", () => {
         }
 
         async function mountTheStoryOfTheDoor(
-            passageSelected: number | null,
-            salientConceptSelected: string | null = null,
+            storyAnnotationsSelected: Record<string, StoryAnnotationSelected>,
         ): Promise<void> {
             await mountCanvas({
                 cells: [
@@ -1220,7 +1274,7 @@ describe("the plots the story weaves", () => {
                     {
                         kind: "salient-concept",
                         source: "What he heard.",
-                        attrs: { id: "k1", title: "Hearing", words: "3-4" },
+                        attrs: { id: "k1", title: "Hearing", words: "0-1, 3-4" },
                     },
                     {
                         kind: "plot",
@@ -1229,6 +1283,15 @@ describe("the plots the story weaves", () => {
                             id: "p1",
                             title: "The door",
                             words: "2-2, 0-1, 3-4",
+                        },
+                    },
+                    {
+                        kind: "plot",
+                        source: "The door opens, then he hears it.",
+                        attrs: {
+                            id: "p2",
+                            title: "In order",
+                            words: "0-1, 2-2, 3-4",
                         },
                     },
                 ],
@@ -1241,9 +1304,7 @@ describe("the plots the story weaves", () => {
                         />
                     ),
                 },
-                plotSelected: "p1",
-                passageSelected,
-                salientConceptSelected,
+                storyAnnotationsSelected,
             });
         }
 
@@ -1269,157 +1330,147 @@ describe("the plots the story weaves", () => {
             return arrows.map((arrow) => arrow.getAttribute("d"));
         }
 
-        it.each([
+        it.each<{
+            selected: string;
+            storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
+            marks: string[][];
+            arrows: string[];
+        }>([
             {
-                passage: "the first",
-                passageSelected: 0,
+                selected: "nothing",
+                storyAnnotationsSelected: {},
+                marks: [],
+                arrows: [],
+            },
+            {
+                selected: "a concept",
+                storyAnnotationsSelected: {
+                    "salient-concept": { annotationCellId: "k1", passage: null },
+                },
+                marks: [
+                    [MARKED, "0", "9"],
+                    [MARKED, "150", "9"],
+                ],
+                arrows: [],
+            },
+            {
+                selected: "a concept and one of its examples",
+                storyAnnotationsSelected: {
+                    "salient-concept": { annotationCellId: "k1", passage: 1 },
+                },
+                marks: [
+                    [MARKED_DIMMED, "0", "9"],
+                    [MARKED, "150", "9"],
+                ],
+                arrows: [],
+            },
+            {
+                selected: "a plot",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p1", passage: null },
+                },
+                marks: [
+                    [MARKED, "10", "9"],
+                    [MARKED, "0", "9"],
+                    [MARKED, "150", "9"],
+                ],
+                arrows: [],
+            },
+            {
+                selected: "the first passage of a plot",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p1", passage: 0 },
+                },
+                marks: [
+                    [MARKED, "10", "9"],
+                    [MARKED_DIMMED, "0", "9"],
+                    [MARKED_DIMMED, "150", "9"],
+                ],
+                arrows: ["M 16 16.75 H 22 V 2.25 H 16"],
+            },
+            {
+                selected: "the second passage of a plot",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p1", passage: 1 },
+                },
+                marks: [
+                    [MARKED_DIMMED, "10", "9"],
+                    [MARKED, "0", "9"],
+                    [MARKED_DIMMED, "150", "9"],
+                ],
+                arrows: [
+                    "M 16 16.75 H 22 V 2.25 H 16",
+                    "M 16 6.75 H 28 V 152.25 H 16",
+                ],
+            },
+            {
+                selected: "the middle passage of a plot told in order",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p2", passage: 1 },
+                },
                 marks: [
                     [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-1",
+                        "0",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-1",
                         "10",
                         "9",
                     ],
                     [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
-                        "0",
-                        "9",
-                    ],
-                ],
-            },
-            {
-                passage: "the second",
-                passageSelected: 1,
-                marks: [
-                    [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
-                        "0",
-                        "9",
-                    ],
-                    [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
-                        "10",
-                        "9",
-                    ],
-                    [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-1",
                         "150",
                         "9",
                     ],
                 ],
+                arrows: [
+                    "M 16 6.75 H 22 V 12.25 H 16",
+                    "M 16 16.75 H 22 V 152.25 H 16",
+                ],
             },
             {
-                passage: "the last",
-                passageSelected: 2,
+                selected: "the last passage of a plot",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p1", passage: 2 },
+                },
                 marks: [
-                    [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
-                        "150",
-                        "9",
-                    ],
-                    [
-                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
-                        "0",
-                        "9",
-                    ],
+                    [MARKED_DIMMED, "10", "9"],
+                    [MARKED_DIMMED, "0", "9"],
+                    [MARKED, "150", "9"],
+                ],
+                arrows: ["M 16 6.75 H 22 V 152.25 H 16"],
+            },
+            {
+                selected: "a concept and a passage of a plot",
+                storyAnnotationsSelected: {
+                    "salient-concept": { annotationCellId: "k1", passage: null },
+                    plot: { annotationCellId: "p1", passage: 1 },
+                },
+                marks: [
+                    [MARKED, "0", "9"],
+                    [MARKED, "150", "9"],
+                    [MARKED_DIMMED, "10", "9"],
+                    [MARKED, "0", "9"],
+                    [MARKED_DIMMED, "150", "9"],
+                ],
+                arrows: [
+                    "M 16 16.75 H 22 V 2.25 H 16",
+                    "M 16 6.75 H 28 V 152.25 H 16",
                 ],
             },
         ])(
-            "marks $passage passage in the plot's colour, and the passages either side of it dimmed",
-            async ({ passageSelected, marks }) => {
+            "marks the passages, and points along a plot's trajectory, when $selected is selected",
+            async ({ storyAnnotationsSelected, marks, arrows }) => {
                 storyDrawnTwiceAsTallAsTheRuler();
 
-                await mountTheStoryOfTheDoor(passageSelected);
+                await mountTheStoryOfTheDoor(storyAnnotationsSelected);
 
                 expect(marksOnTheRuler()).toEqual(marks);
-            },
-        );
-
-        it.each([
-            {
-                passage: "the first",
-                passageSelected: 0,
-                arrows: ["M 16 14.5 H 22 V 4.5 H 16"],
-            },
-            {
-                passage: "the second",
-                passageSelected: 1,
-                arrows: [
-                    "M 16 14.5 H 22 V 4.5 H 16",
-                    "M 16 4.5 H 28 V 154.5 H 16",
-                ],
-            },
-            {
-                passage: "the last",
-                passageSelected: 2,
-                arrows: ["M 16 4.5 H 22 V 154.5 H 16"],
-            },
-        ])(
-            "points into $passage passage from the one before it and out of it to the one after",
-            async ({ passageSelected, arrows }) => {
-                storyDrawnTwiceAsTallAsTheRuler();
-
-                await mountTheStoryOfTheDoor(passageSelected);
-
                 expect(arrowsOnTheRuler()).toEqual(arrows);
             },
         );
-
-        it("marks every example of the concept selected, in the concept's colour", async () => {
-            storyDrawnTwiceAsTallAsTheRuler();
-
-            await mountTheStoryOfTheDoor(null, "k1");
-
-            expect(marksOnTheRuler()).toEqual([
-                [
-                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
-                    "150",
-                    "9",
-                ],
-            ]);
-            expect(arrowsOnTheRuler()).toEqual([]);
-        });
-
-        it("draws the plot's passages over the concept's examples, with the arrows between the passages", async () => {
-            storyDrawnTwiceAsTallAsTheRuler();
-
-            await mountTheStoryOfTheDoor(1, "k1");
-
-            expect(marksOnTheRuler()).toEqual([
-                [
-                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
-                    "150",
-                    "9",
-                ],
-                [
-                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0",
-                    "0",
-                    "9",
-                ],
-                [
-                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
-                    "10",
-                    "9",
-                ],
-                [
-                    "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0",
-                    "150",
-                    "9",
-                ],
-            ]);
-            expect(arrowsOnTheRuler()).toEqual([
-                "M 16 14.5 H 22 V 4.5 H 16",
-                "M 16 4.5 H 28 V 154.5 H 16",
-            ]);
-        });
-
-        it("is empty until a passage is selected", async () => {
-            storyDrawnTwiceAsTallAsTheRuler();
-
-            await mountTheStoryOfTheDoor(null);
-
-            expect(marksOnTheRuler()).toEqual([]);
-            expect(arrowsOnTheRuler()).toEqual([]);
-        });
 
         function areaInViewOnTheRuler(): (string | null)[] {
             const areaInView = document.querySelector(
@@ -1442,7 +1493,7 @@ describe("the plots the story weaves", () => {
                 "get",
             ).mockReturnValue(400);
 
-            await mountTheStoryOfTheDoor(null);
+            await mountTheStoryOfTheDoor({});
 
             expect(areaInViewOnTheRuler()).toEqual(["100", "200"]);
         });
@@ -1457,7 +1508,7 @@ describe("the plots the story weaves", () => {
                 "clientHeight",
                 "get",
             ).mockReturnValue(400);
-            await mountTheStoryOfTheDoor(null);
+            await mountTheStoryOfTheDoor({});
             const story = document.querySelector(
                 ".author-file-editor-canvas > ul",
             )!;

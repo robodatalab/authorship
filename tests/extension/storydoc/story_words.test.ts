@@ -5,8 +5,7 @@ import {
     MutableAuthorDocument,
 } from "../../../extension/vscode_runtime/storydoc/model";
 import {
-    plotsIn,
-    salientConceptsIn,
+    storyAnnotationsIn,
     storyTextSpansOf,
     storyWordRangesOf,
     storyWordsIn,
@@ -128,12 +127,17 @@ describe("a salient concept's words", () => {
             storyWhereSheSaw("She saw the door.", "2-3, 6-7"),
         );
 
-        expect(salientConceptsIn(story.cells)).toEqual([
+        const conceptsInTheStory = storyAnnotationsIn(
+            story.cells,
+            "salient-concept",
+        );
+
+        expect(conceptsInTheStory).toEqual([
             {
-                conceptCellId: "k1",
+                annotationCellId: "k1",
                 title: "Door",
                 description: "What she saw.",
-                storyWordRanges: [
+                passages: [
                     {
                         firstWord: 2,
                         lastWord: 3,
@@ -223,14 +227,14 @@ describe("a plot's trajectory", () => {
     it("is listed with the plot's title and abstract, in the order it is written", () => {
         const story = ImmutableAuthorDocument.fromText(STORY_OF_THE_BELL);
 
-        const plotsInTheStory = plotsIn(story.cells);
+        const plotsInTheStory = storyAnnotationsIn(story.cells, "plot");
 
         expect(plotsInTheStory).toEqual([
             {
-                plotCellId: "p1",
+                annotationCellId: "p1",
                 title: "The bell",
-                abstract: "He hears the bell, so she opens the door.",
-                trajectory: [
+                description: "He hears the bell, so she opens the door.",
+                passages: [
                     {
                         firstWord: 6,
                         lastWord: 7,

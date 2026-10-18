@@ -1,13 +1,10 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { AddPlotCommand } from "./add_plot";
-import { AddSalientConceptCommand } from "./add_salient_concept";
+import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextCommand } from "./assign_story_text";
-import { AssignStoryTextToThePlotCommand } from "./assign_story_text_to_the_plot";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
-import { DeletePlotCommand } from "./delete_plot";
-import { DeleteSalientConceptCommand } from "./delete_salient_concept";
+import { DeleteStoryAnnotationCommand } from "./delete_story_annotation";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
@@ -25,7 +22,6 @@ import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
-import { RemoveStoryWordRangeFromThePlotCommand } from "./remove_story_word_range_from_the_plot";
 import { ReplaceAttributeCommand } from "./replace_attribute";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
@@ -65,14 +61,10 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceAttributeCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
-    new AddSalientConceptCommand(),
-    new DeleteSalientConceptCommand(),
+    new AddStoryAnnotationCommand(),
+    new DeleteStoryAnnotationCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
-    new AddPlotCommand(),
-    new DeletePlotCommand(),
-    new AssignStoryTextToThePlotCommand(),
-    new RemoveStoryWordRangeFromThePlotCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

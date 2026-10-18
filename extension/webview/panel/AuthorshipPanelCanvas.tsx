@@ -7,12 +7,16 @@ import {
     AuthorshipPanelAsyncJobs,
     type AsyncJobStatus,
 } from "./AuthorshipPanelAsyncJobs";
-import { AuthorshipPanelSalientConcepts } from "./AuthorshipPanelSalientConcepts";
-import { AuthorshipPanelPlots } from "./AuthorshipPanelPlots";
-import type {
-    PlotInTheStory,
-    SalientConceptInTheStory,
-    StoryTextSpan,
+import {
+    AuthorshipPanelStoryAnnotations,
+    type AuthorshipPanelStoryAnnotationsWording,
+} from "./AuthorshipPanelStoryAnnotations";
+import { PLOT, SALIENT_CONCEPT } from "../../vscode_runtime/storydoc/model";
+import {
+    NO_STORY_ANNOTATION_SELECTED,
+    type StoryAnnotationInTheStory,
+    type StoryAnnotationSelected,
+    type StoryTextSpan,
 } from "../../vscode_runtime/storydoc/story_words";
 import "./AuthorshipPanelCanvas.css";
 
@@ -39,6 +43,28 @@ const PLOTS_TAB: AuthorshipPanelTab = {
     label: "Plots",
     iconClassName: "codicon codicon-layers",
 };
+const SALIENT_CONCEPTS_WORDING: AuthorshipPanelStoryAnnotationsWording = {
+    addAnAnnotation: "Add a salient concept",
+    noAnnotationsYet: "No salient concepts yet",
+    selectAnAnnotation: "Select a concept to see its description and examples",
+    deleteTheAnnotation: "Delete this concept",
+    passagesHeading: "Examples",
+    passagesCounted: "Examples",
+    assignTheWordsSelected: "Assign the selected words to this concept",
+    noPassagesYet: "No words assigned yet",
+    takeThePassageOut: "Take these words out of the concept",
+};
+const PLOTS_WORDING: AuthorshipPanelStoryAnnotationsWording = {
+    addAnAnnotation: "Add a plot",
+    noAnnotationsYet: "No plots yet",
+    selectAnAnnotation: "Select a plot to see its abstract and trajectory",
+    deleteTheAnnotation: "Delete this plot",
+    passagesHeading: "Trajectory",
+    passagesCounted: "Spans",
+    assignTheWordsSelected: "Add the selected words to the trajectory",
+    noPassagesYet: "No words in the trajectory yet",
+    takeThePassageOut: "Take these words out of the trajectory",
+};
 const AUTHORSHIP_PANEL_TABS = [
     SALIENT_CONCEPTS_TAB,
     PLOTS_TAB,
@@ -49,11 +75,8 @@ const AUTHORSHIP_PANEL_TABS = [
 interface AuthorshipPanelCanvasProps {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
-    salientConcepts?: SalientConceptInTheStory[] | null;
-    salientConceptSelected?: string | null;
-    plots?: PlotInTheStory[] | null;
-    plotSelected?: string | null;
-    passageSelected?: number | null;
+    storyAnnotations?: Record<string, StoryAnnotationInTheStory[]> | null;
+    storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextSelected?: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -61,11 +84,8 @@ interface AuthorshipPanelCanvasProps {
 export function AuthorshipPanelCanvas({
     models,
     jobs,
-    salientConcepts,
-    salientConceptSelected = null,
-    plots,
-    plotSelected = null,
-    passageSelected = null,
+    storyAnnotations,
+    storyAnnotationsSelected = {},
     storyTextSelected = null,
     sendMessagesToVscode,
 }: AuthorshipPanelCanvasProps) {
@@ -91,20 +111,36 @@ export function AuthorshipPanelCanvas({
             </div>
             <div className="authorship-panel-tab-body" role="tabpanel">
                 {tabShown === SALIENT_CONCEPTS_TAB &&
-                    salientConcepts !== undefined && (
-                        <AuthorshipPanelSalientConcepts
-                            salientConcepts={salientConcepts}
-                            salientConceptSelected={salientConceptSelected}
+                    storyAnnotations !== undefined && (
+                        <AuthorshipPanelStoryAnnotations
+                            cellKind={SALIENT_CONCEPT}
+                            storyAnnotations={
+                                storyAnnotations &&
+                                (storyAnnotations[SALIENT_CONCEPT] ?? [])
+                            }
+                            storyAnnotationSelected={
+                                storyAnnotationsSelected[SALIENT_CONCEPT] ??
+                                NO_STORY_ANNOTATION_SELECTED
+                            }
                             storyTextSelected={storyTextSelected}
+                            wording={SALIENT_CONCEPTS_WORDING}
+                            listsThePassagesNewestFirst={true}
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
                     )}
-                {tabShown === PLOTS_TAB && plots !== undefined && (
-                    <AuthorshipPanelPlots
-                        plots={plots}
-                        plotSelected={plotSelected}
-                        passageSelected={passageSelected}
+                {tabShown === PLOTS_TAB && storyAnnotations !== undefined && (
+                    <AuthorshipPanelStoryAnnotations
+                        cellKind={PLOT}
+                        storyAnnotations={
+                            storyAnnotations && (storyAnnotations[PLOT] ?? [])
+                        }
+                        storyAnnotationSelected={
+                            storyAnnotationsSelected[PLOT] ??
+                            NO_STORY_ANNOTATION_SELECTED
+                        }
                         storyTextSelected={storyTextSelected}
+                        wording={PLOTS_WORDING}
+                        listsThePassagesNewestFirst={false}
                         sendMessagesToVscode={sendMessagesToVscode}
                     />
                 )}
