@@ -36,6 +36,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from uuid import uuid4
 
 EXTENSION = ".author"
 
@@ -58,6 +59,8 @@ PLOT = "plot"
 NO = "no"
 
 FULL_PAGE = "full-page"
+
+_UNIQUE_ID = "id"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
@@ -92,6 +95,7 @@ class Cell:
     source: str = ""
     attrs: dict[str, str] = field(default_factory=dict)
     at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
 
     @property
     def title(self) -> str:
@@ -99,7 +103,7 @@ class Cell:
 
     @property
     def unique_id(self) -> str:
-        return self.attrs.get("id", "")
+        return self._unique_id
 
     def offset_of(self, line: int, character: int) -> int:
         assert self.at is not None
@@ -146,7 +150,7 @@ class PlotInTheStory:
 
 def parse(text: str) -> list[Cell]:
     cells: list[Cell] = []
-    kind, attrs, body, first = MARKDOWN, {}, [], 0
+    kind, attrs, body, first, unique_id = MARKDOWN, {}, [], 0, ""
     opened = False
 
     def close() -> None:
@@ -158,7 +162,7 @@ def parse(text: str) -> list[Cell]:
         # to no cell and is dropped — as the editor's reader drops it.
         if opened:
             at = (first + written[0], first + written[-1]) if written else None
-            cells.append(Cell(kind, source, dict(attrs), at))
+            cells.append(Cell(kind, source, dict(attrs), at, unique_id))
 
     # Split on "\n" alone, as the editor's reader does: a form feed or a
     # U+2028 is a character the author wrote, not a line the document has.
@@ -171,6 +175,7 @@ def parse(text: str) -> list[Cell]:
         opened = True
         kind = marker.group(1)
         attrs = _read_attrs(marker.group(2))
+        unique_id = attrs.pop(_UNIQUE_ID, "") or str(uuid4())
         body = []
         first = index + 1
     close()
@@ -470,8 +475,9 @@ def _read_attrs(text: str) -> dict[str, str]:
 
 
 def _marker_for(cell: Cell) -> str:
+    written_attrs = {_UNIQUE_ID: cell.unique_id, **cell.attrs}
     said = "".join(
-        f' {name}="{_escape(value)}"' for name, value in cell.attrs.items()
+        f' {name}="{_escape(value)}"' for name, value in written_attrs.items()
     )
     return f"<!-- cell: {cell.kind}{said} -->"
 

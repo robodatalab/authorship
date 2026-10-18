@@ -57,6 +57,8 @@ export const NO = "no";
 
 export const FULL_PAGE = "full-page";
 
+const UNIQUE_ID = "id";
+
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
@@ -97,14 +99,11 @@ export class Cell {
         readonly source: string = "",
         readonly attrs: Readonly<Record<string, string>> = {},
         readonly at: readonly [number, number] | null = null,
+        readonly uniqueId: string = crypto.randomUUID(),
     ) {}
 
     get title(): string {
         return this.attrs["title"] ?? "";
-    }
-
-    get uniqueId(): string {
-        return this.attrs["id"] ?? "";
     }
 
     offsetOf(line: number, character: number): number {
@@ -117,7 +116,7 @@ export class Cell {
     }
 
     withSource(source: string): Cell {
-        return new Cell(this.kind, source, this.attrs, this.at);
+        return new Cell(this.kind, source, this.attrs, this.at, this.uniqueId);
     }
 }
 
@@ -162,12 +161,13 @@ export class PlotInTheStory {
 
 export function parse(text: string): Cell[] {
     const cells: Cell[] = [];
-    let [kind, attrs, body, first]: [
+    let [kind, attrs, body, first, uniqueId]: [
         string,
         Record<string, string>,
         string[],
         number,
-    ] = [MARKDOWN, {}, [], 0];
+        string,
+    ] = [MARKDOWN, {}, [], 0, ""];
     let opened = false;
 
     function close(): void {
@@ -182,7 +182,7 @@ export function parse(text: string): Cell[] {
                 written.length > 0
                     ? [first + written[0], first + written[written.length - 1]]
                     : null;
-            cells.push(new Cell(kind, source, { ...attrs }, at));
+            cells.push(new Cell(kind, source, { ...attrs }, at, uniqueId));
         }
     }
 
@@ -198,6 +198,8 @@ export function parse(text: string): Cell[] {
         opened = true;
         kind = marker[1];
         attrs = readAttrs(marker[2]);
+        uniqueId = attrs[UNIQUE_ID] || crypto.randomUUID();
+        delete attrs[UNIQUE_ID];
         body = [];
         first = index + 1;
     }
@@ -595,7 +597,8 @@ function readAttrs(text: string): Record<string, string> {
 }
 
 function markerFor(cell: Cell): string {
-    const said = Object.entries(cell.attrs)
+    const writtenAttrs = { [UNIQUE_ID]: cell.uniqueId, ...cell.attrs };
+    const said = Object.entries(writtenAttrs)
         .map(([name, value]) => ` ${name}="${escape(value)}"`)
         .join("");
     return `<!-- cell: ${cell.kind}${said} -->`;

@@ -112,7 +112,7 @@ export class AuthorDocCellDiff {
         }
         const cellInLhs =
             cells.find((cell) => cell.uniqueId === this.cellId) ??
-            new Cell(this.kindInRhs, "", { id: this.cellId });
+            new Cell(this.kindInRhs, "", {}, null, this.cellId);
         const attributes: Record<string, string> = { ...cellInLhs.attrs };
         for (const [attributeName, attributeValue] of Object.entries(
             this.attributesInRhs,
@@ -129,6 +129,8 @@ export class AuthorDocCellDiff {
                 this.textInRhs +
                 cellInLhs.source.slice(this.theyDifferToCharacterInLhs),
             attributes,
+            null,
+            this.cellId,
         );
         return cells.some((cell) => cell.uniqueId === this.cellId)
             ? cells.map((cell) =>
