@@ -12,7 +12,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { TITLE_PAGE } from "../../vscode_runtime/storydoc/model";
+import { TITLE_PAGE } from "../../vscode_runtime/storydoc/storydoc";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     { attributeName: "title", label: "Title" },

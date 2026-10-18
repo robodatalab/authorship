@@ -14,7 +14,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { NOTE } from "../../vscode_runtime/storydoc/model";
+import { NOTE } from "../../vscode_runtime/storydoc/storydoc";
 import "./NotesCell.css";
 
 interface NotesCellProps {

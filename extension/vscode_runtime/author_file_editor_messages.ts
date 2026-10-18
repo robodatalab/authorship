@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import type { AuthorFileEditorMessage } from "./message_queue_between_vscode_and_webview";
-import type { StoryTextSpan } from "./storydoc/story_words";
 
 export class ThePageIsReady implements AuthorFileEditorMessage {
     invoke(session: AuthorFileEditorSession): void {

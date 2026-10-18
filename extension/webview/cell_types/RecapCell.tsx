@@ -19,7 +19,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { RECAP } from "../../vscode_runtime/storydoc/model";
+import { RECAP } from "../../vscode_runtime/storydoc/storydoc";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     {

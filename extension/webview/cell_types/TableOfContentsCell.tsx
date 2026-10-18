@@ -14,7 +14,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { TABLE_OF_CONTENTS } from "../../vscode_runtime/storydoc/model";
+import { TABLE_OF_CONTENTS } from "../../vscode_runtime/storydoc/storydoc";
 
 interface TableOfContentsCellProps {
     cell: WebviewCell;

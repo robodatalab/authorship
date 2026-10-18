@@ -13,7 +13,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { IMAGE } from "../../vscode_runtime/storydoc/model";
+import { IMAGE } from "../../vscode_runtime/storydoc/storydoc";
 import "./ImageCell.css";
 
 const FIELDS: AuthorFileEditorCellField[] = [
