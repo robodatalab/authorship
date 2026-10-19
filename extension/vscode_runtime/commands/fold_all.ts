@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { FOLDED, type ImmutableAuthorDocument } from "../storydoc/model";
+import { FOLDED } from "../storydoc/storydoc";
 import type {
     AuthorDocumentCommand,
     CellAttributeCondition,
@@ -23,9 +23,9 @@ export class FoldAllCommand implements AuthorDocumentCommand {
 
     invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            for (const cell of story.cells) {
-                cell.fold(this.folded);
-            }
+            story.cells = story.cells.map((cell) =>
+                cell.withFolded(this.folded),
+            );
         });
     }
 }

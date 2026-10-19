@@ -58,7 +58,7 @@ export const NO = "no";
 export const FULL_PAGE = "full-page";
 
 const UNIQUE_ID = "id";
-const FOLDED = "folded";
+export const FOLDED = "folded";
 const TRUE = "true";
 
 const TITLE = "title";
@@ -160,6 +160,11 @@ export abstract class Cell {
         readonly uniqueId: string,
     ) {}
 
+    static ofKind(kind: string): Cell {
+        const uniqueId = crypto.randomUUID();
+        return cellFromMarker(kind, {}, "", false, null, uniqueId);
+    }
+
     offsetOf(line: number, character: number): number {
         assert(this.at !== null);
         const above = splitlines(this.source).slice(0, line - this.at[0]);
@@ -170,6 +175,8 @@ export abstract class Cell {
     }
 
     abstract withSource(source: string): Cell;
+
+    abstract withFolded(folded: boolean): Cell;
 
     abstract accept<Result>(visitor: CellVisitor<Result>): Result;
 }
@@ -188,6 +195,10 @@ export class MarkdownCell extends Cell {
 
     withSource(source: string): MarkdownCell {
         return new MarkdownCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    withFolded(folded: boolean): MarkdownCell {
+        return new MarkdownCell(this.source, folded, this.at, this.uniqueId);
     }
 
     accept<Result>(visitor: CellVisitor<Result>): Result {
@@ -213,6 +224,16 @@ export class ChapterCell extends Cell {
             this.title,
             source,
             this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    withFolded(folded: boolean): ChapterCell {
+        return new ChapterCell(
+            this.title,
+            this.source,
+            folded,
             this.at,
             this.uniqueId,
         );
@@ -246,6 +267,16 @@ export class PartCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): PartCell {
+        return new PartCell(
+            this.title,
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitPart(this);
     }
@@ -265,6 +296,10 @@ export class DividerCell extends Cell {
 
     withSource(source: string): DividerCell {
         return new DividerCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    withFolded(folded: boolean): DividerCell {
+        return new DividerCell(this.source, folded, this.at, this.uniqueId);
     }
 
     accept<Result>(visitor: CellVisitor<Result>): Result {
@@ -311,6 +346,24 @@ export class TitlePageCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): TitlePageCell {
+        return new TitlePageCell(
+            this.title,
+            this.subtitle,
+            this.author,
+            this.publisher,
+            this.date,
+            this.version,
+            this.isbn,
+            this.coverDesigner,
+            this.language,
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitTitlePage(this);
     }
@@ -336,6 +389,17 @@ export class ImageCell extends Cell {
             this.fullPage,
             source,
             this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    withFolded(folded: boolean): ImageCell {
+        return new ImageCell(
+            this.src,
+            this.fullPage,
+            this.source,
+            folded,
             this.at,
             this.uniqueId,
         );
@@ -367,6 +431,15 @@ export class TableOfContentsCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): TableOfContentsCell {
+        return new TableOfContentsCell(
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitTableOfContents(this);
     }
@@ -390,6 +463,16 @@ export class DisclaimerCell extends Cell {
             this.title,
             source,
             this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    withFolded(folded: boolean): DisclaimerCell {
+        return new DisclaimerCell(
+            this.title,
+            this.source,
+            folded,
             this.at,
             this.uniqueId,
         );
@@ -429,6 +512,19 @@ export class AboutCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): AboutCell {
+        return new AboutCell(
+            this.kdp,
+            this.website,
+            this.substack,
+            this.portrait,
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitAbout(this);
     }
@@ -450,6 +546,10 @@ export class BlurbCell extends Cell {
         return new BlurbCell(source, this.folded, this.at, this.uniqueId);
     }
 
+    withFolded(folded: boolean): BlurbCell {
+        return new BlurbCell(this.source, folded, this.at, this.uniqueId);
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitBlurb(this);
     }
@@ -469,6 +569,10 @@ export class NoteCell extends Cell {
 
     withSource(source: string): NoteCell {
         return new NoteCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    withFolded(folded: boolean): NoteCell {
+        return new NoteCell(this.source, folded, this.at, this.uniqueId);
     }
 
     accept<Result>(visitor: CellVisitor<Result>): Result {
@@ -499,6 +603,16 @@ export class RecapCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): RecapCell {
+        return new RecapCell(
+            this.documents,
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitRecap(this);
     }
@@ -524,6 +638,17 @@ export class SalientConceptCell extends Cell {
             this.storyWordRanges,
             source,
             this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    withFolded(folded: boolean): SalientConceptCell {
+        return new SalientConceptCell(
+            this.title,
+            this.storyWordRanges,
+            this.source,
+            folded,
             this.at,
             this.uniqueId,
         );
@@ -561,6 +686,18 @@ export class PlotCell extends Cell {
         );
     }
 
+    withFolded(folded: boolean): PlotCell {
+        return new PlotCell(
+            this.title,
+            this.nodes,
+            this.edges,
+            this.source,
+            folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitPlot(this);
     }
@@ -584,6 +721,17 @@ export class UnknownCell extends Cell {
             this.attrs,
             source,
             this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    withFolded(folded: boolean): UnknownCell {
+        return new UnknownCell(
+            this.kind,
+            this.attrs,
+            this.source,
+            folded,
             this.at,
             this.uniqueId,
         );

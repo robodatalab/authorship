@@ -184,6 +184,11 @@ class Cell(ABC):
     at: tuple[int, int] | None
     _unique_id: str
 
+    @classmethod
+    def of_kind(cls, kind: str) -> Cell:
+        unique_id = str(uuid4())
+        return _cell_from_marker(kind, {}, "", False, None, unique_id)
+
     @property
     def unique_id(self) -> str:
         return self._unique_id
@@ -195,6 +200,9 @@ class Cell(ABC):
 
     @abstractmethod
     def with_source(self, source: str) -> Cell: ...
+
+    @abstractmethod
+    def with_folded(self, folded: bool) -> Cell: ...
 
     @abstractmethod
     def accept(self, visitor: CellVisitor[_Result]) -> _Result: ...
@@ -210,6 +218,9 @@ class MarkdownCell(Cell):
 
     def with_source(self, source: str) -> MarkdownCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> MarkdownCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_markdown(self)
@@ -227,6 +238,9 @@ class ChapterCell(Cell):
     def with_source(self, source: str) -> ChapterCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> ChapterCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_chapter(self)
 
@@ -243,6 +257,9 @@ class PartCell(Cell):
     def with_source(self, source: str) -> PartCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> PartCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_part(self)
 
@@ -257,6 +274,9 @@ class DividerCell(Cell):
 
     def with_source(self, source: str) -> DividerCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> DividerCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_divider(self)
@@ -282,6 +302,9 @@ class TitlePageCell(Cell):
     def with_source(self, source: str) -> TitlePageCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> TitlePageCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_title_page(self)
 
@@ -299,6 +322,9 @@ class ImageCell(Cell):
     def with_source(self, source: str) -> ImageCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> ImageCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_image(self)
 
@@ -313,6 +339,9 @@ class TableOfContentsCell(Cell):
 
     def with_source(self, source: str) -> TableOfContentsCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> TableOfContentsCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_table_of_contents(self)
@@ -329,6 +358,9 @@ class DisclaimerCell(Cell):
 
     def with_source(self, source: str) -> DisclaimerCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> DisclaimerCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_disclaimer(self)
@@ -349,6 +381,9 @@ class AboutCell(Cell):
     def with_source(self, source: str) -> AboutCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> AboutCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_about(self)
 
@@ -364,6 +399,9 @@ class BlurbCell(Cell):
     def with_source(self, source: str) -> BlurbCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> BlurbCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_blurb(self)
 
@@ -378,6 +416,9 @@ class NoteCell(Cell):
 
     def with_source(self, source: str) -> NoteCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> NoteCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_note(self)
@@ -395,6 +436,9 @@ class RecapCell(Cell):
     def with_source(self, source: str) -> RecapCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> RecapCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_recap(self)
 
@@ -411,6 +455,9 @@ class SalientConceptCell(Cell):
 
     def with_source(self, source: str) -> SalientConceptCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> SalientConceptCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_salient_concept(self)
@@ -430,6 +477,9 @@ class PlotCell(Cell):
     def with_source(self, source: str) -> PlotCell:
         return replace(self, source=source)
 
+    def with_folded(self, folded: bool) -> PlotCell:
+        return replace(self, folded=folded)
+
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_plot(self)
 
@@ -445,6 +495,9 @@ class UnknownCell(Cell):
 
     def with_source(self, source: str) -> UnknownCell:
         return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> UnknownCell:
+        return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
         return visitor.visit_unknown(self)

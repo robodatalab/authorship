@@ -22,7 +22,7 @@ describe("FoldAllCommand — folds and unfolds the whole document", () => {
 
         FOLD_ALL.invoke(session);
 
-        expect(session.document.cells.map((cell) => cell.isFolded())).toEqual([
+        expect(session.document.cells.map((cell) => cell.folded)).toEqual([
             true,
             true,
             true,
@@ -36,7 +36,7 @@ describe("FoldAllCommand — folds and unfolds the whole document", () => {
 
         UNFOLD_ALL.invoke(session);
 
-        expect(session.document.cells.map((cell) => cell.isFolded())).toEqual([
+        expect(session.document.cells.map((cell) => cell.folded)).toEqual([
             false,
             false,
         ]);
