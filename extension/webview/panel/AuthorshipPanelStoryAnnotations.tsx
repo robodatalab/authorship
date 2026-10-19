@@ -9,8 +9,8 @@ import { fieldsOfCellKind } from "../../vscode_runtime/storydoc/cell_kinds";
 import type {
     StoryAnnotationInTheStory,
     StoryAnnotationSelected,
-    StoryTextSpan,
 } from "../../vscode_runtime/storydoc/story_words";
+import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
 import "./AuthorshipPanelStoryAnnotations.css";
 
 export interface AuthorshipPanelStoryAnnotationsWording {

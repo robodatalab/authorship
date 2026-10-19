@@ -8,8 +8,8 @@ import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 import type {
     StoryAnnotationInTheStory,
     StoryAnnotationSelected,
-    StoryTextSpan,
 } from "../vscode_runtime/storydoc/story_words";
+import type { StoryTextSpan } from "../vscode_runtime/storydoc/iterators/story_words_iterator";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 

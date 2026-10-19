@@ -20,9 +20,9 @@ import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileE
 import { LinterTooltip } from "../linter/LinterTooltip";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import {
-    storyWordSpansIn,
-    type StoryWordSpan,
-} from "../../vscode_runtime/storydoc/story_words";
+    TextWordsIterator,
+    type TextWord,
+} from "../../vscode_runtime/storydoc/iterators/text_words_iterator";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });
@@ -488,8 +488,8 @@ function lettersAndDigitsOf(word: string): string {
 }
 
 function markdownWordOfEachRenderedWord(
-    renderedWords: StoryWordSpan[],
-    markdownWords: StoryWordSpan[],
+    renderedWords: TextWord[],
+    markdownWords: TextWord[],
 ): (number | null)[] {
     let nextMarkdownWord = 0;
     return renderedWords.map((renderedWord) => {
@@ -552,8 +552,10 @@ function renderedRangeOfTheMarkdown(
     from: number,
     to: number,
 ): Range | null {
-    const markdownWords = storyWordSpansIn(markdown);
-    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownTextWords = new TextWordsIterator(markdown);
+    const markdownWords = Array.from(markdownTextWords);
+    const renderedTextWords = new TextWordsIterator(rendered.textContent ?? "");
+    const renderedWords = Array.from(renderedTextWords);
     const markdownWordOfEach = markdownWordOfEachRenderedWord(
         renderedWords,
         markdownWords,
@@ -563,8 +565,8 @@ function renderedRangeOfTheMarkdown(
             const markdownWord = markdownWordOfEach[renderedWordIndex];
             return (
                 markdownWord !== null &&
-                markdownWords[markdownWord].startCharacterOffsetInCell < to &&
-                from < markdownWords[markdownWord].endCharacterOffsetInCell
+                markdownWords[markdownWord].startCharacterOffset < to &&
+                from < markdownWords[markdownWord].endCharacterOffset
             );
         },
     );
@@ -573,12 +575,12 @@ function renderedRangeOfTheMarkdown(
     }
     const startsAt = renderedPositionOf(
         rendered,
-        renderedWordsCovered[0].startCharacterOffsetInCell,
+        renderedWordsCovered[0].startCharacterOffset,
     );
     const endsAt = renderedPositionOf(
         rendered,
         renderedWordsCovered[renderedWordsCovered.length - 1]
-            .endCharacterOffsetInCell,
+            .endCharacterOffset,
     );
     if (!startsAt || !endsAt) {
         return null;
@@ -616,8 +618,10 @@ function whereTheRenderedCaretStandsInTheMarkdown(
         caret.startContainer,
         caret.startOffset,
     );
-    const markdownWords = storyWordSpansIn(markdown);
-    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownTextWords = new TextWordsIterator(markdown);
+    const markdownWords = Array.from(markdownTextWords);
+    const renderedTextWords = new TextWordsIterator(rendered.textContent ?? "");
+    const renderedWords = Array.from(renderedTextWords);
     const markdownWordOfEach = markdownWordOfEachRenderedWord(
         renderedWords,
         markdownWords,
@@ -630,16 +634,16 @@ function whereTheRenderedCaretStandsInTheMarkdown(
         .filter(
             ({ renderedWord, markdownWord }) =>
                 markdownWord !== null &&
-                renderedWord.startCharacterOffsetInCell <= caretAt,
+                renderedWord.startCharacterOffset <= caretAt,
         );
     const wordAtTheCaret = wordsUpToTheCaret[wordsUpToTheCaret.length - 1];
     if (!wordAtTheCaret || wordAtTheCaret.markdownWord === null) {
         return null;
     }
     const markdownWord = markdownWords[wordAtTheCaret.markdownWord];
-    return caretAt <= wordAtTheCaret.renderedWord.endCharacterOffsetInCell
-        ? markdownWord.startCharacterOffsetInCell
-        : markdownWord.endCharacterOffsetInCell + 1;
+    return caretAt <= wordAtTheCaret.renderedWord.endCharacterOffset
+        ? markdownWord.startCharacterOffset
+        : markdownWord.endCharacterOffset + 1;
 }
 
 function whereTheRenderedSelectionStandsInTheMarkdown(
@@ -657,8 +661,10 @@ function whereTheRenderedSelectionStandsInTheMarkdown(
         selected.endContainer,
         selected.endOffset,
     );
-    const markdownWords = storyWordSpansIn(markdown);
-    const renderedWords = storyWordSpansIn(rendered.textContent ?? "");
+    const markdownTextWords = new TextWordsIterator(markdown);
+    const markdownWords = Array.from(markdownTextWords);
+    const renderedTextWords = new TextWordsIterator(rendered.textContent ?? "");
+    const renderedWords = Array.from(renderedTextWords);
     const markdownWordOfEach = markdownWordOfEachRenderedWord(
         renderedWords,
         markdownWords,
@@ -671,8 +677,8 @@ function whereTheRenderedSelectionStandsInTheMarkdown(
         .filter(
             ({ renderedWord, markdownWord }) =>
                 markdownWord !== null &&
-                renderedWord.startCharacterOffsetInCell < selectedTo &&
-                selectedFrom < renderedWord.endCharacterOffsetInCell,
+                renderedWord.startCharacterOffset < selectedTo &&
+                selectedFrom < renderedWord.endCharacterOffset,
         )
         .map(({ markdownWord }) => markdownWord as number);
     if (markdownWordsSelected.length === 0) {
@@ -680,9 +686,9 @@ function whereTheRenderedSelectionStandsInTheMarkdown(
     }
     return {
         from: markdownWords[Math.min(...markdownWordsSelected)]
-            .startCharacterOffsetInCell,
+            .startCharacterOffset,
         to: markdownWords[Math.max(...markdownWordsSelected)]
-            .endCharacterOffsetInCell,
+            .endCharacterOffset,
     };
 }
 

@@ -16,13 +16,14 @@ import type { Cell } from "./storydoc/cells/cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,
-    storyTextSpansOf,
-    storyWordsIn,
     synchronizeTheStoryWordRanges,
     type StoryAnnotationSelected,
-    type StoryTextSpan,
-    type StoryWordRange,
 } from "./storydoc/story_words";
+import {
+    StoryWordsIterator,
+    type StoryTextSpan,
+} from "./storydoc/iterators/story_words_iterator";
+import type { StoryWordRange } from "./storydoc/cells/story_word_range";
 import { WordCounter } from "../webview/author_editor/word_counter";
 
 export class AuthorFileEditorSession
@@ -134,8 +135,8 @@ export class AuthorFileEditorSession
     }
 
     showTheStoryWordRange(storyWordRange: StoryWordRange): void {
-        const storyWords = storyWordsIn(this.documentAsItStands.cells);
-        const [storyTextShown] = storyTextSpansOf(storyWords, storyWordRange);
+        const storyWords = new StoryWordsIterator(this.documentAsItStands);
+        const [storyTextShown] = storyWords.spans(storyWordRange);
         if (storyTextShown) {
             void this.panel?.webview.postMessage({
                 type: "storyTextShown",

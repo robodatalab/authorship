@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveStoryWordRangeCommand } from "../../../extension/vscode_runtime/commands/remove_story_word_range";
+import { StoryWordRange } from "../../../extension/vscode_runtime/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 function storyWithTheDoor(words: string) {
@@ -25,7 +26,9 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
             lastWord: 3,
         });
 
-        expect(session.document.cellWithId("k1")?.attrs.words).toBe("1-1");
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [new StoryWordRange(1, 1)],
+        });
     });
 
     it("keeps the ranges it was not asked to remove in the order they are written", () => {
@@ -37,8 +40,12 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
             lastWord: 1,
         });
 
-        const wordsKept = session.document.cellWithId("k1")?.attrs.words;
-        expect(wordsKept).toBe("3-3, 0-0");
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [
+                new StoryWordRange(3, 3),
+                new StoryWordRange(0, 0),
+            ],
+        });
     });
 
     it("leaves the concept without words once its last range is removed", () => {
@@ -50,6 +57,8 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
             lastWord: 3,
         });
 
-        expect(session.document.cellWithId("k1")?.attrs.words).toBe(undefined);
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [],
+        });
     });
 });

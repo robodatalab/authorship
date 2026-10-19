@@ -1,10 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import {
-    STORY_WORD_RANGES,
-    storyWordRangeBetween,
-    storyWordRangesAsTheyAreWritten,
-    storyWordRangesOf,
-} from "../storydoc/story_words";
+import { SalientConceptCell } from "../storydoc/cells/salient_concept_cell";
+import { StoryWordsIterator } from "../storydoc/iterators/story_words_iterator";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class AssignStoryTextCommand implements AuthorDocumentCommand {
@@ -17,22 +13,26 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
         session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
+        const annotationCellId = commandArguments.annotationCellId as string;
         session.changeTheDocument((story) => {
-            const annotation = story.cellWithId(
-                commandArguments.annotationCellId as string,
+            const annotationIndex = story.cells.findIndex(
+                (cell) => cell.uniqueId === annotationCellId,
             );
-            const wordsAssigned = storyWordRangeBetween(
-                story.cells,
+            const storyWords = new StoryWordsIterator(story);
+            const wordsAssigned = storyWords.rangeBetween(
                 commandArguments.cellId as string,
                 commandArguments.startCharacterOffsetInCell as number,
                 commandArguments.endCharacterOffsetInCell as number,
             );
-            if (annotation === undefined || wordsAssigned === null) {
+            const annotation = story.cells[annotationIndex];
+            if (
+                !(annotation instanceof SalientConceptCell) ||
+                wordsAssigned === null
+            ) {
                 return;
             }
-            const rangesItHolds = storyWordRangesOf(annotation);
             if (
-                rangesItHolds.some(
+                annotation.storyWordRanges.some(
                     (range) =>
                         range.firstWord === wordsAssigned.firstWord &&
                         range.lastWord === wordsAssigned.lastWord,
@@ -40,12 +40,17 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
             ) {
                 return;
             }
-            annotation.replaceAttribute(
-                STORY_WORD_RANGES,
-                storyWordRangesAsTheyAreWritten([
-                    ...rangesItHolds,
-                    wordsAssigned,
-                ]),
+            const storyWordRanges = [
+                ...annotation.storyWordRanges,
+                wordsAssigned,
+            ];
+            story.cells[annotationIndex] = new SalientConceptCell(
+                annotation.title,
+                storyWordRanges,
+                annotation.source,
+                annotation.folded,
+                annotation.at,
+                annotation.uniqueId,
             );
         });
     }

@@ -5,8 +5,8 @@ import { createRoot, type Root } from "react-dom/client";
 import type {
     StoryAnnotationInTheStory,
     StoryAnnotationSelected,
-    StoryTextSpan,
 } from "../../../extension/vscode_runtime/storydoc/story_words";
+import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
