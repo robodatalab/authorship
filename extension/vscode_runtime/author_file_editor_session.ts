@@ -11,6 +11,12 @@ import type {
 } from "./message_queue_between_vscode_and_webview";
 import { CharacterRangeSynchronizer } from "./storydoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocSynchronizer } from "./storydoc/author_doc_synchronizer";
+import type { AuthorDocChangeVisitor } from "./storydoc/author_doc_change_visitor";
+import type { CellAdded } from "./storydoc/changes/cell_added";
+import type { CellHeaderChanged } from "./storydoc/changes/cell_header_changed";
+import type { CellRemoved } from "./storydoc/changes/cell_removed";
+import type { CellTextChanged } from "./storydoc/changes/cell_text_changed";
+import type { CellsMoved } from "./storydoc/changes/cells_moved";
 import { AuthorDocDiff } from "./storydoc/diff";
 import { Document } from "./storydoc/storydoc";
 import type { Cell } from "./storydoc/cells/cell";
@@ -418,7 +424,7 @@ export class AuthorFileEditorSession
 
 const CHARACTERS_THE_AUTHOR_MAY_TYPE_IN_ONE_BURST = 50;
 
-class TypingBurst {
+class TypingBurst implements AuthorDocChangeVisitor<boolean> {
     private charactersTyped = 1;
 
     constructor(
@@ -432,15 +438,36 @@ class TypingBurst {
         documentAsItStands: Document,
         documentChange: AuthorDocDiff,
     ): boolean {
-        const cellChanged = documentChange.cells[0];
+        const [onlyChange] = documentChange.changes;
         return (
             documentAsItStands === this.documentAsItLastStood &&
-            documentChange.cells.length === 1 &&
-            documentChange.cellIdsInRhs === undefined &&
-            cellChanged.cellId === this.cellId &&
-            !/\s/.test(cellChanged.textInRhs) &&
+            documentChange.changes.length === 1 &&
+            onlyChange.accept(this) &&
             this.charactersTyped < CHARACTERS_THE_AUTHOR_MAY_TYPE_IN_ONE_BURST
         );
+    }
+
+    visitCellTextChanged(cellTextChanged: CellTextChanged): boolean {
+        return (
+            cellTextChanged.cellId === this.cellId &&
+            !/\s/.test(cellTextChanged.textWritten)
+        );
+    }
+
+    visitCellAdded(_cellAdded: CellAdded): boolean {
+        return false;
+    }
+
+    visitCellRemoved(_cellRemoved: CellRemoved): boolean {
+        return false;
+    }
+
+    visitCellsMoved(_cellsMoved: CellsMoved): boolean {
+        return false;
+    }
+
+    visitCellHeaderChanged(_cellHeaderChanged: CellHeaderChanged): boolean {
+        return false;
     }
 
     nowReaches(documentAsItStands: Document): void {

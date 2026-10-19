@@ -1,208 +1,84 @@
 import { Document } from "./storydoc";
-import { parse } from "./parser";
+import { markerFor } from "./parser";
+import type { AuthorDocChange } from "./author_doc_change";
 import type { Cell } from "./cells/cell";
-
-export class AuthorDocCellDiff {
-    constructor(
-        readonly cellId: string,
-        readonly theyDifferFromCharacter: number,
-        readonly headerInLhs: string | undefined,
-        readonly headerInRhs: string | undefined,
-        readonly textInLhs: string,
-        readonly textInRhs: string,
-    ) {}
-
-    static between(
-        cellInLhs: Cell,
-        cellInRhs: Cell,
-    ): AuthorDocCellDiff | undefined {
-        const headerInLhs = headerOf(cellInLhs);
-        const headerInRhs = headerOf(cellInRhs);
-        if (
-            headerInLhs === headerInRhs &&
-            cellInLhs.source === cellInRhs.source
-        ) {
-            return undefined;
-        }
-        const markdownInLhs = cellInLhs.source;
-        const markdownInRhs = cellInRhs.source;
-
-        let charactersSameAtTheStart = 0;
-        while (
-            charactersSameAtTheStart < markdownInLhs.length &&
-            charactersSameAtTheStart < markdownInRhs.length &&
-            markdownInLhs[charactersSameAtTheStart] ===
-                markdownInRhs[charactersSameAtTheStart]
-        ) {
-            charactersSameAtTheStart += 1;
-        }
-        let charactersSameAtTheEnd = 0;
-        while (
-            charactersSameAtTheEnd <
-                markdownInLhs.length - charactersSameAtTheStart &&
-            charactersSameAtTheEnd <
-                markdownInRhs.length - charactersSameAtTheStart &&
-            markdownInLhs[markdownInLhs.length - 1 - charactersSameAtTheEnd] ===
-                markdownInRhs[markdownInRhs.length - 1 - charactersSameAtTheEnd]
-        ) {
-            charactersSameAtTheEnd += 1;
-        }
-
-        return new AuthorDocCellDiff(
-            cellInRhs.uniqueId,
-            charactersSameAtTheStart,
-            headerInLhs,
-            headerInRhs,
-            markdownInLhs.slice(
-                charactersSameAtTheStart,
-                markdownInLhs.length - charactersSameAtTheEnd,
-            ),
-            markdownInRhs.slice(
-                charactersSameAtTheStart,
-                markdownInRhs.length - charactersSameAtTheEnd,
-            ),
-        );
-    }
-
-    static takingTheCellOut(cell: Cell): AuthorDocCellDiff {
-        const header = headerOf(cell);
-        return new AuthorDocCellDiff(
-            cell.uniqueId,
-            0,
-            header,
-            undefined,
-            cell.source,
-            "",
-        );
-    }
-
-    get theyDifferToCharacterInLhs(): number {
-        return this.theyDifferFromCharacter + this.textInLhs.length;
-    }
-
-    get theyDifferToCharacterInRhs(): number {
-        return this.theyDifferFromCharacter + this.textInRhs.length;
-    }
-
-    invert(): AuthorDocCellDiff {
-        return new AuthorDocCellDiff(
-            this.cellId,
-            this.theyDifferFromCharacter,
-            this.headerInRhs,
-            this.headerInLhs,
-            this.textInRhs,
-            this.textInLhs,
-        );
-    }
-
-    sourceInRhs(sourceInLhs: string): string {
-        return (
-            sourceInLhs.slice(0, this.theyDifferFromCharacter) +
-            this.textInRhs +
-            sourceInLhs.slice(this.theyDifferToCharacterInLhs)
-        );
-    }
-
-    writeInto(cells: Cell[]): Cell[] {
-        if (this.headerInRhs === undefined) {
-            return cells.filter((cell) => cell.uniqueId !== this.cellId);
-        }
-        const cellInLhs = cells.find((cell) => cell.uniqueId === this.cellId);
-        const sourceInLhs = cellInLhs?.source ?? "";
-        const sourceInRhs = this.sourceInRhs(sourceInLhs);
-        const [cellInRhs] = parse(`${this.headerInRhs}\n${sourceInRhs}`);
-        return cellInLhs
-            ? cells.map((cell) =>
-                  cell.uniqueId === this.cellId ? cellInRhs : cell,
-              )
-            : [...cells, cellInRhs];
-    }
-}
+import { CellAdded } from "./changes/cell_added";
+import { CellHeaderChanged } from "./changes/cell_header_changed";
+import { CellRemoved } from "./changes/cell_removed";
+import { CellTextChanged } from "./changes/cell_text_changed";
+import { CellsMoved } from "./changes/cells_moved";
+import { MarkerAttributes } from "./visitors/marker_attributes";
 
 export class AuthorDocDiff {
-    constructor(
-        readonly cells: readonly AuthorDocCellDiff[],
-        readonly cellIdsInLhs: readonly string[] | undefined,
-        readonly cellIdsInRhs: readonly string[] | undefined,
-    ) {}
+    constructor(readonly changes: readonly AuthorDocChange[]) {}
 
     static diff(lhs: Document, rhs: Document): AuthorDocDiff {
-        const cells: AuthorDocCellDiff[] = [];
-        for (const cellInLhs of lhs.cells) {
-            if (
-                !rhs.cells.some((cell) => cell.uniqueId === cellInLhs.uniqueId)
-            ) {
-                cells.push(AuthorDocCellDiff.takingTheCellOut(cellInLhs));
+        const changes: AuthorDocChange[] = [];
+        const cellIdsInLhs = lhs.cells.map((cell) => cell.uniqueId);
+        const cellIdsInRhs = rhs.cells.map((cell) => cell.uniqueId);
+
+        for (let cellIndex = lhs.cells.length - 1; cellIndex >= 0; cellIndex--) {
+            const cellInLhs = lhs.cells[cellIndex];
+            if (!cellIdsInRhs.includes(cellInLhs.uniqueId)) {
+                changes.push(new CellRemoved(cellIndex, cellInLhs));
             }
         }
-        for (const cellInRhs of rhs.cells) {
-            const cellInLhs = lhs.cells.find(
-                (cell) => cell.uniqueId === cellInRhs.uniqueId,
-            );
-            if (!cellInLhs) {
-                cells.push(
-                    AuthorDocCellDiff.takingTheCellOut(cellInRhs).invert(),
-                );
+
+        const cellIdsBefore = cellIdsInLhs.filter((cellId) =>
+            cellIdsInRhs.includes(cellId),
+        );
+        const cellIdsAfter = cellIdsInRhs.filter((cellId) =>
+            cellIdsInLhs.includes(cellId),
+        );
+        const theyStandInTheSameOrder = cellIdsBefore.every(
+            (cellId, standing) => cellId === cellIdsAfter[standing],
+        );
+        if (!theyStandInTheSameOrder) {
+            changes.push(new CellsMoved(cellIdsBefore, cellIdsAfter));
+        }
+
+        const markerAttributes = new MarkerAttributes();
+        for (const [cellIndex, cellInRhs] of rhs.cells.entries()) {
+            const cellInLhs = lhs.cellWithId(cellInRhs.uniqueId);
+            if (cellInLhs === undefined) {
+                changes.push(new CellAdded(cellIndex, cellInRhs));
                 continue;
             }
-            const cellDiff = AuthorDocCellDiff.between(cellInLhs, cellInRhs);
-            if (cellDiff) {
-                cells.push(cellDiff);
+            const markerInLhs = markerFor(cellInLhs, markerAttributes);
+            const markerInRhs = markerFor(cellInRhs, markerAttributes);
+            if (markerInLhs !== markerInRhs) {
+                const headerBefore = cellInLhs.withSource("");
+                const headerAfter = cellInRhs.withSource("");
+                changes.push(new CellHeaderChanged(headerBefore, headerAfter));
+            }
+            if (cellInLhs.source !== cellInRhs.source) {
+                const cellTextChanged = CellTextChanged.between(
+                    cellInRhs.uniqueId,
+                    cellInLhs.source,
+                    cellInRhs.source,
+                );
+                changes.push(cellTextChanged);
             }
         }
-        const theyStandInTheSameOrder =
-            lhs.cells.length === rhs.cells.length &&
-            lhs.cells.every(
-                (cell, standing) =>
-                    cell.uniqueId === rhs.cells[standing].uniqueId,
-            );
-        return new AuthorDocDiff(
-            cells,
-            theyStandInTheSameOrder ? undefined : cellIdsOf(lhs),
-            theyStandInTheSameOrder ? undefined : cellIdsOf(rhs),
-        );
+
+        return new AuthorDocDiff(changes);
     }
 
     empty(): boolean {
-        return this.cells.length === 0 && this.cellIdsInRhs === undefined;
+        return this.changes.length === 0;
     }
 
     invert(): AuthorDocDiff {
-        return new AuthorDocDiff(
-            this.cells.map((cellDiff) => cellDiff.invert()),
-            this.cellIdsInRhs,
-            this.cellIdsInLhs,
-        );
+        const changesInReverse = [...this.changes].reverse();
+        const inverted = changesInReverse.map((change) => change.invert());
+        return new AuthorDocDiff(inverted);
     }
 
     applyTheDiff(document: Document): Document {
-        let cells = [...document.cells];
-        for (const cellDiff of this.cells) {
-            cells = cellDiff.writeInto(cells);
-        }
-        for (const [standing, cellId] of this.cellIdsInRhs?.entries() ?? []) {
-            const standsAt = cells.findIndex(
-                (cell) => cell.uniqueId === cellId,
-            );
-            if (standsAt !== standing) {
-                const moved = cells.splice(standsAt, 1);
-                cells.splice(
-                    standing > standsAt ? standing - 1 : standing,
-                    0,
-                    ...moved,
-                );
-            }
+        let cells: readonly Cell[] = document.cells;
+        for (const change of this.changes) {
+            cells = change.applyTo(cells);
         }
         return Document.fromCells(cells, document.path);
     }
-}
-
-function cellIdsOf(document: Document): string[] {
-    return document.cells.map((cell) => cell.uniqueId);
-}
-
-function headerOf(cell: Cell): string {
-    const cellWithoutItsText = cell.withSource("");
-    const writtenWithoutItsText = Document.fromCells([cellWithoutItsText]);
-    return writtenWithoutItsText.text;
 }

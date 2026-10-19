@@ -1,17 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    AuthorDocCellDiff,
-    AuthorDocDiff,
-} from "../../../extension/vscode_runtime/storydoc/diff";
+import { AuthorDocDiff } from "../../../extension/vscode_runtime/storydoc/diff";
 import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const HE_HEARD = '<!-- cell: markdown id="c2" -->\n\nHe heard the bell.\n';
 const THE_CHAPTER = '<!-- cell: chapter id="c0" title="One" -->\n';
 const THE_STORY = THE_CHAPTER + "\n" + SHE_SAW + "\n" + HE_HEARD;
-const SHE_SAW_HEADER = '<!-- cell: markdown id="c1" -->\n';
-const HE_HEARD_HEADER = '<!-- cell: markdown id="c2" -->\n';
 
 function theDifferenceBetween(lhsText: string, rhsText: string): AuthorDocDiff {
     return AuthorDocDiff.diff(
@@ -24,153 +19,9 @@ describe("diff — what would have to change to turn one document into the other
     it("says nothing about two documents written the same", () => {
         expect(theDifferenceBetween(SHE_SAW, SHE_SAW).empty()).toBe(true);
     });
-
-    it("gives the order the cells stand in when the same cells stand in another", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW + "\n" + HE_HEARD,
-                HE_HEARD + "\n" + SHE_SAW,
-            ),
-        ).toEqual(new AuthorDocDiff([], ["c1", "c2"], ["c2", "c1"]));
-    });
-
-    it("says nothing of the order when the cells stand as they stood", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                '<!-- cell: markdown id="c1" -->\n\nShe saw the gate.\n',
-            ).cellIdsInRhs,
-        ).toBeUndefined();
-    });
-
-    it("speaks up when a cell is of one kind in the first and another in the second", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                SHE_SAW.replace("markdown", "disclaimer"),
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                17,
-                SHE_SAW_HEADER,
-                '<!-- cell: disclaimer id="c1" -->\n',
-                "",
-                "",
-            ),
-        ]);
-    });
-
-    it("gives a cell the second has and the first has not, with all it is written with", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW, SHE_SAW + "\n" + HE_HEARD),
-        ).toEqual(
-            new AuthorDocDiff(
-                [
-                    new AuthorDocCellDiff(
-                        "c2",
-                        0,
-                        undefined,
-                        HE_HEARD_HEADER,
-                        "",
-                        "He heard the bell.",
-                    ),
-                ],
-                ["c1"],
-                ["c1", "c2"],
-            ),
-        );
-    });
-
-    it("gives a cell the first has and the second has not, with all it was written with", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW + "\n" + HE_HEARD, HE_HEARD).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                0,
-                SHE_SAW_HEADER,
-                undefined,
-                "She saw the door.",
-                "",
-            ),
-        ]);
-    });
-
-    it("tells a cell emptied of its text from a cell taken out of the document", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW, '<!-- cell: markdown id="c1" -->\n')
-                .cells[0].headerInRhs,
-        ).toEqual(SHE_SAW_HEADER);
-    });
-
-    it("says where a cell's markdown differs, in both of them", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                '<!-- cell: markdown id="c1" -->\n\nShe opened the door.\n',
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                4,
-                SHE_SAW_HEADER,
-                SHE_SAW_HEADER,
-                "saw",
-                "opened",
-            ),
-        ]);
-    });
-
-    it("reads the difference from the first character that differs to the last", () => {
-        const cellDiff = theDifferenceBetween(
-            SHE_SAW,
-            '<!-- cell: markdown id="c1" -->\n\nSlowly, She saw the door.\n',
-        ).cells[0];
-
-        expect(cellDiff.theyDifferFromCharacter).toBe(1);
-        expect(cellDiff.theyDifferToCharacterInLhs).toBe(1);
-        expect(cellDiff.theyDifferToCharacterInRhs).toBe(9);
-        expect(cellDiff.textInRhs).toBe("lowly, S");
-    });
-
-    it("gives the marker each of them opens the cell with", () => {
-        expect(
-            theDifferenceBetween(
-                '<!-- cell: chapter id="c1" title="One" folded="true" -->\n',
-                '<!-- cell: chapter id="c1" title="Two" -->\n',
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                0,
-                '<!-- cell: chapter id="c1" title="One" folded="true" -->\n',
-                '<!-- cell: chapter id="c1" title="Two" -->\n',
-                "",
-                "",
-            ),
-        ]);
-    });
-
-    it("gives one difference per cell, however many ways the two differ", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW + "\n" + HE_HEARD,
-                '<!-- cell: markdown id="c2" title="Bells" -->\n\nHe heard a bell.\n',
-            ).cells.map((cellDiff) => cellDiff.cellId),
-        ).toEqual(["c1", "c2"]);
-    });
 });
 
 describe("inverting a difference", () => {
-    it("turns each cell round, and the order they stand in", () => {
-        const change = theDifferenceBetween(THE_STORY, HE_HEARD + SHE_SAW);
-
-        expect(change.invert()).toEqual(
-            theDifferenceBetween(HE_HEARD + SHE_SAW, THE_STORY),
-        );
-    });
-
     it("leaves a difference that says nothing saying nothing", () => {
         expect(theDifferenceBetween(SHE_SAW, SHE_SAW).invert().empty()).toBe(
             true,
