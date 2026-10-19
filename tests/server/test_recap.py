@@ -15,7 +15,12 @@ from cortexgrid_infer import CompletionChunk
 from parameterized import parameterized  # type: ignore
 
 from server import storydoc
-from server.storydoc import Document
+from server.storydoc import (
+    ChapterCell,
+    Document,
+    MarkdownCell,
+    TitlePageCell,
+)
 from server.writing_tools.recap import write_recap
 
 
@@ -29,10 +34,10 @@ async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
 
 def volume(title: str, chapters: list[tuple[str, list[str]]]) -> Document:
     """A book with those chapters, each written in the markdown cells given."""
-    cells = [storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": title})]
+    cells = [TitlePageCell(title=title)]
     for name, sections in chapters:
-        cells.append(storydoc.chapter(name))
-        cells.extend(storydoc.markdown(section) for section in sections)
+        cells.append(ChapterCell(name))
+        cells.extend(MarkdownCell(section) for section in sections)
     return Document(storydoc.dumps(cells))
 
 

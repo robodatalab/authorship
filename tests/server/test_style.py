@@ -6,7 +6,14 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
-from server.storydoc import Document
+from server.storydoc import (
+    ChapterCell,
+    Document,
+    MarkdownCell,
+    NoteCell,
+    TableOfContentsCell,
+    TitlePageCell,
+)
 from server.writing_tools.style import (
     FIX_REQUEST,
     STYLE_INSTRUCTION,
@@ -55,19 +62,19 @@ def styled(*arguments: object, **named: object) -> None:
 
 
 def markdown(source: str, cell_id: str) -> storydoc.Cell:
-    return storydoc.Cell(storydoc.MARKDOWN, source, {"id": cell_id})
+    return MarkdownCell(_unique_id=cell_id, source=source)
 
 
 STORY = storydoc.dumps(
     [
-        storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
+        TitlePageCell(title="Veriona"),
         markdown(FRONT, FRONT_CELL_ID),
-        storydoc.chapter("The First Night"),
+        ChapterCell("The First Night"),
         markdown(FIRST, FIRST_CELL_ID),
         markdown(SECOND, SECOND_CELL_ID),
-        storydoc.Cell(storydoc.NOTE, "Ask Mara whether this is the third time.", {}),
-        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
-        storydoc.chapter("The Second"),
+        NoteCell(source="Ask Mara whether this is the third time."),
+        TableOfContentsCell(source="1. The First Night"),
+        ChapterCell("The Second"),
         markdown(THIRD, THIRD_CELL_ID),
     ]
 )
@@ -236,7 +243,7 @@ class FixStyle(unittest.TestCase):
 
     def test_a_document_with_no_prose_is_refused(self) -> None:
         with self.assertRaises(ValueError):
-            styled(build_model(), Document(storydoc.dumps([storydoc.chapter("One")])))
+            styled(build_model(), Document(storydoc.dumps([ChapterCell("One")])))
 
 
 if __name__ == "__main__":

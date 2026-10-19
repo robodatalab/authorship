@@ -33,9 +33,11 @@ marker opens a new cell. Markdown has the same bargain with fences.
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Generic, TypeVar
 from uuid import uuid4
 
 EXTENSION = ".author"
@@ -61,6 +63,24 @@ NO = "no"
 FULL_PAGE = "full-page"
 
 _UNIQUE_ID = "id"
+_FOLDED = "folded"
+_TRUE = "true"
+
+_TITLE = "title"
+_SUBTITLE = "subtitle"
+_AUTHOR = "author"
+_PUBLISHER = "publisher"
+_DATE = "date"
+_VERSION = "version"
+_ISBN = "isbn"
+_COVER_DESIGNER = "cover-designer"
+_LANGUAGE = "language"
+_SRC = "src"
+_KDP = "kdp"
+_WEBSITE = "website"
+_SUBSTACK = "substack"
+_PORTRAIT = "portrait"
+_DOCUMENTS = "documents"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
@@ -83,48 +103,9 @@ _PLOT_EDGE = re.compile(r"^\s*([^:\s]+):([^>\s]+)>(\S+)\s*$")
 
 
 @dataclass(frozen=True)
-class Cell:
-    """One thing the document is made of, and what it says it is.
-
-    `kind` is the cell's identity and is never inferred from its text — a chapter
-    called "Disclaimer" is still a chapter. `attrs` is whatever the kind needs
-    said about it, and is kept even when this module has no use for it.
-    """
-
-    kind: str
-    source: str = ""
-    attrs: dict[str, str] = field(default_factory=dict)
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    @property
-    def title(self) -> str:
-        return self.attrs.get("title", "")
-
-    @property
-    def unique_id(self) -> str:
-        return self._unique_id
-
-    def offset_of(self, line: int, character: int) -> int:
-        assert self.at is not None
-        above = self.source.splitlines()[: line - self.at[0]]
-        return sum(len(written) + 1 for written in above) + character
-
-    def with_source(self, source: str) -> "Cell":
-        return replace(self, source=source)
-
-
-@dataclass(frozen=True)
 class StoryWordRange:
     first_word: int
     last_word: int
-
-
-@dataclass(frozen=True)
-class SalientConceptInTheStory:
-    title: str
-    abstract: str
-    story_word_ranges: list[StoryWordRange]
 
 
 @dataclass(frozen=True)
@@ -140,17 +121,338 @@ class PlotEdge:
     to_node_id: str
 
 
+_Result = TypeVar("_Result")
+
+
+class CellVisitor(ABC, Generic[_Result]):
+    @abstractmethod
+    def visit_markdown(self, cell: MarkdownCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_chapter(self, cell: ChapterCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_part(self, cell: PartCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_divider(self, cell: DividerCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_title_page(self, cell: TitlePageCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_image(self, cell: ImageCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_table_of_contents(self, cell: TableOfContentsCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_disclaimer(self, cell: DisclaimerCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_about(self, cell: AboutCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_blurb(self, cell: BlurbCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_note(self, cell: NoteCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_recap(self, cell: RecapCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_salient_concept(self, cell: SalientConceptCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_plot(self, cell: PlotCell) -> _Result: ...
+
+    @abstractmethod
+    def visit_unknown(self, cell: UnknownCell) -> _Result: ...
+
+
+class Cell(ABC):
+    """One thing the document is made of, and what it says it is.
+
+    `kind` is the cell's identity and is never inferred from its text — a chapter
+    called "Disclaimer" is still a chapter.
+    """
+
+    kind: str
+    source: str
+    folded: bool
+    at: tuple[int, int] | None
+    _unique_id: str
+
+    @property
+    def unique_id(self) -> str:
+        return self._unique_id
+
+    def offset_of(self, line: int, character: int) -> int:
+        assert self.at is not None
+        above = self.source.splitlines()[: line - self.at[0]]
+        return sum(len(written) + 1 for written in above) + character
+
+    @abstractmethod
+    def with_source(self, source: str) -> Cell: ...
+
+    @abstractmethod
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result: ...
+
+
 @dataclass(frozen=True)
-class PlotInTheStory:
-    title: str
-    abstract: str
-    nodes: list[PlotNode]
-    edges: list[PlotEdge]
+class MarkdownCell(Cell):
+    kind: str = field(default=MARKDOWN, init=False)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> MarkdownCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_markdown(self)
+
+
+@dataclass(frozen=True)
+class ChapterCell(Cell):
+    kind: str = field(default=CHAPTER, init=False)
+    title: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> ChapterCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_chapter(self)
+
+
+@dataclass(frozen=True)
+class PartCell(Cell):
+    kind: str = field(default=PART, init=False)
+    title: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> PartCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_part(self)
+
+
+@dataclass(frozen=True)
+class DividerCell(Cell):
+    kind: str = field(default=DIVIDER, init=False)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> DividerCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_divider(self)
+
+
+@dataclass(frozen=True)
+class TitlePageCell(Cell):
+    kind: str = field(default=TITLE_PAGE, init=False)
+    title: str = ""
+    subtitle: str = ""
+    author: str = ""
+    publisher: str = ""
+    date: str = ""
+    version: str = ""
+    isbn: str = ""
+    cover_designer: str = ""
+    language: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> TitlePageCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_title_page(self)
+
+
+@dataclass(frozen=True)
+class ImageCell(Cell):
+    kind: str = field(default=IMAGE, init=False)
+    src: str = ""
+    full_page: bool = True
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> ImageCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_image(self)
+
+
+@dataclass(frozen=True)
+class TableOfContentsCell(Cell):
+    kind: str = field(default=TABLE_OF_CONTENTS, init=False)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> TableOfContentsCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_table_of_contents(self)
+
+
+@dataclass(frozen=True)
+class DisclaimerCell(Cell):
+    kind: str = field(default=DISCLAIMER, init=False)
+    title: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> DisclaimerCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_disclaimer(self)
+
+
+@dataclass(frozen=True)
+class AboutCell(Cell):
+    kind: str = field(default=ABOUT, init=False)
+    kdp: str = ""
+    website: str = ""
+    substack: str = ""
+    portrait: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> AboutCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_about(self)
+
+
+@dataclass(frozen=True)
+class BlurbCell(Cell):
+    kind: str = field(default=BLURB, init=False)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> BlurbCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_blurb(self)
+
+
+@dataclass(frozen=True)
+class NoteCell(Cell):
+    kind: str = field(default=NOTE, init=False)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> NoteCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_note(self)
+
+
+@dataclass(frozen=True)
+class RecapCell(Cell):
+    kind: str = field(default=RECAP, init=False)
+    documents: str = ""
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> RecapCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_recap(self)
+
+
+@dataclass(frozen=True)
+class SalientConceptCell(Cell):
+    kind: str = field(default=SALIENT_CONCEPT, init=False)
+    title: str = ""
+    story_word_ranges: list[StoryWordRange] = field(default_factory=list)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> SalientConceptCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_salient_concept(self)
+
+
+@dataclass(frozen=True)
+class PlotCell(Cell):
+    kind: str = field(default=PLOT, init=False)
+    title: str = ""
+    nodes: list[PlotNode] = field(default_factory=list)
+    edges: list[PlotEdge] = field(default_factory=list)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> PlotCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_plot(self)
+
+
+@dataclass(frozen=True)
+class UnknownCell(Cell):
+    kind: str
+    attrs: dict[str, str] = field(default_factory=dict)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> UnknownCell:
+        return replace(self, source=source)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_unknown(self)
 
 
 def parse(text: str) -> list[Cell]:
     cells: list[Cell] = []
-    kind, attrs, body, first, unique_id = MARKDOWN, {}, [], 0, ""
+    kind, attrs, body, first, unique_id, folded = MARKDOWN, {}, [], 0, "", False
     opened = False
 
     def close() -> None:
@@ -162,7 +464,8 @@ def parse(text: str) -> list[Cell]:
         # to no cell and is dropped — as the editor's reader drops it.
         if opened:
             at = (first + written[0], first + written[-1]) if written else None
-            cells.append(Cell(kind, source, dict(attrs), at, unique_id))
+            cell = _cell_from_marker(kind, dict(attrs), source, folded, at, unique_id)
+            cells.append(cell)
 
     # Split on "\n" alone, as the editor's reader does: a form feed or a
     # U+2028 is a character the author wrote, not a line the document has.
@@ -176,6 +479,7 @@ def parse(text: str) -> list[Cell]:
         kind = marker.group(1)
         attrs = _read_attrs(marker.group(2))
         unique_id = attrs.pop(_UNIQUE_ID, "") or str(uuid4())
+        folded = attrs.pop(_FOLDED, "") == _TRUE
         body = []
         first = index + 1
     close()
@@ -184,9 +488,11 @@ def parse(text: str) -> list[Cell]:
 
 def dumps(cells: list[Cell]) -> str:
     """The document as text, such that `parse(dumps(cells)) == cells`."""
+    marker_attributes = _MarkerAttributes()
     out: list[str] = []
     for cell in cells:
-        out.append(_marker_for(cell))
+        marker = _marker_for(cell, marker_attributes)
+        out.append(marker)
         out.append("")
         if cell.source:
             out.append(cell.source)
@@ -208,34 +514,6 @@ def add_missing(cells: list[Cell], wanted: list[Cell]) -> list[Cell]:
         if not any(added_cell.kind == cell.kind for added_cell in added_cells):
             added_cells.append(cell)
     return added_cells
-
-
-def markdown(source: str) -> Cell:
-    return Cell(MARKDOWN, source)
-
-
-def chapter(title: str) -> Cell:
-    return Cell(CHAPTER, "", {"title": title})
-
-
-def part(title: str) -> Cell:
-    return Cell(PART, "", {"title": title})
-
-
-def divider() -> Cell:
-    return Cell(DIVIDER, "")
-
-
-def image(src: str, full_page: bool = True) -> Cell:
-    return Cell(IMAGE, "", {"src": src} if full_page else {"src": src, FULL_PAGE: NO})
-
-
-def is_full_page(cell: Cell) -> bool:
-    return cell.attrs.get(FULL_PAGE, "") != NO
-
-
-def table_of_contents() -> Cell:
-    return Cell(TABLE_OF_CONTENTS)
 
 
 def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int, int]]:
@@ -282,10 +560,9 @@ def _split_comments(lines: list[str], line_indices: list[int]) -> list[tuple[int
     return ranges
 
 
-def _salient_concept_in_the_story(concept_cell: Cell) -> SalientConceptInTheStory:
-    written_ranges = concept_cell.attrs.get(STORY_WORD_RANGES, "").split(",")
+def _story_word_ranges_in(written: str) -> list[StoryWordRange]:
     story_word_ranges: list[StoryWordRange] = []
-    for written_range in written_ranges:
+    for written_range in written.split(","):
         read_range = _STORY_WORD_RANGE.match(written_range)
         if read_range is None:
             continue
@@ -293,15 +570,12 @@ def _salient_concept_in_the_story(concept_cell: Cell) -> SalientConceptInTheStor
         last_word = int(read_range.group(2))
         story_word_range = StoryWordRange(first_word, last_word)
         story_word_ranges.append(story_word_range)
-    salient_concept = SalientConceptInTheStory(
-        concept_cell.title, concept_cell.source, story_word_ranges
-    )
-    return salient_concept
+    return story_word_ranges
 
 
-def _plot_in_the_story(plot_cell: Cell) -> PlotInTheStory:
+def _plot_nodes_in(written: str) -> list[PlotNode]:
     nodes: list[PlotNode] = []
-    for written_node in plot_cell.attrs.get(PLOT_NODES, "").split(","):
+    for written_node in written.split(","):
         read_node = _PLOT_NODE.match(written_node)
         if read_node is None:
             continue
@@ -310,15 +584,94 @@ def _plot_in_the_story(plot_cell: Cell) -> PlotInTheStory:
         story_word_range = StoryWordRange(first_word, last_word)
         node = PlotNode(read_node.group(1), story_word_range)
         nodes.append(node)
+    return nodes
+
+
+def _plot_edges_in(written: str) -> list[PlotEdge]:
     edges: list[PlotEdge] = []
-    for written_edge in plot_cell.attrs.get(PLOT_EDGES, "").split(","):
+    for written_edge in written.split(","):
         read_edge = _PLOT_EDGE.match(written_edge)
         if read_edge is None:
             continue
         edge = PlotEdge(read_edge.group(1), read_edge.group(2), read_edge.group(3))
         edges.append(edge)
-    plot = PlotInTheStory(plot_cell.title, plot_cell.source, nodes, edges)
-    return plot
+    return edges
+
+
+def _cell_from_marker(
+    kind: str,
+    attrs: dict[str, str],
+    source: str,
+    folded: bool,
+    at: tuple[int, int] | None,
+    unique_id: str,
+) -> Cell:
+    if kind == MARKDOWN:
+        return MarkdownCell(source, folded, at, unique_id)
+    if kind == CHAPTER:
+        return ChapterCell(attrs.get(_TITLE, ""), source, folded, at, unique_id)
+    if kind == PART:
+        return PartCell(attrs.get(_TITLE, ""), source, folded, at, unique_id)
+    if kind == DIVIDER:
+        return DividerCell(source, folded, at, unique_id)
+    if kind == TITLE_PAGE:
+        return TitlePageCell(
+            attrs.get(_TITLE, ""),
+            attrs.get(_SUBTITLE, ""),
+            attrs.get(_AUTHOR, ""),
+            attrs.get(_PUBLISHER, ""),
+            attrs.get(_DATE, ""),
+            attrs.get(_VERSION, ""),
+            attrs.get(_ISBN, ""),
+            attrs.get(_COVER_DESIGNER, ""),
+            attrs.get(_LANGUAGE, ""),
+            source,
+            folded,
+            at,
+            unique_id,
+        )
+    if kind == IMAGE:
+        return ImageCell(
+            attrs.get(_SRC, ""),
+            attrs.get(FULL_PAGE) != NO,
+            source,
+            folded,
+            at,
+            unique_id,
+        )
+    if kind == TABLE_OF_CONTENTS:
+        return TableOfContentsCell(source, folded, at, unique_id)
+    if kind == DISCLAIMER:
+        return DisclaimerCell(attrs.get(_TITLE, ""), source, folded, at, unique_id)
+    if kind == ABOUT:
+        return AboutCell(
+            attrs.get(_KDP, ""),
+            attrs.get(_WEBSITE, ""),
+            attrs.get(_SUBSTACK, ""),
+            attrs.get(_PORTRAIT, ""),
+            source,
+            folded,
+            at,
+            unique_id,
+        )
+    if kind == BLURB:
+        return BlurbCell(source, folded, at, unique_id)
+    if kind == NOTE:
+        return NoteCell(source, folded, at, unique_id)
+    if kind == RECAP:
+        return RecapCell(attrs.get(_DOCUMENTS, ""), source, folded, at, unique_id)
+    if kind == SALIENT_CONCEPT:
+        story_word_ranges = _story_word_ranges_in(attrs.get(STORY_WORD_RANGES, ""))
+        return SalientConceptCell(
+            attrs.get(_TITLE, ""), story_word_ranges, source, folded, at, unique_id
+        )
+    if kind == PLOT:
+        nodes = _plot_nodes_in(attrs.get(PLOT_NODES, ""))
+        edges = _plot_edges_in(attrs.get(PLOT_EDGES, ""))
+        return PlotCell(
+            attrs.get(_TITLE, ""), nodes, edges, source, folded, at, unique_id
+        )
+    return UnknownCell(kind, attrs, source, folded, at, unique_id)
 
 
 class Document:
@@ -341,18 +694,19 @@ class Document:
         return cls(path.read_text(encoding="utf-8"), path)
 
     @property
-    def title_page(self) -> Cell:
+    def title_page(self) -> TitlePageCell:
         """What the book says of itself, blank in a document that says nothing."""
         return next(
-            (cell for cell in self.cells if cell.kind == TITLE_PAGE), Cell(TITLE_PAGE)
+            (cell for cell in self.cells if isinstance(cell, TitlePageCell)),
+            TitlePageCell(),
         )
 
     @property
     def title(self) -> str:
         return self.title_page.title or "Anonymous"
 
-    def markdown_cells(self) -> list[Cell]:
-        return [cell for cell in self.cells if cell.kind == MARKDOWN]
+    def markdown_cells(self) -> list[MarkdownCell]:
+        return [cell for cell in self.cells if isinstance(cell, MarkdownCell)]
 
     def cell_with_id(self, cell_id: str) -> Cell | None:
         return next((cell for cell in self.cells if cell.unique_id == cell_id), None)
@@ -364,7 +718,7 @@ class Document:
         by the line of the document each is written on."""
         last = len(self.lines) - 1 if end is None else end
         for cell in self.cells:
-            if cell.at is None or cell.kind != MARKDOWN:
+            if cell.at is None or not isinstance(cell, MarkdownCell):
                 continue
             first, final = cell.at
             covered = list(range(first, final + 1))
@@ -403,7 +757,7 @@ class Document:
         """The raw contents of chapters - stripped of comments and any other information"""
         found: list[tuple[str, list[tuple[int, str]]]] = []
         for cell in self.cells:
-            if cell.kind == CHAPTER:
+            if isinstance(cell, ChapterCell):
                 found.append((cell.title or f"Chapter {len(found) + 1}", []))
             elif found and cell.at:
                 found[-1][1].extend(self.story_lines(*cell.at))
@@ -415,18 +769,11 @@ class Document:
 
         return chapter_lines
 
-    def salient_concepts(self) -> list[SalientConceptInTheStory]:
-        concept_cells = [cell for cell in self.cells if cell.kind == SALIENT_CONCEPT]
-        salient_concepts = [
-            _salient_concept_in_the_story(concept_cell)
-            for concept_cell in concept_cells
-        ]
-        return salient_concepts
+    def salient_concepts(self) -> list[SalientConceptCell]:
+        return [cell for cell in self.cells if isinstance(cell, SalientConceptCell)]
 
-    def plots(self) -> list[PlotInTheStory]:
-        plot_cells = [cell for cell in self.cells if cell.kind == PLOT]
-        plots = [_plot_in_the_story(plot_cell) for plot_cell in plot_cells]
-        return plots
+    def plots(self) -> list[PlotCell]:
+        return [cell for cell in self.cells if isinstance(cell, PlotCell)]
 
     def __str__(self) -> str:
         return self.text
@@ -474,8 +821,112 @@ def _read_attrs(text: str) -> dict[str, str]:
     }
 
 
-def _marker_for(cell: Cell) -> str:
-    written_attrs = {_UNIQUE_ID: cell.unique_id, **cell.attrs}
+def _without_the_ones_nothing_is_said_about(
+    attributes: dict[str, str],
+) -> dict[str, str]:
+    return {name: value for name, value in attributes.items() if value != ""}
+
+
+def _written_story_word_ranges(story_word_ranges: list[StoryWordRange]) -> str:
+    return ", ".join(
+        f"{story_word_range.first_word}-{story_word_range.last_word}"
+        for story_word_range in story_word_ranges
+    )
+
+
+def _written_plot_nodes(nodes: list[PlotNode]) -> str:
+    return ", ".join(
+        f"{node.node_id}:{node.story_word_range.first_word}"
+        f"-{node.story_word_range.last_word}"
+        for node in nodes
+    )
+
+
+def _written_plot_edges(edges: list[PlotEdge]) -> str:
+    return ", ".join(
+        f"{edge.edge_id}:{edge.from_node_id}>{edge.to_node_id}" for edge in edges
+    )
+
+
+class _MarkerAttributes(CellVisitor[dict[str, str]]):
+    def visit_markdown(self, cell: MarkdownCell) -> dict[str, str]:
+        return {}
+
+    def visit_chapter(self, cell: ChapterCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about({_TITLE: cell.title})
+
+    def visit_part(self, cell: PartCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about({_TITLE: cell.title})
+
+    def visit_divider(self, cell: DividerCell) -> dict[str, str]:
+        return {}
+
+    def visit_title_page(self, cell: TitlePageCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about(
+            {
+                _TITLE: cell.title,
+                _SUBTITLE: cell.subtitle,
+                _AUTHOR: cell.author,
+                _PUBLISHER: cell.publisher,
+                _DATE: cell.date,
+                _VERSION: cell.version,
+                _ISBN: cell.isbn,
+                _COVER_DESIGNER: cell.cover_designer,
+                _LANGUAGE: cell.language,
+            }
+        )
+
+    def visit_image(self, cell: ImageCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about(
+            {_SRC: cell.src, FULL_PAGE: "" if cell.full_page else NO}
+        )
+
+    def visit_table_of_contents(self, cell: TableOfContentsCell) -> dict[str, str]:
+        return {}
+
+    def visit_disclaimer(self, cell: DisclaimerCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about({_TITLE: cell.title})
+
+    def visit_about(self, cell: AboutCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about(
+            {
+                _KDP: cell.kdp,
+                _WEBSITE: cell.website,
+                _SUBSTACK: cell.substack,
+                _PORTRAIT: cell.portrait,
+            }
+        )
+
+    def visit_blurb(self, cell: BlurbCell) -> dict[str, str]:
+        return {}
+
+    def visit_note(self, cell: NoteCell) -> dict[str, str]:
+        return {}
+
+    def visit_recap(self, cell: RecapCell) -> dict[str, str]:
+        return _without_the_ones_nothing_is_said_about({_DOCUMENTS: cell.documents})
+
+    def visit_salient_concept(self, cell: SalientConceptCell) -> dict[str, str]:
+        story_word_ranges = _written_story_word_ranges(cell.story_word_ranges)
+        return _without_the_ones_nothing_is_said_about(
+            {_TITLE: cell.title, STORY_WORD_RANGES: story_word_ranges}
+        )
+
+    def visit_plot(self, cell: PlotCell) -> dict[str, str]:
+        nodes = _written_plot_nodes(cell.nodes)
+        edges = _written_plot_edges(cell.edges)
+        return _without_the_ones_nothing_is_said_about(
+            {_TITLE: cell.title, PLOT_NODES: nodes, PLOT_EDGES: edges}
+        )
+
+    def visit_unknown(self, cell: UnknownCell) -> dict[str, str]:
+        return dict(cell.attrs)
+
+
+def _marker_for(cell: Cell, marker_attributes: _MarkerAttributes) -> str:
+    attributes_of_the_kind = cell.accept(marker_attributes)
+    folded = {_FOLDED: _TRUE} if cell.folded else {}
+    written_attrs = {_UNIQUE_ID: cell.unique_id, **attributes_of_the_kind, **folded}
     said = "".join(
         f' {name}="{_escape(value)}"' for name, value in written_attrs.items()
     )

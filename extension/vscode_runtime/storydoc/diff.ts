@@ -1,32 +1,24 @@
-import { Cell, Document, dumps } from "./storydoc";
-
-const NO_ATTRIBUTES: Readonly<Record<string, string | undefined>> =
-    Object.freeze({});
+import { type Cell, Document, dumps, parse } from "./storydoc";
 
 export class AuthorDocCellDiff {
     constructor(
         readonly cellId: string,
         readonly theyDifferFromCharacter: number,
-        readonly kindInLhs: string | undefined,
-        readonly kindInRhs: string | undefined,
+        readonly headerInLhs: string | undefined,
+        readonly headerInRhs: string | undefined,
         readonly textInLhs: string,
         readonly textInRhs: string,
-        readonly attributesInLhs: Readonly<Record<string, string | undefined>>,
-        readonly attributesInRhs: Readonly<Record<string, string | undefined>>,
     ) {}
 
     static between(
         cellInLhs: Cell,
         cellInRhs: Cell,
     ): AuthorDocCellDiff | undefined {
-        const attributesChanged = attributesWhereTheyDiffer(
-            cellInLhs,
-            cellInRhs,
-        );
+        const headerInLhs = headerOf(cellInLhs);
+        const headerInRhs = headerOf(cellInRhs);
         if (
-            cellInLhs.kind === cellInRhs.kind &&
-            cellInLhs.source === cellInRhs.source &&
-            Object.keys(attributesChanged.inRhs).length === 0
+            headerInLhs === headerInRhs &&
+            cellInLhs.source === cellInRhs.source
         ) {
             return undefined;
         }
@@ -57,8 +49,8 @@ export class AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             cellInRhs.uniqueId,
             charactersSameAtTheStart,
-            cellInLhs.kind,
-            cellInRhs.kind,
+            headerInLhs,
+            headerInRhs,
             markdownInLhs.slice(
                 charactersSameAtTheStart,
                 markdownInLhs.length - charactersSameAtTheEnd,
@@ -67,21 +59,18 @@ export class AuthorDocCellDiff {
                 charactersSameAtTheStart,
                 markdownInRhs.length - charactersSameAtTheEnd,
             ),
-            attributesChanged.inLhs,
-            attributesChanged.inRhs,
         );
     }
 
     static takingTheCellOut(cell: Cell): AuthorDocCellDiff {
+        const header = headerOf(cell);
         return new AuthorDocCellDiff(
             cell.uniqueId,
             0,
-            cell.kind,
+            header,
             undefined,
             cell.source,
             "",
-            { ...cell.attrs },
-            NO_ATTRIBUTES,
         );
     }
 
@@ -97,42 +86,25 @@ export class AuthorDocCellDiff {
         return new AuthorDocCellDiff(
             this.cellId,
             this.theyDifferFromCharacter,
-            this.kindInRhs,
-            this.kindInLhs,
+            this.headerInRhs,
+            this.headerInLhs,
             this.textInRhs,
             this.textInLhs,
-            this.attributesInRhs,
-            this.attributesInLhs,
         );
     }
 
     writeInto(cells: Cell[]): Cell[] {
-        if (this.kindInRhs === undefined) {
+        if (this.headerInRhs === undefined) {
             return cells.filter((cell) => cell.uniqueId !== this.cellId);
         }
-        const cellInLhs =
-            cells.find((cell) => cell.uniqueId === this.cellId) ??
-            new Cell(this.kindInRhs, "", {}, null, this.cellId);
-        const attributes: Record<string, string> = { ...cellInLhs.attrs };
-        for (const [attributeName, attributeValue] of Object.entries(
-            this.attributesInRhs,
-        )) {
-            if (attributeValue === undefined) {
-                delete attributes[attributeName];
-            } else {
-                attributes[attributeName] = attributeValue;
-            }
-        }
-        const cellInRhs = new Cell(
-            this.kindInRhs,
-            cellInLhs.source.slice(0, this.theyDifferFromCharacter) +
-                this.textInRhs +
-                cellInLhs.source.slice(this.theyDifferToCharacterInLhs),
-            attributes,
-            null,
-            this.cellId,
-        );
-        return cells.some((cell) => cell.uniqueId === this.cellId)
+        const cellInLhs = cells.find((cell) => cell.uniqueId === this.cellId);
+        const sourceInLhs = cellInLhs?.source ?? "";
+        const sourceInRhs =
+            sourceInLhs.slice(0, this.theyDifferFromCharacter) +
+            this.textInRhs +
+            sourceInLhs.slice(this.theyDifferToCharacterInLhs);
+        const [cellInRhs] = parse(`${this.headerInRhs}\n${sourceInRhs}`);
+        return cellInLhs
             ? cells.map((cell) =>
                   cell.uniqueId === this.cellId ? cellInRhs : cell,
               )
@@ -220,30 +192,7 @@ function cellIdsOf(document: Document): string[] {
     return document.cells.map((cell) => cell.uniqueId);
 }
 
-function attributesWhereTheyDiffer(
-    cellInLhs: Cell,
-    cellInRhs: Cell,
-): {
-    inLhs: Record<string, string | undefined>;
-    inRhs: Record<string, string | undefined>;
-} {
-    const attributeNames = [
-        ...new Set([
-            ...Object.keys(cellInLhs.attrs),
-            ...Object.keys(cellInRhs.attrs),
-        ]),
-    ].filter(
-        (attributeName) =>
-            cellInLhs.attrs[attributeName] !== cellInRhs.attrs[attributeName],
-    );
-    if (attributeNames.length === 0) {
-        return { inLhs: NO_ATTRIBUTES, inRhs: NO_ATTRIBUTES };
-    }
-    const inLhs: Record<string, string | undefined> = {};
-    const inRhs: Record<string, string | undefined> = {};
-    for (const attributeName of attributeNames) {
-        inLhs[attributeName] = cellInLhs.attrs[attributeName];
-        inRhs[attributeName] = cellInRhs.attrs[attributeName];
-    }
-    return { inLhs, inRhs };
+function headerOf(cell: Cell): string {
+    const cellWithoutItsText = cell.withSource("");
+    return dumps([cellWithoutItsText]);
 }

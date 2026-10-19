@@ -14,6 +14,16 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
+from server.storydoc import (
+    AboutCell,
+    BlurbCell,
+    ChapterCell,
+    ImageCell,
+    MarkdownCell,
+    RecapCell,
+    TableOfContentsCell,
+    TitlePageCell,
+)
 
 
 DEFAULT_REPLY = (
@@ -100,9 +110,9 @@ class Jobs(unittest.TestCase):
         self.manuscript = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
         self.written = storydoc.dumps(
             [
-                storydoc.chapter("One"),
-                storydoc.markdown("The lantern had gone out."),
-                storydoc.Cell(storydoc.BLURB),
+                ChapterCell("One"),
+                MarkdownCell("The lantern had gone out."),
+                BlurbCell(),
             ]
         )
         self.manuscript.write_text(self.written, encoding="utf-8")
@@ -217,12 +227,12 @@ class GenerateBlurb(unittest.TestCase):
         self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
         self.written = storydoc.dumps(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
-                storydoc.chapter("Two"),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
-                storydoc.Cell(storydoc.BLURB, "", {}),
+                TitlePageCell(title="Veriona"),
+                ChapterCell("One"),
+                MarkdownCell(_unique_id="lantern", source="The lantern had gone out."),
+                ChapterCell("Two"),
+                MarkdownCell(_unique_id="door", source="The door stood open."),
+                BlurbCell(),
             ]
         )
         self.document.write_text(self.written, encoding="utf-8")
@@ -403,10 +413,10 @@ class GenerateRecap(unittest.TestCase):
         storydoc.save(
             self.document,
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona III"}),
-                storydoc.Cell(storydoc.RECAP, "", {"documents": "a.author, b.author"}),
-                storydoc.chapter("One"),
-                storydoc.markdown("The road ended at a gate."),
+                TitlePageCell(title="Veriona III"),
+                RecapCell(documents="a.author, b.author"),
+                ChapterCell("One"),
+                MarkdownCell("The road ended at a gate."),
             ],
         )
         self.written = self.document.read_text()
@@ -417,9 +427,9 @@ class GenerateRecap(unittest.TestCase):
             storydoc.save(
                 self.folder / name,
                 [
-                    storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": title}),
-                    storydoc.chapter("One"),
-                    storydoc.markdown(prose),
+                    TitlePageCell(title=title),
+                    ChapterCell("One"),
+                    MarkdownCell(prose),
                 ],
             )
 
@@ -522,9 +532,9 @@ class ExportEpub(unittest.TestCase):
         storydoc.save(
             self.document,
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Book"}),
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
+                TitlePageCell(title="Book"),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
             ],
         )
 
@@ -534,23 +544,13 @@ class ExportEpub(unittest.TestCase):
         storydoc.save(
             self.document,
             [
-                storydoc.image("art.png"),
-                storydoc.Cell(
-                    storydoc.TITLE_PAGE,
-                    "",
-                    {
-                        "title": "Book",
-                        "subtitle": "A Story",
-                        "author": "A. Writer",
-                        "publisher": "A Press",
-                        "date": "2026-09-02",
-                    },
-                ),
-                storydoc.table_of_contents(),
-                storydoc.Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
-                storydoc.Cell(storydoc.ABOUT, "I live by the sea."),
+                ImageCell("art.png"),
+                TitlePageCell(title="Book", subtitle="A Story", author="A. Writer", publisher="A Press", date="2026-09-02"),
+                TableOfContentsCell(),
+                BlurbCell(source="A lantern, and a stair."),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
+                AboutCell(source="I live by the sea."),
             ],
         )
 
@@ -649,11 +649,11 @@ class FixStyle(unittest.TestCase):
         self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
         self.written = storydoc.dumps(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
-                storydoc.chapter("Two"),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
+                TitlePageCell(title="Veriona"),
+                ChapterCell("One"),
+                MarkdownCell(_unique_id="lantern", source="The lantern had gone out."),
+                ChapterCell("Two"),
+                MarkdownCell(_unique_id="door", source="The door stood open."),
             ]
         )
         self.document.write_text(self.written, encoding="utf-8")
@@ -715,7 +715,7 @@ class FixStyle(unittest.TestCase):
         self,
     ) -> None:
         self.document.write_text(
-            storydoc.dumps([storydoc.chapter("One")]), encoding="utf-8"
+            storydoc.dumps([ChapterCell("One")]), encoding="utf-8"
         )
         status = self.start()
         self.assertIn("no prose", status["error"])

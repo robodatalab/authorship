@@ -58,6 +58,24 @@ export const NO = "no";
 export const FULL_PAGE = "full-page";
 
 const UNIQUE_ID = "id";
+const FOLDED = "folded";
+const TRUE = "true";
+
+const TITLE = "title";
+const SUBTITLE = "subtitle";
+const AUTHOR = "author";
+const PUBLISHER = "publisher";
+const DATE = "date";
+const VERSION = "version";
+const ISBN = "isbn";
+const COVER_DESIGNER = "cover-designer";
+const LANGUAGE = "language";
+const SRC = "src";
+const KDP = "kdp";
+const WEBSITE = "website";
+const SUBSTACK = "substack";
+const PORTRAIT = "portrait";
+const DOCUMENTS = "documents";
 
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
@@ -86,52 +104,10 @@ function splitlines(text: string): string[] {
     return lines;
 }
 
-/**
- * One thing the document is made of, and what it says it is.
- *
- * `kind` is the cell's identity and is never inferred from its text — a chapter
- * called "Disclaimer" is still a chapter. `attrs` is whatever the kind needs
- * said about it, and is kept even when this module has no use for it.
- */
-export class Cell {
-    constructor(
-        readonly kind: string,
-        readonly source: string = "",
-        readonly attrs: Readonly<Record<string, string>> = {},
-        readonly at: readonly [number, number] | null = null,
-        readonly uniqueId: string = crypto.randomUUID(),
-    ) {}
-
-    get title(): string {
-        return this.attrs["title"] ?? "";
-    }
-
-    offsetOf(line: number, character: number): number {
-        assert(this.at !== null);
-        const above = splitlines(this.source).slice(0, line - this.at[0]);
-        return (
-            above.reduce((sum, written) => sum + written.length + 1, 0) +
-            character
-        );
-    }
-
-    withSource(source: string): Cell {
-        return new Cell(this.kind, source, this.attrs, this.at, this.uniqueId);
-    }
-}
-
 export class StoryWordRange {
     constructor(
         readonly firstWord: number,
         readonly lastWord: number,
-    ) {}
-}
-
-export class SalientConceptInTheStory {
-    constructor(
-        readonly title: string,
-        readonly abstract: string,
-        readonly storyWordRanges: StoryWordRange[],
     ) {}
 }
 
@@ -150,24 +126,484 @@ export class PlotEdge {
     ) {}
 }
 
-export class PlotInTheStory {
+export interface CellVisitor<Result> {
+    visitMarkdown(cell: MarkdownCell): Result;
+    visitChapter(cell: ChapterCell): Result;
+    visitPart(cell: PartCell): Result;
+    visitDivider(cell: DividerCell): Result;
+    visitTitlePage(cell: TitlePageCell): Result;
+    visitImage(cell: ImageCell): Result;
+    visitTableOfContents(cell: TableOfContentsCell): Result;
+    visitDisclaimer(cell: DisclaimerCell): Result;
+    visitAbout(cell: AboutCell): Result;
+    visitBlurb(cell: BlurbCell): Result;
+    visitNote(cell: NoteCell): Result;
+    visitRecap(cell: RecapCell): Result;
+    visitSalientConcept(cell: SalientConceptCell): Result;
+    visitPlot(cell: PlotCell): Result;
+    visitUnknown(cell: UnknownCell): Result;
+}
+
+/**
+ * One thing the document is made of, and what it says it is.
+ *
+ * `kind` is the cell's identity and is never inferred from its text — a chapter
+ * called "Disclaimer" is still a chapter.
+ */
+export abstract class Cell {
+    abstract readonly kind: string;
+
     constructor(
-        readonly title: string,
-        readonly abstract: string,
-        readonly nodes: PlotNode[],
-        readonly edges: PlotEdge[],
+        readonly source: string,
+        readonly folded: boolean,
+        readonly at: readonly [number, number] | null,
+        readonly uniqueId: string,
     ) {}
+
+    offsetOf(line: number, character: number): number {
+        assert(this.at !== null);
+        const above = splitlines(this.source).slice(0, line - this.at[0]);
+        return (
+            above.reduce((sum, written) => sum + written.length + 1, 0) +
+            character
+        );
+    }
+
+    abstract withSource(source: string): Cell;
+
+    abstract accept<Result>(visitor: CellVisitor<Result>): Result;
+}
+
+export class MarkdownCell extends Cell {
+    readonly kind = MARKDOWN;
+
+    constructor(
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): MarkdownCell {
+        return new MarkdownCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitMarkdown(this);
+    }
+}
+
+export class ChapterCell extends Cell {
+    readonly kind = CHAPTER;
+
+    constructor(
+        readonly title: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): ChapterCell {
+        return new ChapterCell(
+            this.title,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitChapter(this);
+    }
+}
+
+export class PartCell extends Cell {
+    readonly kind = PART;
+
+    constructor(
+        readonly title: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): PartCell {
+        return new PartCell(
+            this.title,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitPart(this);
+    }
+}
+
+export class DividerCell extends Cell {
+    readonly kind = DIVIDER;
+
+    constructor(
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): DividerCell {
+        return new DividerCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitDivider(this);
+    }
+}
+
+export class TitlePageCell extends Cell {
+    readonly kind = TITLE_PAGE;
+
+    constructor(
+        readonly title: string = "",
+        readonly subtitle: string = "",
+        readonly author: string = "",
+        readonly publisher: string = "",
+        readonly date: string = "",
+        readonly version: string = "",
+        readonly isbn: string = "",
+        readonly coverDesigner: string = "",
+        readonly language: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): TitlePageCell {
+        return new TitlePageCell(
+            this.title,
+            this.subtitle,
+            this.author,
+            this.publisher,
+            this.date,
+            this.version,
+            this.isbn,
+            this.coverDesigner,
+            this.language,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitTitlePage(this);
+    }
+}
+
+export class ImageCell extends Cell {
+    readonly kind = IMAGE;
+
+    constructor(
+        readonly src: string = "",
+        readonly fullPage: boolean = true,
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): ImageCell {
+        return new ImageCell(
+            this.src,
+            this.fullPage,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitImage(this);
+    }
+}
+
+export class TableOfContentsCell extends Cell {
+    readonly kind = TABLE_OF_CONTENTS;
+
+    constructor(
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): TableOfContentsCell {
+        return new TableOfContentsCell(
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitTableOfContents(this);
+    }
+}
+
+export class DisclaimerCell extends Cell {
+    readonly kind = DISCLAIMER;
+
+    constructor(
+        readonly title: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): DisclaimerCell {
+        return new DisclaimerCell(
+            this.title,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitDisclaimer(this);
+    }
+}
+
+export class AboutCell extends Cell {
+    readonly kind = ABOUT;
+
+    constructor(
+        readonly kdp: string = "",
+        readonly website: string = "",
+        readonly substack: string = "",
+        readonly portrait: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): AboutCell {
+        return new AboutCell(
+            this.kdp,
+            this.website,
+            this.substack,
+            this.portrait,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitAbout(this);
+    }
+}
+
+export class BlurbCell extends Cell {
+    readonly kind = BLURB;
+
+    constructor(
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): BlurbCell {
+        return new BlurbCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitBlurb(this);
+    }
+}
+
+export class NoteCell extends Cell {
+    readonly kind = NOTE;
+
+    constructor(
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): NoteCell {
+        return new NoteCell(source, this.folded, this.at, this.uniqueId);
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitNote(this);
+    }
+}
+
+export class RecapCell extends Cell {
+    readonly kind = RECAP;
+
+    constructor(
+        readonly documents: string = "",
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): RecapCell {
+        return new RecapCell(
+            this.documents,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitRecap(this);
+    }
+}
+
+export class SalientConceptCell extends Cell {
+    readonly kind = SALIENT_CONCEPT;
+
+    constructor(
+        readonly title: string = "",
+        readonly storyWordRanges: readonly StoryWordRange[] = [],
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): SalientConceptCell {
+        return new SalientConceptCell(
+            this.title,
+            this.storyWordRanges,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitSalientConcept(this);
+    }
+}
+
+export class PlotCell extends Cell {
+    readonly kind = PLOT;
+
+    constructor(
+        readonly title: string = "",
+        readonly nodes: readonly PlotNode[] = [],
+        readonly edges: readonly PlotEdge[] = [],
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): PlotCell {
+        return new PlotCell(
+            this.title,
+            this.nodes,
+            this.edges,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitPlot(this);
+    }
+}
+
+export class UnknownCell extends Cell {
+    constructor(
+        readonly kind: string,
+        readonly attrs: Readonly<Record<string, string>> = {},
+        source: string = "",
+        folded: boolean = false,
+        at: readonly [number, number] | null = null,
+        uniqueId: string = crypto.randomUUID(),
+    ) {
+        super(source, folded, at, uniqueId);
+    }
+
+    withSource(source: string): UnknownCell {
+        return new UnknownCell(
+            this.kind,
+            this.attrs,
+            source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    accept<Result>(visitor: CellVisitor<Result>): Result {
+        return visitor.visitUnknown(this);
+    }
 }
 
 export function parse(text: string): Cell[] {
     const cells: Cell[] = [];
-    let [kind, attrs, body, first, uniqueId]: [
+    let [kind, attrs, body, first, uniqueId, folded]: [
         string,
         Record<string, string>,
         string[],
         number,
         string,
-    ] = [MARKDOWN, {}, [], 0, ""];
+        boolean,
+    ] = [MARKDOWN, {}, [], 0, "", false];
     let opened = false;
 
     function close(): void {
@@ -182,7 +618,15 @@ export function parse(text: string): Cell[] {
                 written.length > 0
                     ? [first + written[0], first + written[written.length - 1]]
                     : null;
-            cells.push(new Cell(kind, source, { ...attrs }, at, uniqueId));
+            const cell = cellFromMarker(
+                kind,
+                { ...attrs },
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+            cells.push(cell);
         }
     }
 
@@ -199,7 +643,9 @@ export function parse(text: string): Cell[] {
         kind = marker[1];
         attrs = readAttrs(marker[2]);
         uniqueId = attrs[UNIQUE_ID] || crypto.randomUUID();
+        folded = attrs[FOLDED] === TRUE;
         delete attrs[UNIQUE_ID];
+        delete attrs[FOLDED];
         body = [];
         first = index + 1;
     }
@@ -208,10 +654,12 @@ export function parse(text: string): Cell[] {
 }
 
 /** The document as text, such that `parse(dumps(cells)) == cells`. */
-export function dumps(cells: Cell[]): string {
+export function dumps(cells: readonly Cell[]): string {
+    const markerAttributes = new MarkerAttributes();
     const out: string[] = [];
     for (const cell of cells) {
-        out.push(markerFor(cell));
+        const marker = markerFor(cell, markerAttributes);
+        out.push(marker);
         out.push("");
         if (cell.source) {
             out.push(cell.source);
@@ -237,38 +685,6 @@ export function addMissing(cells: Cell[], wanted: Cell[]): Cell[] {
         }
     }
     return addedCells;
-}
-
-export function markdown(source: string): Cell {
-    return new Cell(MARKDOWN, source);
-}
-
-export function chapter(title: string): Cell {
-    return new Cell(CHAPTER, "", { title: title });
-}
-
-export function part(title: string): Cell {
-    return new Cell(PART, "", { title: title });
-}
-
-export function divider(): Cell {
-    return new Cell(DIVIDER, "");
-}
-
-export function image(src: string, fullPage: boolean = true): Cell {
-    return new Cell(
-        IMAGE,
-        "",
-        fullPage ? { src: src } : { src: src, [FULL_PAGE]: NO },
-    );
-}
-
-export function isFullPage(cell: Cell): boolean {
-    return (cell.attrs[FULL_PAGE] ?? "") !== NO;
-}
-
-export function tableOfContents(): Cell {
-    return new Cell(TABLE_OF_CONTENTS);
 }
 
 function splitComments(
@@ -335,12 +751,9 @@ function splitComments(
     return ranges;
 }
 
-function salientConceptInTheStory(conceptCell: Cell): SalientConceptInTheStory {
-    const writtenRanges = (conceptCell.attrs[STORY_WORD_RANGES] ?? "").split(
-        ",",
-    );
+function storyWordRangesIn(written: string): StoryWordRange[] {
     const storyWordRanges: StoryWordRange[] = [];
-    for (const writtenRange of writtenRanges) {
+    for (const writtenRange of written.split(",")) {
         const readRange = STORY_WORD_RANGE.exec(writtenRange);
         if (readRange === null) {
             continue;
@@ -350,17 +763,12 @@ function salientConceptInTheStory(conceptCell: Cell): SalientConceptInTheStory {
         const storyWordRange = new StoryWordRange(firstWord, lastWord);
         storyWordRanges.push(storyWordRange);
     }
-    const salientConcept = new SalientConceptInTheStory(
-        conceptCell.title,
-        conceptCell.source,
-        storyWordRanges,
-    );
-    return salientConcept;
+    return storyWordRanges;
 }
 
-function plotInTheStory(plotCell: Cell): PlotInTheStory {
+function plotNodesIn(written: string): PlotNode[] {
     const nodes: PlotNode[] = [];
-    for (const writtenNode of (plotCell.attrs[PLOT_NODES] ?? "").split(",")) {
+    for (const writtenNode of written.split(",")) {
         const readNode = PLOT_NODE.exec(writtenNode);
         if (readNode === null) {
             continue;
@@ -371,8 +779,12 @@ function plotInTheStory(plotCell: Cell): PlotInTheStory {
         const node = new PlotNode(readNode[1], storyWordRange);
         nodes.push(node);
     }
+    return nodes;
+}
+
+function plotEdgesIn(written: string): PlotEdge[] {
     const edges: PlotEdge[] = [];
-    for (const writtenEdge of (plotCell.attrs[PLOT_EDGES] ?? "").split(",")) {
+    for (const writtenEdge of written.split(",")) {
         const readEdge = PLOT_EDGE.exec(writtenEdge);
         if (readEdge === null) {
             continue;
@@ -380,13 +792,125 @@ function plotInTheStory(plotCell: Cell): PlotInTheStory {
         const edge = new PlotEdge(readEdge[1], readEdge[2], readEdge[3]);
         edges.push(edge);
     }
-    const plot = new PlotInTheStory(
-        plotCell.title,
-        plotCell.source,
-        nodes,
-        edges,
-    );
-    return plot;
+    return edges;
+}
+
+function cellFromMarker(
+    kind: string,
+    attrs: Record<string, string>,
+    source: string,
+    folded: boolean,
+    at: readonly [number, number] | null,
+    uniqueId: string,
+): Cell {
+    switch (kind) {
+        case MARKDOWN:
+            return new MarkdownCell(source, folded, at, uniqueId);
+        case CHAPTER:
+            return new ChapterCell(
+                attrs[TITLE] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case PART:
+            return new PartCell(
+                attrs[TITLE] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case DIVIDER:
+            return new DividerCell(source, folded, at, uniqueId);
+        case TITLE_PAGE:
+            return new TitlePageCell(
+                attrs[TITLE] ?? "",
+                attrs[SUBTITLE] ?? "",
+                attrs[AUTHOR] ?? "",
+                attrs[PUBLISHER] ?? "",
+                attrs[DATE] ?? "",
+                attrs[VERSION] ?? "",
+                attrs[ISBN] ?? "",
+                attrs[COVER_DESIGNER] ?? "",
+                attrs[LANGUAGE] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case IMAGE:
+            return new ImageCell(
+                attrs[SRC] ?? "",
+                attrs[FULL_PAGE] !== NO,
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case TABLE_OF_CONTENTS:
+            return new TableOfContentsCell(source, folded, at, uniqueId);
+        case DISCLAIMER:
+            return new DisclaimerCell(
+                attrs[TITLE] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case ABOUT:
+            return new AboutCell(
+                attrs[KDP] ?? "",
+                attrs[WEBSITE] ?? "",
+                attrs[SUBSTACK] ?? "",
+                attrs[PORTRAIT] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case BLURB:
+            return new BlurbCell(source, folded, at, uniqueId);
+        case NOTE:
+            return new NoteCell(source, folded, at, uniqueId);
+        case RECAP:
+            return new RecapCell(
+                attrs[DOCUMENTS] ?? "",
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        case SALIENT_CONCEPT: {
+            const storyWordRanges = storyWordRangesIn(
+                attrs[STORY_WORD_RANGES] ?? "",
+            );
+            return new SalientConceptCell(
+                attrs[TITLE] ?? "",
+                storyWordRanges,
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        }
+        case PLOT: {
+            const nodes = plotNodesIn(attrs[PLOT_NODES] ?? "");
+            const edges = plotEdgesIn(attrs[PLOT_EDGES] ?? "");
+            return new PlotCell(
+                attrs[TITLE] ?? "",
+                nodes,
+                edges,
+                source,
+                folded,
+                at,
+                uniqueId,
+            );
+        }
+        default:
+            return new UnknownCell(kind, attrs, source, folded, at, uniqueId);
+    }
 }
 
 /** An .author document */
@@ -413,10 +937,10 @@ export class Document {
     }
 
     /** What the book says of itself, blank in a document that says nothing. */
-    get titlePage(): Cell {
+    get titlePage(): TitlePageCell {
         return (
-            this.cells.find((cell) => cell.kind === TITLE_PAGE) ??
-            new Cell(TITLE_PAGE)
+            this.cells.find((cell) => cell instanceof TitlePageCell) ??
+            new TitlePageCell()
         );
     }
 
@@ -424,8 +948,8 @@ export class Document {
         return this.titlePage.title || "Anonymous";
     }
 
-    markdownCells(): Cell[] {
-        return this.cells.filter((cell) => cell.kind === MARKDOWN);
+    markdownCells(): MarkdownCell[] {
+        return this.cells.filter((cell) => cell instanceof MarkdownCell);
     }
 
     cellWithId(cellId: string): Cell | undefined {
@@ -442,7 +966,7 @@ export class Document {
     ): Generator<[number, string]> {
         const last = end === null ? this.lines.length - 1 : end;
         for (const cell of this.cells) {
-            if (cell.at === null || cell.kind !== MARKDOWN) {
+            if (cell.at === null || !(cell instanceof MarkdownCell)) {
                 continue;
             }
             const [first, final] = cell.at;
@@ -501,7 +1025,7 @@ export class Document {
     get chapters(): [string, string][] {
         const found: [string, [number, string][]][] = [];
         for (const cell of this.cells) {
-            if (cell.kind === CHAPTER) {
+            if (cell instanceof ChapterCell) {
                 found.push([cell.title || `Chapter ${found.length + 1}`, []]);
             } else if (found.length > 0 && cell.at) {
                 found[found.length - 1][1].push(...this.storyLines(...cell.at));
@@ -519,20 +1043,12 @@ export class Document {
         return chapterLines;
     }
 
-    salientConcepts(): SalientConceptInTheStory[] {
-        const conceptCells = this.cells.filter(
-            (cell) => cell.kind === SALIENT_CONCEPT,
-        );
-        const salientConcepts = conceptCells.map((conceptCell) =>
-            salientConceptInTheStory(conceptCell),
-        );
-        return salientConcepts;
+    salientConcepts(): SalientConceptCell[] {
+        return this.cells.filter((cell) => cell instanceof SalientConceptCell);
     }
 
-    plots(): PlotInTheStory[] {
-        const plotCells = this.cells.filter((cell) => cell.kind === PLOT);
-        const plots = plotCells.map((plotCell) => plotInTheStory(plotCell));
-        return plots;
+    plots(): PlotCell[] {
+        return this.cells.filter((cell) => cell instanceof PlotCell);
     }
 
     toString(): string {
@@ -596,8 +1112,135 @@ function readAttrs(text: string): Record<string, string> {
     );
 }
 
-function markerFor(cell: Cell): string {
-    const writtenAttrs = { [UNIQUE_ID]: cell.uniqueId, ...cell.attrs };
+function withoutTheOnesNothingIsSaidAbout(
+    attributes: Record<string, string>,
+): Record<string, string> {
+    const said = Object.entries(attributes).filter(([, value]) => value !== "");
+    return Object.fromEntries(said);
+}
+
+function writtenStoryWordRanges(
+    storyWordRanges: readonly StoryWordRange[],
+): string {
+    return storyWordRanges
+        .map((range) => `${range.firstWord}-${range.lastWord}`)
+        .join(", ");
+}
+
+function writtenPlotNodes(nodes: readonly PlotNode[]): string {
+    return nodes
+        .map(
+            (node) =>
+                `${node.nodeId}:${node.storyWordRange.firstWord}-${node.storyWordRange.lastWord}`,
+        )
+        .join(", ");
+}
+
+function writtenPlotEdges(edges: readonly PlotEdge[]): string {
+    return edges
+        .map((edge) => `${edge.edgeId}:${edge.fromNodeId}>${edge.toNodeId}`)
+        .join(", ");
+}
+
+class MarkerAttributes implements CellVisitor<Record<string, string>> {
+    visitMarkdown(): Record<string, string> {
+        return {};
+    }
+
+    visitChapter(cell: ChapterCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({ [TITLE]: cell.title });
+    }
+
+    visitPart(cell: PartCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({ [TITLE]: cell.title });
+    }
+
+    visitDivider(): Record<string, string> {
+        return {};
+    }
+
+    visitTitlePage(cell: TitlePageCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({
+            [TITLE]: cell.title,
+            [SUBTITLE]: cell.subtitle,
+            [AUTHOR]: cell.author,
+            [PUBLISHER]: cell.publisher,
+            [DATE]: cell.date,
+            [VERSION]: cell.version,
+            [ISBN]: cell.isbn,
+            [COVER_DESIGNER]: cell.coverDesigner,
+            [LANGUAGE]: cell.language,
+        });
+    }
+
+    visitImage(cell: ImageCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({
+            [SRC]: cell.src,
+            [FULL_PAGE]: cell.fullPage ? "" : NO,
+        });
+    }
+
+    visitTableOfContents(): Record<string, string> {
+        return {};
+    }
+
+    visitDisclaimer(cell: DisclaimerCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({ [TITLE]: cell.title });
+    }
+
+    visitAbout(cell: AboutCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({
+            [KDP]: cell.kdp,
+            [WEBSITE]: cell.website,
+            [SUBSTACK]: cell.substack,
+            [PORTRAIT]: cell.portrait,
+        });
+    }
+
+    visitBlurb(): Record<string, string> {
+        return {};
+    }
+
+    visitNote(): Record<string, string> {
+        return {};
+    }
+
+    visitRecap(cell: RecapCell): Record<string, string> {
+        return withoutTheOnesNothingIsSaidAbout({
+            [DOCUMENTS]: cell.documents,
+        });
+    }
+
+    visitSalientConcept(cell: SalientConceptCell): Record<string, string> {
+        const storyWordRanges = writtenStoryWordRanges(cell.storyWordRanges);
+        return withoutTheOnesNothingIsSaidAbout({
+            [TITLE]: cell.title,
+            [STORY_WORD_RANGES]: storyWordRanges,
+        });
+    }
+
+    visitPlot(cell: PlotCell): Record<string, string> {
+        const nodes = writtenPlotNodes(cell.nodes);
+        const edges = writtenPlotEdges(cell.edges);
+        return withoutTheOnesNothingIsSaidAbout({
+            [TITLE]: cell.title,
+            [PLOT_NODES]: nodes,
+            [PLOT_EDGES]: edges,
+        });
+    }
+
+    visitUnknown(cell: UnknownCell): Record<string, string> {
+        return { ...cell.attrs };
+    }
+}
+
+function markerFor(cell: Cell, markerAttributes: MarkerAttributes): string {
+    const attributesOfTheKind = cell.accept(markerAttributes);
+    const writtenAttrs = {
+        [UNIQUE_ID]: cell.uniqueId,
+        ...attributesOfTheKind,
+        ...(cell.folded ? { [FOLDED]: TRUE } : {}),
+    };
     const said = Object.entries(writtenAttrs)
         .map(([name, value]) => ` ${name}="${escape(value)}"`)
         .join("");

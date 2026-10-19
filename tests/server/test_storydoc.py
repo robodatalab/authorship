@@ -7,13 +7,22 @@ from parameterized import parameterized
 
 from server import storydoc
 from server.storydoc import (
-    Cell,
+    BlurbCell,
+    ChapterCell,
+    DividerCell,
     Document,
+    ImageCell,
+    MarkdownCell,
+    NoteCell,
+    PartCell,
+    PlotCell,
     PlotEdge,
-    PlotInTheStory,
     PlotNode,
-    SalientConceptInTheStory,
+    RecapCell,
+    SalientConceptCell,
     StoryWordRange,
+    TableOfContentsCell,
+    TitlePageCell,
 )
 
 CORPUS = json.loads(
@@ -26,18 +35,18 @@ class StoryLines(unittest.TestCase):
         return Document(
             storydoc.dumps(
                 [
-                    Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-                    storydoc.chapter("The First Night"),
-                    storydoc.markdown(
+                    TitlePageCell("Veriona"),
+                    ChapterCell("The First Night"),
+                    MarkdownCell(
                         "The lantern had gone out.\n"
                         "<!-- ask Mara whether this is the third time -->\n"
                         "She did not light it."
                     ),
-                    Cell(storydoc.NOTE, "Remember the lantern.", {}),
-                    Cell(storydoc.BLURB, "A woman loses her name.", {}),
-                    Cell(storydoc.RECAP, "What happened before.", {}),
-                    Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
-                    storydoc.markdown("The door stood open."),
+                    NoteCell("Remember the lantern."),
+                    BlurbCell("A woman loses her name."),
+                    RecapCell("", "What happened before."),
+                    TableOfContentsCell("1. The First Night"),
+                    MarkdownCell("The door stood open."),
                 ]
             )
         )
@@ -77,10 +86,12 @@ class Corpus(unittest.TestCase):
         # language cannot quietly go unimplemented in the other.
         for case in CORPUS["cases"]:
             with self.subTest(case=case["name"]):
-                expected = [
-                    Cell(c["kind"], c["source"], c["attrs"]) for c in case["cells"]
+                expected = [(c["kind"], c["source"], c["id"]) for c in case["cells"]]
+                parsed = [
+                    (cell.kind, cell.source, cell.unique_id)
+                    for cell in storydoc.parse(case["text"])
                 ]
-                self.assertEqual(storydoc.parse(case["text"]), expected)
+                self.assertEqual(parsed, expected)
 
     def test_every_document_is_written_back_byte_for_byte(self) -> None:
         # Round-tripping through this library alone would let the two
@@ -100,39 +111,43 @@ class Corpus(unittest.TestCase):
 
 class Writing(unittest.TestCase):
     def test_a_cell_is_written_as_a_marker_and_its_text(self) -> None:
-        written = storydoc.dumps([storydoc.markdown("Prose.")])
-        self.assertEqual(written, "<!-- cell: markdown -->\n\nProse.\n")
+        written = storydoc.dumps([MarkdownCell("Prose.", False, None, "m1")])
+        self.assertEqual(written, '<!-- cell: markdown id="m1" -->\n\nProse.\n')
 
     def test_a_chapter_is_written_as_its_marker_alone(self) -> None:
         # A chapter names a place in the book; the prose under it is its own cell.
-        written = storydoc.dumps([storydoc.chapter("One")])
-        self.assertEqual(written, '<!-- cell: chapter title="One" -->\n')
+        written = storydoc.dumps([ChapterCell("One", "", False, None, "c1")])
+        self.assertEqual(written, '<!-- cell: chapter id="c1" title="One" -->\n')
 
     def test_a_part_is_written_as_its_marker_alone(self) -> None:
         # A part names a division of the story; the chapters under it are their
         # own cells, exactly as the prose under a chapter is.
-        written = storydoc.dumps([storydoc.part("Book One")])
-        self.assertEqual(written, '<!-- cell: part title="Book One" -->\n')
+        written = storydoc.dumps([PartCell("Book One", "", False, None, "p1")])
+        self.assertEqual(written, '<!-- cell: part id="p1" title="Book One" -->\n')
 
     def test_a_divider_is_written_as_its_marker_alone(self) -> None:
         # Where the author cuts the files, and nothing the reader ever meets.
         self.assertEqual(
-            storydoc.dumps([storydoc.divider()]), "<!-- cell: divider -->\n"
+            storydoc.dumps([DividerCell("", False, None, "d1")]),
+            '<!-- cell: divider id="d1" -->\n',
         )
 
     def test_a_divider_survives_the_round_trip(self) -> None:
-        back = storydoc.parse(storydoc.dumps([storydoc.divider()]))
+        back = storydoc.parse(storydoc.dumps([DividerCell()]))
         self.assertEqual(back[0].kind, storydoc.DIVIDER)
 
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
-        self.assertEqual(storydoc.dumps([storydoc.table_of_contents()]), "<!-- cell: contents -->\n")
+        self.assertEqual(
+            storydoc.dumps([TableOfContentsCell("", False, None, "t1")]),
+            '<!-- cell: contents id="t1" -->\n',
+        )
 
     def test_an_unknown_kind_is_written_back_as_it_was_read(self) -> None:
-        text = '<!-- cell: epigraph attribution="Anon" -->\n\nA line.\n'
+        text = '<!-- cell: epigraph id="e1" attribution="Anon" -->\n\nA line.\n'
         self.assertEqual(storydoc.dumps(storydoc.parse(text)), text)
 
     def test_a_quote_in_an_attribute_is_escaped_on_the_way_out(self) -> None:
-        written = storydoc.dumps([storydoc.chapter('She said "no"')])
+        written = storydoc.dumps([ChapterCell('She said "no"')])
         self.assertIn('title="She said \\"no\\""', written)
 
 
@@ -141,10 +156,10 @@ class Asking(unittest.TestCase):
         document = Document(
             storydoc.dumps(
                 [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The lantern had gone out."),
-                    storydoc.table_of_contents(),
-                    storydoc.markdown("The door stood open."),
+                    ChapterCell("One"),
+                    MarkdownCell("The lantern had gone out."),
+                    TableOfContentsCell(),
+                    MarkdownCell("The door stood open."),
                 ]
             )
         )
@@ -155,30 +170,30 @@ class Asking(unittest.TestCase):
         )
 
     def test_a_document_with_no_title_page_says_it_is_anonymous(self) -> None:
-        document = Document(storydoc.dumps([storydoc.chapter("One")]))
+        document = Document(storydoc.dumps([ChapterCell("One")]))
 
-        self.assertEqual(document.title_page.attrs, {})
+        self.assertEqual(document.title_page.title, "")
         self.assertEqual(document.title, "Anonymous")
 
 
 class Preparing(unittest.TestCase):
     def test_missing_cells_are_added_in_order(self) -> None:
         prepared = storydoc.add_missing(
-            [storydoc.chapter("One")], [storydoc.table_of_contents(), storydoc.image("c.jpg")]
+            [ChapterCell("One")], [TableOfContentsCell(), ImageCell("c.jpg")]
         )
         self.assertEqual(
             [cell.kind for cell in prepared], ["chapter", "contents", "image"]
         )
 
     def test_preparing_twice_adds_nothing_the_second_time(self) -> None:
-        wanted = [storydoc.table_of_contents(), storydoc.image("c.jpg")]
-        once = storydoc.add_missing([storydoc.chapter("One")], wanted)
+        wanted = [TableOfContentsCell(), ImageCell("c.jpg")]
+        once = storydoc.add_missing([ChapterCell("One")], wanted)
         twice = storydoc.add_missing(once, wanted)
         self.assertEqual(once, twice)
 
     def test_a_cell_the_author_has_edited_is_left_alone(self) -> None:
-        mine = Cell(storydoc.TABLE_OF_CONTENTS, "My own contents.")
-        prepared = storydoc.add_missing([mine], [storydoc.table_of_contents()])
+        mine = TableOfContentsCell("My own contents.")
+        prepared = storydoc.add_missing([mine], [TableOfContentsCell()])
         self.assertEqual(prepared, [mine])
 
 
@@ -187,10 +202,10 @@ class Chapters(unittest.TestCase):
         document = Document(
             storydoc.dumps(
                 [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.chapter("Two"),
-                    storydoc.markdown("It closed."),
+                    ChapterCell("One"),
+                    MarkdownCell("The door stood open."),
+                    ChapterCell("Two"),
+                    MarkdownCell("It closed."),
                 ]
             )
         )
@@ -205,12 +220,12 @@ class Chapters(unittest.TestCase):
         document = Document(
             storydoc.dumps(
                 [
-                    storydoc.part("Day One"),
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.part("Day Two"),
-                    storydoc.chapter("Two"),
-                    storydoc.markdown("It closed."),
+                    PartCell("Day One"),
+                    ChapterCell("One"),
+                    MarkdownCell("The door stood open."),
+                    PartCell("Day Two"),
+                    ChapterCell("Two"),
+                    MarkdownCell("It closed."),
                 ]
             )
         )
@@ -222,7 +237,7 @@ class Chapters(unittest.TestCase):
 
 class OnDisk(unittest.TestCase):
     def test_a_document_survives_being_saved_and_loaded(self) -> None:
-        cells = [storydoc.image("c.jpg"), storydoc.chapter("One")]
+        cells = [ImageCell("c.jpg"), ChapterCell("One")]
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / f"story{storydoc.EXTENSION}"
             storydoc.save(path, cells)
@@ -248,10 +263,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Door" -->\n'
             '\n'
             'What she saw.\n',
-            [SalientConceptInTheStory("Door", "What she saw.", [])],
+            [SalientConceptCell("Door", [], "What she saw.", False, None, "k1")],
         ),
         (
             "a_range_within_a_cell",
@@ -259,10 +274,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n'
             '\n'
             'What she saw.\n',
-            [SalientConceptInTheStory("Door", "What she saw.", [StoryWordRange(2, 3)])],
+            [SalientConceptCell("Door", [StoryWordRange(2, 3)], "What she saw.", False, None, "k1")],
         ),
         (
             "a_range_of_one_word",
@@ -270,8 +285,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Her" words="0-0" -->\n',
-            [SalientConceptInTheStory("Her", "", [StoryWordRange(0, 0)])],
+            '<!-- cell: salient-concept id="k1" title="Her" words="0-0" -->\n',
+            [SalientConceptCell("Her", [StoryWordRange(0, 0)], "", False, None, "k1")],
         ),
         (
             "a_range_across_paragraphs_of_a_cell",
@@ -281,8 +296,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept title="Arrival" words="2-5" -->\n',
-            [SalientConceptInTheStory("Arrival", "", [StoryWordRange(2, 5)])],
+            '<!-- cell: salient-concept id="k1" title="Arrival" words="2-5" -->\n',
+            [SalientConceptCell("Arrival", [StoryWordRange(2, 5)], "", False, None, "k1")],
         ),
         (
             "a_range_across_markdown_cells",
@@ -294,8 +309,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept title="Arrival" words="3-5" -->\n',
-            [SalientConceptInTheStory("Arrival", "", [StoryWordRange(3, 5)])],
+            '<!-- cell: salient-concept id="k1" title="Arrival" words="3-5" -->\n',
+            [SalientConceptCell("Arrival", [StoryWordRange(3, 5)], "", False, None, "k1")],
         ),
         (
             "cells_other_than_markdown_hold_no_story_words",
@@ -313,10 +328,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept title="Him" words="4-4" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Him" words="4-4" -->\n'
             '\n'
             'The one who heard.\n',
-            [SalientConceptInTheStory("Him", "The one who heard.", [StoryWordRange(4, 4)])],
+            [SalientConceptCell("Him", [StoryWordRange(4, 4)], "The one who heard.", False, None, "k1")],
         ),
         (
             "a_run_without_a_letter_or_a_digit_is_not_a_word",
@@ -324,8 +339,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She — saw 2 doors.\n'
             '\n'
-            '<!-- cell: salient-concept title="Seeing" words="0-2" -->\n',
-            [SalientConceptInTheStory("Seeing", "", [StoryWordRange(0, 2)])],
+            '<!-- cell: salient-concept id="k1" title="Seeing" words="0-2" -->\n',
+            [SalientConceptCell("Seeing", [StoryWordRange(0, 2)], "", False, None, "k1")],
         ),
         (
             "a_run_of_letters_outside_ascii_alone_is_not_a_word",
@@ -333,8 +348,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw é café.\n'
             '\n'
-            '<!-- cell: salient-concept title="Café" words="2-2" -->\n',
-            [SalientConceptInTheStory("Café", "", [StoryWordRange(2, 2)])],
+            '<!-- cell: salient-concept id="k1" title="Café" words="2-2" -->\n',
+            [SalientConceptCell("Café", [StoryWordRange(2, 2)], "", False, None, "k1")],
         ),
         (
             "the_words_of_a_comment_in_a_markdown_cell_are_story_words",
@@ -342,8 +357,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw <!-- a note --> the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="4-5" -->\n',
-            [SalientConceptInTheStory("Door", "", [StoryWordRange(4, 5)])],
+            '<!-- cell: salient-concept id="k1" title="Door" words="4-5" -->\n',
+            [SalientConceptCell("Door", [StoryWordRange(4, 5)], "", False, None, "k1")],
         ),
         (
             "ranges_keep_the_order_they_are_written_in",
@@ -351,13 +366,9 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-3, 0-1" -->\n',
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3, 0-1" -->\n',
             [
-                SalientConceptInTheStory(
-                    "Door",
-                    "",
-                    [StoryWordRange(2, 3), StoryWordRange(0, 1)],
-                )
+                SalientConceptCell("Door", [StoryWordRange(2, 3), StoryWordRange(0, 1)], "", False, None, "k1")
             ],
         ),
         (
@@ -366,13 +377,9 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-3, x, 5-, -1, 0-0" -->\n',
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3, x, 5-, -1, 0-0" -->\n',
             [
-                SalientConceptInTheStory(
-                    "Door",
-                    "",
-                    [StoryWordRange(2, 3), StoryWordRange(0, 0)],
-                )
+                SalientConceptCell("Door", [StoryWordRange(2, 3), StoryWordRange(0, 0)], "", False, None, "k1")
             ],
         ),
         (
@@ -381,8 +388,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="10-12" -->\n',
-            [SalientConceptInTheStory("Door", "", [StoryWordRange(10, 12)])],
+            '<!-- cell: salient-concept id="k1" title="Door" words="10-12" -->\n',
+            [SalientConceptCell("Door", [StoryWordRange(10, 12)], "", False, None, "k1")],
         ),
         (
             "a_range_running_past_the_end_covers_the_words_up_to_the_end",
@@ -390,12 +397,12 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-12" -->\n',
-            [SalientConceptInTheStory("Door", "", [StoryWordRange(2, 12)])],
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-12" -->\n',
+            [SalientConceptCell("Door", [StoryWordRange(2, 12)], "", False, None, "k1")],
         ),
         (
             "several_concepts_in_the_order_of_the_document",
-            '<!-- cell: salient-concept title="Bell" words="6-7" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Bell" words="6-7" -->\n'
             '\n'
             '<!-- cell: markdown -->\n'
             '\n'
@@ -405,10 +412,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-3" -->\n',
+            '<!-- cell: salient-concept id="k2" title="Door" words="2-3" -->\n',
             [
-                SalientConceptInTheStory("Bell", "", [StoryWordRange(6, 7)]),
-                SalientConceptInTheStory("Door", "", [StoryWordRange(2, 3)]),
+                SalientConceptCell("Bell", [StoryWordRange(6, 7)], "", False, None, "k1"),
+                SalientConceptCell("Door", [StoryWordRange(2, 3)], "", False, None, "k2"),
             ],
         ),
         (
@@ -417,17 +424,17 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept title="Door" words="2-3" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n'
             '\n'
-            '<!-- cell: salient-concept title="Seeing" words="0-3" -->\n',
+            '<!-- cell: salient-concept id="k2" title="Seeing" words="0-3" -->\n',
             [
-                SalientConceptInTheStory("Door", "", [StoryWordRange(2, 3)]),
-                SalientConceptInTheStory("Seeing", "", [StoryWordRange(0, 3)]),
+                SalientConceptCell("Door", [StoryWordRange(2, 3)], "", False, None, "k1"),
+                SalientConceptCell("Seeing", [StoryWordRange(0, 3)], "", False, None, "k2"),
             ],
         ),
     ])
     def test_are_read_with_the_story_text_their_word_ranges_cover(
-        self, _, text: str, expected: list[SalientConceptInTheStory]
+        self, _, text: str, expected: list[SalientConceptCell]
     ) -> None:
         document = Document(text)
 
@@ -451,10 +458,10 @@ class Plots(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: plot title="The door" -->\n'
+            '<!-- cell: plot id="k1" title="The door" -->\n'
             '\n'
             'She finds the door.\n',
-            [PlotInTheStory("The door", "She finds the door.", [], [])],
+            [PlotCell("The door", [], [], "She finds the door.", False, None, "k1")],
         ),
         (
             "nodes_in_the_order_they_are_written",
@@ -466,19 +473,14 @@ class Plots(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: plot title="The bell" nodes="n-bell:6-7, n-door:2-3" -->\n'
+            '<!-- cell: plot id="k1" title="The bell" nodes="n-bell:6-7, n-door:2-3" -->\n'
             '\n'
             'He hears the bell.\n',
             [
-                PlotInTheStory(
-                    "The bell",
-                    "He hears the bell.",
-                    [
+                PlotCell("The bell", [
                         PlotNode("n-bell", StoryWordRange(6, 7)),
                         PlotNode("n-door", StoryWordRange(2, 3)),
-                    ],
-                    [],
-                )
+                    ], [], "He hears the bell.", False, None, "k1")
             ],
         ),
         (
@@ -487,23 +489,18 @@ class Plots(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: plot title="Seeing" nodes="n-she:0-0, n-saw:1-1, n-door:2-3" '
+            '<!-- cell: plot id="k1" title="Seeing" nodes="n-she:0-0, n-saw:1-1, n-door:2-3" '
             'edges="e-1:n-she>n-saw, e-2:n-she>n-door, e-3:n-saw>n-door" -->\n',
             [
-                PlotInTheStory(
-                    "Seeing",
-                    "",
-                    [
+                PlotCell("Seeing", [
                         PlotNode("n-she", StoryWordRange(0, 0)),
                         PlotNode("n-saw", StoryWordRange(1, 1)),
                         PlotNode("n-door", StoryWordRange(2, 3)),
-                    ],
-                    [
+                    ], [
                         PlotEdge("e-1", "n-she", "n-saw"),
                         PlotEdge("e-2", "n-she", "n-door"),
                         PlotEdge("e-3", "n-saw", "n-door"),
-                    ],
-                )
+                    ], "", False, None, "k1")
             ],
         ),
         (
@@ -512,19 +509,14 @@ class Plots(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: plot title="Seeing" nodes="n-she:0-0, 2-3" edges="e-1:n-she, e-2:n-she>n-she" -->\n',
+            '<!-- cell: plot id="k1" title="Seeing" nodes="n-she:0-0, 2-3" edges="e-1:n-she, e-2:n-she>n-she" -->\n',
             [
-                PlotInTheStory(
-                    "Seeing",
-                    "",
-                    [PlotNode("n-she", StoryWordRange(0, 0))],
-                    [PlotEdge("e-2", "n-she", "n-she")],
-                )
+                PlotCell("Seeing", [PlotNode("n-she", StoryWordRange(0, 0))], [PlotEdge("e-2", "n-she", "n-she")], "", False, None, "k1")
             ],
         ),
     ])
     def test_are_read_with_their_nodes_and_edges(
-        self, _, text: str, expected: list[PlotInTheStory]
+        self, _, text: str, expected: list[PlotCell]
     ) -> None:
         document = Document(text)
 

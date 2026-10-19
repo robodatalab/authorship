@@ -10,6 +10,8 @@ const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const HE_HEARD = '<!-- cell: markdown id="c2" -->\n\nHe heard the bell.\n';
 const THE_CHAPTER = '<!-- cell: chapter id="c0" title="One" -->\n';
 const THE_STORY = THE_CHAPTER + "\n" + SHE_SAW + "\n" + HE_HEARD;
+const SHE_SAW_HEADER = '<!-- cell: markdown id="c1" -->\n';
+const HE_HEARD_HEADER = '<!-- cell: markdown id="c2" -->\n';
 
 function theDifferenceBetween(lhsText: string, rhsText: string): AuthorDocDiff {
     return AuthorDocDiff.diff(
@@ -51,12 +53,10 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 17,
-                "markdown",
-                "disclaimer",
+                SHE_SAW_HEADER,
+                '<!-- cell: disclaimer id="c1" -->\n',
                 "",
                 "",
-                {},
-                {},
             ),
         ]);
     });
@@ -71,11 +71,9 @@ describe("diff — what would have to change to turn one document into the other
                         "c2",
                         0,
                         undefined,
-                        "markdown",
+                        HE_HEARD_HEADER,
                         "",
                         "He heard the bell.",
-                        {},
-                        {},
                     ),
                 ],
                 ["c1"],
@@ -91,12 +89,10 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 0,
-                "markdown",
+                SHE_SAW_HEADER,
                 undefined,
                 "She saw the door.",
                 "",
-                {},
-                {},
             ),
         ]);
     });
@@ -104,8 +100,8 @@ describe("diff — what would have to change to turn one document into the other
     it("tells a cell emptied of its text from a cell taken out of the document", () => {
         expect(
             theDifferenceBetween(SHE_SAW, '<!-- cell: markdown id="c1" -->\n')
-                .cells[0].kindInRhs,
-        ).toEqual("markdown");
+                .cells[0].headerInRhs,
+        ).toEqual(SHE_SAW_HEADER);
     });
 
     it("says where a cell's markdown differs, in both of them", () => {
@@ -118,12 +114,10 @@ describe("diff — what would have to change to turn one document into the other
             new AuthorDocCellDiff(
                 "c1",
                 4,
-                "markdown",
-                "markdown",
+                SHE_SAW_HEADER,
+                SHE_SAW_HEADER,
                 "saw",
                 "opened",
-                {},
-                {},
             ),
         ]);
     });
@@ -140,22 +134,20 @@ describe("diff — what would have to change to turn one document into the other
         expect(cellDiff.textInRhs).toBe("lowly, S");
     });
 
-    it("gives every attribute written, changed, or missing from the second", () => {
+    it("gives the marker each of them opens the cell with", () => {
         expect(
             theDifferenceBetween(
                 '<!-- cell: chapter id="c1" title="One" folded="true" -->\n',
-                '<!-- cell: chapter id="c1" title="Two" printed="no" -->\n',
+                '<!-- cell: chapter id="c1" title="Two" -->\n',
             ).cells,
         ).toEqual([
             new AuthorDocCellDiff(
                 "c1",
                 0,
-                "chapter",
-                "chapter",
+                '<!-- cell: chapter id="c1" title="One" folded="true" -->\n',
+                '<!-- cell: chapter id="c1" title="Two" -->\n',
                 "",
                 "",
-                { title: "One", folded: "true", printed: undefined },
-                { title: "Two", folded: undefined, printed: "no" },
             ),
         ]);
     });

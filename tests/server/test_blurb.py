@@ -16,7 +16,15 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
-from server.storydoc import Document
+from server.storydoc import (
+    BlurbCell,
+    ChapterCell,
+    Document,
+    MarkdownCell,
+    PartCell,
+    TableOfContentsCell,
+    TitlePageCell,
+)
 from server.writing_tools.blurb import BLURB_INSTRUCTION, write_blurb
 
 
@@ -42,17 +50,17 @@ def said_in(call: Any) -> str:
 
 STORY = storydoc.dumps(
     [
-        storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-        storydoc.markdown("Front matter, about the book and not in it."),
-        storydoc.chapter("The First Night"),
-        storydoc.markdown(
+        TitlePageCell(title="Veriona"),
+        MarkdownCell("Front matter, about the book and not in it."),
+        ChapterCell("The First Night"),
+        MarkdownCell(
             "The lantern had gone out again.\n"
             "<!-- ask Mara whether this is the third time -->\n"
             "She did not light it."
         ),
-        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
-        storydoc.chapter("The Second"),
-        storydoc.markdown("The door stood open."),
+        TableOfContentsCell(source="1. The First Night"),
+        ChapterCell("The Second"),
+        MarkdownCell("The door stood open."),
     ]
 )
 
@@ -109,9 +117,9 @@ class WriteBlurb(unittest.TestCase):
         document = Document(
             storydoc.dumps(
                 [
-                    storydoc.part("Day One"),
-                    storydoc.chapter("The First Night"),
-                    storydoc.markdown("The lantern had gone out again."),
+                    PartCell("Day One"),
+                    ChapterCell("The First Night"),
+                    MarkdownCell("The lantern had gone out again."),
                 ]
             )
         )
@@ -124,9 +132,9 @@ class WriteBlurb(unittest.TestCase):
         document = Document(
             storydoc.dumps(
                 [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.Cell(storydoc.BLURB, "The last thing this wrote.", {}),
+                    ChapterCell("One"),
+                    MarkdownCell("The door stood open."),
+                    BlurbCell(source="The last thing this wrote."),
                 ]
             )
         )
@@ -139,7 +147,7 @@ class WriteBlurb(unittest.TestCase):
     def test_an_untitled_chapter_is_named_by_its_number(self) -> None:
         document = Document(
             storydoc.dumps(
-                [storydoc.chapter(""), storydoc.markdown("The door stood open.")]
+                [ChapterCell(""), MarkdownCell("The door stood open.")]
             )
         )
         model = build_model()
@@ -154,7 +162,7 @@ class WriteBlurb(unittest.TestCase):
 
     def test_a_document_with_no_chapters_has_nothing_to_write_about(self) -> None:
         document = Document(
-            storydoc.dumps([storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "V"})])
+            storydoc.dumps([TitlePageCell(title="V")])
         )
         with self.assertRaises(ValueError):
             blurb_written(build_model(), document)
