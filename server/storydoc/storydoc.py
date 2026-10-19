@@ -33,16 +33,14 @@ marker opens a new cell. Markdown has the same bargain with fences.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
 from pathlib import Path
 
 from server.storydoc.cells.cell import Cell
-from server.storydoc.cells.chapter_cell import ChapterCell
-from server.storydoc.cells.markdown_cell import MarkdownCell
 from server.storydoc.cells.plot_cell import PlotCell
 from server.storydoc.cells.salient_concept_cell import SalientConceptCell
 from server.storydoc.cells.title_page_cell import TitlePageCell
-from server.storydoc.parser import marker_for, parse, split_comments
+from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
+from server.storydoc.parser import marker_for, parse
 from server.storydoc.visitors.marker_attributes import MarkerAttributes
 
 EXTENSION = ".author"
@@ -103,36 +101,14 @@ class Document:
     def title(self) -> str:
         return self.title_page.title or "Anonymous"
 
-    def markdown_cells(self) -> list[MarkdownCell]:
-        return [cell for cell in self.cells if isinstance(cell, MarkdownCell)]
-
     def cell_with_id(self, cell_id: str) -> Cell | None:
         return next((cell for cell in self.cells if cell.unique_id == cell_id), None)
-
-    def story_lines(
-        self, start: int = 0, end: int | None = None
-    ) -> Iterator[tuple[int, str]]:
-        """The story itself, line by line: the prose of the markdown cells,
-        by the line of the document each is written on."""
-        last = len(self.lines) - 1 if end is None else end
-        for cell in self.cells:
-            if cell.at is None or not isinstance(cell, MarkdownCell):
-                continue
-            first, final = cell.at
-            covered = list(range(first, final + 1))
-            # A cell's prose may carry the author's own notes, and those are no
-            # more story than the markers around them.
-            for kept_first, kept_last in split_comments(
-                [self.lines[i] for i in covered], covered
-            ):
-                for index in range(max(kept_first, start), min(kept_last, last) + 1):
-                    if self.lines[index].strip():
-                        yield index, self.lines[index]
 
     def story_text(self, start_word_idx: int, end_word_idx: int) -> str:
         texts_of_the_cells: list[str] = []
         words_before = 0
-        for cell in self.markdown_cells():
+        prose_cells = ProseCellsIterator(self)
+        for cell in prose_cells:
             words_of_the_cell = [
                 run
                 for run in _STORY_WORD.finditer(cell.source)
@@ -149,23 +125,6 @@ class Document:
                 texts_of_the_cells.append(text_of_the_cell)
         story_text = "\n\n".join(texts_of_the_cells)
         return story_text
-
-    @property
-    def chapters(self) -> list[tuple[str, str]]:
-        """The raw contents of chapters - stripped of comments and any other information"""
-        found: list[tuple[str, list[tuple[int, str]]]] = []
-        for cell in self.cells:
-            if isinstance(cell, ChapterCell):
-                found.append((cell.title or f"Chapter {len(found) + 1}", []))
-            elif found and cell.at:
-                found[-1][1].extend(self.story_lines(*cell.at))
-
-        chapter_lines: list[tuple[str, str]] = []
-        for title, numbered_lines in found:
-            unnumbered_lines = "\n".join([line for _, line in numbered_lines])
-            chapter_lines.append((title, unnumbered_lines))
-
-        return chapter_lines
 
     def salient_concepts(self) -> list[SalientConceptCell]:
         return [cell for cell in self.cells if isinstance(cell, SalientConceptCell)]

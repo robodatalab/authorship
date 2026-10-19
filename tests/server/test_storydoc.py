@@ -7,6 +7,9 @@ from parameterized import parameterized
 
 from server.storydoc import storydoc
 from server.storydoc.parser import parse
+from server.storydoc.iterators.chapters_iterator import ChaptersIterator
+from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
+from server.storydoc.iterators.story_lines_iterator import StoryLinesIterator
 from server.storydoc.storydoc import Document
 from server.storydoc.cells.blurb_cell import BlurbCell
 from server.storydoc.cells.chapter_cell import ChapterCell
@@ -47,7 +50,7 @@ class StoryLines(unittest.TestCase):
             )
 
     def test_are_the_prose_of_the_markdown_cells_and_nothing_else(self) -> None:
-        said = [line for _, line in self.build_document().story_lines()]
+        said = [line for _, line in StoryLinesIterator(self.build_document())]
 
         self.assertEqual(
             said,
@@ -61,7 +64,7 @@ class StoryLines(unittest.TestCase):
     def test_say_which_line_of_the_document_each_is_written_on(self) -> None:
         document = self.build_document()
 
-        for index, said in document.story_lines():
+        for index, said in StoryLinesIterator(document):
             self.assertEqual(document.lines[index], said)
 
     def test_can_be_asked_for_one_stretch_of_the_document(self) -> None:
@@ -70,7 +73,7 @@ class StoryLines(unittest.TestCase):
         assert lantern.at is not None
 
         self.assertEqual(
-            [line for _, line in document.story_lines(*lantern.at)],
+            [line for _, line in StoryLinesIterator(document, *lantern.at)],
             ["The lantern had gone out.", "She did not light it."],
         )
 
@@ -158,7 +161,7 @@ class Asking(unittest.TestCase):
             )
 
         self.assertEqual(
-            [cell.source for cell in document.markdown_cells()],
+            [cell.source for cell in ProseCellsIterator(document)],
             ["The lantern had gone out.", "The door stood open."],
         )
 
@@ -180,7 +183,10 @@ class Chapters(unittest.TestCase):
                 ]
             )
         self.assertEqual(
-            document.chapters,
+            [
+                (title, chapter_lines.text())
+                for title, chapter_lines in ChaptersIterator(document)
+            ],
             [("One", "The door stood open."), ("Two", "It closed.")],
         )
 
@@ -198,7 +204,10 @@ class Chapters(unittest.TestCase):
                 ]
             )
         self.assertEqual(
-            document.chapters,
+            [
+                (title, chapter_lines.text())
+                for title, chapter_lines in ChaptersIterator(document)
+            ],
             [("One", "The door stood open."), ("Two", "It closed.")],
         )
 

@@ -35,12 +35,11 @@ import assert from "node:assert";
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { Cell, splitlines } from "./cells/cell";
-import { ChapterCell } from "./cells/chapter_cell";
-import { MarkdownCell } from "./cells/markdown_cell";
 import { PlotCell } from "./cells/plot_cell";
 import { SalientConceptCell } from "./cells/salient_concept_cell";
 import { TitlePageCell } from "./cells/title_page_cell";
-import { markerFor, parse, splitComments } from "./parser";
+import { ProseCellsIterator } from "./iterators/prose_cells_iterator";
+import { markerFor, parse } from "./parser";
 import { MarkerAttributes } from "./visitors/marker_attributes";
 
 export const EXTENSION = ".author";
@@ -70,6 +69,7 @@ export class Document {
     }
 
     /** The document as text, such that `parse(text) == cells`. */
+
     get text(): string {
         const markerAttributes = new MarkerAttributes();
         const out: string[] = [];
@@ -99,6 +99,7 @@ export class Document {
     }
 
     /** What the book says of itself, blank in a document that says nothing. */
+
     get titlePage(): TitlePageCell {
         return (
             this.cells.find((cell) => cell instanceof TitlePageCell) ??
@@ -110,55 +111,15 @@ export class Document {
         return this.titlePage.title || "Anonymous";
     }
 
-    markdownCells(): MarkdownCell[] {
-        return this.cells.filter((cell) => cell instanceof MarkdownCell);
-    }
-
     cellWithId(cellId: string): Cell | undefined {
         return this.cells.find((cell) => cell.uniqueId === cellId);
-    }
-
-    /**
-     * The story itself, line by line: the prose of the markdown cells,
-     * by the line of the document each is written on.
-     */
-    *storyLines(
-        start: number = 0,
-        end: number | null = null,
-    ): Generator<[number, string]> {
-        const last = end === null ? this.lines.length - 1 : end;
-        for (const cell of this.cells) {
-            if (cell.at === null || !(cell instanceof MarkdownCell)) {
-                continue;
-            }
-            const [first, final] = cell.at;
-            const covered = Array.from(
-                { length: final + 1 - first },
-                (_, offset) => first + offset,
-            );
-            // A cell's prose may carry the author's own notes, and those are no
-            // more story than the markers around them.
-            for (const [keptFirst, keptLast] of splitComments(
-                covered.map((i) => this.lines[i]),
-                covered,
-            )) {
-                for (
-                    let index = Math.max(keptFirst, start);
-                    index < Math.min(keptLast, last) + 1;
-                    index += 1
-                ) {
-                    if (this.lines[index].trim()) {
-                        yield [index, this.lines[index]];
-                    }
-                }
-            }
-        }
     }
 
     storyText(startWordIdx: number, endWordIdx: number): string {
         const textsOfTheCells: string[] = [];
         let wordsBefore = 0;
-        for (const cell of this.markdownCells()) {
+        const proseCells = new ProseCellsIterator(this);
+        for (const cell of proseCells) {
             const wordsOfTheCell = Array.from(
                 cell.source.matchAll(STORY_WORD),
             ).filter((run) => WORD_CHARACTER.test(run[0]));
@@ -183,28 +144,6 @@ export class Document {
         return storyText;
     }
 
-    /** The raw contents of chapters - stripped of comments and any other information */
-    get chapters(): [string, string][] {
-        const found: [string, [number, string][]][] = [];
-        for (const cell of this.cells) {
-            if (cell instanceof ChapterCell) {
-                found.push([cell.title || `Chapter ${found.length + 1}`, []]);
-            } else if (found.length > 0 && cell.at) {
-                found[found.length - 1][1].push(...this.storyLines(...cell.at));
-            }
-        }
-
-        const chapterLines: [string, string][] = [];
-        for (const [title, numberedLines] of found) {
-            const unnumberedLines = numberedLines
-                .map(([, line]) => line)
-                .join("\n");
-            chapterLines.push([title, unnumberedLines]);
-        }
-
-        return chapterLines;
-    }
-
     salientConcepts(): SalientConceptCell[] {
         return this.cells.filter((cell) => cell instanceof SalientConceptCell);
     }
@@ -218,6 +157,7 @@ export class Document {
     }
 
     /** The cell `line` falls in. */
+
     cellAt(line: number): Cell | null {
         for (const cell of this.cells) {
             if (cell.at && cell.at[0] <= line && line <= cell.at[1]) {

@@ -6,7 +6,7 @@ comes back is the blurb the book has earned by that point. The last chapter's
 answer is the blurb. Nothing ever has to hold the whole manuscript at once, which
 is what makes a novel writable on a machine that fits one chapter in a prompt.
 
-What goes in is the story and only the story, which is `Document.chapters`'s
+What goes in is the story and only the story, which is `ChaptersIterator`'s
 answer rather than this module's: the markers, the notes in the margin, the table
 of contents and a blurb already in the document are all left out there, for every
 tool that reads a book rather than for this one.
@@ -18,6 +18,7 @@ from collections.abc import Callable
 
 from cortexgrid_infer import CompletingModel
 
+from server.storydoc.iterators.chapters_iterator import ChaptersIterator
 from server.storydoc.storydoc import Document
 
 # A blurb that runs longer than this has stopped being a blurb.
@@ -53,7 +54,10 @@ async def write_blurb(
     Raises `ValueError` if the document has no chapters with prose in them: a
     blurb for an empty book is one the model has to invent.
     """
-    chapters = document.chapters
+    chapters = [
+        (title, chapter_lines.text())
+        for title, chapter_lines in ChaptersIterator(document)
+    ]
     if not chapters:
         raise ValueError("There is no story there to write a blurb for.")
 
