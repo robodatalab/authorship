@@ -26,13 +26,15 @@ import {
     type CellsInASection,
 } from "../../vscode_runtime/storydoc/sections";
 import {
-    NO_STORY_ANNOTATION_SELECTED,
-    STORY_ANNOTATION_KINDS,
     storyAnnotationsIn,
     storyTextSpansOf,
     storyWordsIn,
-    type StoryAnnotationSelected,
 } from "../../vscode_runtime/storydoc/story_words";
+import {
+    NO_STORY_ANNOTATION_SELECTED,
+    STORY_ANNOTATION_KINDS,
+    type StoryAnnotationSelected,
+} from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
 import {
     MarkdownEditorMediator,

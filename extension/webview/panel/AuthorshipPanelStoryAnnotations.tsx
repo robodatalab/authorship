@@ -1,17 +1,21 @@
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
-import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
+import {
+    AuthorFileEditorCellFields,
+    type AuthorFileEditorCellField,
+} from "../author_editor/AuthorFileEditorCellFields";
 import {
     MarkdownEditor,
     MarkdownEditorMediator,
     useTimesTheHostRewroteIt,
 } from "../markdown/MarkdownEditor";
-import { fieldsOfCellKind } from "../../vscode_runtime/storydoc/cell_kinds";
-import type {
-    StoryAnnotationInTheStory,
-    StoryAnnotationSelected,
-} from "../../vscode_runtime/storydoc/story_words";
+import type { StoryAnnotationInTheStory } from "../../vscode_runtime/storydoc/iterators/story_annotations_iterator";
+import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
 import "./AuthorshipPanelStoryAnnotations.css";
+
+const ANNOTATION_FIELDS: AuthorFileEditorCellField[] = [
+    { attributeName: "title", label: "Title" },
+];
 
 export interface AuthorshipPanelStoryAnnotationsWording {
     addAnAnnotation: string;
@@ -179,7 +183,6 @@ function AuthorshipPanelStoryAnnotationDetails({
     sendMessagesToVscode,
 }: AuthorshipPanelStoryAnnotationDetailsProps) {
     const description = useTimesTheHostRewroteIt(annotation.description);
-    const fieldsOfTheKind = fieldsOfCellKind(cellKind);
     const passagesInTheStory = annotation.passages.map(
         (storyWordRange, passage) => ({ storyWordRange, passage }),
     );
@@ -190,7 +193,7 @@ function AuthorshipPanelStoryAnnotationDetails({
     return (
         <section className="authorship-panel-story-annotation-details">
             <AuthorFileEditorCellFields
-                fields={fieldsOfTheKind}
+                fields={ANNOTATION_FIELDS}
                 cellAttributes={{ title: annotation.title }}
                 onAttributeChanged={(attributeName, attributeValue) =>
                     sendMessagesToVscode({

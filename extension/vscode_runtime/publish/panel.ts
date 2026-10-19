@@ -3,10 +3,8 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
-import {
-    STORY_ANNOTATION_KINDS,
-    storyAnnotationsIn,
-} from "../storydoc/story_words";
+import { StoryAnnotationsIterator } from "../storydoc/iterators/story_annotations_iterator";
+import { STORY_ANNOTATION_KINDS } from "../story_annotation_selection";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -110,10 +108,13 @@ export class PublishView implements vscode.WebviewViewProvider {
     private showStoryAnnotations(): void {
         const session = this.sessionFollowed;
         const annotationsOfEachKind = session
-            ? STORY_ANNOTATION_KINDS.map((cellKind) => [
-                  cellKind,
-                  storyAnnotationsIn(session.document.cells, cellKind),
-              ])
+            ? STORY_ANNOTATION_KINDS.map((cellKind) => {
+                  const storyAnnotations = new StoryAnnotationsIterator(
+                      session.document,
+                      cellKind,
+                  );
+                  return [cellKind, Array.from(storyAnnotations)];
+              })
             : null;
         const storyAnnotations = annotationsOfEachKind
             ? Object.fromEntries(annotationsOfEachKind)

@@ -13,12 +13,12 @@ import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocDiff } from "./storydoc/diff";
 import { Document } from "./storydoc/storydoc";
 import type { Cell } from "./storydoc/cells/cell";
+import { synchronizeTheStoryWordRanges } from "./storydoc/story_words";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,
-    synchronizeTheStoryWordRanges,
     type StoryAnnotationSelected,
-} from "./storydoc/story_words";
+} from "./story_annotation_selection";
 import {
     StoryWordsIterator,
     type StoryTextSpan,

@@ -5,10 +5,8 @@ import {
 } from "./panel/AuthorshipPanelCanvas";
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
-import type {
-    StoryAnnotationInTheStory,
-    StoryAnnotationSelected,
-} from "../vscode_runtime/storydoc/story_words";
+import type { StoryAnnotationInTheStory } from "../vscode_runtime/storydoc/iterators/story_annotations_iterator";
+import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../vscode_runtime/storydoc/iterators/story_words_iterator";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
