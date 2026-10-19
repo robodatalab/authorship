@@ -20,8 +20,10 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "./story_annotation_selection";
-import { StoryWordsIterator } from "./storydoc/iterators/story_words_iterator";
-import type { StoryTextSpan } from "./storydoc/iterators/story_text_span";
+import {
+    StoryWordsIterator,
+    type StoryTextSpan,
+} from "./storydoc/iterators/story_words_iterator";
 import type { StoryWordRange } from "./storydoc/cells/story_word_range";
 import { WordCounter } from "./storydoc/synchronizers/word_counter";
 

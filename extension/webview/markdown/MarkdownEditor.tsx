@@ -19,8 +19,10 @@ import { fenced, markedUp } from "../author_editor/AuthorFileEditorFind";
 import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileEditorFind";
 import { LinterTooltip } from "../linter/LinterTooltip";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
-import { TextWordsIterator } from "../../vscode_runtime/storydoc/iterators/text_words_iterator";
-import type { TextWord } from "../../vscode_runtime/storydoc/iterators/text_word";
+import {
+    TextWordsIterator,
+    type TextWord,
+} from "../../vscode_runtime/storydoc/iterators/text_words_iterator";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });

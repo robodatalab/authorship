@@ -12,7 +12,7 @@ import {
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../vscode_runtime/storydoc/iterators/story_text_span";
+import type { StoryTextSpan } from "../vscode_runtime/storydoc/iterators/story_words_iterator";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 

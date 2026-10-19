@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { StoryAnnotationInTheStory } from "../../../extension/vscode_runtime/storydoc/iterators/story_annotation_in_the_story";
+import type { StoryAnnotationInTheStory } from "../../../extension/vscode_runtime/storydoc/iterators/story_annotations_iterator";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_text_span";
+import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
