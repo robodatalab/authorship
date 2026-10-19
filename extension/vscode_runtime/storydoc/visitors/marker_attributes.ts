@@ -1,12 +1,8 @@
 import type { AboutCell } from "../cells/about_cell";
-import type { BlurbCell } from "../cells/blurb_cell";
 import type { CellVisitor } from "../cells/cell_visitor";
 import type { ChapterCell } from "../cells/chapter_cell";
 import type { DisclaimerCell } from "../cells/disclaimer_cell";
-import type { DividerCell } from "../cells/divider_cell";
 import type { ImageCell } from "../cells/image_cell";
-import type { MarkdownCell } from "../cells/markdown_cell";
-import type { NoteCell } from "../cells/note_cell";
 import type { PartCell } from "../cells/part_cell";
 import type { PlotCell } from "../cells/plot_cell";
 import type { PlotEdge } from "../cells/plot_edge";
@@ -14,7 +10,6 @@ import type { PlotNode } from "../cells/plot_node";
 import type { RecapCell } from "../cells/recap_cell";
 import type { SalientConceptCell } from "../cells/salient_concept_cell";
 import type { StoryWordRange } from "../cells/story_word_range";
-import type { TableOfContentsCell } from "../cells/table_of_contents_cell";
 import type { TitlePageCell } from "../cells/title_page_cell";
 import type { UnknownCell } from "../cells/unknown_cell";
 
