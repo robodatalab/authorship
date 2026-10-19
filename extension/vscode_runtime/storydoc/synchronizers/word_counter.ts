@@ -1,5 +1,5 @@
 import type { AuthorDocSynchronizer } from "../author_doc_synchronizer";
-import type { AuthorDocDiff } from "../diff";
+import { AuthorDocDiff } from "../diff";
 import type { Document } from "../storydoc";
 import type { Cell } from "../cells/cell";
 import { MARKDOWN } from "../cells/markdown_cell";
@@ -24,11 +24,12 @@ export class WordCounter implements AuthorDocSynchronizer {
     private wordsInEachSection = new Map<string, number>();
     private wordsInTheWholeDocument = 0;
 
-    synchronize(before: Document, change: AuthorDocDiff): void {
+    synchronize(before: Document, change: AuthorDocDiff): AuthorDocDiff {
         const after = change.applyTheDiff(before);
         this.wordsInEachSection = new Map<string, number>();
         this.countSections(cellsBySection(after.cells));
         this.wordsInTheWholeDocument = wordsInTheCells(after.cells);
+        return new AuthorDocDiff([]);
     }
 
     private countSections(sections: CellsInASection<Cell>[]): void {

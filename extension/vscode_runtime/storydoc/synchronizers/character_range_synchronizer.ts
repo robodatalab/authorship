@@ -1,5 +1,5 @@
 import type { AuthorDocChangeVisitor } from "../author_doc_change_visitor";
-import type { AuthorDocDiff } from "../diff";
+import { AuthorDocDiff } from "../diff";
 import type { Document } from "../storydoc";
 import type { AuthorDocSynchronizer } from "../author_doc_synchronizer";
 import type { CellAdded } from "../changes/cell_added";
@@ -110,7 +110,7 @@ export class CharacterRangeSynchronizer<
 > implements AuthorDocSynchronizer {
     constructor(private readonly representations: Representation[]) {}
 
-    synchronize(before: Document, change: AuthorDocDiff): void {
+    synchronize(before: Document, change: AuthorDocDiff): AuthorDocDiff {
         const followingTheChanges = new CharacterRangesFollowingTheChanges(
             before,
             this.representations,
@@ -118,5 +118,6 @@ export class CharacterRangeSynchronizer<
         for (const cellChange of change.changes) {
             cellChange.accept(followingTheChanges);
         }
+        return new AuthorDocDiff([]);
     }
 }

@@ -68,6 +68,11 @@ export class AuthorDocDiff {
         return this.changes.length === 0;
     }
 
+    followedBy(diffsAfterIt: readonly AuthorDocDiff[]): AuthorDocDiff {
+        const changesAfterIt = diffsAfterIt.flatMap((diff) => diff.changes);
+        return new AuthorDocDiff([...this.changes, ...changesAfterIt]);
+    }
+
     invert(): AuthorDocDiff {
         const changesInReverse = [...this.changes].reverse();
         const inverted = changesInReverse.map((change) => change.invert());
