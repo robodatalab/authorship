@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 
 from server.storydoc.cells.cell import Cell
-from server.storydoc.cells.story_word_range import StoryWordRange
+from server.storydoc.cells.plot_edge import PlotEdge
+from server.storydoc.cells.plot_node import PlotNode
 
 if TYPE_CHECKING:
     from server.storydoc.cells.cell_visitor import CellVisitor
@@ -13,19 +14,6 @@ if TYPE_CHECKING:
 PLOT = "plot"
 
 _Result = TypeVar("_Result")
-
-
-@dataclass(frozen=True)
-class PlotNode:
-    node_id: str
-    story_word_range: StoryWordRange
-
-
-@dataclass(frozen=True)
-class PlotEdge:
-    edge_id: str
-    from_node_id: str
-    to_node_id: str
 
 
 @dataclass(frozen=True)

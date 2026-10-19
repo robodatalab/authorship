@@ -1,14 +1,16 @@
-import { type Document } from "../../vscode_runtime/storydoc/storydoc";
-import type { Cell } from "../../vscode_runtime/storydoc/cells/cell";
-import { MARKDOWN } from "../../vscode_runtime/storydoc/cells/markdown_cell";
+import type { AuthorDocSynchronizer } from "./author_doc_synchronizer";
+import type { AuthorDocDiff } from "../diff";
+import type { Document } from "../storydoc";
+import type { Cell } from "../cells/cell";
+import { MARKDOWN } from "../cells/markdown_cell";
 import {
     cellsBySection,
     cellsWithinASection,
     opensASection,
-    type CellsInASection,
-} from "../../vscode_runtime/storydoc/story_sections";
+} from "../story_sections";
+import type { CellsInASection } from "../cells_in_a_section";
 
-export function numberOfWords(markdown: string): number {
+function numberOfWords(markdown: string): number {
     return markdown.split(/\s+/).filter((word) => /\w/.test(word)).length;
 }
 
@@ -18,14 +20,15 @@ function wordsInTheCells(cells: readonly Cell[]): number {
         .reduce((words, cell) => words + numberOfWords(cell.source), 0);
 }
 
-export class WordCounter {
+export class WordCounter implements AuthorDocSynchronizer {
     private wordsInEachSection = new Map<string, number>();
     private wordsInTheWholeDocument = 0;
 
-    synchronize(document: Document): void {
+    synchronize(before: Document, change: AuthorDocDiff): void {
+        const after = change.applyTheDiff(before);
         this.wordsInEachSection = new Map<string, number>();
-        this.countSections(cellsBySection(document.cells));
-        this.wordsInTheWholeDocument = wordsInTheCells(document.cells);
+        this.countSections(cellsBySection(after.cells));
+        this.wordsInTheWholeDocument = wordsInTheCells(after.cells);
     }
 
     private countSections(sections: CellsInASection<Cell>[]): void {

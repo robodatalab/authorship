@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
-import { WordCounter } from "../../../extension/webview/author_editor/word_counter";
+import { Document } from "../../../../extension/vscode_runtime/storydoc/storydoc";
+import { AuthorDocDiff } from "../../../../extension/vscode_runtime/storydoc/diff";
+import { WordCounter } from "../../../../extension/vscode_runtime/storydoc/synchronizers/word_counter";
 
 const A_STORY_IN_TWO_PARTS = `
 <!-- cell: part title="The Morning" id="p1" -->
@@ -32,8 +33,11 @@ They drank.
 `;
 
 function counterOver(text: string): WordCounter {
+    const before = new Document("");
+    const after = new Document(text.replace(/^\n/, ""));
+    const change = AuthorDocDiff.diff(before, after);
     const counter = new WordCounter();
-    counter.synchronize(new Document(text.replace(/^\n/, "")));
+    counter.synchronize(before, change);
     return counter;
 }
 
@@ -89,29 +93,36 @@ A woman loses her name.
     });
 
     it("counts again once the author has written more", () => {
-        const document = new Document(
+        const counter = counterOver(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
         );
-        const counter = new WordCounter();
-        counter.synchronize(document);
+        const before = new Document(
+            '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
+        );
+        const after = new Document(
+            '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door open.\n',
+        );
+        const change = AuthorDocDiff.diff(before, after);
 
-        const sheSaw = document.cells[1];
-        document.cells[1] = sheSaw.withSource("She saw the door open.");
-        counter.synchronize(document);
+        counter.synchronize(before, change);
 
         expect(counter.wordsInTheDocument).toBe(5);
         expect(counter.wordsInTheSection("c1")).toBe(5);
     });
 
     it("forgets a section the author has deleted", () => {
-        const document = new Document(
+        const counter = counterOver(
             '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
         );
-        const counter = new WordCounter();
-        counter.synchronize(document);
+        const before = new Document(
+            '<!-- cell: chapter title="One" id="c1" -->\n\n<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
+        );
+        const after = new Document(
+            '<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n',
+        );
+        const change = AuthorDocDiff.diff(before, after);
 
-        document.cells.splice(0, 1);
-        counter.synchronize(document);
+        counter.synchronize(before, change);
 
         expect(counter.wordsInTheSection("c1")).toBeUndefined();
         expect(counter.wordsInTheDocument).toBe(4);

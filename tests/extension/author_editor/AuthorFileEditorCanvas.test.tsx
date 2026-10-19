@@ -12,7 +12,7 @@ import {
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_text_span";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type {
     AuthorDocumentCellRenderers,

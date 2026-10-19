@@ -4,11 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
 import { StoryWordRange } from "../../../extension/vscode_runtime/storydoc/cells/story_word_range";
-import {
-    StoryTextSpan,
-    StoryWord,
-    StoryWordsIterator,
-} from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
+import { StoryWordsIterator } from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
+import { StoryTextSpan } from "../../../extension/vscode_runtime/storydoc/iterators/story_text_span";
+import { StoryWord } from "../../../extension/vscode_runtime/storydoc/iterators/story_word";
 import { parse } from "../../../extension/vscode_runtime/storydoc/parser";
 
 interface CorpusCase {

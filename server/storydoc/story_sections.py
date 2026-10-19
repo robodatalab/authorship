@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
+from server.storydoc.cells_in_a_section import CellsInASection
 from server.storydoc.storydoc import Document
+from server.storydoc.where_a_cell_stands import WhereACellStands
 from server.storydoc.cells.about_cell import ABOUT
 from server.storydoc.cells.blurb_cell import BLURB
 from server.storydoc.cells.cell import Cell
@@ -27,19 +27,6 @@ _KINDS_THAT_STAND_OUTSIDE_THE_STORY = frozenset(
         PLOT,
     }
 )
-
-
-@dataclass(eq=False)
-class CellsInASection:
-    cell: Cell
-    within: list[CellsInASection] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class WhereACellStands:
-    section: CellsInASection
-    among: list[CellsInASection]
-    under: tuple[CellsInASection, ...]
 
 
 def stands_outside_the_story(kind: str) -> bool:

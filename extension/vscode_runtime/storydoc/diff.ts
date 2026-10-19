@@ -95,16 +95,21 @@ export class AuthorDocCellDiff {
         );
     }
 
+    sourceInRhs(sourceInLhs: string): string {
+        return (
+            sourceInLhs.slice(0, this.theyDifferFromCharacter) +
+            this.textInRhs +
+            sourceInLhs.slice(this.theyDifferToCharacterInLhs)
+        );
+    }
+
     writeInto(cells: Cell[]): Cell[] {
         if (this.headerInRhs === undefined) {
             return cells.filter((cell) => cell.uniqueId !== this.cellId);
         }
         const cellInLhs = cells.find((cell) => cell.uniqueId === this.cellId);
         const sourceInLhs = cellInLhs?.source ?? "";
-        const sourceInRhs =
-            sourceInLhs.slice(0, this.theyDifferFromCharacter) +
-            this.textInRhs +
-            sourceInLhs.slice(this.theyDifferToCharacterInLhs);
+        const sourceInRhs = this.sourceInRhs(sourceInLhs);
         const [cellInRhs] = parse(`${this.headerInRhs}\n${sourceInRhs}`);
         return cellInLhs
             ? cells.map((cell) =>

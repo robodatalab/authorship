@@ -17,8 +17,8 @@ import {
     NO_STORY_ANNOTATION_SELECTED,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryAnnotationInTheStory } from "../../vscode_runtime/storydoc/iterators/story_annotations_iterator";
-import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
+import type { StoryAnnotationInTheStory } from "../../vscode_runtime/storydoc/iterators/story_annotation_in_the_story";
+import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_text_span";
 import "./AuthorshipPanelCanvas.css";
 
 export type SendMessagesToVscode = (message: unknown) => void;

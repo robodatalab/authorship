@@ -1,31 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from server.storydoc.cells.story_word_range import StoryWordRange
 from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
+from server.storydoc.iterators.story_text_span import StoryTextSpan
+from server.storydoc.iterators.story_word import StoryWord
 from server.storydoc.iterators.text_words_iterator import TextWordsIterator
 
 if TYPE_CHECKING:
     from server.storydoc.storydoc import Document
-
-
-@dataclass(frozen=True)
-class StoryWord:
-    number: int
-    cell_id: str
-    text: str
-    start_character_offset_in_cell: int
-    end_character_offset_in_cell: int
-
-
-@dataclass(frozen=True)
-class StoryTextSpan:
-    cell_id: str
-    start_character_offset_in_cell: int
-    end_character_offset_in_cell: int
 
 
 class StoryWordsIterator:

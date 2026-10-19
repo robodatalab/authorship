@@ -1,4 +1,7 @@
 import { type Document } from "./storydoc";
+import type { CellOfADocument } from "./cell_of_a_document";
+import type { CellsInASection } from "./cells_in_a_section";
+import type { WhereACellStands } from "./where_a_cell_stands";
 import { ABOUT } from "./cells/about_cell";
 import { BLURB } from "./cells/blurb_cell";
 import type { Cell } from "./cells/cell";
@@ -21,22 +24,6 @@ const KINDS_THAT_STAND_OUTSIDE_THE_STORY = new Set([
     SALIENT_CONCEPT,
     PLOT,
 ]);
-
-export interface CellOfADocument {
-    readonly kind: string;
-    readonly uniqueId: string;
-}
-
-export interface CellsInASection<CellInTheDocument extends CellOfADocument> {
-    cell: CellInTheDocument;
-    within: CellsInASection<CellInTheDocument>[];
-}
-
-export interface WhereACellStands<CellInTheDocument extends CellOfADocument> {
-    section: CellsInASection<CellInTheDocument>;
-    among: CellsInASection<CellInTheDocument>[];
-    under: CellsInASection<CellInTheDocument>[];
-}
 
 export function standsOutsideTheStory(kind: string): boolean {
     return KINDS_THAT_STAND_OUTSIDE_THE_STORY.has(kind);

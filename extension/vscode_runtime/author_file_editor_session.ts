@@ -9,7 +9,8 @@ import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
-import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
+import { CharacterRangeSynchronizer } from "./storydoc/synchronizers/character_range_synchronizer";
+import type { AuthorDocSynchronizer } from "./storydoc/synchronizers/author_doc_synchronizer";
 import { AuthorDocDiff } from "./storydoc/diff";
 import { Document } from "./storydoc/storydoc";
 import type { Cell } from "./storydoc/cells/cell";
@@ -19,12 +20,10 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "./story_annotation_selection";
-import {
-    StoryWordsIterator,
-    type StoryTextSpan,
-} from "./storydoc/iterators/story_words_iterator";
+import { StoryWordsIterator } from "./storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "./storydoc/iterators/story_text_span";
 import type { StoryWordRange } from "./storydoc/cells/story_word_range";
-import { WordCounter } from "../webview/author_editor/word_counter";
+import { WordCounter } from "./storydoc/synchronizers/word_counter";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
@@ -34,9 +33,8 @@ export class AuthorFileEditorSession
     private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
         [];
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
-    private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
-    private readonly findMatchesInTheProseSynchronizer: AuthorDocSynchronizer<AuthorFileEditorFindMatchInTheProse>;
     private readonly wordCounter = new WordCounter();
+    private readonly synchronizers: AuthorDocSynchronizer[];
     private documentAsTheLastSynchronizationLeftIt: Document;
 
     private panel: vscode.WebviewPanel | undefined;
@@ -68,14 +66,21 @@ export class AuthorFileEditorSession
             vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
         >,
     ) {
-        this.proseErrorsSynchronizer = new AuthorDocSynchronizer(
+        const proseErrorsSynchronizer = new CharacterRangeSynchronizer(
             this.proseErrors,
         );
-        this.findMatchesInTheProseSynchronizer = new AuthorDocSynchronizer(
-            this.findMatchesInTheProse,
+        const findMatchesInTheProseSynchronizer =
+            new CharacterRangeSynchronizer(this.findMatchesInTheProse);
+        this.synchronizers = [
+            proseErrorsSynchronizer,
+            findMatchesInTheProseSynchronizer,
+            this.wordCounter,
+        ];
+        this.documentAsTheLastSynchronizationLeftIt = new Document(
+            "",
+            uri.fsPath,
         );
-        this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
-        this.wordCounter.synchronize(this.documentAsItStands);
+        this.synchronizeTheRepresentations();
     }
 
     dispose(): void {}
@@ -300,16 +305,13 @@ export class AuthorFileEditorSession
     }
 
     private synchronizeTheRepresentations(): void {
-        this.proseErrorsSynchronizer.synchronize(
-            this.documentAsTheLastSynchronizationLeftIt,
-            this.documentAsItStands,
-        );
-        this.findMatchesInTheProseSynchronizer.synchronize(
-            this.documentAsTheLastSynchronizationLeftIt,
-            this.documentAsItStands,
-        );
-        this.documentAsTheLastSynchronizationLeftIt = this.documentAsItStands;
-        this.wordCounter.synchronize(this.documentAsItStands);
+        const before = this.documentAsTheLastSynchronizationLeftIt;
+        const after = this.documentAsItStands;
+        const change = AuthorDocDiff.diff(before, after);
+        for (const synchronizer of this.synchronizers) {
+            synchronizer.synchronize(before, change);
+        }
+        this.documentAsTheLastSynchronizationLeftIt = after;
     }
 
     sendCellsBeingWritten(): void {

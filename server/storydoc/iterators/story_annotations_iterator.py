@@ -1,29 +1,19 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from server.storydoc.cells.story_word_range import StoryWordRange
 from server.storydoc.iterators.story_words_iterator import StoryWordsIterator
-from server.storydoc.visitors.annotated_passages import AnnotatedPassagesOf
+from server.storydoc.iterators.story_annotation_in_the_story import (
+    StoryAnnotationInTheStory,
+)
+from server.storydoc.iterators.story_word_range_in_the_story import (
+    StoryWordRangeInTheStory,
+)
+from server.storydoc.visitors.annotated_passages_of import AnnotatedPassagesOf
 
 if TYPE_CHECKING:
     from server.storydoc.storydoc import Document
-
-
-@dataclass(frozen=True)
-class StoryWordRangeInTheStory(StoryWordRange):
-    cell_id: str
-    words_it_covers: str
-
-
-@dataclass(frozen=True)
-class StoryAnnotationInTheStory:
-    annotation_cell_id: str
-    title: str
-    description: str
-    passages: list[StoryWordRangeInTheStory]
 
 
 class StoryAnnotationsIterator:

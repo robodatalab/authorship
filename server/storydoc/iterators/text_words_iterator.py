@@ -2,17 +2,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from server.storydoc.iterators.text_word import TextWord
 
 _RUN_OF_NON_SPACES = re.compile(r"\S+")
 _WORD_CHARACTER = re.compile(r"\w", re.ASCII)
-
-
-@dataclass(frozen=True)
-class TextWord:
-    text: str
-    start_character_offset: int
-    end_character_offset: int
 
 
 class TextWordsIterator:

@@ -1,13 +1,7 @@
-import { AuthorDocDiff } from "./diff";
-import type { Document } from "./storydoc";
-
-export interface SynchronizedRepresentation {
-    cellId: string;
-    startCharacterOffsetInCell: number;
-    endCharacterOffsetInCell: number;
-    wordsInTheCell: string;
-    isVisible: boolean;
-}
+import type { AuthorDocDiff } from "../diff";
+import type { Document } from "../storydoc";
+import type { AuthorDocSynchronizer } from "./author_doc_synchronizer";
+import type { SynchronizedRepresentation } from "./synchronized_representation";
 
 function rangeOverlaps(
     startOfTheFirst: number,
@@ -18,20 +12,19 @@ function rangeOverlaps(
     return endOfTheFirst > startOfTheSecond && startOfTheFirst < endOfTheSecond;
 }
 
-export class AuthorDocSynchronizer<
+export class CharacterRangeSynchronizer<
     Representation extends SynchronizedRepresentation,
-> {
+> implements AuthorDocSynchronizer {
     constructor(private readonly representations: Representation[]) {}
 
-    synchronize(docBefore: Document, docAfter: Document): void {
-        for (const cellDiff of AuthorDocDiff.diff(docBefore, docAfter).cells) {
-            const cellBefore = docBefore.cells.find(
-                (cell) => cell.uniqueId === cellDiff.cellId,
-            );
-            const cellAfter = docAfter.cells.find(
-                (cell) => cell.uniqueId === cellDiff.cellId,
-            );
-            const markdownAfter = cellAfter?.source;
+    synchronize(before: Document, change: AuthorDocDiff): void {
+        for (const cellDiff of change.cells) {
+            const cellBefore = before.cellWithId(cellDiff.cellId);
+            const markdownBefore = cellBefore?.source ?? "";
+            const markdownAfter =
+                cellDiff.headerInRhs === undefined
+                    ? undefined
+                    : cellDiff.sourceInRhs(markdownBefore);
             const charactersAdded =
                 cellDiff.textInRhs.length - cellDiff.textInLhs.length;
 
@@ -46,8 +39,8 @@ export class AuthorDocSynchronizer<
                 }
 
                 const endOfTheCell = Math.max(
-                    cellBefore?.source.length ?? 0,
-                    cellAfter?.source.length ?? 0,
+                    markdownBefore.length,
+                    markdownAfter.length,
                 );
                 if (
                     rangeOverlaps(

@@ -1,23 +1,9 @@
 import { Cell } from "./cell";
 import type { CellVisitor } from "./cell_visitor";
-import type { StoryWordRange } from "./story_word_range";
+import type { PlotEdge } from "./plot_edge";
+import type { PlotNode } from "./plot_node";
 
 export const PLOT = "plot";
-
-export class PlotNode {
-    constructor(
-        readonly nodeId: string,
-        readonly storyWordRange: StoryWordRange,
-    ) {}
-}
-
-export class PlotEdge {
-    constructor(
-        readonly edgeId: string,
-        readonly fromNodeId: string,
-        readonly toNodeId: string,
-    ) {}
-}
 
 export class PlotCell extends Cell {
     readonly kind = PLOT;
