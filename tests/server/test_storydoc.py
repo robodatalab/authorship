@@ -6,24 +6,20 @@ from pathlib import Path
 from parameterized import parameterized
 
 from server import storydoc
-from server.storydoc import (
-    BlurbCell,
-    ChapterCell,
-    DividerCell,
-    Document,
-    ImageCell,
-    MarkdownCell,
-    NoteCell,
-    PartCell,
-    PlotCell,
-    PlotEdge,
-    PlotNode,
-    RecapCell,
-    SalientConceptCell,
-    StoryWordRange,
-    TableOfContentsCell,
-    TitlePageCell,
-)
+from server.storydoc import Document
+from server.cells.blurb_cell import BlurbCell
+from server.cells.chapter_cell import ChapterCell
+from server.cells.divider_cell import DIVIDER, DividerCell
+from server.cells.image_cell import ImageCell
+from server.cells.markdown_cell import MarkdownCell
+from server.cells.note_cell import NoteCell
+from server.cells.part_cell import PartCell
+from server.cells.plot_cell import PlotCell, PlotEdge, PlotNode
+from server.cells.recap_cell import RecapCell
+from server.cells.salient_concept_cell import SalientConceptCell
+from server.cells.story_word_range import StoryWordRange
+from server.cells.table_of_contents_cell import TableOfContentsCell
+from server.cells.title_page_cell import TitlePageCell
 
 CORPUS = json.loads(
     (Path(__file__).parents[1] / "storydoc_corpus.json").read_text(encoding="utf-8")
@@ -134,7 +130,7 @@ class Writing(unittest.TestCase):
 
     def test_a_divider_survives_the_round_trip(self) -> None:
         back = storydoc.parse(storydoc.dumps([DividerCell()]))
-        self.assertEqual(back[0].kind, storydoc.DIVIDER)
+        self.assertEqual(back[0].kind, DIVIDER)
 
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
         self.assertEqual(

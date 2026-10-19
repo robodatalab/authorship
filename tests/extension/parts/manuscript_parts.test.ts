@@ -8,18 +8,16 @@ import {
     partNumber,
     partTitle,
 } from "../../../extension/vscode_runtime/parts/manuscript_parts";
-import {
-    AboutCell,
-    BlurbCell,
-    ChapterCell,
-    DividerCell,
-    ImageCell,
-    MarkdownCell,
-    NoteCell,
-    PartCell,
-    RecapCell,
-    TitlePageCell,
-} from "../../../extension/vscode_runtime/storydoc/storydoc";
+import { AboutCell } from "../../../extension/vscode_runtime/storydoc/cells/about_cell";
+import { BlurbCell } from "../../../extension/vscode_runtime/storydoc/cells/blurb_cell";
+import { ChapterCell } from "../../../extension/vscode_runtime/storydoc/cells/chapter_cell";
+import { DividerCell } from "../../../extension/vscode_runtime/storydoc/cells/divider_cell";
+import { ImageCell } from "../../../extension/vscode_runtime/storydoc/cells/image_cell";
+import { MarkdownCell } from "../../../extension/vscode_runtime/storydoc/cells/markdown_cell";
+import { NoteCell } from "../../../extension/vscode_runtime/storydoc/cells/note_cell";
+import { PartCell } from "../../../extension/vscode_runtime/storydoc/cells/part_cell";
+import { RecapCell } from "../../../extension/vscode_runtime/storydoc/cells/recap_cell";
+import { TitlePageCell } from "../../../extension/vscode_runtime/storydoc/cells/title_page_cell";
 
 /** Prose of a given length, for a story that has to look like one. */
 function prose(words: number): MarkdownCell {

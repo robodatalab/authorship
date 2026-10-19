@@ -11,7 +11,8 @@ import type {
 } from "./message_queue_between_vscode_and_webview";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocDiff } from "./storydoc/diff";
-import { Document, type Cell } from "./storydoc/storydoc";
+import { Document } from "./storydoc/storydoc";
+import type { Cell } from "./storydoc/cells/cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,

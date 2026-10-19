@@ -6,14 +6,13 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 
 from server import storydoc
-from server.storydoc import (
-    ChapterCell,
-    Document,
-    MarkdownCell,
-    NoteCell,
-    TableOfContentsCell,
-    TitlePageCell,
-)
+from server.storydoc import Document
+from server.cells.cell import Cell
+from server.cells.chapter_cell import ChapterCell
+from server.cells.markdown_cell import MarkdownCell
+from server.cells.note_cell import NoteCell
+from server.cells.table_of_contents_cell import TableOfContentsCell
+from server.cells.title_page_cell import TitlePageCell
 from server.writing_tools.style import (
     FIX_REQUEST,
     STYLE_INSTRUCTION,
@@ -61,7 +60,7 @@ def styled(*arguments: object, **named: object) -> None:
     asyncio.run(fix_style(*arguments, **named))
 
 
-def markdown(source: str, cell_id: str) -> storydoc.Cell:
+def markdown(source: str, cell_id: str) -> Cell:
     return MarkdownCell(_unique_id=cell_id, source=source)
 
 

@@ -14,16 +14,14 @@ from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
 from server import storydoc
-from server.storydoc import (
-    AboutCell,
-    BlurbCell,
-    ChapterCell,
-    ImageCell,
-    MarkdownCell,
-    RecapCell,
-    TableOfContentsCell,
-    TitlePageCell,
-)
+from server.cells.about_cell import ABOUT, AboutCell
+from server.cells.blurb_cell import BLURB, BlurbCell
+from server.cells.chapter_cell import ChapterCell
+from server.cells.image_cell import ImageCell
+from server.cells.markdown_cell import MarkdownCell
+from server.cells.recap_cell import RECAP, RecapCell
+from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
+from server.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 DEFAULT_REPLY = (
@@ -258,7 +256,7 @@ class GenerateBlurb(unittest.TestCase):
         status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(status["text"], "A woman loses her name.")
-        self.assertEqual(status["kind"], storydoc.BLURB)
+        self.assertEqual(status["kind"], BLURB)
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_leaves_the_document_alone(self) -> None:
@@ -461,7 +459,7 @@ class GenerateRecap(unittest.TestCase):
         status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(status["text"], "She has lost her name.")
-        self.assertEqual(status["kind"], storydoc.RECAP)
+        self.assertEqual(status["kind"], RECAP)
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_says_which_section_is_being_written(self) -> None:
@@ -470,7 +468,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("a.author")
         self.assertEqual(
-            wait_for_writing(client, started.json()["id"])["kind"], storydoc.RECAP
+            wait_for_writing(client, started.json()["id"])["kind"], RECAP
         )
 
     def test_the_documents_are_named_beside_the_one_that_asks(self) -> None:
@@ -591,13 +589,13 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
-            said["added"], [storydoc.TABLE_OF_CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+            said["added"], [TABLE_OF_CONTENTS, BLURB, ABOUT]
         )
         wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
         # The title page is there, in place, and still not filled in — which is
         # the fault a document can have while looking complete.
         self.assertEqual(
-            wanting[storydoc.TITLE_PAGE],
+            wanting[TITLE_PAGE],
             ["subtitle", "author", "publisher", "date"],
         )
 

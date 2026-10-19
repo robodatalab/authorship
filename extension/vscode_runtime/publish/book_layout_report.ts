@@ -1,4 +1,5 @@
-import { Cell } from "../storydoc/storydoc";
+import type { Cell } from "../storydoc/cells/cell";
+import { cellOfKind } from "../storydoc/storydoc";
 
 const NEEDS_TEXT = "text";
 
@@ -26,7 +27,7 @@ export function cellsLaidOutByPlan(
     plan: PlannedSection[],
 ): Cell[] {
     return plan.map((section) =>
-        section.at === null ? Cell.ofKind(section.kind) : cells[section.at],
+        section.at === null ? cellOfKind(section.kind) : cells[section.at],
     );
 }
 

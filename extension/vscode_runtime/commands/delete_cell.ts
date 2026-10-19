@@ -1,12 +1,10 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import {
-    ChapterCell,
-    PartCell,
-    type Cell,
-    type Document,
-} from "../storydoc/storydoc";
+import { type Document } from "../storydoc/storydoc";
+import type { Cell } from "../storydoc/cells/cell";
+import { ChapterCell } from "../storydoc/cells/chapter_cell";
+import { PartCell } from "../storydoc/cells/part_cell";
 import {
     cellsBySection,
     cellsWithinASection,

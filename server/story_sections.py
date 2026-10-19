@@ -2,20 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from server.storydoc import (
-    ABOUT,
-    BLURB,
-    CHAPTER,
-    DISCLAIMER,
-    PART,
-    PLOT,
-    RECAP,
-    SALIENT_CONCEPT,
-    TABLE_OF_CONTENTS,
-    TITLE_PAGE,
-    Cell,
-    Document,
-)
+from server.storydoc import Document
+from server.cells.about_cell import ABOUT
+from server.cells.blurb_cell import BLURB
+from server.cells.cell import Cell
+from server.cells.chapter_cell import CHAPTER
+from server.cells.disclaimer_cell import DISCLAIMER
+from server.cells.part_cell import PART
+from server.cells.plot_cell import PLOT
+from server.cells.recap_cell import RECAP
+from server.cells.salient_concept_cell import SALIENT_CONCEPT
+from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS
+from server.cells.title_page_cell import TITLE_PAGE
 
 _KINDS_THAT_STAND_OUTSIDE_THE_STORY = frozenset(
     {

@@ -1,17 +1,15 @@
-import {
-    ABOUT,
-    BLURB,
-    CHAPTER,
-    DISCLAIMER,
-    PART,
-    PLOT,
-    RECAP,
-    SALIENT_CONCEPT,
-    TABLE_OF_CONTENTS,
-    TITLE_PAGE,
-    type Cell,
-    type Document,
-} from "./storydoc";
+import { type Document } from "./storydoc";
+import { ABOUT } from "./cells/about_cell";
+import { BLURB } from "./cells/blurb_cell";
+import type { Cell } from "./cells/cell";
+import { CHAPTER } from "./cells/chapter_cell";
+import { DISCLAIMER } from "./cells/disclaimer_cell";
+import { PART } from "./cells/part_cell";
+import { PLOT } from "./cells/plot_cell";
+import { RECAP } from "./cells/recap_cell";
+import { SALIENT_CONCEPT } from "./cells/salient_concept_cell";
+import { TABLE_OF_CONTENTS } from "./cells/table_of_contents_cell";
+import { TITLE_PAGE } from "./cells/title_page_cell";
 
 const KINDS_THAT_STAND_OUTSIDE_THE_STORY = new Set([
     TITLE_PAGE,

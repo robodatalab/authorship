@@ -1,5 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { Cell, type Document } from "../storydoc/storydoc";
+import { type Document } from "../storydoc/storydoc";
+import { Cell } from "../storydoc/cells/cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class ReplaceAttributeCommand implements AuthorDocumentCommand {

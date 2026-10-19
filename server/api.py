@@ -18,8 +18,9 @@ from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
-from server import storydoc
 from server.storydoc import Document
+from server.cells.blurb_cell import BLURB
+from server.cells.recap_cell import RECAP
 
 _log = log.logger(__name__)
 
@@ -166,7 +167,7 @@ class BlurbJob(WritingJob):
     kind = "blurb"
 
     def __init__(self, model: CompletingModel, document: Document) -> None:
-        super().__init__(storydoc.BLURB, str(document.path))
+        super().__init__(BLURB, str(document.path))
         self._model = model
         self._document = document
 
@@ -186,7 +187,7 @@ class RecapJob(WritingJob):
     kind = "recap"
 
     def __init__(self, model: CompletingModel, document: Document, earlier: list[Document]) -> None:
-        super().__init__(storydoc.RECAP, str(document.path))
+        super().__init__(RECAP, str(document.path))
         self._model = model
         self._earlier = earlier
 

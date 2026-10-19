@@ -18,19 +18,16 @@
 // turns the parts into files.
 
 import { standsOutsideTheStory } from "../storydoc/story_sections";
-import {
-    ABOUT,
-    type Cell,
-    ChapterCell,
-    DISCLAIMER,
-    DividerCell,
-    EXTENSION,
-    ImageCell,
-    PartCell,
-    TABLE_OF_CONTENTS,
-    TITLE_PAGE,
-    TitlePageCell,
-} from "../storydoc/storydoc";
+import { EXTENSION } from "../storydoc/storydoc";
+import { ABOUT } from "../storydoc/cells/about_cell";
+import type { Cell } from "../storydoc/cells/cell";
+import { ChapterCell } from "../storydoc/cells/chapter_cell";
+import { DISCLAIMER } from "../storydoc/cells/disclaimer_cell";
+import { DividerCell } from "../storydoc/cells/divider_cell";
+import { ImageCell } from "../storydoc/cells/image_cell";
+import { PartCell } from "../storydoc/cells/part_cell";
+import { TABLE_OF_CONTENTS } from "../storydoc/cells/table_of_contents_cell";
+import { TITLE_PAGE, TitlePageCell } from "../storydoc/cells/title_page_cell";
 
 const KINDS_EVERY_PART_CARRIES = new Set([
     TITLE_PAGE,

@@ -1,23 +1,21 @@
-import {
-    type AboutCell,
-    type BlurbCell,
-    type Cell,
-    type CellVisitor,
-    ChapterCell,
-    type DisclaimerCell,
-    type DividerCell,
-    dumps,
-    type ImageCell,
-    MarkdownCell,
-    type NoteCell,
-    PartCell,
-    type PlotCell,
-    type RecapCell,
-    type SalientConceptCell,
-    type TableOfContentsCell,
-    TitlePageCell,
-    type UnknownCell,
-} from "../storydoc/storydoc";
+import { dumps } from "../storydoc/storydoc";
+import type { AboutCell } from "../storydoc/cells/about_cell";
+import type { BlurbCell } from "../storydoc/cells/blurb_cell";
+import type { Cell } from "../storydoc/cells/cell";
+import type { CellVisitor } from "../storydoc/cells/cell_visitor";
+import { ChapterCell } from "../storydoc/cells/chapter_cell";
+import type { DisclaimerCell } from "../storydoc/cells/disclaimer_cell";
+import type { DividerCell } from "../storydoc/cells/divider_cell";
+import type { ImageCell } from "../storydoc/cells/image_cell";
+import { MarkdownCell } from "../storydoc/cells/markdown_cell";
+import type { NoteCell } from "../storydoc/cells/note_cell";
+import { PartCell } from "../storydoc/cells/part_cell";
+import type { PlotCell } from "../storydoc/cells/plot_cell";
+import type { RecapCell } from "../storydoc/cells/recap_cell";
+import type { SalientConceptCell } from "../storydoc/cells/salient_concept_cell";
+import type { TableOfContentsCell } from "../storydoc/cells/table_of_contents_cell";
+import { TitlePageCell } from "../storydoc/cells/title_page_cell";
+import type { UnknownCell } from "../storydoc/cells/unknown_cell";
 
 const TITLE_PAGE_HEADING = "#";
 const PART_HEADING = "##";

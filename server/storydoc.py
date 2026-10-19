@@ -33,29 +33,30 @@ marker opens a new cell. Markdown has the same bargain with fences.
 from __future__ import annotations
 
 import re
-from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Generic, TypeVar
 from uuid import uuid4
 
-EXTENSION = ".author"
+from server.cells.cell import Cell
+from server.cells.cell_visitor import CellVisitor
+from server.cells.about_cell import ABOUT, AboutCell
+from server.cells.blurb_cell import BLURB, BlurbCell
+from server.cells.chapter_cell import CHAPTER, ChapterCell
+from server.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
+from server.cells.divider_cell import DIVIDER, DividerCell
+from server.cells.image_cell import IMAGE, ImageCell
+from server.cells.markdown_cell import MARKDOWN, MarkdownCell
+from server.cells.note_cell import NOTE, NoteCell
+from server.cells.part_cell import PART, PartCell
+from server.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
+from server.cells.recap_cell import RECAP, RecapCell
+from server.cells.salient_concept_cell import SALIENT_CONCEPT, SalientConceptCell
+from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
+from server.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from server.cells.story_word_range import StoryWordRange
+from server.cells.unknown_cell import UnknownCell
 
-MARKDOWN = "markdown"
-CHAPTER = "chapter"
-PART = "part"
-DIVIDER = "divider"
-TITLE_PAGE = "title-page"
-IMAGE = "image"
-TABLE_OF_CONTENTS = "contents"
-DISCLAIMER = "disclaimer"
-ABOUT = "about"
-BLURB = "blurb"
-NOTE = "note"
-RECAP = "recap"
-SALIENT_CONCEPT = "salient-concept"
-PLOT = "plot"
+EXTENSION = ".author"
 
 # What an attribute says when the answer to it is no.
 NO = "no"
@@ -100,407 +101,6 @@ PLOT_EDGES = "edges"
 
 _PLOT_NODE = re.compile(r"^\s*([^:\s]+):(\d+)-(\d+)\s*$")
 _PLOT_EDGE = re.compile(r"^\s*([^:\s]+):([^>\s]+)>(\S+)\s*$")
-
-
-@dataclass(frozen=True)
-class StoryWordRange:
-    first_word: int
-    last_word: int
-
-
-@dataclass(frozen=True)
-class PlotNode:
-    node_id: str
-    story_word_range: StoryWordRange
-
-
-@dataclass(frozen=True)
-class PlotEdge:
-    edge_id: str
-    from_node_id: str
-    to_node_id: str
-
-
-_Result = TypeVar("_Result")
-
-
-class CellVisitor(ABC, Generic[_Result]):
-    @abstractmethod
-    def visit_markdown(self, cell: MarkdownCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_chapter(self, cell: ChapterCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_part(self, cell: PartCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_divider(self, cell: DividerCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_title_page(self, cell: TitlePageCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_image(self, cell: ImageCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_table_of_contents(self, cell: TableOfContentsCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_disclaimer(self, cell: DisclaimerCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_about(self, cell: AboutCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_blurb(self, cell: BlurbCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_note(self, cell: NoteCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_recap(self, cell: RecapCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_salient_concept(self, cell: SalientConceptCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_plot(self, cell: PlotCell) -> _Result: ...
-
-    @abstractmethod
-    def visit_unknown(self, cell: UnknownCell) -> _Result: ...
-
-
-class Cell(ABC):
-    """One thing the document is made of, and what it says it is.
-
-    `kind` is the cell's identity and is never inferred from its text — a chapter
-    called "Disclaimer" is still a chapter.
-    """
-
-    kind: str
-    source: str
-    folded: bool
-    at: tuple[int, int] | None
-    _unique_id: str
-
-    @classmethod
-    def of_kind(cls, kind: str) -> Cell:
-        unique_id = str(uuid4())
-        return _cell_from_marker(kind, {}, "", False, None, unique_id)
-
-    @property
-    def unique_id(self) -> str:
-        return self._unique_id
-
-    def offset_of(self, line: int, character: int) -> int:
-        assert self.at is not None
-        above = self.source.splitlines()[: line - self.at[0]]
-        return sum(len(written) + 1 for written in above) + character
-
-    @abstractmethod
-    def with_source(self, source: str) -> Cell: ...
-
-    @abstractmethod
-    def with_folded(self, folded: bool) -> Cell: ...
-
-    @abstractmethod
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result: ...
-
-
-@dataclass(frozen=True)
-class MarkdownCell(Cell):
-    kind: str = field(default=MARKDOWN, init=False)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> MarkdownCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> MarkdownCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_markdown(self)
-
-
-@dataclass(frozen=True)
-class ChapterCell(Cell):
-    kind: str = field(default=CHAPTER, init=False)
-    title: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> ChapterCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> ChapterCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_chapter(self)
-
-
-@dataclass(frozen=True)
-class PartCell(Cell):
-    kind: str = field(default=PART, init=False)
-    title: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> PartCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> PartCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_part(self)
-
-
-@dataclass(frozen=True)
-class DividerCell(Cell):
-    kind: str = field(default=DIVIDER, init=False)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> DividerCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> DividerCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_divider(self)
-
-
-@dataclass(frozen=True)
-class TitlePageCell(Cell):
-    kind: str = field(default=TITLE_PAGE, init=False)
-    title: str = ""
-    subtitle: str = ""
-    author: str = ""
-    publisher: str = ""
-    date: str = ""
-    version: str = ""
-    isbn: str = ""
-    cover_designer: str = ""
-    language: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> TitlePageCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> TitlePageCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_title_page(self)
-
-
-@dataclass(frozen=True)
-class ImageCell(Cell):
-    kind: str = field(default=IMAGE, init=False)
-    src: str = ""
-    full_page: bool = True
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> ImageCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> ImageCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_image(self)
-
-
-@dataclass(frozen=True)
-class TableOfContentsCell(Cell):
-    kind: str = field(default=TABLE_OF_CONTENTS, init=False)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> TableOfContentsCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> TableOfContentsCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_table_of_contents(self)
-
-
-@dataclass(frozen=True)
-class DisclaimerCell(Cell):
-    kind: str = field(default=DISCLAIMER, init=False)
-    title: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> DisclaimerCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> DisclaimerCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_disclaimer(self)
-
-
-@dataclass(frozen=True)
-class AboutCell(Cell):
-    kind: str = field(default=ABOUT, init=False)
-    kdp: str = ""
-    website: str = ""
-    substack: str = ""
-    portrait: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> AboutCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> AboutCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_about(self)
-
-
-@dataclass(frozen=True)
-class BlurbCell(Cell):
-    kind: str = field(default=BLURB, init=False)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> BlurbCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> BlurbCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_blurb(self)
-
-
-@dataclass(frozen=True)
-class NoteCell(Cell):
-    kind: str = field(default=NOTE, init=False)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> NoteCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> NoteCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_note(self)
-
-
-@dataclass(frozen=True)
-class RecapCell(Cell):
-    kind: str = field(default=RECAP, init=False)
-    documents: str = ""
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> RecapCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> RecapCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_recap(self)
-
-
-@dataclass(frozen=True)
-class SalientConceptCell(Cell):
-    kind: str = field(default=SALIENT_CONCEPT, init=False)
-    title: str = ""
-    story_word_ranges: list[StoryWordRange] = field(default_factory=list)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> SalientConceptCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> SalientConceptCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_salient_concept(self)
-
-
-@dataclass(frozen=True)
-class PlotCell(Cell):
-    kind: str = field(default=PLOT, init=False)
-    title: str = ""
-    nodes: list[PlotNode] = field(default_factory=list)
-    edges: list[PlotEdge] = field(default_factory=list)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> PlotCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> PlotCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_plot(self)
-
-
-@dataclass(frozen=True)
-class UnknownCell(Cell):
-    kind: str
-    attrs: dict[str, str] = field(default_factory=dict)
-    source: str = ""
-    folded: bool = False
-    at: tuple[int, int] | None = field(default=None, compare=False)
-    _unique_id: str = field(default_factory=lambda: str(uuid4()))
-
-    def with_source(self, source: str) -> UnknownCell:
-        return replace(self, source=source)
-
-    def with_folded(self, folded: bool) -> UnknownCell:
-        return replace(self, folded=folded)
-
-    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_unknown(self)
 
 
 def parse(text: str) -> list[Cell]:
@@ -559,6 +159,11 @@ def load(path: Path) -> list[Cell]:
 
 def save(path: Path, cells: list[Cell]) -> None:
     path.write_text(dumps(cells), encoding="utf-8")
+
+
+def cell_of_kind(kind: str) -> Cell:
+    unique_id = str(uuid4())
+    return _cell_from_marker(kind, {}, "", False, None, unique_id)
 
 
 def add_missing(cells: list[Cell], wanted: list[Cell]) -> list[Cell]:

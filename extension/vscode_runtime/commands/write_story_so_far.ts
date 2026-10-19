@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { RECAP, RecapCell } from "../storydoc/storydoc";
+import { RECAP, RecapCell } from "../storydoc/cells/recap_cell";
 
 interface WrittenSection extends ServerJob {
     text: string;

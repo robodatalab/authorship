@@ -1,4 +1,5 @@
-import { type Cell, Document, dumps, parse } from "./storydoc";
+import { Document, dumps, parse } from "./storydoc";
+import type { Cell } from "./cells/cell";
 
 export class AuthorDocCellDiff {
     constructor(

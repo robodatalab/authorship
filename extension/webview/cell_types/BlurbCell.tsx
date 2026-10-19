@@ -16,7 +16,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { BLURB } from "../../vscode_runtime/storydoc/storydoc";
+import { BLURB } from "../../vscode_runtime/storydoc/cells/blurb_cell";
 
 interface BlurbCellProps {
     cell: WebviewCell;

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { MARKDOWN } from "../storydoc/storydoc";
+import { MARKDOWN } from "../storydoc/cells/markdown_cell";
 
 const STYLE_FIX_STATUS = "/fix/style/status";
 

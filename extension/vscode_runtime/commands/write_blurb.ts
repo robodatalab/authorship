@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { BLURB } from "../storydoc/storydoc";
+import { BLURB } from "../storydoc/cells/blurb_cell";
 
 interface WrittenSection extends ServerJob {
     text: string;

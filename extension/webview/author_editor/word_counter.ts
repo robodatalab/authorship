@@ -1,8 +1,6 @@
-import {
-    MARKDOWN,
-    type Cell,
-    type Document,
-} from "../../vscode_runtime/storydoc/storydoc";
+import { type Document } from "../../vscode_runtime/storydoc/storydoc";
+import type { Cell } from "../../vscode_runtime/storydoc/cells/cell";
+import { MARKDOWN } from "../../vscode_runtime/storydoc/cells/markdown_cell";
 import {
     cellsBySection,
     cellsWithinASection,

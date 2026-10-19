@@ -1,6 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { Cell } from "../storydoc/storydoc";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { cellOfKind } from "../storydoc/storydoc";
 
 export class InsertCellCommand implements AuthorDocumentCommand {
     readonly commandName = "insertCell";
@@ -12,7 +12,7 @@ export class InsertCellCommand implements AuthorDocumentCommand {
         session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        const blankCell = Cell.ofKind(commandArguments.cellKind as string);
+        const blankCell = cellOfKind(commandArguments.cellKind as string);
         const beforeCellId = commandArguments.beforeCellId as string | null;
         session.changeTheDocument((story) => {
             const beforeCellIndex = story.cells.findIndex(

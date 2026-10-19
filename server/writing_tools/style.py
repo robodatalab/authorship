@@ -8,9 +8,9 @@ from typing import Any
 
 from cortexgrid_infer import CompletingModel
 
-from server import storydoc
 from server.jobs import Job
-from server.storydoc import Cell, Document
+from server.storydoc import Document
+from server.cells.cell import Cell
 
 _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(?P<body>.*)\n```\s*\Z", re.DOTALL)
 THINKING_HEADROOM = 8192

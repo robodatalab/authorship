@@ -24,23 +24,21 @@ from server.publishing.epub_exporter import (
     report_of,
 )
 from server import storydoc
-from server.storydoc import (
-    AboutCell,
-    BlurbCell,
-    Cell,
-    ChapterCell,
-    DisclaimerCell,
-    DividerCell,
-    Document,
-    ImageCell,
-    MarkdownCell,
-    NoteCell,
-    PartCell,
-    RecapCell,
-    SalientConceptCell,
-    TableOfContentsCell,
-    TitlePageCell,
-)
+from server.storydoc import Document
+from server.cells.about_cell import ABOUT, AboutCell
+from server.cells.blurb_cell import BLURB, BlurbCell
+from server.cells.cell import Cell
+from server.cells.chapter_cell import CHAPTER, ChapterCell
+from server.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
+from server.cells.divider_cell import DividerCell
+from server.cells.image_cell import ImageCell
+from server.cells.markdown_cell import MarkdownCell
+from server.cells.note_cell import NoteCell
+from server.cells.part_cell import PartCell
+from server.cells.recap_cell import RecapCell
+from server.cells.salient_concept_cell import SalientConceptCell
+from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
+from server.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 def document(*cells: Cell) -> Document:
@@ -1070,50 +1068,50 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
     def test_a_title_page_nobody_filled_in(self) -> None:
         said = self.wanting(TitlePageCell(title="Untitled"))
         self.assertEqual(
-            said[storydoc.TITLE_PAGE],
+            said[TITLE_PAGE],
             ("title", "subtitle", "author", "publisher", "date"),
         )
 
     def test_it_names_only_the_fields_that_are_empty(self) -> None:
         said = self.wanting(filled_title_page(author="", date="   "))
-        self.assertEqual(said[storydoc.TITLE_PAGE], ("author", "date"))
+        self.assertEqual(said[TITLE_PAGE], ("author", "date"))
 
     def test_a_version_is_never_wanted(self) -> None:
         # A fact about an edition, like an ISBN, not a thing a book waits for.
         said = self.wanting(filled_title_page(version=""))
-        self.assertNotIn(storydoc.TITLE_PAGE, said)
+        self.assertNotIn(TITLE_PAGE, said)
 
     def test_an_isbn_is_never_wanted(self) -> None:
         # Many editions have none, so it is not a fact a book waits for.
         said = self.wanting(filled_title_page())
-        self.assertNotIn(storydoc.TITLE_PAGE, said)
+        self.assertNotIn(TITLE_PAGE, said)
 
     def test_an_about_page_with_nothing_on_it(self) -> None:
         # `build_about_page` already answers None here.
         said = self.wanting(AboutCell())
-        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+        self.assertEqual(said[ABOUT], (TEXT,))
 
     def test_an_about_page_with_only_a_link_is_written(self) -> None:
         said = self.wanting(AboutCell(website="https://x.com"))
-        self.assertNotIn(storydoc.ABOUT, said)
+        self.assertNotIn(ABOUT, said)
 
     def test_an_empty_blurb(self) -> None:
         said = self.wanting(BlurbCell())
-        self.assertEqual(said[storydoc.BLURB], (TEXT,))
+        self.assertEqual(said[BLURB], (TEXT,))
 
     def test_the_table_of_contents_is_never_wanting(self) -> None:
         # It is built from the chapters whatever the cell holds.
         said = self.wanting(TableOfContentsCell())
-        self.assertNotIn(storydoc.TABLE_OF_CONTENTS, said)
+        self.assertNotIn(TABLE_OF_CONTENTS, said)
 
     def test_a_section_that_is_not_there_wants_everything(self) -> None:
         said = self.wanting(ChapterCell("One"))
-        self.assertEqual(said[storydoc.BLURB], (TEXT,))
-        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+        self.assertEqual(said[BLURB], (TEXT,))
+        self.assertEqual(said[ABOUT], (TEXT,))
 
     def test_a_disclaimer_is_not_a_section_the_book_requires(self) -> None:
         said = self.wanting(DisclaimerCell(), ChapterCell("One"))
-        self.assertNotIn(storydoc.DISCLAIMER, said)
+        self.assertNotIn(DISCLAIMER, said)
 
 
 class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
@@ -1131,14 +1129,14 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         found = report_of(placed(self.root, ChapterCell("One")))
         self.assertEqual(
             [slot.kind for slot in found.plan],
-            [*OPENING, storydoc.CHAPTER, *CLOSING],
+            [*OPENING, CHAPTER, *CLOSING],
         )
 
     def test_a_section_already_there_is_carried_by_index(self) -> None:
         found = report_of(
             placed(self.root, ChapterCell("One"), filled_title_page())
         )
-        self.assertNotIn(storydoc.TITLE_PAGE, found.added)
+        self.assertNotIn(TITLE_PAGE, found.added)
         self.assertEqual(found.plan[0].at, 1)
 
     def test_the_story_keeps_the_order_it_was_written_in(self) -> None:
@@ -1156,7 +1154,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         found = report_of(
             placed(self.root, ChapterCell("One"), TableOfContentsCell())
         )
-        self.assertIn(storydoc.TABLE_OF_CONTENTS, found.moved)
+        self.assertIn(TABLE_OF_CONTENTS, found.moved)
 
     def test_writing_a_section_in_moves_nothing(self) -> None:
         # The about page is last before and last after; only its index changed.
@@ -1208,7 +1206,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         )
         self.assertEqual(
             [slot.kind for slot in found.plan],
-            [*OPENING, storydoc.DISCLAIMER, storydoc.CHAPTER, *CLOSING],
+            [*OPENING, DISCLAIMER, CHAPTER, *CLOSING],
         )
 
     def test_only_the_first_of_a_kind_is_claimed(self) -> None:
