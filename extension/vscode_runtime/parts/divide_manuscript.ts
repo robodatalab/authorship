@@ -9,7 +9,7 @@ import * as vscode from "vscode";
 
 import {
     PARTS_FOLDER,
-    furnitureOf,
+    partBoilerplateOf,
     intoParts,
     partCells,
     partFileName,
@@ -45,7 +45,7 @@ export async function divideManuscript(
         return { partsFolder, partFilesWritten: 0 };
     }
 
-    const furniture = furnitureOf(cells);
+    const partBoilerplate = partBoilerplateOf(cells);
     await vscode.workspace.fs.createDirectory(partsFolder);
     await clearParts(partsFolder);
 
@@ -55,7 +55,7 @@ export async function divideManuscript(
         const number = index + 1;
         const partFileNameOnDisk = partFileName(number);
         const partFile = vscode.Uri.joinPath(partsFolder, partFileNameOnDisk);
-        const cellsOfThePart = partCells(furniture, number, part);
+        const cellsOfThePart = partCells(partBoilerplate, number, part);
         const textOfThePart = dumps(cellsOfThePart);
         const bytesOfThePart = new TextEncoder().encode(textOfThePart);
         await vscode.workspace.fs.writeFile(partFile, bytesOfThePart);

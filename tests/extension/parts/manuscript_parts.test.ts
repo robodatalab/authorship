@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    furnitureOf,
+    partBoilerplateOf,
     intoParts,
     partCells,
     partFileName,
@@ -28,9 +28,9 @@ function prose(words: number): MarkdownCell {
     );
 }
 
-describe("furnitureOf — what stands before the story and after it", () => {
+describe("partBoilerplateOf — what stands before the story and after it", () => {
     it("splits at the first chapter", () => {
-        const { front, back } = furnitureOf([
+        const { front, back } = partBoilerplateOf([
             new ImageCell("cover.jpg"),
             new TitlePageCell("Veriona"),
             new ChapterCell("One"),
@@ -41,8 +41,8 @@ describe("furnitureOf — what stands before the story and after it", () => {
         expect(back.map((cell) => cell.kind)).toEqual(["about"]);
     });
 
-    it("a story with no chapters has all of its furniture in front", () => {
-        const { front, back } = furnitureOf([
+    it("a story with no chapters has all of its part boilerplate in front", () => {
+        const { front, back } = partBoilerplateOf([
             new TitlePageCell("V"),
             new MarkdownCell("a"),
         ]);
@@ -51,7 +51,7 @@ describe("furnitureOf — what stands before the story and after it", () => {
     });
 
     it("takes nothing that is the story", () => {
-        const { front, back } = furnitureOf([
+        const { front, back } = partBoilerplateOf([
             new ChapterCell("One"),
             new MarkdownCell("alpha"),
         ]);
@@ -62,7 +62,7 @@ describe("furnitureOf — what stands before the story and after it", () => {
     it("takes no part of the story, not even the parts it is divided into", () => {
         // A part standing before the first chapter is still the story, and travels
         // with the chapters it names rather than with every part of the book.
-        const { front } = furnitureOf([
+        const { front } = partBoilerplateOf([
             new TitlePageCell("Veriona"),
             new PartCell("Day One"),
             new ChapterCell("One"),
@@ -199,7 +199,7 @@ describe("intoParts — one file per Divider the author placed", () => {
         ]);
     });
 
-    it("leaves the furniture, the blurb and the story so far out of the story", () => {
+    it("leaves the part boilerplate, the blurb and the story so far out of the story", () => {
         const cells = [
             new TitlePageCell("Veriona"),
             new RecapCell().withSource("She has lost her name."),
@@ -277,7 +277,7 @@ describe("intoParts — one file per Divider the author placed", () => {
 });
 
 describe("partCells — a part as a document of its own", () => {
-    it("carries the furniture around its share of the story", () => {
+    it("carries the part boilerplate around its share of the story", () => {
         const cells = [
             new ImageCell("cover.jpg"),
             new TitlePageCell("Veriona", "A Queendom drama"),
@@ -289,7 +289,7 @@ describe("partCells — a part as a document of its own", () => {
             new AboutCell().withSource("A. Writer lives by the sea."),
         ];
         const parts = intoParts(cells);
-        const second = partCells(furnitureOf(cells), 2, parts[1]);
+        const second = partCells(partBoilerplateOf(cells), 2, parts[1]);
 
         expect(second.map((cell) => cell.kind)).toEqual([
             "image",
@@ -314,10 +314,12 @@ describe("partCells — a part as a document of its own", () => {
         const parts = intoParts(cells);
 
         expect(parts).toHaveLength(2);
-        expect(partCells(furnitureOf(cells), 1, parts[0])).toContainEqual(note);
-        expect(partCells(furnitureOf(cells), 2, parts[1])).not.toContainEqual(
+        expect(partCells(partBoilerplateOf(cells), 1, parts[0])).toContainEqual(
             note,
         );
+        expect(
+            partCells(partBoilerplateOf(cells), 2, parts[1]),
+        ).not.toContainEqual(note);
     });
 
     it("renumbers the title page, and leaves the subtitle as it stands", () => {
@@ -328,7 +330,7 @@ describe("partCells — a part as a document of its own", () => {
             new MarkdownCell("alpha"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 3, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 3, parts[0]);
 
         expect(only[0]).toMatchObject({
             title: "Veriona — Part 3",
@@ -356,7 +358,7 @@ describe("partCells — a part as a document of its own", () => {
             prose(100),
         ];
         const parts = intoParts(cells);
-        const second = partCells(furnitureOf(cells), 2, parts[1]);
+        const second = partCells(partBoilerplateOf(cells), 2, parts[1]);
 
         expect(second[0]).toMatchObject({
             title: "Veriona — Day One — Part 2",
@@ -374,13 +376,13 @@ describe("partCells — a part as a document of its own", () => {
             prose(100),
         ];
         const parts = intoParts(cells);
-        const furniture = furnitureOf(cells);
+        const partBoilerplate = partBoilerplateOf(cells);
 
         expect(
-            partCells(furniture, 1, parts[0]).map((cell) => cell.kind),
+            partCells(partBoilerplate, 1, parts[0]).map((cell) => cell.kind),
         ).toEqual(["title-page", "part", "chapter", "markdown"]);
         expect(
-            partCells(furniture, 2, parts[1]).map((cell) => cell.kind),
+            partCells(partBoilerplate, 2, parts[1]).map((cell) => cell.kind),
         ).toEqual(["title-page", "chapter", "markdown"]);
     });
 
@@ -393,7 +395,7 @@ describe("partCells — a part as a document of its own", () => {
             new MarkdownCell("alpha"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
         expect(only[0]).toMatchObject({ src: "../art/cover.jpg" });
     });
@@ -406,7 +408,7 @@ describe("partCells — a part as a document of its own", () => {
             new ImageCell("art/veriona.jpg"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
         expect(only.map((cell) => cell.kind)).toEqual([
             "chapter",
@@ -425,7 +427,7 @@ describe("partCells — a part as a document of its own", () => {
                 new MarkdownCell("a"),
             ];
             const parts = intoParts(cells);
-            const only = partCells(furnitureOf(cells), 1, parts[0]);
+            const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
             expect(only[0], src).toMatchObject({ src });
         }
@@ -440,12 +442,12 @@ describe("partCells — a part as a document of its own", () => {
             new MarkdownCell("a"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
         expect(only[0]).toMatchObject({ src: "../../shared/c.jpg" });
     });
 
-    it("a story with no furniture is a part of nothing but chapters", () => {
+    it("a story with no part boilerplate is a part of nothing but chapters", () => {
         const cells = [
             new ChapterCell("One"),
             new MarkdownCell("alpha"),
@@ -455,7 +457,7 @@ describe("partCells — a part as a document of its own", () => {
         ];
         const parts = intoParts(cells);
         expect(
-            partCells(furnitureOf(cells), 1, parts[0]).map((c) => c.kind),
+            partCells(partBoilerplateOf(cells), 1, parts[0]).map((c) => c.kind),
         ).toEqual(["chapter", "markdown"]);
     });
 });

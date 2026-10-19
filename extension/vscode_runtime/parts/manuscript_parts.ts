@@ -2,7 +2,7 @@
 // part is once they do.
 //
 // A part is an `.author` document like the story it was cut from — the book's
-// furniture carried over, its title page renumbered, and its share of the
+// part boilerplate carried over, its title page renumbered, and its share of the
 // chapters. That is the whole point of cutting into this format rather than into
 // markdown: everything that works on a story works on a part. It opens in the
 // same editor, exports to the same EPUB, and nothing here has to know how either
@@ -17,19 +17,27 @@
 // without launching an editor. Everything here deals in cells; divide_manuscript.ts
 // turns the parts into files.
 
+import { standsOutsideTheStory } from "../storydoc/story_sections";
 import {
-    isFrontOrBackMatter,
-    standsOutsideTheStory,
-} from "../storydoc/story_sections";
-import {
+    ABOUT,
     type Cell,
     ChapterCell,
+    DISCLAIMER,
     DividerCell,
     EXTENSION,
     ImageCell,
     PartCell,
+    TABLE_OF_CONTENTS,
+    TITLE_PAGE,
     TitlePageCell,
 } from "../storydoc/storydoc";
+
+const KINDS_EVERY_PART_CARRIES = new Set([
+    TITLE_PAGE,
+    TABLE_OF_CONTENTS,
+    DISCLAIMER,
+    ABOUT,
+]);
 
 /** The cells of the story that travel together, as one part. */
 export interface Part {
@@ -45,22 +53,22 @@ export interface Part {
  * Split at the story rather than listed by kind, so a disclaimer the author put
  * after the last chapter is still after the last chapter in every part.
  */
-export interface Furniture {
+export interface PartBoilerplate {
     front: Cell[];
     back: Cell[];
 }
 
 /** What stands before the story and what stands after it. */
-export function furnitureOf(cells: readonly Cell[]): Furniture {
+export function partBoilerplateOf(cells: readonly Cell[]): PartBoilerplate {
     const opens = cells.findIndex((cell) => cell instanceof ChapterCell);
-    // A story with no chapters has nothing for furniture to stand behind.
+    // A story with no chapters has nothing for part boilerplate to stand behind.
     const story = opens < 0 ? cells.length : opens;
     const opening = picturesTheStoryOpensWith(cells);
     const front: Cell[] = [];
     const back: Cell[] = [];
 
     cells.forEach((cell, at) => {
-        if (at < opening || isFrontOrBackMatter(cell.kind)) {
+        if (at < opening || KINDS_EVERY_PART_CARRIES.has(cell.kind)) {
             (at < story ? front : back).push(cell);
         }
     });
@@ -87,7 +95,7 @@ function picturesTheStoryOpensWith(cells: readonly Cell[]): number {
  * A story with no Dividers at all is asking to be divided nowhere, so it divides
  * into nothing rather than into one file holding all of it.
  *
- * The book's furniture is not the story and belongs to every part rather than to
+ * The book's part boilerplate is not the story and belongs to every part rather than to
  * one; what the author keeps beside the story and publishes nowhere belongs to
  * neither. An aside is the exception: it was written about the passage it stands
  * beside, so it goes wherever that passage goes.
@@ -124,15 +132,17 @@ export function intoParts(cells: readonly Cell[]): Part[] {
     return parts;
 }
 
-/** A part as a document of its own: the furniture, then its share of the story. */
+/** A part as a document of its own: the part boilerplate, then its share of the story. */
 export function partCells(
-    furniture: Furniture,
+    partBoilerplate: PartBoilerplate,
     number: number,
     part: Part,
 ): Cell[] {
-    return [...furniture.front, ...part.cells, ...furniture.back].map((cell) =>
-        carried(cell, number, part.under),
-    );
+    return [
+        ...partBoilerplate.front,
+        ...part.cells,
+        ...partBoilerplate.back,
+    ].map((cell) => carried(cell, number, part.under));
 }
 
 /**
