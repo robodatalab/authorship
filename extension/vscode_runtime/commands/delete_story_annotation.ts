@@ -1,7 +1,12 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import { PLOT, SALIENT_CONCEPT } from "../storydoc/storydoc";
+import {
+    PLOT,
+    PlotCell,
+    SALIENT_CONCEPT,
+    SalientConceptCell,
+} from "../storydoc/storydoc";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 const DELETE = "Delete";
@@ -23,11 +28,14 @@ export class DeleteStoryAnnotationCommand implements AuthorDocumentCommand {
     ): Promise<void> {
         const annotationCellId = commandArguments.annotationCellId as string;
         const annotation = session.document.cellWithId(annotationCellId);
-        if (!annotation) {
+        if (
+            !(annotation instanceof SalientConceptCell) &&
+            !(annotation instanceof PlotCell)
+        ) {
             return;
         }
         const answer = await vscode.window.showWarningMessage(
-            `Delete the ${annotation.kind} “${annotation.attrs.title ?? ""}”?`,
+            `Delete the ${annotation.kind} “${annotation.title}”?`,
             {
                 modal: true,
                 detail: WHAT_GOES_WITH_THE_ANNOTATION[annotation.kind],

@@ -3,9 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { RECAP } from "../storydoc/storydoc";
-
-const DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES = "documents";
+import { RECAP, RecapCell } from "../storydoc/storydoc";
 
 interface WrittenSection extends ServerJob {
     text: string;
@@ -31,12 +29,10 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
         const cell = session.document.cellWithId(cellId);
-        if (!cell) {
+        if (!(cell instanceof RecapCell)) {
             return;
         }
-        const documents = (
-            cell.attrs[DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES] ?? ""
-        )
+        const documents = cell.documents
             .split(",")
             .map((named) => named.trim())
             .filter(Boolean);

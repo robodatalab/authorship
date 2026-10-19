@@ -11,11 +11,7 @@ import type {
 } from "./message_queue_between_vscode_and_webview";
 import { AuthorDocSynchronizer } from "./storydoc/author_doc_synch";
 import { AuthorDocDiff } from "./storydoc/diff";
-import {
-    ImmutableAuthorDocument,
-    MutableAuthorDocument,
-    type ImmutableCell,
-} from "./storydoc/model";
+import { Document, type Cell } from "./storydoc/storydoc";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,
@@ -26,7 +22,7 @@ import {
     type StoryTextSpan,
     type StoryWordRange,
 } from "./storydoc/story_words";
-import { WordCounter } from "./storydoc/word_counter";
+import { WordCounter } from "../webview/author_editor/word_counter";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
@@ -39,7 +35,7 @@ export class AuthorFileEditorSession
     private readonly proseErrorsSynchronizer: AuthorDocSynchronizer<ProseCheckError>;
     private readonly findMatchesInTheProseSynchronizer: AuthorDocSynchronizer<AuthorFileEditorFindMatchInTheProse>;
     private readonly wordCounter = new WordCounter();
-    private documentAsTheLastSynchronizationLeftIt: ImmutableAuthorDocument;
+    private documentAsTheLastSynchronizationLeftIt: Document;
 
     private panel: vscode.WebviewPanel | undefined;
 
@@ -64,7 +60,8 @@ export class AuthorFileEditorSession
         this.documentOrSelectionChanged.event;
 
     constructor(
-        private documentAsItStands: ImmutableAuthorDocument,
+        readonly uri: vscode.Uri,
+        private documentAsItStands: Document,
         private readonly edited: vscode.EventEmitter<
             vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
         >,
@@ -79,10 +76,6 @@ export class AuthorFileEditorSession
         this.wordCounter.synchronize(this.documentAsItStands);
     }
 
-    get uri(): vscode.Uri {
-        return this.documentAsItStands.uri;
-    }
-
     dispose(): void {}
 
     showOn(panel: vscode.WebviewPanel): void {
@@ -93,7 +86,7 @@ export class AuthorFileEditorSession
         await message.invoke(this);
     }
 
-    get document(): ImmutableAuthorDocument {
+    get document(): Document {
         return this.documentAsItStands;
     }
 
@@ -152,9 +145,16 @@ export class AuthorFileEditorSession
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
         this.whatThePageJustTyped = { cellId, markdown };
-        const documentChange = this.theChangeThisWouldMake((story) =>
-            story.cellWithId(cellId)?.replaceMarkdown(markdown),
-        );
+        const documentChange = this.theChangeThisWouldMake((story) => {
+            const cellIndex = story.cells.findIndex(
+                (cell) => cell.uniqueId === cellId,
+            );
+            if (cellIndex === -1) {
+                return;
+            }
+            const cell = story.cells[cellIndex];
+            story.cells[cellIndex] = cell.withSource(markdown);
+        });
         if (documentChange.empty()) {
             return;
         }
@@ -187,26 +187,26 @@ export class AuthorFileEditorSession
             ? this.documentAsItStands.cellWithId(beingEdited)?.source
             : undefined;
         const asItStoodBefore = this.documentAsItStands;
-        const documentAsTheFileHasIt = new MutableAuthorDocument(
-            this.uri,
-            savedText,
+        const documentAsTheFileHasIt = new Document(savedText, this.uri.fsPath);
+        const cellIndex = documentAsTheFileHasIt.cells.findIndex(
+            (cell) => cell.uniqueId === beingEdited,
         );
-        if (beingEdited && asTheAuthorHasIt !== undefined) {
-            documentAsTheFileHasIt
-                .cellWithId(beingEdited)
-                ?.replaceMarkdown(asTheAuthorHasIt);
+        if (beingEdited && asTheAuthorHasIt !== undefined && cellIndex !== -1) {
+            const cell = documentAsTheFileHasIt.cells[cellIndex];
+            documentAsTheFileHasIt.cells[cellIndex] =
+                cell.withSource(asTheAuthorHasIt);
         }
-        this.documentAsItStands = documentAsTheFileHasIt.toImmutable();
+        this.documentAsItStands = documentAsTheFileHasIt;
         this.sendWhatChanged(asItStoodBefore);
     }
 
     importDocumentFromText(text: string): void {
         const asItStoodBefore = this.documentAsItStands;
-        this.documentAsItStands = new ImmutableAuthorDocument(this.uri, text);
+        this.documentAsItStands = new Document(text, this.uri.fsPath);
         this.sendWhatChanged(asItStoodBefore);
     }
 
-    changeTheDocument(change: (document: MutableAuthorDocument) => void): void {
+    changeTheDocument(change: (document: Document) => void): void {
         const documentChange = this.theChangeThisWouldMake(change);
         if (documentChange.empty()) {
             return;
@@ -216,11 +216,11 @@ export class AuthorFileEditorSession
     }
 
     private theChangeThisWouldMake(
-        change: (document: MutableAuthorDocument) => void,
+        change: (document: Document) => void,
     ): AuthorDocDiff {
-        const documentBeingChanged = new MutableAuthorDocument(
-            this.uri,
+        const documentBeingChanged = new Document(
             this.documentAsItStands.text,
+            this.uri.fsPath,
         );
         change(documentBeingChanged);
         synchronizeTheStoryWordRanges(
@@ -229,7 +229,7 @@ export class AuthorFileEditorSession
         );
         return AuthorDocDiff.diff(
             this.documentAsItStands,
-            documentBeingChanged.toImmutable(),
+            documentBeingChanged,
         );
     }
 
@@ -361,7 +361,7 @@ export class AuthorFileEditorSession
         this.documentOrSelectionChanged.fire();
     }
 
-    private sendWhatChanged(asItStoodBefore: ImmutableAuthorDocument): void {
+    private sendWhatChanged(asItStoodBefore: Document): void {
         const thePageDrewItAlready = this.whatThePageJustTyped;
         this.whatThePageJustTyped = null;
         const theSameCellsInTheSameOrder =
@@ -387,7 +387,7 @@ export class AuthorFileEditorSession
                 );
             },
         );
-        const thePageTypedIt = (cell: ImmutableCell): boolean =>
+        const thePageTypedIt = (cell: Cell): boolean =>
             thePageDrewItAlready?.cellId === cell.uniqueId &&
             thePageDrewItAlready.markdown === cell.source;
         const cellsTheHostWrote = changed
@@ -417,13 +417,13 @@ class TypingBurst {
 
     constructor(
         private readonly cellId: string,
-        private readonly documentWhenItBegan: ImmutableAuthorDocument,
-        private documentAsItLastStood: ImmutableAuthorDocument,
+        private readonly documentWhenItBegan: Document,
+        private documentAsItLastStood: Document,
         private readonly everythingTyped: { theChange: AuthorDocDiff },
     ) {}
 
     carriesOn(
-        documentAsItStands: ImmutableAuthorDocument,
+        documentAsItStands: Document,
         documentChange: AuthorDocDiff,
     ): boolean {
         const cellChanged = documentChange.cells[0];
@@ -437,7 +437,7 @@ class TypingBurst {
         );
     }
 
-    nowReaches(documentAsItStands: ImmutableAuthorDocument): void {
+    nowReaches(documentAsItStands: Document): void {
         this.everythingTyped.theChange = AuthorDocDiff.diff(
             this.documentWhenItBegan,
             documentAsItStands,
@@ -447,7 +447,7 @@ class TypingBurst {
     }
 }
 
-function asThePageDrawsIt(cell: ImmutableCell): {
+function asThePageDrawsIt(cell: Cell): {
     kind: string;
     source: string;
     attrs: Readonly<Record<string, string>>;
@@ -462,8 +462,6 @@ export function openAuthorFileEditorSession(
         vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
     >,
 ): AuthorFileEditorSession {
-    return new AuthorFileEditorSession(
-        new ImmutableAuthorDocument(uri, text),
-        edited,
-    );
+    const document = new Document(text, uri.fsPath);
+    return new AuthorFileEditorSession(uri, document, edited);
 }

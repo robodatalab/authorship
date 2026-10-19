@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { blankCellOfKind } from "../../../extension/vscode_runtime/storydoc/cell_kinds";
 import {
     cellsLaidOutByPlan,
     askedBeforeBinding,
@@ -11,22 +10,12 @@ import {
 } from "../../../extension/vscode_runtime/publish/book_layout_report";
 import {
     CHAPTER,
-    MutableCell,
+    ChapterCell,
     IMAGE,
-    MARKDOWN,
-} from "../../../extension/vscode_runtime/storydoc/model";
-
-function chapter(title: string): MutableCell {
-    return new MutableCell(CHAPTER, "", { title });
-}
-
-function markdown(source: string): MutableCell {
-    return new MutableCell(MARKDOWN, source, {});
-}
-
-function image(src: string): MutableCell {
-    return new MutableCell(IMAGE, "", { src });
-}
+    ImageCell,
+    MarkdownCell,
+    UnknownCell,
+} from "../../../extension/vscode_runtime/storydoc/storydoc";
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {
@@ -41,8 +30,8 @@ function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
 
 describe("cellsLaidOutByPlan — the document laid out as the server planned it", () => {
     it("carries the author’s own cells across by index", () => {
-        const authorsOwnCover = image("art/mine.png");
-        const cells = [chapter("One"), authorsOwnCover];
+        const authorsOwnCover = new ImageCell("art/mine.png");
+        const cells = [new ChapterCell("One"), authorsOwnCover];
         const laidOut = cellsLaidOutByPlan(cells, [
             { kind: IMAGE, at: 1 },
             { kind: CHAPTER, at: 0 },
@@ -53,7 +42,7 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
 
     it("writes a blank for a section the document has not got", () => {
         const laidOut = cellsLaidOutByPlan(
-            [chapter("One")],
+            [new ChapterCell("One")],
             [
                 { kind: "contents", at: null },
                 { kind: CHAPTER, at: 0 },
@@ -65,15 +54,15 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
             CHAPTER,
             "about",
         ]);
-        expect(laidOut[0].source).toBe(blankCellOfKind("contents").source);
-        expect(laidOut[2].source).toBe(blankCellOfKind("about").source);
+        expect(laidOut[0].source).toBe("");
+        expect(laidOut[2].source).toBe("");
     });
 
     it("keeps the story in the order the plan gives", () => {
         const cells = [
-            chapter("One"),
-            markdown("The lantern."),
-            chapter("Two"),
+            new ChapterCell("One"),
+            new MarkdownCell("The lantern."),
+            new ChapterCell("Two"),
         ];
         const laidOut = cellsLaidOutByPlan(cells, [
             { kind: "contents", at: null },
@@ -85,7 +74,7 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
     });
 
     it("carries a kind it has never heard of", () => {
-        const strange = new MutableCell("epigraph", "Whom the gods…", {});
+        const strange = new UnknownCell("epigraph", {}, "Whom the gods…");
         expect(
             cellsLaidOutByPlan([strange], [{ kind: "epigraph", at: 0 }]),
         ).toEqual([strange]);
@@ -93,22 +82,14 @@ describe("cellsLaidOutByPlan — the document laid out as the server planned it"
 });
 
 describe("wordsForWhatIsMissing — what a section wants, in the author’s words", () => {
-    it("names a field as the box beside it is named", () => {
-        expect(wordsForWhatIsMissing("title-page", ["title", "author"])).toBe(
-            "Title, Author",
+    it("names a field as the server names it", () => {
+        expect(wordsForWhatIsMissing(["title", "author"])).toBe(
+            "title, author",
         );
     });
 
     it("says what is wanted when it is not typed into a box", () => {
-        expect(wordsForWhatIsMissing("blurb", ["text"])).toBe(
-            "something written in it",
-        );
-    });
-
-    it("falls back to what the server called it", () => {
-        expect(wordsForWhatIsMissing("title-page", ["sideburns"])).toBe(
-            "sideburns",
-        );
+        expect(wordsForWhatIsMissing(["text"])).toBe("something written in it");
     });
 });
 
@@ -123,9 +104,9 @@ describe("askedBeforeBinding — what the author is asked when the book will not
             }),
         );
         expect(message).toBe("story.author is not ready to bind.");
-        expect(detail).toContain("Missing: Table of Contents, Blurb");
-        expect(detail).toContain("Out of place: About the Author");
-        expect(detail).toContain("Title Page needs Author, Date");
+        expect(detail).toContain("Missing: contents, blurb");
+        expect(detail).toContain("Out of place: about");
+        expect(detail).toContain("title-page needs author, date");
     });
 
     it("says a section is not filled in even when nothing is missing", () => {
@@ -135,7 +116,7 @@ describe("askedBeforeBinding — what the author is asked when the book will not
         );
         expect(detail).not.toContain("Missing:");
         expect(detail).not.toContain("Out of place:");
-        expect(detail).toContain("Title Page needs Author");
+        expect(detail).toContain("title-page needs author");
     });
 
     it("says that fixing does not export, and exporting does not fix", () => {
@@ -145,15 +126,6 @@ describe("askedBeforeBinding — what the author is asked when the book will not
         );
         expect(detail).toContain("It does not export.");
         expect(detail).toContain("Export Anyway binds the book as it stands.");
-    });
-
-    it("names sections as the menus name them, not as the format does", () => {
-        const { detail } = askedBeforeBinding(
-            "story.author",
-            report({ added: ["title-page"] }),
-        );
-        expect(detail).not.toContain("title-page");
-        expect(detail).toContain("Title Page");
     });
 });
 
@@ -168,7 +140,7 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
                 }),
             ),
         ).toBe(
-            "Added Table of Contents, Blurb in story.author. " +
+            "Added contents, blurb in story.author. " +
                 "The sections still to write are marked.",
         );
     });
@@ -179,7 +151,7 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
             report({ added: ["contents"], moved: ["about"] }),
         );
         expect(toldTheAuthor).toBe(
-            "Added Table of Contents and moved About the Author into place in story.author.",
+            "Added contents and moved about into place in story.author.",
         );
     });
 

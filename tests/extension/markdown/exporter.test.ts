@@ -17,13 +17,8 @@ function markdownOf(text: string): string {
     return toMarkdown(cellsOf(text));
 }
 
-function shapeOf(
-    authorText: string,
-): { kind: string; source: string; attrs: Record<string, string> }[] {
-    return cellsOf(authorText).map((cell) => {
-        const { id: _id, ...attrs } = cell.attrs;
-        return { kind: cell.kind, source: cell.source, attrs };
-    });
+function withoutIds(authorText: string): string {
+    return authorText.replace(/ id="[^"]*"/g, "");
 }
 
 describe("what a document exports as", () => {
@@ -112,39 +107,35 @@ describe("what a document exports as", () => {
 
 describe("what a markdown manuscript imports as", () => {
     it("reads a first-level heading as the title page", () => {
-        expect(shapeOf(fromMarkdown("# Veriona\n"))).toEqual([
-            { kind: "title-page", source: "", attrs: { title: "Veriona" } },
-        ]);
+        expect(withoutIds(fromMarkdown("# Veriona\n"))).toBe(
+            '<!-- cell: title-page title="Veriona" -->\n',
+        );
     });
 
     it("reads the three levels as title page, part and chapter", () => {
         expect(
-            shapeOf(
-                fromMarkdown("# Veriona\n\n## Book One\n\n### Night\n"),
-            ).map((cell) => cell.kind),
-        ).toEqual(["title-page", "part", "chapter"]);
+            withoutIds(fromMarkdown("# Veriona\n\n## Book One\n\n### Night\n")),
+        ).toBe(
+            '<!-- cell: title-page title="Veriona" -->\n\n<!-- cell: part title="Book One" -->\n\n<!-- cell: chapter title="Night" -->\n',
+        );
     });
 
     it("reads the prose under a heading as a markdown cell of its own", () => {
-        expect(shapeOf(fromMarkdown("### Night\n\nIt began badly.\n"))).toEqual(
-            [
-                { kind: "chapter", source: "", attrs: { title: "Night" } },
-                { kind: "markdown", source: "It began badly.", attrs: {} },
-            ],
+        expect(withoutIds(fromMarkdown("### Night\n\nIt began badly.\n"))).toBe(
+            '<!-- cell: chapter title="Night" -->\n\n<!-- cell: markdown -->\n\nIt began badly.\n',
         );
     });
 
     it("reads prose written before any heading", () => {
-        expect(shapeOf(fromMarkdown("Loose.\n\n### Night\n"))).toEqual([
-            { kind: "markdown", source: "Loose.", attrs: {} },
-            { kind: "chapter", source: "", attrs: { title: "Night" } },
-        ]);
+        expect(withoutIds(fromMarkdown("Loose.\n\n### Night\n"))).toBe(
+            '<!-- cell: markdown -->\n\nLoose.\n\n<!-- cell: chapter title="Night" -->\n',
+        );
     });
 
     it("reads a deeper heading as prose, since the story has three levels", () => {
-        expect(shapeOf(fromMarkdown("#### Deeper\n"))).toEqual([
-            { kind: "markdown", source: "#### Deeper", attrs: {} },
-        ]);
+        expect(withoutIds(fromMarkdown("#### Deeper\n"))).toBe(
+            "<!-- cell: markdown -->\n\n#### Deeper\n",
+        );
     });
 
     it("reads nothing out of an empty manuscript", () => {
@@ -159,10 +150,6 @@ describe("a manuscript that goes out and comes back", () => {
 
         const cameBack = fromMarkdown(markdownOf(authorText));
 
-        expect(shapeOf(cameBack)).toEqual([
-            { kind: "part", source: "", attrs: { title: "Book One" } },
-            { kind: "chapter", source: "", attrs: { title: "Night" } },
-            { kind: "markdown", source: "It began badly.", attrs: {} },
-        ]);
+        expect(withoutIds(cameBack)).toBe(authorText);
     });
 });

@@ -1,8 +1,8 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import {
-    CHAPTER,
-    PART,
+    ChapterCell,
+    PartCell,
     TABLE_OF_CONTENTS,
     type Cell,
     type Document,
@@ -24,17 +24,18 @@ function linesOfTheContents(
     indent: string,
 ): string[] {
     return sections.flatMap((section) => {
-        const listed = `${indent}1. ${section.cell.attrs.title || UNTITLED}`;
-        if (section.cell.kind === CHAPTER) {
-            return [listed];
+        if (section.cell instanceof ChapterCell) {
+            return [`${indent}1. ${section.cell.title || UNTITLED}`];
         }
-        if (section.cell.kind !== PART) {
+        if (!(section.cell instanceof PartCell)) {
             return [];
         }
-        return [
-            listed,
-            ...linesOfTheContents(section.within, `${indent}${UNDER_THE_PART}`),
-        ];
+        const listed = `${indent}1. ${section.cell.title || UNTITLED}`;
+        const listedWithin = linesOfTheContents(
+            section.within,
+            `${indent}${UNDER_THE_PART}`,
+        );
+        return [listed, ...listedWithin];
     });
 }
 

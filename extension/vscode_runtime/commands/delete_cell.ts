@@ -1,7 +1,12 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { Cell, Document } from "../storydoc/storydoc";
+import {
+    ChapterCell,
+    PartCell,
+    type Cell,
+    type Document,
+} from "../storydoc/storydoc";
 import {
     cellsBySection,
     cellsWithinASection,
@@ -18,8 +23,12 @@ async function theAuthorWantsTheWholeSectionGone(
     section: CellsInASection<Cell>,
 ): Promise<boolean | undefined> {
     const held = cellsWithinASection(section).length - 1;
+    const title =
+        section.cell instanceof PartCell || section.cell instanceof ChapterCell
+            ? section.cell.title
+            : "";
     const answer = await vscode.window.showWarningMessage(
-        `Delete “${section.cell.title}” and the ${held} ${held === 1 ? "section" : "sections"} under it?`,
+        `Delete “${title}” and the ${held} ${held === 1 ? "section" : "sections"} under it?`,
         {
             modal: true,
             detail: "Delete it alone and they stay where they are.",
