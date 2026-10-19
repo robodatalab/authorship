@@ -5,8 +5,10 @@ import type { Cell } from "../storydoc/cells/cell";
 import { ChapterCell } from "../storydoc/cells/chapter_cell";
 import { PartCell } from "../storydoc/cells/part_cell";
 import { TABLE_OF_CONTENTS } from "../storydoc/cells/table_of_contents_cell";
-import { cellsBySection } from "../storydoc/story_sections";
-import type { CellsInASection } from "../storydoc/cells_in_a_section";
+import {
+    cellsBySection,
+    type CellsInASection,
+} from "../storydoc/story_sections";
 
 const UNTITLED = "Untitled";
 const UNDER_THE_PART = "    ";

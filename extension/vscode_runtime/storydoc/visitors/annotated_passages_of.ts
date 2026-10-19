@@ -11,10 +11,17 @@ import type { PartCell } from "../cells/part_cell";
 import type { PlotCell } from "../cells/plot_cell";
 import type { RecapCell } from "../cells/recap_cell";
 import type { SalientConceptCell } from "../cells/salient_concept_cell";
+import type { StoryWordRange } from "../cells/story_word_range";
 import type { TableOfContentsCell } from "../cells/table_of_contents_cell";
 import type { TitlePageCell } from "../cells/title_page_cell";
 import type { UnknownCell } from "../cells/unknown_cell";
-import { AnnotatedPassages } from "./annotated_passages";
+
+export class AnnotatedPassages {
+    constructor(
+        readonly title: string,
+        readonly storyWordRanges: readonly StoryWordRange[],
+    ) {}
+}
 
 export class AnnotatedPassagesOf implements CellVisitor<AnnotatedPassages | null> {
     visitSalientConcept(cell: SalientConceptCell): AnnotatedPassages {

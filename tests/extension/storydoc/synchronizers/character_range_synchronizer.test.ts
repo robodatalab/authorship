@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CharacterRangeSynchronizer } from "../../../../extension/vscode_runtime/storydoc/synchronizers/character_range_synchronizer";
-import type { SynchronizedRepresentation } from "../../../../extension/vscode_runtime/storydoc/synchronizers/synchronized_representation";
+import {
+    CharacterRangeSynchronizer,
+    type SynchronizedRepresentation,
+} from "../../../../extension/vscode_runtime/storydoc/synchronizers/character_range_synchronizer";
 import { AuthorDocDiff } from "../../../../extension/vscode_runtime/storydoc/diff";
 import { Document } from "../../../../extension/vscode_runtime/storydoc/storydoc";
 

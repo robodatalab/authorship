@@ -1,7 +1,4 @@
 import { type Document } from "./storydoc";
-import type { CellOfADocument } from "./cell_of_a_document";
-import type { CellsInASection } from "./cells_in_a_section";
-import type { WhereACellStands } from "./where_a_cell_stands";
 import { ABOUT } from "./cells/about_cell";
 import { BLURB } from "./cells/blurb_cell";
 import type { Cell } from "./cells/cell";
@@ -13,6 +10,22 @@ import { RECAP } from "./cells/recap_cell";
 import { SALIENT_CONCEPT } from "./cells/salient_concept_cell";
 import { TABLE_OF_CONTENTS } from "./cells/table_of_contents_cell";
 import { TITLE_PAGE } from "./cells/title_page_cell";
+
+export interface CellOfADocument {
+    readonly kind: string;
+    readonly uniqueId: string;
+}
+
+export interface CellsInASection<CellInTheDocument extends CellOfADocument> {
+    cell: CellInTheDocument;
+    within: CellsInASection<CellInTheDocument>[];
+}
+
+export interface WhereACellStands<CellInTheDocument extends CellOfADocument> {
+    section: CellsInASection<CellInTheDocument>;
+    among: CellsInASection<CellInTheDocument>[];
+    under: CellsInASection<CellInTheDocument>[];
+}
 
 const KINDS_THAT_STAND_OUTSIDE_THE_STORY = new Set([
     TITLE_PAGE,

@@ -1,7 +1,13 @@
-import { TextWord } from "./text_word";
-
 const RUN_OF_NON_SPACES = /\S+/g;
 const WORD_CHARACTER = /\w/;
+
+export class TextWord {
+    constructor(
+        readonly text: string,
+        readonly startCharacterOffset: number,
+        readonly endCharacterOffset: number,
+    ) {}
+}
 
 export class TextWordsIterator implements Iterable<TextWord> {
     constructor(private readonly text: string) {}

@@ -18,9 +18,7 @@ import {
     SALIENT_CONCEPT,
     SalientConceptCell,
 } from "./cells/salient_concept_cell";
-import { PLOT, PlotCell } from "./cells/plot_cell";
-import { PlotEdge } from "./cells/plot_edge";
-import { PlotNode } from "./cells/plot_node";
+import { PLOT, PlotCell, PlotEdge, PlotNode } from "./cells/plot_cell";
 import { StoryWordRange } from "./cells/story_word_range";
 import { UnknownCell } from "./cells/unknown_cell";
 import {

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from server.storydoc.cells_in_a_section import CellsInASection
+from dataclasses import dataclass, field
+
 from server.storydoc.storydoc import Document
-from server.storydoc.where_a_cell_stands import WhereACellStands
 from server.storydoc.cells.about_cell import ABOUT
 from server.storydoc.cells.blurb_cell import BLURB
 from server.storydoc.cells.cell import Cell
@@ -14,6 +14,20 @@ from server.storydoc.cells.recap_cell import RECAP
 from server.storydoc.cells.salient_concept_cell import SALIENT_CONCEPT
 from server.storydoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS
 from server.storydoc.cells.title_page_cell import TITLE_PAGE
+
+
+@dataclass(eq=False)
+class CellsInASection:
+    cell: Cell
+    within: list[CellsInASection] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class WhereACellStands:
+    section: CellsInASection
+    among: list[CellsInASection]
+    under: tuple[CellsInASection, ...]
+
 
 _KINDS_THAT_STAND_OUTSIDE_THE_STORY = frozenset(
     {

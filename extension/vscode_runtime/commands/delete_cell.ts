@@ -10,8 +10,8 @@ import {
     cellsWithinASection,
     removeTheSection,
     whereACellStands,
+    type CellsInASection,
 } from "../storydoc/story_sections";
-import type { CellsInASection } from "../storydoc/cells_in_a_section";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 const EVERYTHING_UNDER_IT = "Delete All";

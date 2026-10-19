@@ -1,7 +1,14 @@
 import type { AuthorDocDiff } from "../diff";
 import type { Document } from "../storydoc";
 import type { AuthorDocSynchronizer } from "../author_doc_synchronizer";
-import type { SynchronizedRepresentation } from "./synchronized_representation";
+
+export interface SynchronizedRepresentation {
+    cellId: string;
+    startCharacterOffsetInCell: number;
+    endCharacterOffsetInCell: number;
+    wordsInTheCell: string;
+    isVisible: boolean;
+}
 
 function rangeOverlaps(
     startOfTheFirst: number,

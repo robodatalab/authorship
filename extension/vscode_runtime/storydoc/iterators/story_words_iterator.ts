@@ -1,9 +1,25 @@
 import { StoryWordRange } from "../cells/story_word_range";
 import type { Document } from "../storydoc";
 import { ProseCellsIterator } from "./prose_cells_iterator";
-import { StoryTextSpan } from "./story_text_span";
-import { StoryWord } from "./story_word";
 import { TextWordsIterator } from "./text_words_iterator";
+
+export class StoryWord {
+    constructor(
+        readonly number: number,
+        readonly cellId: string,
+        readonly text: string,
+        readonly startCharacterOffsetInCell: number,
+        readonly endCharacterOffsetInCell: number,
+    ) {}
+}
+
+export class StoryTextSpan {
+    constructor(
+        readonly cellId: string,
+        readonly startCharacterOffsetInCell: number,
+        readonly endCharacterOffsetInCell: number,
+    ) {}
+}
 
 export class StoryWordsIterator implements Iterable<StoryWord> {
     constructor(private readonly document: Document) {}

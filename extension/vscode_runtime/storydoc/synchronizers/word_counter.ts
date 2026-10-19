@@ -7,8 +7,8 @@ import {
     cellsBySection,
     cellsWithinASection,
     opensASection,
+    type CellsInASection,
 } from "../story_sections";
-import type { CellsInASection } from "../cells_in_a_section";
 
 function numberOfWords(markdown: string): number {
     return markdown.split(/\s+/).filter((word) => /\w/.test(word)).length;

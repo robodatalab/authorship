@@ -11,7 +11,7 @@
 // rename them twice.
 
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { SynchronizedRepresentation } from "../storydoc/synchronizers/synchronized_representation";
+import type { SynchronizedRepresentation } from "../storydoc/synchronizers/character_range_synchronizer";
 import { fieldsOfCellKind } from "../storydoc/cell_kinds";
 import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";

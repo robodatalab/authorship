@@ -13,9 +13,7 @@ from server.storydoc.cells.image_cell import IMAGE, ImageCell
 from server.storydoc.cells.markdown_cell import MARKDOWN, MarkdownCell
 from server.storydoc.cells.note_cell import NOTE, NoteCell
 from server.storydoc.cells.part_cell import PART, PartCell
-from server.storydoc.cells.plot_cell import PLOT, PlotCell
-from server.storydoc.cells.plot_edge import PlotEdge
-from server.storydoc.cells.plot_node import PlotNode
+from server.storydoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
 from server.storydoc.cells.recap_cell import RECAP, RecapCell
 from server.storydoc.cells.salient_concept_cell import (
     SALIENT_CONCEPT,

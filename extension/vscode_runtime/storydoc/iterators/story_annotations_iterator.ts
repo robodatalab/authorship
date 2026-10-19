@@ -1,8 +1,27 @@
+import { StoryWordRange } from "../cells/story_word_range";
 import type { Document } from "../storydoc";
 import { AnnotatedPassagesOf } from "../visitors/annotated_passages_of";
-import { StoryAnnotationInTheStory } from "./story_annotation_in_the_story";
-import { StoryWordRangeInTheStory } from "./story_word_range_in_the_story";
 import { StoryWordsIterator } from "./story_words_iterator";
+
+export class StoryWordRangeInTheStory extends StoryWordRange {
+    constructor(
+        firstWord: number,
+        lastWord: number,
+        readonly cellId: string,
+        readonly wordsItCovers: string,
+    ) {
+        super(firstWord, lastWord);
+    }
+}
+
+export class StoryAnnotationInTheStory {
+    constructor(
+        readonly annotationCellId: string,
+        readonly title: string,
+        readonly description: string,
+        readonly passages: readonly StoryWordRangeInTheStory[],
+    ) {}
+}
 
 export class StoryAnnotationsIterator implements Iterable<StoryAnnotationInTheStory> {
     constructor(

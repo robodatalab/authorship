@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import type { SynchronizedRepresentation } from "../storydoc/synchronizers/synchronized_representation";
+import type { SynchronizedRepresentation } from "../storydoc/synchronizers/character_range_synchronizer";
 
 export interface ProseCheckError extends SynchronizedRepresentation {
     ruleThatFoundTheError: string;

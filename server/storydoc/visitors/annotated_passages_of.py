@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from server.storydoc.cells.about_cell import AboutCell
 from server.storydoc.cells.blurb_cell import BlurbCell
 from server.storydoc.cells.cell_visitor import CellVisitor
@@ -13,10 +15,16 @@ from server.storydoc.cells.part_cell import PartCell
 from server.storydoc.cells.plot_cell import PlotCell
 from server.storydoc.cells.recap_cell import RecapCell
 from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.story_word_range import StoryWordRange
 from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
 from server.storydoc.cells.title_page_cell import TitlePageCell
 from server.storydoc.cells.unknown_cell import UnknownCell
-from server.storydoc.visitors.annotated_passages import AnnotatedPassages
+
+
+@dataclass(frozen=True)
+class AnnotatedPassages:
+    title: str
+    story_word_ranges: list[StoryWordRange]
 
 
 class AnnotatedPassagesOf(CellVisitor["AnnotatedPassages | None"]):
