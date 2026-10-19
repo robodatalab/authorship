@@ -15,7 +15,7 @@ import {
     partFileName,
     partNumber,
 } from "./manuscript_parts";
-import { dumps } from "../storydoc/storydoc";
+import { Document } from "../storydoc/storydoc";
 import type { Cell } from "../storydoc/cells/cell";
 
 /** What a division came to. */
@@ -57,7 +57,8 @@ export async function divideManuscript(
         const partFileNameOnDisk = partFileName(number);
         const partFile = vscode.Uri.joinPath(partsFolder, partFileNameOnDisk);
         const cellsOfThePart = partCells(partBoilerplate, number, part);
-        const textOfThePart = dumps(cellsOfThePart);
+        const documentOfThePart = Document.fromCells(cellsOfThePart);
+        const textOfThePart = documentOfThePart.text;
         const bytesOfThePart = new TextEncoder().encode(textOfThePart);
         await vscode.workspace.fs.writeFile(partFile, bytesOfThePart);
     }

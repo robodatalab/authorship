@@ -9,7 +9,7 @@ from typing import Any
 
 from cortexgrid_infer import CompletingModel
 
-from server.storydoc import Document
+from server.storydoc.storydoc import Document
 
 
 SUMMARY_TOKENS = 300

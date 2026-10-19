@@ -10,7 +10,7 @@ from typing import Any
 from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
-from server.storydoc import Document
+from server.storydoc.storydoc import Document
 from server.writing_tools import grammar_check, prose_check
 
 

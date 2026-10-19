@@ -14,11 +14,11 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 from parameterized import parameterized  # type: ignore
 
-from server import storydoc
-from server.storydoc import Document
-from server.cells.chapter_cell import ChapterCell
-from server.cells.markdown_cell import MarkdownCell
-from server.cells.title_page_cell import TitlePageCell
+from server.storydoc import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.title_page_cell import TitlePageCell
 from server.writing_tools.recap import write_recap
 
 
@@ -36,7 +36,7 @@ def volume(title: str, chapters: list[tuple[str, list[str]]]) -> Document:
     for name, sections in chapters:
         cells.append(ChapterCell(name))
         cells.extend(MarkdownCell(section) for section in sections)
-    return Document(storydoc.dumps(cells))
+    return Document.from_cells(cells)
 
 
 ONE_VOLUME_ONE_CHAPTER = [

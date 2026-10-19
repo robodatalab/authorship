@@ -1,6 +1,6 @@
 """Tests for binding a story document into an EPUB.
 
-The documents are built through `storydoc.save` rather than written out by hand,
+The documents are built through `Document.save` rather than written out by hand,
 so a change to how the format is written cannot leave these testing a layout that
 no longer exists. Each one is built where a real book is built — in a directory,
 from a file — because the cover is a path the document points at.
@@ -23,33 +23,36 @@ from server.publishing.epub_exporter import (
     read_book,
     report_of,
 )
-from server import storydoc
-from server.storydoc import Document
-from server.cells.about_cell import ABOUT, AboutCell
-from server.cells.blurb_cell import BLURB, BlurbCell
-from server.cells.cell import Cell
-from server.cells.chapter_cell import CHAPTER, ChapterCell
-from server.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
-from server.cells.divider_cell import DividerCell
-from server.cells.image_cell import ImageCell
-from server.cells.markdown_cell import MarkdownCell
-from server.cells.note_cell import NoteCell
-from server.cells.part_cell import PartCell
-from server.cells.recap_cell import RecapCell
-from server.cells.salient_concept_cell import SalientConceptCell
-from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
-from server.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from server.storydoc import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.about_cell import ABOUT, AboutCell
+from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.chapter_cell import CHAPTER, ChapterCell
+from server.storydoc.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
+from server.storydoc.cells.divider_cell import DividerCell
+from server.storydoc.cells.image_cell import ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.recap_cell import RecapCell
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.table_of_contents_cell import (
+    TABLE_OF_CONTENTS,
+    TableOfContentsCell,
+)
+from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 def document(*cells: Cell) -> Document:
     """A document written the way the format writes one."""
-    return Document(storydoc.dumps(list(cells)))
+    return Document.from_cells(list(cells))
 
 
 def written(root: Path, *cells: Cell, name: str = "story") -> Path:
     """The EPUB that `cells` bind into, built from a file the way a real one is."""
     path = root / f"{name}{storydoc.EXTENSION}"
-    storydoc.save(path, list(cells))
+    Document.from_cells(list(cells), path).save()
     out_path = root / f"{name}.epub"
     build_epub(Document.load(path), out_path)
     return out_path
@@ -1033,7 +1036,7 @@ class BuildEpub(unittest.TestCase):
 def placed(root: Path, *cells: Cell, name: str = "story") -> Document:
     """A document on disk, so the cover art it points at can be looked for."""
     path = root / f"{name}{storydoc.EXTENSION}"
-    storydoc.save(path, list(cells))
+    Document.from_cells(list(cells), path).save()
     return Document.load(path)
 
 

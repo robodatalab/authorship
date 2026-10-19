@@ -2,11 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-    Document,
-    dumps,
-    parse,
-} from "../../../extension/vscode_runtime/storydoc/storydoc";
+import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
+import { parse } from "../../../extension/vscode_runtime/storydoc/parser";
 
 interface CorpusCase {
     name: string;
@@ -19,7 +16,7 @@ const CORPUS: { cases: CorpusCase[] } = JSON.parse(
     readFileSync(join(__dirname, "../../storydoc_corpus.json"), "utf-8"),
 );
 
-describe("the shared corpus — the same documents server/storydoc.py reads", () => {
+describe("the shared corpus — the same documents server/storydoc/parser.py reads", () => {
     it.each(CORPUS.cases)("reads $name", ({ text, cells }) => {
         const parsed = parse(text).map((cell) => ({
             kind: cell.kind,
@@ -33,20 +30,20 @@ describe("the shared corpus — the same documents server/storydoc.py reads", ()
     it.each(CORPUS.cases)(
         "writes back byte for byte: $name",
         ({ text, dumped }) => {
-            const cells = parse(text);
+            const document = new Document(text);
 
-            const written = dumps(cells);
+            const written = document.text;
 
             expect(written).toBe(dumped);
         },
     );
 
     it.each(CORPUS.cases)("survives a round trip: $name", ({ text }) => {
-        const cells = parse(text);
-        const written = dumps(cells);
+        const document = new Document(text);
+        const written = document.text;
 
-        const readBack = parse(written);
-        const writtenAgain = dumps(readBack);
+        const readBack = new Document(written);
+        const writtenAgain = readBack.text;
 
         expect(writtenAgain).toBe(written);
     });

@@ -4,30 +4,32 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 
-from server.cells.cell import Cell
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.story_word_range import StoryWordRange
 
 if TYPE_CHECKING:
-    from server.cells.cell_visitor import CellVisitor
+    from server.storydoc.cells.cell_visitor import CellVisitor
 
-CHAPTER = "chapter"
+SALIENT_CONCEPT = "salient-concept"
 
 _Result = TypeVar("_Result")
 
 
 @dataclass(frozen=True)
-class ChapterCell(Cell):
-    kind: str = field(default=CHAPTER, init=False)
+class SalientConceptCell(Cell):
+    kind: str = field(default=SALIENT_CONCEPT, init=False)
     title: str = ""
+    story_word_ranges: list[StoryWordRange] = field(default_factory=list)
     source: str = ""
     folded: bool = False
     at: tuple[int, int] | None = field(default=None, compare=False)
     _unique_id: str = field(default_factory=lambda: str(uuid4()))
 
-    def with_source(self, source: str) -> ChapterCell:
+    def with_source(self, source: str) -> SalientConceptCell:
         return replace(self, source=source)
 
-    def with_folded(self, folded: bool) -> ChapterCell:
+    def with_folded(self, folded: bool) -> SalientConceptCell:
         return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_chapter(self)
+        return visitor.visit_salient_concept(self)

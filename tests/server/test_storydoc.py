@@ -5,21 +5,22 @@ from pathlib import Path
 
 from parameterized import parameterized
 
-from server import storydoc
-from server.storydoc import Document
-from server.cells.blurb_cell import BlurbCell
-from server.cells.chapter_cell import ChapterCell
-from server.cells.divider_cell import DIVIDER, DividerCell
-from server.cells.image_cell import ImageCell
-from server.cells.markdown_cell import MarkdownCell
-from server.cells.note_cell import NoteCell
-from server.cells.part_cell import PartCell
-from server.cells.plot_cell import PlotCell, PlotEdge, PlotNode
-from server.cells.recap_cell import RecapCell
-from server.cells.salient_concept_cell import SalientConceptCell
-from server.cells.story_word_range import StoryWordRange
-from server.cells.table_of_contents_cell import TableOfContentsCell
-from server.cells.title_page_cell import TitlePageCell
+from server.storydoc import storydoc
+from server.storydoc.parser import parse
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.blurb_cell import BlurbCell
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.divider_cell import DIVIDER, DividerCell
+from server.storydoc.cells.image_cell import ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
+from server.storydoc.cells.recap_cell import RecapCell
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.story_word_range import StoryWordRange
+from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
+from server.storydoc.cells.title_page_cell import TitlePageCell
 
 CORPUS = json.loads(
     (Path(__file__).parents[1] / "storydoc_corpus.json").read_text(encoding="utf-8")
@@ -28,8 +29,7 @@ CORPUS = json.loads(
 
 class StoryLines(unittest.TestCase):
     def build_document(self) -> Document:
-        return Document(
-            storydoc.dumps(
+        return Document.from_cells(
                 [
                     TitlePageCell("Veriona"),
                     ChapterCell("The First Night"),
@@ -45,7 +45,6 @@ class StoryLines(unittest.TestCase):
                     MarkdownCell("The door stood open."),
                 ]
             )
-        )
 
     def test_are_the_prose_of_the_markdown_cells_and_nothing_else(self) -> None:
         said = [line for _, line in self.build_document().story_lines()]
@@ -85,7 +84,7 @@ class Corpus(unittest.TestCase):
                 expected = [(c["kind"], c["source"], c["id"]) for c in case["cells"]]
                 parsed = [
                     (cell.kind, cell.source, cell.unique_id)
-                    for cell in storydoc.parse(case["text"])
+                    for cell in parse(case["text"])
                 ]
                 self.assertEqual(parsed, expected)
 
@@ -95,62 +94,61 @@ class Corpus(unittest.TestCase):
         # corpus pins the bytes rather than the behaviour.
         for case in CORPUS["cases"]:
             with self.subTest(case=case["name"]):
-                written = storydoc.dumps(storydoc.parse(case["text"]))
+                written = Document(case["text"]).text
                 self.assertEqual(written, case["dumped"])
 
     def test_every_document_survives_a_round_trip(self) -> None:
         for case in CORPUS["cases"]:
             with self.subTest(case=case["name"]):
-                cells = storydoc.parse(case["text"])
-                self.assertEqual(storydoc.parse(storydoc.dumps(cells)), cells)
+                cells = parse(case["text"])
+                self.assertEqual(Document.from_cells(cells).cells, cells)
 
 
 class Writing(unittest.TestCase):
     def test_a_cell_is_written_as_a_marker_and_its_text(self) -> None:
-        written = storydoc.dumps([MarkdownCell("Prose.", False, None, "m1")])
+        written = Document.from_cells([MarkdownCell("Prose.", False, None, "m1")]).text
         self.assertEqual(written, '<!-- cell: markdown id="m1" -->\n\nProse.\n')
 
     def test_a_chapter_is_written_as_its_marker_alone(self) -> None:
         # A chapter names a place in the book; the prose under it is its own cell.
-        written = storydoc.dumps([ChapterCell("One", "", False, None, "c1")])
+        written = Document.from_cells([ChapterCell("One", "", False, None, "c1")]).text
         self.assertEqual(written, '<!-- cell: chapter id="c1" title="One" -->\n')
 
     def test_a_part_is_written_as_its_marker_alone(self) -> None:
         # A part names a division of the story; the chapters under it are their
         # own cells, exactly as the prose under a chapter is.
-        written = storydoc.dumps([PartCell("Book One", "", False, None, "p1")])
+        written = Document.from_cells([PartCell("Book One", "", False, None, "p1")]).text
         self.assertEqual(written, '<!-- cell: part id="p1" title="Book One" -->\n')
 
     def test_a_divider_is_written_as_its_marker_alone(self) -> None:
         # Where the author cuts the files, and nothing the reader ever meets.
         self.assertEqual(
-            storydoc.dumps([DividerCell("", False, None, "d1")]),
+            Document.from_cells([DividerCell("", False, None, "d1")]).text,
             '<!-- cell: divider id="d1" -->\n',
         )
 
     def test_a_divider_survives_the_round_trip(self) -> None:
-        back = storydoc.parse(storydoc.dumps([DividerCell()]))
+        back = Document.from_cells([DividerCell()]).cells
         self.assertEqual(back[0].kind, DIVIDER)
 
     def test_a_cell_with_no_text_is_written_as_its_marker_alone(self) -> None:
         self.assertEqual(
-            storydoc.dumps([TableOfContentsCell("", False, None, "t1")]),
+            Document.from_cells([TableOfContentsCell("", False, None, "t1")]).text,
             '<!-- cell: contents id="t1" -->\n',
         )
 
     def test_an_unknown_kind_is_written_back_as_it_was_read(self) -> None:
         text = '<!-- cell: epigraph id="e1" attribution="Anon" -->\n\nA line.\n'
-        self.assertEqual(storydoc.dumps(storydoc.parse(text)), text)
+        self.assertEqual(Document(text).text, text)
 
     def test_a_quote_in_an_attribute_is_escaped_on_the_way_out(self) -> None:
-        written = storydoc.dumps([ChapterCell('She said "no"')])
+        written = Document.from_cells([ChapterCell('She said "no"')]).text
         self.assertIn('title="She said \\"no\\""', written)
 
 
 class Asking(unittest.TestCase):
     def test_a_document_says_which_of_its_cells_are_prose(self) -> None:
-        document = Document(
-            storydoc.dumps(
+        document = Document.from_cells(
                 [
                     ChapterCell("One"),
                     MarkdownCell("The lantern had gone out."),
@@ -158,7 +156,6 @@ class Asking(unittest.TestCase):
                     MarkdownCell("The door stood open."),
                 ]
             )
-        )
 
         self.assertEqual(
             [cell.source for cell in document.markdown_cells()],
@@ -166,37 +163,15 @@ class Asking(unittest.TestCase):
         )
 
     def test_a_document_with_no_title_page_says_it_is_anonymous(self) -> None:
-        document = Document(storydoc.dumps([ChapterCell("One")]))
+        document = Document.from_cells([ChapterCell("One")])
 
         self.assertEqual(document.title_page.title, "")
         self.assertEqual(document.title, "Anonymous")
 
 
-class Preparing(unittest.TestCase):
-    def test_missing_cells_are_added_in_order(self) -> None:
-        prepared = storydoc.add_missing(
-            [ChapterCell("One")], [TableOfContentsCell(), ImageCell("c.jpg")]
-        )
-        self.assertEqual(
-            [cell.kind for cell in prepared], ["chapter", "contents", "image"]
-        )
-
-    def test_preparing_twice_adds_nothing_the_second_time(self) -> None:
-        wanted = [TableOfContentsCell(), ImageCell("c.jpg")]
-        once = storydoc.add_missing([ChapterCell("One")], wanted)
-        twice = storydoc.add_missing(once, wanted)
-        self.assertEqual(once, twice)
-
-    def test_a_cell_the_author_has_edited_is_left_alone(self) -> None:
-        mine = TableOfContentsCell("My own contents.")
-        prepared = storydoc.add_missing([mine], [TableOfContentsCell()])
-        self.assertEqual(prepared, [mine])
-
-
 class Chapters(unittest.TestCase):
     def test_each_chapter_carries_the_prose_written_under_it(self) -> None:
-        document = Document(
-            storydoc.dumps(
+        document = Document.from_cells(
                 [
                     ChapterCell("One"),
                     MarkdownCell("The door stood open."),
@@ -204,7 +179,6 @@ class Chapters(unittest.TestCase):
                     MarkdownCell("It closed."),
                 ]
             )
-        )
         self.assertEqual(
             document.chapters,
             [("One", "The door stood open."), ("Two", "It closed.")],
@@ -213,8 +187,7 @@ class Chapters(unittest.TestCase):
     def test_a_part_divides_the_chapters_without_being_one(self) -> None:
         # A part names a run of chapters and carries no prose, so it is neither a
         # chapter of its own nor something falling into the one before it.
-        document = Document(
-            storydoc.dumps(
+        document = Document.from_cells(
                 [
                     PartCell("Day One"),
                     ChapterCell("One"),
@@ -224,7 +197,6 @@ class Chapters(unittest.TestCase):
                     MarkdownCell("It closed."),
                 ]
             )
-        )
         self.assertEqual(
             document.chapters,
             [("One", "The door stood open."), ("Two", "It closed.")],
@@ -236,8 +208,8 @@ class OnDisk(unittest.TestCase):
         cells = [ImageCell("c.jpg"), ChapterCell("One")]
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / f"story{storydoc.EXTENSION}"
-            storydoc.save(path, cells)
-            self.assertEqual(storydoc.load(path), cells)
+            Document.from_cells(cells, path).save()
+            self.assertEqual(Document.load(path).cells, cells)
 
 
 if __name__ == "__main__":

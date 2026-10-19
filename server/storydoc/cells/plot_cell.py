@@ -4,11 +4,11 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 
-from server.cells.cell import Cell
-from server.cells.story_word_range import StoryWordRange
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.story_word_range import StoryWordRange
 
 if TYPE_CHECKING:
-    from server.cells.cell_visitor import CellVisitor
+    from server.storydoc.cells.cell_visitor import CellVisitor
 
 PLOT = "plot"
 

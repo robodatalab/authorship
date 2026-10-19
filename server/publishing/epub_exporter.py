@@ -12,24 +12,27 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from server.storydoc import Document
-from server.cells.about_cell import ABOUT, AboutCell
-from server.cells.blurb_cell import BLURB, BlurbCell
-from server.cells.cell import Cell
-from server.cells.cell_visitor import CellVisitor
-from server.cells.chapter_cell import ChapterCell
-from server.cells.disclaimer_cell import DisclaimerCell
-from server.cells.divider_cell import DividerCell
-from server.cells.image_cell import IMAGE, ImageCell
-from server.cells.markdown_cell import MarkdownCell
-from server.cells.note_cell import NoteCell
-from server.cells.part_cell import PartCell
-from server.cells.plot_cell import PlotCell
-from server.cells.recap_cell import RecapCell
-from server.cells.salient_concept_cell import SalientConceptCell
-from server.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
-from server.cells.title_page_cell import TITLE_PAGE, TitlePageCell
-from server.cells.unknown_cell import UnknownCell
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.about_cell import ABOUT, AboutCell
+from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.cell_visitor import CellVisitor
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.disclaimer_cell import DisclaimerCell
+from server.storydoc.cells.divider_cell import DividerCell
+from server.storydoc.cells.image_cell import IMAGE, ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.plot_cell import PlotCell
+from server.storydoc.cells.recap_cell import RecapCell
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.table_of_contents_cell import (
+    TABLE_OF_CONTENTS,
+    TableOfContentsCell,
+)
+from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from server.storydoc.cells.unknown_cell import UnknownCell
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is

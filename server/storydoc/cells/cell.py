@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from server.cells.cell_visitor import CellVisitor
+    from server.storydoc.cells.cell_visitor import CellVisitor
 
 _Result = TypeVar("_Result")
 

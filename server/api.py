@@ -18,9 +18,9 @@ from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
-from server.storydoc import Document
-from server.cells.blurb_cell import BLURB
-from server.cells.recap_cell import RECAP
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.blurb_cell import BLURB
+from server.storydoc.cells.recap_cell import RECAP
 
 _log = log.logger(__name__)
 
@@ -130,7 +130,8 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         "path": None,
     }
     
-    out_path = document.beside(".epub")
+    assert document.path is not None
+    out_path = document.path.with_suffix(".epub")
     build_epub(document, out_path)
     return {
         "ready": found.ready,

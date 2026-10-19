@@ -1,4 +1,5 @@
-import { Document, dumps, parse } from "./storydoc";
+import { Document } from "./storydoc";
+import { parse } from "./parser";
 import type { Cell } from "./cells/cell";
 
 export class AuthorDocCellDiff {
@@ -175,7 +176,9 @@ export class AuthorDocDiff {
             cells = cellDiff.writeInto(cells);
         }
         for (const [standing, cellId] of this.cellIdsInRhs?.entries() ?? []) {
-            const standsAt = cells.findIndex((cell) => cell.uniqueId === cellId);
+            const standsAt = cells.findIndex(
+                (cell) => cell.uniqueId === cellId,
+            );
             if (standsAt !== standing) {
                 const moved = cells.splice(standsAt, 1);
                 cells.splice(
@@ -185,7 +188,7 @@ export class AuthorDocDiff {
                 );
             }
         }
-        return new Document(dumps(cells), document.path);
+        return Document.fromCells(cells, document.path);
     }
 }
 
@@ -195,5 +198,6 @@ function cellIdsOf(document: Document): string[] {
 
 function headerOf(cell: Cell): string {
     const cellWithoutItsText = cell.withSource("");
-    return dumps([cellWithoutItsText]);
+    const writtenWithoutItsText = Document.fromCells([cellWithoutItsText]);
+    return writtenWithoutItsText.text;
 }

@@ -4,28 +4,29 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 
-from server.cells.cell import Cell
+from server.storydoc.cells.cell import Cell
 
 if TYPE_CHECKING:
-    from server.cells.cell_visitor import CellVisitor
+    from server.storydoc.cells.cell_visitor import CellVisitor
+
+TABLE_OF_CONTENTS = "contents"
 
 _Result = TypeVar("_Result")
 
 
 @dataclass(frozen=True)
-class UnknownCell(Cell):
-    kind: str
-    attrs: dict[str, str] = field(default_factory=dict)
+class TableOfContentsCell(Cell):
+    kind: str = field(default=TABLE_OF_CONTENTS, init=False)
     source: str = ""
     folded: bool = False
     at: tuple[int, int] | None = field(default=None, compare=False)
     _unique_id: str = field(default_factory=lambda: str(uuid4()))
 
-    def with_source(self, source: str) -> UnknownCell:
+    def with_source(self, source: str) -> TableOfContentsCell:
         return replace(self, source=source)
 
-    def with_folded(self, folded: bool) -> UnknownCell:
+    def with_folded(self, folded: bool) -> TableOfContentsCell:
         return replace(self, folded=folded)
 
     def accept(self, visitor: CellVisitor[_Result]) -> _Result:
-        return visitor.visit_unknown(self)
+        return visitor.visit_table_of_contents(self)

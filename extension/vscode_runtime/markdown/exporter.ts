@@ -1,4 +1,4 @@
-import { dumps } from "../storydoc/storydoc";
+import { Document } from "../storydoc/storydoc";
 import type { AboutCell } from "../storydoc/cells/about_cell";
 import type { BlurbCell } from "../storydoc/cells/blurb_cell";
 import type { Cell } from "../storydoc/cells/cell";
@@ -137,7 +137,8 @@ export function toMarkdown(cells: readonly Cell[]): string {
 
 export function fromMarkdown(markdown: string): string {
     const cells = cellsReadFromMarkdown(markdown);
-    return dumps(cells);
+    const document = Document.fromCells(cells);
+    return document.text;
 }
 
 function cellsReadFromMarkdown(markdown: string): Cell[] {
