@@ -10,7 +10,7 @@ import type {
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
 import { CharacterRangeSynchronizer } from "./storydoc/synchronizers/character_range_synchronizer";
-import type { AuthorDocSynchronizer } from "./storydoc/synchronizers/author_doc_synchronizer";
+import type { AuthorDocSynchronizer } from "./storydoc/author_doc_synchronizer";
 import { AuthorDocDiff } from "./storydoc/diff";
 import { Document } from "./storydoc/storydoc";
 import type { Cell } from "./storydoc/cells/cell";

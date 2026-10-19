@@ -1,4 +1,4 @@
-import type { AuthorDocSynchronizer } from "./author_doc_synchronizer";
+import type { AuthorDocSynchronizer } from "../author_doc_synchronizer";
 import type { AuthorDocDiff } from "../diff";
 import type { Document } from "../storydoc";
 import type { Cell } from "../cells/cell";

@@ -1,6 +1,6 @@
 import type { AuthorDocDiff } from "../diff";
 import type { Document } from "../storydoc";
-import type { AuthorDocSynchronizer } from "./author_doc_synchronizer";
+import type { AuthorDocSynchronizer } from "../author_doc_synchronizer";
 import type { SynchronizedRepresentation } from "./synchronized_representation";
 
 function rangeOverlaps(
