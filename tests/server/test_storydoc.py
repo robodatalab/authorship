@@ -10,6 +10,7 @@ from server.storydoc.parser import parse
 from server.storydoc.iterators.chapters_iterator import ChaptersIterator
 from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
 from server.storydoc.iterators.story_lines_iterator import StoryLinesIterator
+from server.storydoc.iterators.story_words_iterator import StoryWordsIterator
 from server.storydoc.storydoc import Document
 from server.storydoc.cells.blurb_cell import BlurbCell
 from server.storydoc.cells.chapter_cell import ChapterCell
@@ -615,7 +616,9 @@ class StoryText(unittest.TestCase):
         self, _, text: str, start_word_idx: int, end_word_idx: int, expected: str
     ) -> None:
         document = Document(text)
+        story_words = StoryWordsIterator(document)
+        story_word_range = StoryWordRange(start_word_idx, end_word_idx)
 
-        story_text = document.story_text(start_word_idx, end_word_idx)
+        story_text = story_words.text(story_word_range)
 
         self.assertEqual(story_text, expected)

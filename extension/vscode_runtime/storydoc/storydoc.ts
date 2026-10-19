@@ -38,14 +38,10 @@ import { Cell, splitlines } from "./cells/cell";
 import { PlotCell } from "./cells/plot_cell";
 import { SalientConceptCell } from "./cells/salient_concept_cell";
 import { TitlePageCell } from "./cells/title_page_cell";
-import { ProseCellsIterator } from "./iterators/prose_cells_iterator";
 import { markerFor, parse } from "./parser";
 import { MarkerAttributes } from "./visitors/marker_attributes";
 
 export const EXTENSION = ".author";
-
-const STORY_WORD = /\S+/g;
-const WORD_CHARACTER = /\w/;
 
 /** An .author document */
 export class Document {
@@ -113,35 +109,6 @@ export class Document {
 
     cellWithId(cellId: string): Cell | undefined {
         return this.cells.find((cell) => cell.uniqueId === cellId);
-    }
-
-    storyText(startWordIdx: number, endWordIdx: number): string {
-        const textsOfTheCells: string[] = [];
-        let wordsBefore = 0;
-        const proseCells = new ProseCellsIterator(this);
-        for (const cell of proseCells) {
-            const wordsOfTheCell = Array.from(
-                cell.source.matchAll(STORY_WORD),
-            ).filter((run) => WORD_CHARACTER.test(run[0]));
-            const firstWordIdxOfTheCell = wordsBefore;
-            const covered = wordsOfTheCell.filter(
-                (_, offset) =>
-                    startWordIdx <= firstWordIdxOfTheCell + offset &&
-                    firstWordIdxOfTheCell + offset <= endWordIdx,
-            );
-            wordsBefore += wordsOfTheCell.length;
-            if (covered.length > 0) {
-                const firstWord = covered[0];
-                const lastWord = covered[covered.length - 1];
-                const textOfTheCell = cell.source.slice(
-                    firstWord.index,
-                    lastWord.index + lastWord[0].length,
-                );
-                textsOfTheCells.push(textOfTheCell);
-            }
-        }
-        const storyText = textsOfTheCells.join("\n\n");
-        return storyText;
     }
 
     salientConcepts(): SalientConceptCell[] {

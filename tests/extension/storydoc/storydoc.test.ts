@@ -3,6 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
+import { StoryWordRange } from "../../../extension/vscode_runtime/storydoc/cells/story_word_range";
+import {
+    StoryTextSpan,
+    StoryWord,
+    StoryWordsIterator,
+} from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
 import { parse } from "../../../extension/vscode_runtime/storydoc/parser";
 
 interface CorpusCase {
@@ -125,10 +131,92 @@ describe("the story text of a document", () => {
         "is the text the story words $words cover",
         ({ text, startWordIdx, endWordIdx, storyText }) => {
             const document = new Document(text);
+            const storyWords = new StoryWordsIterator(document);
+            const range = new StoryWordRange(startWordIdx, endWordIdx);
 
-            const textCovered = document.storyText(startWordIdx, endWordIdx);
+            const textCovered = storyWords.text(range);
 
             expect(textCovered).toBe(storyText);
         },
     );
+});
+
+function storyWhereSheSaw(): Document {
+    return new Document(
+        [
+            '<!-- cell: chapter title="One" id="c1" -->',
+            "",
+            '<!-- cell: markdown id="c2" -->',
+            "",
+            "She saw the door.",
+            "",
+            '<!-- cell: note id="n1" -->',
+            "",
+            "<!--\nNot a story word.\n-->",
+            "",
+            '<!-- cell: markdown id="c3" -->',
+            "",
+            "He heard the bell.",
+            "",
+        ].join("\n"),
+    );
+}
+
+describe("the story's words", () => {
+    it("are the words of the markdown cells, numbered across them", () => {
+        const storyWords = new StoryWordsIterator(storyWhereSheSaw());
+
+        const words = Array.from(storyWords, (word) => word.text);
+
+        expect(words).toEqual([
+            "She",
+            "saw",
+            "the",
+            "door.",
+            "He",
+            "heard",
+            "the",
+            "bell.",
+        ]);
+    });
+
+    it("know where in their cell they stand", () => {
+        const storyWords = new StoryWordsIterator(storyWhereSheSaw());
+
+        const words = Array.from(storyWords);
+
+        expect(words[5]).toEqual(new StoryWord(5, "c3", "heard", 3, 8));
+    });
+});
+
+describe("the text a range of story words covers", () => {
+    it("is one span in every cell the range reaches", () => {
+        const storyWords = new StoryWordsIterator(storyWhereSheSaw());
+        const range = new StoryWordRange(2, 5);
+
+        const spans = storyWords.spans(range);
+
+        expect(spans).toEqual([
+            new StoryTextSpan("c2", 8, 17),
+            new StoryTextSpan("c3", 0, 8),
+        ]);
+    });
+});
+
+describe("the story words a selection covers", () => {
+    it("are every word the selection touches in its cell", () => {
+        const storyWords = new StoryWordsIterator(storyWhereSheSaw());
+
+        const range = storyWords.rangeBetween("c3", 4, 10);
+
+        expect(range).toEqual(new StoryWordRange(5, 6));
+    });
+
+    it("are none when the selection touches no word", () => {
+        const storyWords = new StoryWordsIterator(storyWhereSheSaw());
+
+        const range = storyWords.rangeBetween("c1", 0, 3);
+
+        expect(range).toBeNull();
+    });
 });

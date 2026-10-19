@@ -32,22 +32,16 @@ marker opens a new cell. Markdown has the same bargain with fences.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from server.storydoc.cells.cell import Cell
 from server.storydoc.cells.plot_cell import PlotCell
 from server.storydoc.cells.salient_concept_cell import SalientConceptCell
 from server.storydoc.cells.title_page_cell import TitlePageCell
-from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
 from server.storydoc.parser import marker_for, parse
 from server.storydoc.visitors.marker_attributes import MarkerAttributes
 
 EXTENSION = ".author"
-
-
-_STORY_WORD = re.compile(r"\S+")
-_WORD_CHARACTER = re.compile(r"\w", re.ASCII)
 
 
 class Document:
@@ -103,28 +97,6 @@ class Document:
 
     def cell_with_id(self, cell_id: str) -> Cell | None:
         return next((cell for cell in self.cells if cell.unique_id == cell_id), None)
-
-    def story_text(self, start_word_idx: int, end_word_idx: int) -> str:
-        texts_of_the_cells: list[str] = []
-        words_before = 0
-        prose_cells = ProseCellsIterator(self)
-        for cell in prose_cells:
-            words_of_the_cell = [
-                run
-                for run in _STORY_WORD.finditer(cell.source)
-                if _WORD_CHARACTER.search(run.group())
-            ]
-            covered = [
-                word
-                for word_idx, word in enumerate(words_of_the_cell, start=words_before)
-                if start_word_idx <= word_idx <= end_word_idx
-            ]
-            words_before += len(words_of_the_cell)
-            if covered:
-                text_of_the_cell = cell.source[covered[0].start() : covered[-1].end()]
-                texts_of_the_cells.append(text_of_the_cell)
-        story_text = "\n\n".join(texts_of_the_cells)
-        return story_text
 
     def salient_concepts(self) -> list[SalientConceptCell]:
         return [cell for cell in self.cells if isinstance(cell, SalientConceptCell)]

@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 
 from server.storydoc.cells.salient_concept_cell import SalientConceptCell
 from server.storydoc.cells.story_word_range import StoryWordRange
+from server.storydoc.iterators.story_words_iterator import StoryWordsIterator
 from server.storydoc.storydoc import Document
 
 UNRELATED_TEXTS_PER_CONCEPT = 8
@@ -49,13 +50,14 @@ def salient_concept_texts(
         concepts_of_the_story: list[SalientConceptCell]
         ) -> SalientConceptTexts:
     own_ranges = distinct_ranges(concept.story_word_ranges)
-    examples = [document.story_text(r.first_word, r.last_word) for r in own_ranges]
+    story_words = StoryWordsIterator(document)
+    examples = [story_words.text(r) for r in own_ranges]
     ranges_of_the_story = [
         word_range for other in concepts_of_the_story for word_range in other.story_word_ranges
     ]
     distinct_ranges_of_the_story = distinct_ranges(ranges_of_the_story)
     unrelated_texts = [
-        document.story_text(r.first_word, r.last_word)
+        story_words.text(r)
         for r in distinct_ranges_of_the_story
         if not concept_covers(concept, r)
     ]
