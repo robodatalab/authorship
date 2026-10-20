@@ -30,6 +30,7 @@ import {
     type StoryTextSpan,
 } from "./storydoc/iterators/story_words_iterator";
 import type { StoryWordRange } from "./storydoc/cells/story_word_range";
+import { PassagesSynchronizer } from "./storydoc/synchronizers/passages_synchronizer";
 import { WordCounter } from "./storydoc/synchronizers/word_counter";
 
 export class AuthorFileEditorSession
@@ -78,10 +79,12 @@ export class AuthorFileEditorSession
         );
         const findMatchesInTheProseSynchronizer =
             new CharacterRangeSynchronizer(this.findMatchesInTheProse);
+        const passagesSynchronizer = new PassagesSynchronizer();
         this.synchronizers = [
             proseErrorsSynchronizer,
             findMatchesInTheProseSynchronizer,
             this.wordCounter,
+            passagesSynchronizer,
         ];
         this.documentAsItStands = new Document("", uri.fsPath);
         const opening = AuthorDocDiff.diff(
