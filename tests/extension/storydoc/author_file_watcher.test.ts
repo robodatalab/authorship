@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
-import { PublishView } from "../../../extension/vscode_runtime/publish/panel";
+import { AuthorshipPanelProvider } from "../../../extension/vscode_runtime/authorship_panel_provider";
 import type { Cell } from "../../../extension/library/storydoc/cells/cell";
 import { parse } from "../../../extension/library/storydoc/parser";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
@@ -25,7 +25,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider(
         { extensionUri: Uri.file("/extension") } as never,
         vscodeWindow.createOutputChannel("Authorship") as never,
-        new PublishView({ extensionUri: Uri.file("/extension") } as never),
+        new AuthorshipPanelProvider({ extensionUri: Uri.file("/extension") } as never),
     );
     const session = await provider.openCustomDocument(
         Uri.file(DOCUMENT_PATH) as never,

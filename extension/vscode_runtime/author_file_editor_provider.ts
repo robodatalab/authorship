@@ -22,7 +22,7 @@ import {
     authorDocumentCommandCards,
 } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
-import type { PublishView } from "./publish/panel";
+import type { AuthorshipPanelProvider } from "./authorship_panel_provider";
 import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
 import { loadTemplates, watchSettings } from "./settings/file";
 import { watchTheAuthorFileForChanges } from "./author_file_watcher";
@@ -43,7 +43,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly log: vscode.LogOutputChannel,
-        private readonly authorshipPanel: PublishView,
+        private readonly authorshipPanel: AuthorshipPanelProvider,
     ) {}
 
     async openCustomDocument(

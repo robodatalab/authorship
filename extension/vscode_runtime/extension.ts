@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AuthorFileEditorProvider } from "./author_file_editor_provider";
-import { PublishView } from "./publish/panel";
+import { AuthorshipPanelProvider } from "./authorship_panel_provider";
 import { ServerStatusBarItem } from "./llm/status_bar";
 import { ModelServer } from "./server/process";
 import { serverPort } from "./server/fetch";
@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(new ModelServer(context, serverPort(), log));
 
-    const authorshipPanel = new PublishView(context);
+    const authorshipPanel = new AuthorshipPanelProvider(context);
     const authorFileEditor = new AuthorFileEditorProvider(
         context,
         log,

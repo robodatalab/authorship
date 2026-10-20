@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 
-import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { authorDocumentCommand } from "../commands/author_document_commands";
-import { fetchFromServer } from "../server/fetch";
+import type { AuthorFileEditorSession } from "./author_file_editor_session";
+import { authorDocumentCommand } from "./commands/author_document_commands";
+import { fetchFromServer } from "./server/fetch";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
 const MILLISECONDS_BEFORE_A_STATUS_REQUEST_TIMES_OUT = 10_000;
 
-export class PublishView implements vscode.WebviewViewProvider {
+export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private statusPollTimer?: ReturnType<typeof setInterval>;
     private readonly whenEachJobFirstAppeared = new Map<string, number>();
@@ -215,10 +215,10 @@ export class PublishView implements vscode.WebviewViewProvider {
             "dist",
         );
         const script = webview.asWebviewUri(
-            vscode.Uri.joinPath(distFolder, "publish_view.js"),
+            vscode.Uri.joinPath(distFolder, "authorship_panel.js"),
         );
         const style = webview.asWebviewUri(
-            vscode.Uri.joinPath(distFolder, "publish_view.css"),
+            vscode.Uri.joinPath(distFolder, "authorship_panel.css"),
         );
         const nonce = scriptNonce();
 

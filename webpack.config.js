@@ -50,18 +50,18 @@ const extensionConfig = {
   },
 };
 /**
- * The Publish sidebar runs inside a webview, which is a browser context rather
+ * The Authorship panel runs inside a webview, which is a browser context rather
  * than Node, so it needs a bundle of its own, loaded from dist/ by URI.
  *
  * @type WebpackConfig
  */
-const publishViewConfig = {
+const authorshipPanelViewConfig = {
   target: 'web',
   mode: 'development',
-  entry: './extension/webview/publish_sidebar_webview.tsx',
+  entry: './extension/webview/authorship_panel_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'publish_view.js'
+    filename: 'authorship_panel.js'
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
@@ -88,7 +88,7 @@ const publishViewConfig = {
     ]
   },
   plugins: [
-    new MiniCssExtractPlugin({ filename: 'publish_view.css' })
+    new MiniCssExtractPlugin({ filename: 'authorship_panel.css' })
   ],
   devtool: 'nosources-source-map',
   infrastructureLogging: {
@@ -98,7 +98,7 @@ const publishViewConfig = {
 
 /** @type WebpackConfig */
 const authorFileEditorViewConfig = {
-  ...publishViewConfig,
+  ...authorshipPanelViewConfig,
   entry: './extension/webview/message_queue_between_vscode_and_webview.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -109,4 +109,4 @@ const authorFileEditorViewConfig = {
   ],
 };
 
-module.exports = [ extensionConfig, publishViewConfig, authorFileEditorViewConfig ];
+module.exports = [ extensionConfig, authorshipPanelViewConfig, authorFileEditorViewConfig ];
