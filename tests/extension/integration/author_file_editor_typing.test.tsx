@@ -103,7 +103,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
         addEventListenerItself(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
-        await import("../../../extension/webview/cell_types/MarkdownCell");
+        await import("../../../extension/webview/cell_types/AuthorFileEditorMarkdownCell");
         await import("../../../extension/webview/message_queue_between_vscode_and_webview");
     });
     window.addEventListener = addEventListenerItself;
@@ -523,11 +523,11 @@ describe("the trajectory of a plot while the author types", () => {
                 "",
                 "She waited for him. A Companion knelt.",
                 "",
-                '<!-- cell: plot id="p1" title="The vigil" words="0-0" -->',
+                '<!-- cell: plot id="p1" title="The vigil" nodes="n1:0-0" -->',
                 "",
                 "She keeps watch.",
                 "",
-                '<!-- cell: plot id="p2" title="The Companion" words="5-6, 0-2" -->',
+                '<!-- cell: plot id="p2" title="The Companion" nodes="n1:5-6, n2:0-2" edges="e1:n1>n2" -->',
                 "",
                 "He kneels before her.",
                 "",

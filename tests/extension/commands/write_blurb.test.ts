@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WriteBlurbCommand } from "../../../extension/vscode_runtime/commands/write_blurb";
+import { parse } from "../../../extension/library/storydoc/parser";
 import { files } from "../vscode";
 import {
     forgetWhatTheEditorDid,
@@ -80,9 +81,9 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
         vi.stubGlobal("fetch", (url: string) => {
             const stillRunning = url.includes("status") && statusAskedFor++ < 1;
             if (stillRunning) {
-                session.changeTheDocument((story) =>
-                    story.fromText(session.document.text),
-                );
+                session.changeTheDocument((story) => {
+                    story.cells = parse(session.document.text);
+                });
             }
             return Promise.resolve({
                 ok: true,

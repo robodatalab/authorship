@@ -77,7 +77,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
         addEventListenerItself(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
-        await import("../../extension/webview/cell_types/MarkdownCell");
+        await import("../../extension/webview/cell_types/AuthorFileEditorMarkdownCell");
         await import("../../extension/webview/message_queue_between_vscode_and_webview");
     });
     window.addEventListener = addEventListenerItself;

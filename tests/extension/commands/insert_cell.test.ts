@@ -28,7 +28,11 @@ describe("InsertCellCommand — inserts a cell", () => {
             cellKind: "chapter",
         });
 
-        expect(session.document.cells[1].attrs.title).toBe("Untitled");
+        expect(session.document.cells[1]).toMatchObject({
+            kind: "chapter",
+            title: "",
+            source: "",
+        });
     });
 
     it("starts a salient concept untitled", () => {
@@ -39,7 +43,11 @@ describe("InsertCellCommand — inserts a cell", () => {
             cellKind: "salient-concept",
         });
 
-        expect(session.document.cells[1].attrs.title).toBe("Untitled");
+        expect(session.document.cells[1]).toMatchObject({
+            kind: "salient-concept",
+            title: "",
+            storyWordRanges: [],
+        });
     });
 
     it("puts it at the end when it precedes no cell at all", () => {

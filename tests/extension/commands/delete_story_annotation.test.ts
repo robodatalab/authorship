@@ -10,7 +10,7 @@ describe("DeleteStoryAnnotationCommand — deletes a story annotation once the a
     it.each([
         {
             cellKind: "salient-concept",
-            asked: "Delete the salient concept “Door”?",
+            asked: "Delete the salient-concept “Door”?",
         },
         { cellKind: "plot", asked: "Delete the plot “Door”?" },
     ])(

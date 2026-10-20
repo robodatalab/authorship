@@ -168,6 +168,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const followingTheActiveEditor = panel.onDidChangeViewState(() => {
             if (panel.active) {
                 this.authorshipPanel.follow(session);
+            } else {
+                this.authorshipPanel.stopFollowing(session);
             }
         });
 

@@ -17,24 +17,22 @@ describe("AddStoryAnnotationCommand — adds a story annotation and selects it",
 
             new AddStoryAnnotationCommand().invoke(session, { cellKind });
 
-            const cellsOfTheStory = session.document.cells.map((cell) => [
-                cell.kind,
-                cell.source,
-                cell.attrs,
-            ]);
-            expect(cellsOfTheStory).toEqual([
-                ["chapter", "", { title: "One", id: "c1" }],
-                ["markdown", "She saw the door.", { id: "c2" }],
-                ["markdown", "He heard the bell.", { id: "c3" }],
+            expect(session.document.text).toBe(
                 [
-                    cellKind,
+                    '<!-- cell: chapter id="c1" title="One" -->',
                     "",
-                    {
-                        title: "Untitled",
-                        id: "00000000-0000-4000-8000-000000000009",
-                    },
-                ],
-            ]);
+                    '<!-- cell: markdown id="c2" -->',
+                    "",
+                    "She saw the door.",
+                    "",
+                    '<!-- cell: markdown id="c3" -->',
+                    "",
+                    "He heard the bell.",
+                    "",
+                    `<!-- cell: ${cellKind} id="00000000-0000-4000-8000-000000000009" -->`,
+                    "",
+                ].join("\n"),
+            );
         },
     );
 

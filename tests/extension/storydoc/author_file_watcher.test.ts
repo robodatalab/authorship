@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
 import { PublishView } from "../../../extension/vscode_runtime/publish/panel";
+import type { Cell } from "../../../extension/library/storydoc/cells/cell";
+import { parse } from "../../../extension/library/storydoc/parser";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
@@ -30,9 +32,8 @@ async function openEditor(text: string): Promise<OpenEditor> {
         {} as never,
     );
 
-    const documentsSentToThePage: { source: string }[][] = [];
-    let cellsOnThePage: { attrs: Record<string, string>; source: string }[] =
-        [];
+    const documentsSentToThePage: string[][] = [];
+    let cellsOnThePage: Cell[] = [];
     let receiveFromThePage: (message: unknown) => void = () => undefined;
     const panel = {
         webview: {
@@ -42,15 +43,14 @@ async function openEditor(text: string): Promise<OpenEditor> {
             asWebviewUri: (uri: unknown) => uri,
             postMessage: (message: {
                 type: string;
-                cells?: { attrs: Record<string, string>; source: string }[];
-                cellsThePageTyped?: {
-                    attrs: Record<string, string>;
-                    source: string;
-                }[];
+                cells?: string[];
+                cellsThePageTyped?: string[];
             }) => {
                 if (message.type === "document" && message.cells) {
                     documentsSentToThePage.push(message.cells);
-                    cellsOnThePage = message.cells;
+                    cellsOnThePage = message.cells.flatMap((written) =>
+                        parse(written),
+                    );
                 } else if (
                     message.type === "cells" &&
                     message.cells &&
@@ -61,10 +61,13 @@ async function openEditor(text: string): Promise<OpenEditor> {
                         ...message.cellsThePageTyped,
                     ];
                     documentsSentToThePage.push(changed);
+                    const cellsChanged = changed.flatMap((written) =>
+                        parse(written),
+                    );
                     cellsOnThePage = cellsOnThePage.map(
                         (drawing) =>
-                            changed.find(
-                                (cell) => cell.attrs.id === drawing.attrs.id,
+                            cellsChanged.find(
+                                (cell) => cell.uniqueId === drawing.uniqueId,
                             ) ?? drawing,
                     );
                 }

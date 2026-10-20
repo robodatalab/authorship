@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -14,12 +14,26 @@ import {
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../../extension/library/storydoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
-import type {
-    AuthorDocumentCellRenderers,
-    WebviewAuthorDocumentCommandCard,
-    WebviewCell,
-} from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 import { MarkdownEditor } from "../../../extension/webview/markdown/MarkdownEditor";
+import { AboutCell } from "../../../extension/library/storydoc/cells/about_cell";
+import { BlurbCell } from "../../../extension/library/storydoc/cells/blurb_cell";
+import type { Cell } from "../../../extension/library/storydoc/cells/cell";
+import type { CellVisitor } from "../../../extension/library/storydoc/cells/cell_visitor";
+import { ChapterCell } from "../../../extension/library/storydoc/cells/chapter_cell";
+import type { DisclaimerCell } from "../../../extension/library/storydoc/cells/disclaimer_cell";
+import type { DividerCell } from "../../../extension/library/storydoc/cells/divider_cell";
+import type { ImageCell } from "../../../extension/library/storydoc/cells/image_cell";
+import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
+import type { NoteCell } from "../../../extension/library/storydoc/cells/note_cell";
+import { PartCell } from "../../../extension/library/storydoc/cells/part_cell";
+import { PlotCell, PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
+import type { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
+import { SalientConceptCell } from "../../../extension/library/storydoc/cells/salient_concept_cell";
+import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+import type { TableOfContentsCell } from "../../../extension/library/storydoc/cells/table_of_contents_cell";
+import type { TitlePageCell } from "../../../extension/library/storydoc/cells/title_page_cell";
+import type { UnknownCell } from "../../../extension/library/storydoc/cells/unknown_cell";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,11 +45,82 @@ interface Invocation {
 
 let posted: Invocation[] = [];
 
-function markdownCell(source: string, id = source): WebviewCell {
-    return { kind: "markdown", source, attrs: { id } };
+function markdownCell(source: string, id = source): MarkdownCell {
+    return new MarkdownCell(source, false, null, id);
 }
 
-const CELL_RENDERERS: AuthorDocumentCellRenderers = {
+type CellDrawings = Partial<Record<string, (cell: Cell) => ReactNode>>;
+
+class CellsDrawnAs implements CellVisitor<ReactNode> {
+    constructor(private readonly drawings: CellDrawings) {}
+
+    visitMarkdown(cell: MarkdownCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitChapter(cell: ChapterCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitPart(cell: PartCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitDivider(cell: DividerCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitTitlePage(cell: TitlePageCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitImage(cell: ImageCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitTableOfContents(cell: TableOfContentsCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitDisclaimer(cell: DisclaimerCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitAbout(cell: AboutCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitBlurb(cell: BlurbCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitNote(cell: NoteCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitRecap(cell: RecapCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitSalientConcept(cell: SalientConceptCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitPlot(cell: PlotCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitUnknown(cell: UnknownCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    private drawn(cell: Cell): ReactNode {
+        const drawing = this.drawings[cell.kind];
+        return drawing ? drawing(cell) : null;
+    }
+}
+
+const CELL_DRAWINGS: CellDrawings = {
     markdown: (cell) => <div className="test-cell">{cell.source}</div>,
 };
 
@@ -61,15 +146,14 @@ function cellType(
         cellKind,
         menuLabel: cellKind,
         insertMenuGroup,
-        render: () => null,
     };
 }
 
 async function mountCanvas(options: {
-    cells?: WebviewCell[];
+    cells?: Cell[];
     commands?: WebviewAuthorDocumentCommandCard[];
     cellTypes?: AuthorDocumentCellType[];
-    cellRenderers?: AuthorDocumentCellRenderers;
+    cellDrawings?: CellDrawings;
     storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextShown?: StoryTextSpan | null;
 }): Promise<void> {
@@ -88,7 +172,9 @@ async function mountCanvas(options: {
                 sendMessagesToVscode={(message) =>
                     posted.push(message as Invocation)
                 }
-                cellRenderers={options.cellRenderers ?? CELL_RENDERERS}
+                cellRenderer={
+                    new CellsDrawnAs(options.cellDrawings ?? CELL_DRAWINGS)
+                }
                 storyAnnotationsSelected={options.storyAnnotationsSelected}
                 storyTextShown={options.storyTextShown}
             />,
@@ -153,7 +239,7 @@ describe("where the insert menus go", () => {
         await mountCanvas({
             cells: [
                 markdownCell("kept"),
-                { kind: "chapter", source: "", attrs: {} },
+                new ChapterCell("", "", false, null, "c1"),
             ],
         });
         expect(insertMenus()).toHaveLength(2);
@@ -296,17 +382,11 @@ describe("invoking a main menu command", () => {
     it("draws the one of a pair that the folding of the document calls for", async () => {
         const foldAll = {
             ...command("foldAll", "fold"),
-            drawnWhenCellAttributeIs: {
-                attributeName: "folded",
-                attributeValue: "",
-            },
+            drawnWhenTheCellIsFolded: false,
         };
         const unfoldAll = {
             ...command("unfoldAll", "fold"),
-            drawnWhenCellAttributeIs: {
-                attributeName: "folded",
-                attributeValue: "true",
-            },
+            drawnWhenTheCellIsFolded: true,
         };
 
         await mountCanvas({
@@ -321,16 +401,8 @@ describe("invoking a main menu command", () => {
 
         await mountCanvas({
             cells: [
-                {
-                    kind: "markdown",
-                    source: "one",
-                    attrs: { id: "one", folded: "true" },
-                },
-                {
-                    kind: "markdown",
-                    source: "two",
-                    attrs: { id: "two", folded: "true" },
-                },
+                new MarkdownCell("one", true, null, "one"),
+                new MarkdownCell("two", true, null, "two"),
             ],
             commands: [foldAll, unfoldAll],
         });
@@ -344,27 +416,17 @@ describe("invoking a main menu command", () => {
     it("draws the first of the pair while the cells disagree", async () => {
         await mountCanvas({
             cells: [
-                {
-                    kind: "markdown",
-                    source: "one",
-                    attrs: { id: "one", folded: "true" },
-                },
+                new MarkdownCell("one", true, null, "one"),
                 markdownCell("two"),
             ],
             commands: [
                 {
                     ...command("foldAll", "fold"),
-                    drawnWhenCellAttributeIs: {
-                        attributeName: "folded",
-                        attributeValue: "",
-                    },
+                    drawnWhenTheCellIsFolded: false,
                 },
                 {
                     ...command("unfoldAll", "fold"),
-                    drawnWhenCellAttributeIs: {
-                        attributeName: "folded",
-                        attributeValue: "true",
-                    },
+                    drawnWhenTheCellIsFolded: true,
                 },
             ],
         });
@@ -383,17 +445,11 @@ describe("invoking a main menu command", () => {
             commands: [
                 {
                     ...command("foldAll", "fold"),
-                    drawnWhenCellAttributeIs: {
-                        attributeName: "folded",
-                        attributeValue: "",
-                    },
+                    drawnWhenTheCellIsFolded: false,
                 },
                 {
                     ...command("unfoldAll", "fold"),
-                    drawnWhenCellAttributeIs: {
-                        attributeName: "folded",
-                        attributeValue: "true",
-                    },
+                    drawnWhenTheCellIsFolded: true,
                 },
             ],
         });
@@ -423,7 +479,7 @@ describe("the commands on a cell", () => {
     it("draws one button for each, inside the cell it belongs to", async () => {
         await mountCanvas({
             cells: [markdownCell("one")],
-            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
                 command("moveCellUp", "cell"),
                 command("deleteCell", "cell"),
@@ -440,7 +496,7 @@ describe("the commands on a cell", () => {
     it("asks for the command the button was drawn from", async () => {
         await mountCanvas({
             cells: [markdownCell("one")],
-            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
                 command("moveCellUp", "cell"),
                 command("deleteCell", "cell"),
@@ -465,7 +521,7 @@ describe("the commands on a cell", () => {
     it("asks for the cell the button was drawn beside", async () => {
         await mountCanvas({
             cells: [markdownCell("one"), markdownCell("two")],
-            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [command("deleteCell", "cell")],
         });
 
@@ -486,9 +542,9 @@ describe("the command that runs a cell", () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
-                { kind: "blurb", source: "", attrs: { id: "b1" } },
+                new BlurbCell("", false, null, "b1"),
             ],
-            cellRenderers: {
+            cellDrawings: {
                 markdown: () => (
                     <AuthorFileEditorCell
                         sidebar={<AuthorFileEditorCellRun />}
@@ -529,27 +585,21 @@ describe("two commands drawn as one button", () => {
             buttonGroup: "cell",
             iconClassName: "codicon codicon-fold-up",
             tooltip: "Fold this section away",
-            drawnWhenCellAttributeIs: {
-                attributeName: "folded",
-                attributeValue: "",
-            },
+            drawnWhenTheCellIsFolded: false,
         },
         {
             commandName: "unfoldCell",
             buttonGroup: "cell",
             iconClassName: "codicon codicon-fold-down",
             tooltip: "Unfold this section",
-            drawnWhenCellAttributeIs: {
-                attributeName: "folded",
-                attributeValue: "true",
-            },
+            drawnWhenTheCellIsFolded: true,
         },
     ];
 
-    async function buttonsBeside(cell: WebviewCell): Promise<string[]> {
+    async function buttonsBeside(cell: Cell): Promise<string[]> {
         await mountCanvas({
             cells: [cell],
-            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: FOLD_COMMANDS,
         });
         return [
@@ -567,24 +617,16 @@ describe("two commands drawn as one button", () => {
 
     it("draws the other one once the cell says otherwise", async () => {
         expect(
-            await buttonsBeside({
-                kind: "markdown",
-                source: "one",
-                attrs: { folded: "true" },
-            }),
+            await buttonsBeside(new MarkdownCell("one", true, null, "one")),
         ).toEqual(["Unfold this section"]);
     });
 
     it("asks for the command that was drawn, not the one that was not", async () => {
         await mountCanvas({
             cells: [
-                {
-                    kind: "markdown",
-                    source: "one",
-                    attrs: { id: "one", folded: "true" },
-                },
+                new MarkdownCell("one", true, null, "one"),
             ],
-            cellRenderers: { markdown: () => <AuthorFileEditorCell /> },
+            cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: FOLD_COMMANDS,
         });
 
@@ -603,34 +645,19 @@ describe("two commands drawn as one button", () => {
 });
 
 describe("folding a part or a chapter", () => {
-    function story(folded: Record<string, boolean>): WebviewCell[] {
+    function story(folded: Record<string, boolean>): Cell[] {
         return [
-            { kind: "part", source: "", attrs: foldedAttributes("p1", folded) },
-            {
-                kind: "chapter",
-                source: "",
-                attrs: foldedAttributes("c1", folded),
-            },
-            { kind: "markdown", source: "one", attrs: { id: "m1" } },
-            {
-                kind: "chapter",
-                source: "",
-                attrs: foldedAttributes("c2", folded),
-            },
-            { kind: "markdown", source: "two", attrs: { id: "m2" } },
-            { kind: "part", source: "", attrs: foldedAttributes("p2", folded) },
-            { kind: "markdown", source: "three", attrs: { id: "m3" } },
+            new PartCell("", "", folded.p1 ?? false, null, "p1"),
+            new ChapterCell("", "", folded.c1 ?? false, null, "c1"),
+            new MarkdownCell("one", false, null, "m1"),
+            new ChapterCell("", "", folded.c2 ?? false, null, "c2"),
+            new MarkdownCell("two", false, null, "m2"),
+            new PartCell("", "", folded.p2 ?? false, null, "p2"),
+            new MarkdownCell("three", false, null, "m3"),
         ];
     }
 
-    function foldedAttributes(
-        id: string,
-        folded: Record<string, boolean>,
-    ): Record<string, string> {
-        return folded[id] ? { id, folded: "true" } : { id };
-    }
-
-    const CELL_KINDS: AuthorDocumentCellRenderers = {
+    const CELL_KINDS: CellDrawings = {
         part: (cell) => <div className="test-cell">{cell.source}</div>,
         chapter: (cell) => <div className="test-cell">{cell.source}</div>,
         markdown: (cell) => <div className="test-cell">{cell.source}</div>,
@@ -641,7 +668,7 @@ describe("folding a part or a chapter", () => {
     ): Promise<(string | null)[]> {
         await mountCanvas({
             cells: story(folded),
-            cellRenderers: CELL_KINDS,
+            cellDrawings: CELL_KINDS,
         });
         return [...document.querySelectorAll("li[data-cell-id]")].map((drawn) =>
             drawn.getAttribute("data-cell-id"),
@@ -696,7 +723,7 @@ describe("folding a part or a chapter", () => {
 });
 
 describe("the part and the chapter the author is looking at", () => {
-    const CELL_KINDS: AuthorDocumentCellRenderers = {
+    const CELL_KINDS: CellDrawings = {
         part: () => <div className="test-cell" />,
         chapter: () => <div className="test-cell" />,
         markdown: () => <div className="test-cell" />,
@@ -741,19 +768,11 @@ describe("the part and the chapter the author is looking at", () => {
             ObserverTheTestDrives;
         await mountCanvas({
             cells: [
-                {
-                    kind: "part",
-                    source: "",
-                    attrs: { id: "p1", title: "Book One" },
-                },
-                {
-                    kind: "chapter",
-                    source: "",
-                    attrs: { id: "c1", title: "The Door" },
-                },
-                { kind: "markdown", source: "one", attrs: { id: "m1" } },
+                new PartCell("Book One", "", false, null, "p1"),
+                new ChapterCell("The Door", "", false, null, "c1"),
+                new MarkdownCell("one", false, null, "m1"),
             ],
-            cellRenderers: CELL_KINDS,
+            cellDrawings: CELL_KINDS,
         });
     }
 
@@ -775,14 +794,14 @@ describe("the part and the chapter the author is looking at", () => {
 });
 
 describe("the scope of a part and of a chapter", () => {
-    const CELL_KINDS: AuthorDocumentCellRenderers = {
+    const CELL_KINDS: CellDrawings = {
         part: () => <div className="test-cell" />,
         chapter: () => <div className="test-cell" />,
         markdown: () => <div className="test-cell" />,
     };
 
-    async function mountStory(cells: WebviewCell[]): Promise<void> {
-        await mountCanvas({ cells, cellRenderers: CELL_KINDS });
+    async function mountStory(cells: Cell[]): Promise<void> {
+        await mountCanvas({ cells, cellDrawings: CELL_KINDS });
     }
 
     function cellsWithin(scope: string): string[] {
@@ -793,9 +812,9 @@ describe("the scope of a part and of a chapter", () => {
 
     it("draws a chapter inside the scope of its part, and the prose inside the chapter's", async () => {
         await mountStory([
-            { kind: "part", source: "", attrs: { id: "p1" } },
-            { kind: "chapter", source: "", attrs: { id: "c1" } },
-            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            new PartCell("", "", false, null, "p1"),
+            new ChapterCell("", "", false, null, "c1"),
+            new MarkdownCell("one", false, null, "m1"),
         ]);
 
         expect(cellsWithin("author-file-editor-part-scope")).toEqual(["c1"]);
@@ -804,9 +823,9 @@ describe("the scope of a part and of a chapter", () => {
 
     it("holds every kind of section inside the chapter it stands in", async () => {
         await mountStory([
-            { kind: "chapter", source: "", attrs: { id: "c1" } },
-            { kind: "markdown", source: "one", attrs: { id: "m1" } },
-            { kind: "part", source: "", attrs: { id: "p1" } },
+            new ChapterCell("", "", false, null, "c1"),
+            new MarkdownCell("one", false, null, "m1"),
+            new PartCell("", "", false, null, "p1"),
         ]);
 
         expect(cellsWithin("author-file-editor-chapter-scope")).toEqual(["m1"]);
@@ -817,9 +836,9 @@ describe("the scope of a part and of a chapter", () => {
 
     it("leaves what stands before any part or chapter at the top", async () => {
         await mountStory([
-            { kind: "markdown", source: "front", attrs: { id: "m0" } },
-            { kind: "part", source: "", attrs: { id: "p1" } },
-            { kind: "markdown", source: "under", attrs: { id: "m1" } },
+            new MarkdownCell("front", false, null, "m0"),
+            new PartCell("", "", false, null, "p1"),
+            new MarkdownCell("under", false, null, "m1"),
         ]);
 
         expect(
@@ -831,13 +850,13 @@ describe("the scope of a part and of a chapter", () => {
     it("ends the part and the chapter where a page outside the story stands", async () => {
         await mountCanvas({
             cells: [
-                { kind: "part", source: "", attrs: { id: "p1" } },
-                { kind: "chapter", source: "", attrs: { id: "c1" } },
-                { kind: "markdown", source: "one", attrs: { id: "m1" } },
-                { kind: "about", source: "", attrs: { id: "a1" } },
-                { kind: "markdown", source: "beside", attrs: { id: "m2" } },
+                new PartCell("", "", false, null, "p1"),
+                new ChapterCell("", "", false, null, "c1"),
+                new MarkdownCell("one", false, null, "m1"),
+                new AboutCell("", "", "", "", "", false, null, "a1"),
+                new MarkdownCell("beside", false, null, "m2"),
             ],
-            cellRenderers: {
+            cellDrawings: {
                 ...CELL_KINDS,
                 about: () => <div className="test-cell" />,
             },
@@ -851,9 +870,9 @@ describe("the scope of a part and of a chapter", () => {
 
     it("marks the end of the line of a section nothing of its kind follows", async () => {
         await mountStory([
-            { kind: "part", source: "", attrs: { id: "p1" } },
-            { kind: "chapter", source: "", attrs: { id: "c1" } },
-            { kind: "chapter", source: "", attrs: { id: "c2" } },
+            new PartCell("", "", false, null, "p1"),
+            new ChapterCell("", "", false, null, "c1"),
+            new ChapterCell("", "", false, null, "c2"),
         ]);
 
         const scopes = [
@@ -866,13 +885,9 @@ describe("the scope of a part and of a chapter", () => {
 
     it("inserts past the contents a folded section holds, not in front of them", async () => {
         await mountStory([
-            {
-                kind: "chapter",
-                source: "",
-                attrs: { id: "c1", folded: "true" },
-            },
-            { kind: "markdown", source: "one", attrs: { id: "m1" } },
-            { kind: "chapter", source: "", attrs: { id: "c2" } },
+            new ChapterCell("", "", true, null, "c1"),
+            new MarkdownCell("one", false, null, "m1"),
+            new ChapterCell("", "", false, null, "c2"),
         ]);
 
         const menu = document.querySelector(
@@ -886,8 +901,8 @@ describe("the scope of a part and of a chapter", () => {
 
     it("opens the scope with the menu that inserts before the section's first cell", async () => {
         await mountStory([
-            { kind: "part", source: "", attrs: { id: "p1" } },
-            { kind: "markdown", source: "one", attrs: { id: "m1" } },
+            new PartCell("", "", false, null, "p1"),
+            new MarkdownCell("one", false, null, "m1"),
         ]);
 
         const menu = document.querySelector(
@@ -904,7 +919,7 @@ describe("a folded cell", () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
-                { kind: "markdown", source: "two", attrs: { folded: "true" } },
+                new MarkdownCell("two", true, null, "two"),
             ],
         });
 
@@ -917,11 +932,14 @@ describe("a folded cell", () => {
 });
 
 describe("the salient concepts the story holds", () => {
-    const THE_DOOR: WebviewCell = {
-        kind: "salient-concept",
-        source: "What she saw.",
-        attrs: { id: "k1", title: "Door", words: "1-2" },
-    };
+    const THE_DOOR = new SalientConceptCell(
+        "Door",
+        [new StoryWordRange(1, 2)],
+        "What she saw.",
+        false,
+        null,
+        "k1",
+    );
 
     function SelectsTheDoor() {
         const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
@@ -951,7 +969,7 @@ describe("the salient concepts the story holds", () => {
     it("highlights none of the words until a concept is selected", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
-            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            cellDrawings: { markdown: () => <SelectsTheDoor /> },
         });
 
         expect(highlightsDrawnOnTheStory()).toEqual([]);
@@ -960,7 +978,7 @@ describe("the salient concepts the story holds", () => {
     it("highlights the selected concept's words in its colour", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
-            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            cellDrawings: { markdown: () => <SelectsTheDoor /> },
             storyAnnotationsSelected: {
                 "salient-concept": { annotationCellId: "k1", passage: null },
             },
@@ -979,7 +997,7 @@ describe("the salient concepts the story holds", () => {
     it("shows the cell the words the host asks to be shown", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
-            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            cellDrawings: { markdown: () => <SelectsTheDoor /> },
             storyTextShown: {
                 cellId: "m1",
                 startCharacterOffsetInCell: 4,
@@ -1005,7 +1023,7 @@ describe("the salient concepts the story holds", () => {
     it("tells the host which words the author selected", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
-            cellRenderers: { markdown: () => <SelectsTheDoor /> },
+            cellDrawings: { markdown: () => <SelectsTheDoor /> },
         });
 
         await click(document.querySelector(".test-select-the-door")!);
@@ -1024,16 +1042,27 @@ describe("the salient concepts the story holds", () => {
 });
 
 describe("the plots the story weaves", () => {
-    const THE_BELL: WebviewCell = {
-        kind: "plot",
-        source: "He hears the bell.",
-        attrs: { id: "p1", title: "The bell", words: "0-0" },
-    };
-    const THE_DOOR: WebviewCell = {
-        kind: "plot",
-        source: "She opens the door.",
-        attrs: { id: "p2", title: "The door", words: "2-2, 0-1" },
-    };
+    const THE_BELL = new PlotCell(
+        "The bell",
+        [new PlotNode("n1", new StoryWordRange(0, 0))],
+        [],
+        "He hears the bell.",
+        false,
+        null,
+        "p1",
+    );
+    const THE_DOOR = new PlotCell(
+        "The door",
+        [
+            new PlotNode("n1", new StoryWordRange(2, 2)),
+            new PlotNode("n2", new StoryWordRange(0, 1)),
+        ],
+        [],
+        "She opens the door.",
+        false,
+        null,
+        "p2",
+    );
 
     function ShowsTheHighlights() {
         const storyTextHighlights =
@@ -1049,7 +1078,7 @@ describe("the plots the story weaves", () => {
     it("highlights none of the words until a plot is selected", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
-            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+            cellDrawings: { markdown: () => <ShowsTheHighlights /> },
         });
 
         const highlightsDrawn = document.querySelector<HTMLElement>(
@@ -1061,7 +1090,7 @@ describe("the plots the story weaves", () => {
     it("highlights every span of the selected plot's trajectory in its colour", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
-            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+            cellDrawings: { markdown: () => <ShowsTheHighlights /> },
             storyAnnotationsSelected: {
                 plot: { annotationCellId: "p2", passage: null },
             },
@@ -1089,7 +1118,7 @@ describe("the plots the story weaves", () => {
     it("emphasizes the passage selected", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
-            cellRenderers: { markdown: () => <ShowsTheHighlights /> },
+            cellDrawings: { markdown: () => <ShowsTheHighlights /> },
             storyAnnotationsSelected: {
                 plot: { annotationCellId: "p2", passage: 1 },
             },
@@ -1136,7 +1165,7 @@ describe("the plots the story weaves", () => {
                     THE_BELL,
                     THE_DOOR,
                 ],
-                cellRenderers: {
+                cellDrawings: {
                     markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
                 },
                 storyAnnotationsSelected: {
@@ -1159,15 +1188,18 @@ describe("the plots the story weaves", () => {
         await mountCanvas({
             cells: [
                 markdownCell("The door opens.", "m1"),
-                {
-                    kind: "salient-concept",
-                    source: "What she saw.",
-                    attrs: { id: "k1", title: "Door", words: "0-1" },
-                },
+                new SalientConceptCell(
+                    "Door",
+                    [new StoryWordRange(0, 1)],
+                    "What she saw.",
+                    false,
+                    null,
+                    "k1",
+                ),
                 THE_BELL,
                 THE_DOOR,
             ],
-            cellRenderers: {
+            cellDrawings: {
                 markdown: () => <ClicksTheStoryText clickedAt={2} />,
             },
             storyAnnotationsSelected: {
@@ -1213,7 +1245,7 @@ describe("the plots the story weaves", () => {
                     THE_BELL,
                     THE_DOOR,
                 ],
-                cellRenderers: {
+                cellDrawings: {
                     markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
                 },
                 storyAnnotationsSelected,
@@ -1269,34 +1301,45 @@ describe("the plots the story weaves", () => {
                 cells: [
                     markdownCell("The door opens.", "m1"),
                     markdownCell("He heard it.", "m2"),
-                    {
-                        kind: "salient-concept",
-                        source: "What he heard.",
-                        attrs: { id: "k1", title: "Hearing", words: "0-1, 3-4" },
-                    },
-                    {
-                        kind: "plot",
-                        source: "The door opens to the bell.",
-                        attrs: {
-                            id: "p1",
-                            title: "The door",
-                            words: "2-2, 0-1, 3-4",
-                        },
-                    },
-                    {
-                        kind: "plot",
-                        source: "The door opens, then he hears it.",
-                        attrs: {
-                            id: "p2",
-                            title: "In order",
-                            words: "0-1, 2-2, 3-4",
-                        },
-                    },
+                    new SalientConceptCell(
+                        "Hearing",
+                        [new StoryWordRange(0, 1), new StoryWordRange(3, 4)],
+                        "What he heard.",
+                        false,
+                        null,
+                        "k1",
+                    ),
+                    new PlotCell(
+                        "The door",
+                        [
+                            new PlotNode("n1", new StoryWordRange(2, 2)),
+                            new PlotNode("n2", new StoryWordRange(0, 1)),
+                            new PlotNode("n3", new StoryWordRange(3, 4)),
+                        ],
+                        [],
+                        "The door opens to the bell.",
+                        false,
+                        null,
+                        "p1",
+                    ),
+                    new PlotCell(
+                        "In order",
+                        [
+                            new PlotNode("n1", new StoryWordRange(0, 1)),
+                            new PlotNode("n2", new StoryWordRange(2, 2)),
+                            new PlotNode("n3", new StoryWordRange(3, 4)),
+                        ],
+                        [],
+                        "The door opens, then he hears it.",
+                        false,
+                        null,
+                        "p2",
+                    ),
                 ],
-                cellRenderers: {
-                    markdown: (cell, cellId) => (
+                cellDrawings: {
+                    markdown: (cell) => (
                         <MarkdownEditor
-                            cellId={cellId}
+                            cellId={cell.uniqueId}
                             markdown={cell.source}
                             onMarkdownCommitted={() => undefined}
                         />

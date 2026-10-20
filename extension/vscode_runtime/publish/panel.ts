@@ -3,8 +3,6 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
-import { StoryAnnotationsIterator } from "../../library/storydoc/iterators/story_annotations_iterator";
-import { STORY_ANNOTATION_KINDS } from "../story_annotation_selection";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
 
@@ -33,7 +31,7 @@ export class PublishView implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.pollTheServer();
-                this.showStoryAnnotations();
+                this.showTheDocument();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
             } else if (message?.type === "selectStoryAnnotation") {
@@ -89,10 +87,10 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.sessionFollowed = session;
         this.followingTheSession = vscode.Disposable.from(
             session.onDocumentOrSelectionChanged(() =>
-                this.showStoryAnnotations(),
+                this.showTheDocument(),
             ),
         );
-        this.showStoryAnnotations();
+        this.showTheDocument();
     }
 
     stopFollowing(session: AuthorFileEditorSession): void {
@@ -102,26 +100,14 @@ export class PublishView implements vscode.WebviewViewProvider {
         this.followingTheSession?.dispose();
         this.followingTheSession = undefined;
         this.sessionFollowed = undefined;
-        this.showStoryAnnotations();
+        this.showTheDocument();
     }
 
-    private showStoryAnnotations(): void {
+    private showTheDocument(): void {
         const session = this.sessionFollowed;
-        const annotationsOfEachKind = session
-            ? STORY_ANNOTATION_KINDS.map((cellKind) => {
-                  const storyAnnotations = new StoryAnnotationsIterator(
-                      session.document,
-                      cellKind,
-                  );
-                  return [cellKind, Array.from(storyAnnotations)];
-              })
-            : null;
-        const storyAnnotations = annotationsOfEachKind
-            ? Object.fromEntries(annotationsOfEachKind)
-            : null;
         void this.view?.webview.postMessage({
-            type: "storyAnnotations",
-            storyAnnotations,
+            type: "document",
+            text: session?.document.text ?? null,
             storyAnnotationsSelected: session?.theStoryAnnotationsSelected ?? {},
             storyTextSelected: session?.theStoryTextSelected ?? null,
         });

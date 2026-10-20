@@ -17,8 +17,8 @@ import {
     NO_STORY_ANNOTATION_SELECTED,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryAnnotationInTheStory } from "../../library/storydoc/iterators/story_annotations_iterator";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
+import type { Document } from "../../library/storydoc/storydoc";
 import "./AuthorshipPanelCanvas.css";
 
 export type SendMessagesToVscode = (message: unknown) => void;
@@ -76,7 +76,7 @@ const AUTHORSHIP_PANEL_TABS = [
 interface AuthorshipPanelCanvasProps {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
-    storyAnnotations?: Record<string, StoryAnnotationInTheStory[]> | null;
+    story?: Document | null;
     storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextSelected?: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
@@ -85,7 +85,7 @@ interface AuthorshipPanelCanvasProps {
 export function AuthorshipPanelCanvas({
     models,
     jobs,
-    storyAnnotations,
+    story,
     storyAnnotationsSelected = {},
     storyTextSelected = null,
     sendMessagesToVscode,
@@ -111,30 +111,24 @@ export function AuthorshipPanelCanvas({
                 ))}
             </div>
             <div className="authorship-panel-tab-body" role="tabpanel">
-                {tabShown === SALIENT_CONCEPTS_TAB &&
-                    storyAnnotations !== undefined && (
-                        <AuthorshipPanelStoryAnnotations
-                            cellKind={SALIENT_CONCEPT}
-                            storyAnnotations={
-                                storyAnnotations &&
-                                (storyAnnotations[SALIENT_CONCEPT] ?? [])
-                            }
-                            storyAnnotationSelected={
-                                storyAnnotationsSelected[SALIENT_CONCEPT] ??
-                                NO_STORY_ANNOTATION_SELECTED
-                            }
-                            storyTextSelected={storyTextSelected}
-                            wording={SALIENT_CONCEPTS_WORDING}
-                            listsThePassagesNewestFirst={true}
-                            sendMessagesToVscode={sendMessagesToVscode}
-                        />
-                    )}
-                {tabShown === PLOTS_TAB && storyAnnotations !== undefined && (
+                {tabShown === SALIENT_CONCEPTS_TAB && story !== undefined && (
+                    <AuthorshipPanelStoryAnnotations
+                        cellKind={SALIENT_CONCEPT}
+                        story={story}
+                        storyAnnotationSelected={
+                            storyAnnotationsSelected[SALIENT_CONCEPT] ??
+                            NO_STORY_ANNOTATION_SELECTED
+                        }
+                        storyTextSelected={storyTextSelected}
+                        wording={SALIENT_CONCEPTS_WORDING}
+                        listsThePassagesNewestFirst={true}
+                        sendMessagesToVscode={sendMessagesToVscode}
+                    />
+                )}
+                {tabShown === PLOTS_TAB && story !== undefined && (
                     <AuthorshipPanelStoryAnnotations
                         cellKind={PLOT}
-                        storyAnnotations={
-                            storyAnnotations && (storyAnnotations[PLOT] ?? [])
-                        }
+                        story={story}
                         storyAnnotationSelected={
                             storyAnnotationsSelected[PLOT] ??
                             NO_STORY_ANNOTATION_SELECTED

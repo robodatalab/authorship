@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { StoryAnnotationInTheStory } from "../../../extension/library/storydoc/iterators/story_annotations_iterator";
+import { Document } from "../../../extension/library/storydoc/storydoc";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../../extension/library/storydoc/iterators/story_words_iterator";
 
@@ -29,13 +29,42 @@ const { AuthorshipPanelStoryAnnotations } = await import(
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
+const THE_STORY = `<!-- cell: markdown id="c2" -->
+
+She saw the door.
+
+<!-- cell: markdown id="c3" -->
+
+He heard the bell.
+`;
+
+const THE_DOOR = `<!-- cell: plot id="p1" title="The door" -->
+
+She finds the door.
+`;
+
+const THE_DOOR_ON_BOTH_PASSAGES = `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" -->
+
+She finds the door.
+`;
+
+const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3" -->
+
+She finds the door.
+`;
+
+const THE_BELL = `<!-- cell: plot id="p2" title="The bell" -->
+
+He hears the bell.
+`;
+
 describe("the tab of a kind of story annotation", () => {
     let posted: unknown[] = [];
     let root: Root;
 
     interface WhatTheTabIsGiven {
         cellKind?: string;
-        storyAnnotations: StoryAnnotationInTheStory[] | null;
+        story: string | null;
         storyAnnotationSelected?: StoryAnnotationSelected;
         storyTextSelected?: StoryTextSpan | null;
         listsThePassagesNewestFirst?: boolean;
@@ -60,7 +89,9 @@ describe("the tab of a kind of story annotation", () => {
             root.render(
                 <AuthorshipPanelStoryAnnotations
                     cellKind={options.cellKind ?? "plot"}
-                    storyAnnotations={options.storyAnnotations}
+                    story={
+                        options.story === null ? null : new Document(options.story)
+                    }
                     storyAnnotationSelected={
                         options.storyAnnotationSelected ?? {
                             annotationCellId: null,
@@ -98,7 +129,7 @@ describe("the tab of a kind of story annotation", () => {
     }
 
     it("says so when no manuscript is open", async () => {
-        await mountStoryAnnotations({ storyAnnotations: null });
+        await mountStoryAnnotations({ story: null });
 
         expect(document.body.textContent).toBe("No manuscript open");
     });
@@ -106,7 +137,7 @@ describe("the tab of a kind of story annotation", () => {
     it.each([{ cellKind: "salient-concept" }, { cellKind: "plot" }])(
         "asks for a new $cellKind to be added",
         async ({ cellKind }) => {
-            await mountStoryAnnotations({ cellKind, storyAnnotations: [] });
+            await mountStoryAnnotations({ cellKind, story: THE_STORY });
             const addButton = document.querySelector(
                 ".authorship-panel-toolbar-button",
             )!;
@@ -125,20 +156,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("lists every annotation by its title", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-                {
-                    annotationCellId: "p2",
-                    title: "The bell",
-                    description: "He hears the bell.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR, THE_BELL].join("\n"),
         });
 
         const titlesListed = [
@@ -147,6 +165,22 @@ describe("the tab of a kind of story annotation", () => {
             ),
         ].map((title) => title.textContent);
         expect(titlesListed).toEqual(["The door", "The bell"]);
+    });
+
+    it("lists an annotation nobody has titled yet as untitled", async () => {
+        await mountStoryAnnotations({
+            story: [
+                THE_STORY,
+                '<!-- cell: plot id="p1" -->\n\nShe finds the door.\n',
+            ].join("\n"),
+        });
+
+        const titlesListed = [
+            ...document.querySelectorAll(
+                ".authorship-panel-story-annotation-title",
+            ),
+        ].map((title) => title.textContent);
+        expect(titlesListed).toEqual(["Untitled"]);
     });
 
     it.each([
@@ -166,20 +200,7 @@ describe("the tab of a kind of story annotation", () => {
         "asks the host to select the annotation clicked, letting go when it clicks $clicked",
         async ({ selected, clickedTitle, annotationCellId }) => {
             await mountStoryAnnotations({
-                storyAnnotations: [
-                    {
-                        annotationCellId: "p1",
-                        title: "The door",
-                        description: "She finds the door.",
-                        passages: [],
-                    },
-                    {
-                        annotationCellId: "p2",
-                        title: "The bell",
-                        description: "He hears the bell.",
-                        passages: [],
-                    },
-                ],
+                story: [THE_STORY, THE_DOOR, THE_BELL].join("\n"),
                 storyAnnotationSelected: {
                     annotationCellId: selected,
                     passage: null,
@@ -203,21 +224,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("shows the selected annotation's title, description and passages below the list", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [
-                        {
-                            firstWord: 2,
-                            lastWord: 3,
-                            cellId: "c2",
-                            wordsItCovers: "the door.",
-                        },
-                    ],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
 
@@ -237,14 +244,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("asks for the title to be replaced as the author types it", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
         const titleBox = document.querySelector<HTMLInputElement>(
@@ -263,11 +263,9 @@ describe("the tab of a kind of story annotation", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "replaceAttribute",
+                commandName: "replaceCell",
                 commandArguments: {
-                    cellId: "p1",
-                    attributeName: "title",
-                    attributeValue: "The doors",
+                    cell: '<!-- cell: plot id="p1" title="The doors" -->\n\nShe finds the door.\n',
                 },
             },
         ]);
@@ -275,14 +273,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("tells the host the description the author types", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
         const descriptionRendered =
@@ -305,26 +296,15 @@ describe("the tab of a kind of story annotation", () => {
 
     it("shows the description the host rewrote, as after an undo", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
 
         await redrawStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She opens the door.",
-                    passages: [],
-                },
-            ],
+            story: [
+                THE_STORY,
+                '<!-- cell: plot id="p1" title="The door" -->\n\nShe opens the door.\n',
+            ].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
 
@@ -336,20 +316,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("asks for the annotation whose bin is pressed to be deleted", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-                {
-                    annotationCellId: "p2",
-                    title: "The bell",
-                    description: "He hears the bell.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR, THE_BELL].join("\n"),
         });
         const secondBin = document.querySelectorAll(
             ".authorship-panel-story-annotation-deleted",
@@ -368,33 +335,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("counts the passages of each annotation in a column beside its title", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [
-                        {
-                            firstWord: 2,
-                            lastWord: 3,
-                            cellId: "c2",
-                            wordsItCovers: "the door.",
-                        },
-                        {
-                            firstWord: 6,
-                            lastWord: 7,
-                            cellId: "c3",
-                            wordsItCovers: "the bell.",
-                        },
-                    ],
-                },
-                {
-                    annotationCellId: "p2",
-                    title: "The bell",
-                    description: "He hears the bell.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES, THE_BELL].join("\n"),
         });
 
         const passagesCounted = [
@@ -420,27 +361,7 @@ describe("the tab of a kind of story annotation", () => {
         "lists the passages $order",
         async ({ listsThePassagesNewestFirst, passagesListed }) => {
             await mountStoryAnnotations({
-                storyAnnotations: [
-                    {
-                        annotationCellId: "p1",
-                        title: "The door",
-                        description: "She finds the door.",
-                        passages: [
-                            {
-                                firstWord: 2,
-                                lastWord: 3,
-                                cellId: "c2",
-                                wordsItCovers: "the door.",
-                            },
-                            {
-                                firstWord: 6,
-                                lastWord: 7,
-                                cellId: "c3",
-                                wordsItCovers: "the bell.",
-                            },
-                        ],
-                    },
-                ],
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
                 storyAnnotationSelected: {
                     annotationCellId: "p1",
                     passage: null,
@@ -481,27 +402,7 @@ describe("the tab of a kind of story annotation", () => {
             lastWord,
         }) => {
             await mountStoryAnnotations({
-                storyAnnotations: [
-                    {
-                        annotationCellId: "p1",
-                        title: "The door",
-                        description: "She finds the door.",
-                        passages: [
-                            {
-                                firstWord: 2,
-                                lastWord: 3,
-                                cellId: "c2",
-                                wordsItCovers: "the door.",
-                            },
-                            {
-                                firstWord: 6,
-                                lastWord: 7,
-                                cellId: "c3",
-                                wordsItCovers: "the bell.",
-                            },
-                        ],
-                    },
-                ],
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
                 storyAnnotationSelected: {
                     annotationCellId: "p1",
                     passage: null,
@@ -536,27 +437,7 @@ describe("the tab of a kind of story annotation", () => {
         "marks the passage selected when listed $order",
         async ({ listsThePassagesNewestFirst, passagesMarked }) => {
             await mountStoryAnnotations({
-                storyAnnotations: [
-                    {
-                        annotationCellId: "p1",
-                        title: "The door",
-                        description: "She finds the door.",
-                        passages: [
-                            {
-                                firstWord: 2,
-                                lastWord: 3,
-                                cellId: "c2",
-                                wordsItCovers: "the door.",
-                            },
-                            {
-                                firstWord: 6,
-                                lastWord: 7,
-                                cellId: "c3",
-                                wordsItCovers: "the bell.",
-                            },
-                        ],
-                    },
-                ],
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
                 storyAnnotationSelected: { annotationCellId: "p1", passage: 0 },
                 listsThePassagesNewestFirst,
             });
@@ -572,21 +453,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("asks for a passage's words to be taken out of the annotation", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [
-                        {
-                            firstWord: 2,
-                            lastWord: 3,
-                            cellId: "c2",
-                            wordsItCovers: "the door.",
-                        },
-                    ],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
         const removeButton = document.querySelector(
@@ -610,14 +477,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("cannot assign anything until words are selected", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
 
@@ -629,14 +489,7 @@ describe("the tab of a kind of story annotation", () => {
 
     it("asks for the selected words to be assigned to the selected annotation", async () => {
         await mountStoryAnnotations({
-            storyAnnotations: [
-                {
-                    annotationCellId: "p1",
-                    title: "The door",
-                    description: "She finds the door.",
-                    passages: [],
-                },
-            ],
+            story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
             storyTextSelected: {
                 cellId: "m1",

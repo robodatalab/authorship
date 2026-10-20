@@ -1,4 +1,7 @@
+import { useMemo } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
+import { StoryAnnotationRetitled } from "./StoryAnnotationRetitled";
+import { replaceTheCell } from "../author_editor/AuthorFileEditorCanvas";
 import {
     AuthorFileEditorCellFields,
     type AuthorFileEditorCellField,
@@ -8,14 +11,17 @@ import {
     MarkdownEditorMediator,
     useTimesTheHostRewroteIt,
 } from "../markdown/MarkdownEditor";
-import type { StoryAnnotationInTheStory } from "../../library/storydoc/iterators/story_annotations_iterator";
+import {
+    StoryAnnotationsIterator,
+    type StoryAnnotationInTheStory,
+} from "../../library/storydoc/iterators/story_annotations_iterator";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import type { Document } from "../../library/storydoc/storydoc";
 import "./AuthorshipPanelStoryAnnotations.css";
 
-const ANNOTATION_FIELDS: AuthorFileEditorCellField[] = [
-    { attributeName: "title", label: "Title" },
-];
+const UNTITLED = "Untitled";
 
 export interface AuthorshipPanelStoryAnnotationsWording {
     addAnAnnotation: string;
@@ -31,7 +37,7 @@ export interface AuthorshipPanelStoryAnnotationsWording {
 
 interface AuthorshipPanelStoryAnnotationsProps {
     cellKind: string;
-    storyAnnotations: StoryAnnotationInTheStory[] | null;
+    story: Document | null;
     storyAnnotationSelected: StoryAnnotationSelected;
     storyTextSelected: StoryTextSpan | null;
     wording: AuthorshipPanelStoryAnnotationsWording;
@@ -41,14 +47,24 @@ interface AuthorshipPanelStoryAnnotationsProps {
 
 export function AuthorshipPanelStoryAnnotations({
     cellKind,
-    storyAnnotations,
+    story,
     storyAnnotationSelected,
     storyTextSelected,
     wording,
     listsThePassagesNewestFirst,
     sendMessagesToVscode,
 }: AuthorshipPanelStoryAnnotationsProps) {
-    if (storyAnnotations === null) {
+    const storyAnnotations = useMemo(() => {
+        if (story === null) {
+            return null;
+        }
+        const storyAnnotationsOfTheKind = new StoryAnnotationsIterator(
+            story,
+            cellKind,
+        );
+        return Array.from(storyAnnotationsOfTheKind);
+    }, [story, cellKind]);
+    if (story === null || storyAnnotations === null) {
         return <div className="authorship-panel-idle">No manuscript open</div>;
     }
     const annotationShown = storyAnnotations.find(
@@ -56,6 +72,16 @@ export function AuthorshipPanelStoryAnnotations({
             annotation.annotationCellId ===
             storyAnnotationSelected.annotationCellId,
     );
+
+    function retitleTheAnnotation(annotationCellId: string, title: string): void {
+        const annotationCell = story?.cellWithId(annotationCellId);
+        if (annotationCell === undefined) {
+            return;
+        }
+        const retitling = new StoryAnnotationRetitled(title);
+        const retitled = annotationCell.accept<Cell>(retitling);
+        replaceTheCell(sendMessagesToVscode, retitled);
+    }
 
     return (
         <div className="authorship-panel-story-annotations">
@@ -108,7 +134,7 @@ export function AuthorshipPanelStoryAnnotations({
                                     }
                                 >
                                     <span className="authorship-panel-swatch" />
-                                    {annotation.title}
+                                    {annotation.title || UNTITLED}
                                 </button>
                                 <span
                                     className="authorship-panel-story-annotation-passages-count"
@@ -154,6 +180,12 @@ export function AuthorshipPanelStoryAnnotations({
                             listsThePassagesNewestFirst={
                                 listsThePassagesNewestFirst
                             }
+                            onRetitled={(title) =>
+                                retitleTheAnnotation(
+                                    annotationShown.annotationCellId,
+                                    title,
+                                )
+                            }
                             sendMessagesToVscode={sendMessagesToVscode}
                         />
                     )}
@@ -170,6 +202,7 @@ interface AuthorshipPanelStoryAnnotationDetailsProps {
     storyTextSelected: StoryTextSpan | null;
     wording: AuthorshipPanelStoryAnnotationsWording;
     listsThePassagesNewestFirst: boolean;
+    onRetitled: (title: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -180,6 +213,7 @@ function AuthorshipPanelStoryAnnotationDetails({
     storyTextSelected,
     wording,
     listsThePassagesNewestFirst,
+    onRetitled,
     sendMessagesToVscode,
 }: AuthorshipPanelStoryAnnotationDetailsProps) {
     const description = useTimesTheHostRewroteIt(annotation.description);
@@ -189,24 +223,13 @@ function AuthorshipPanelStoryAnnotationDetails({
     const passagesListed = listsThePassagesNewestFirst
         ? passagesInTheStory.reverse()
         : passagesInTheStory;
+    const fields: AuthorFileEditorCellField[] = [
+        { label: "Title", said: annotation.title, onSaid: onRetitled },
+    ];
 
     return (
         <section className="authorship-panel-story-annotation-details">
-            <AuthorFileEditorCellFields
-                fields={ANNOTATION_FIELDS}
-                cellAttributes={{ title: annotation.title }}
-                onAttributeChanged={(attributeName, attributeValue) =>
-                    sendMessagesToVscode({
-                        type: "invoke",
-                        commandName: "replaceAttribute",
-                        commandArguments: {
-                            cellId: annotation.annotationCellId,
-                            attributeName,
-                            attributeValue,
-                        },
-                    })
-                }
-            />
+            <AuthorFileEditorCellFields fields={fields} />
             <div className="authorship-panel-story-annotation-description">
                 <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <MarkdownEditor

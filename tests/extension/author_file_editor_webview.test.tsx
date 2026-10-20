@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
-import type { WebviewCell } from "../../extension/webview/author_editor/AuthorFileEditorCanvas";
-
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 let posted: { type: string }[] = [];
 
-function markdownCell(source: string): WebviewCell {
-    return { kind: "markdown", source, attrs: {} };
+function markdownCell(cellId: string, source: string): string {
+    return `<!-- cell: markdown id="${cellId}" -->\n\n${source}\n`;
 }
 
 async function openWebview(): Promise<void> {
@@ -19,13 +17,11 @@ async function openWebview(): Promise<void> {
     });
     vi.resetModules();
     await act(async () => {
-        await import("../../extension/webview/cell_types/MarkdownCell");
-        await import("../../extension/webview/cell_types/NotesCell");
         await import("../../extension/webview/message_queue_between_vscode_and_webview");
     });
 }
 
-async function hostSends(cells: WebviewCell[]): Promise<void> {
+async function hostSends(cells: string[]): Promise<void> {
     await act(async () => {
         window.dispatchEvent(
             new MessageEvent("message", {
@@ -61,15 +57,15 @@ describe("opening the document", () => {
 
     it("renders the cells the host sends", async () => {
         await openWebview();
-        await hostSends([markdownCell("one"), markdownCell("two")]);
+        await hostSends([markdownCell("m1", "one"), markdownCell("m2", "two")]);
         expect(renderedCellText()).toEqual(["one", "two"]);
     });
 
     it("renders nothing for a kind no renderer covers", async () => {
         await openWebview();
         await hostSends([
-            markdownCell("kept"),
-            { kind: "chapter", source: "", attrs: { title: "Dropped" } },
+            markdownCell("m1", "kept"),
+            '<!-- cell: mystery id="x1" -->\n\nDropped\n',
         ]);
         expect(renderedCellText()).toEqual(["kept"]);
     });
@@ -78,28 +74,28 @@ describe("opening the document", () => {
 describe("refreshing the document", () => {
     it("replaces what is on the page when the document changes", async () => {
         await openWebview();
-        await hostSends([markdownCell("first")]);
-        await hostSends([markdownCell("second")]);
+        await hostSends([markdownCell("m1", "first")]);
+        await hostSends([markdownCell("m1", "second")]);
         expect(renderedCellText()).toEqual(["second"]);
     });
 
     it("follows a cell being added", async () => {
         await openWebview();
-        await hostSends([markdownCell("one")]);
-        await hostSends([markdownCell("one"), markdownCell("two")]);
+        await hostSends([markdownCell("m1", "one")]);
+        await hostSends([markdownCell("m1", "one"), markdownCell("m2", "two")]);
         expect(renderedCellText()).toEqual(["one", "two"]);
     });
 
     it("follows a cell being taken out", async () => {
         await openWebview();
-        await hostSends([markdownCell("one"), markdownCell("two")]);
-        await hostSends([markdownCell("two")]);
+        await hostSends([markdownCell("m1", "one"), markdownCell("m2", "two")]);
+        await hostSends([markdownCell("m2", "two")]);
         expect(renderedCellText()).toEqual(["two"]);
     });
 
     it("ignores a message that is not the document", async () => {
         await openWebview();
-        await hostSends([markdownCell("kept")]);
+        await hostSends([markdownCell("m1", "kept")]);
         await act(async () => {
             window.dispatchEvent(
                 new MessageEvent("message", { data: { type: "something" } }),

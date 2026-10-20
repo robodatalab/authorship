@@ -63,7 +63,8 @@ describe("the sidebar every cell has", () => {
                 cellCommands={[]}
                 runCommand={RUN_COMMAND}
                 cellId="c1"
-                cellAttributes={{}}
+                cellIsFolded={false}
+                timesTheHostWroteIt={0}
                 sendMessagesToVscode={() => undefined}
             >
                 <AuthorFileEditorCell sidebar={<AuthorFileEditorCellRun />}>
@@ -151,7 +152,8 @@ describe("what the prose checker found", () => {
             <AuthorFileEditorCellState
                 cellCommands={[]}
                 cellId="c1"
-                cellAttributes={{}}
+                cellIsFolded={false}
+                timesTheHostWroteIt={0}
                 proseErrors={proseErrors}
                 sendMessagesToVscode={(message) => posted.push(message)}
             >
@@ -193,7 +195,8 @@ describe("the words of the section a cell opens", () => {
             <AuthorFileEditorCellState
                 cellCommands={[]}
                 cellId="c1"
-                cellAttributes={{}}
+                cellIsFolded={false}
+                timesTheHostWroteIt={0}
                 wordsInTheSection={wordsInTheSection}
                 sendMessagesToVscode={() => undefined}
             >
@@ -241,7 +244,8 @@ describe("running a cell that writes itself", () => {
                 cellCommands={[]}
                 runCommand={options.runCommand}
                 cellId="c1"
-                cellAttributes={{}}
+                cellIsFolded={false}
+                timesTheHostWroteIt={0}
                 howFarTheCellHasBeenWritten={
                     options.howFarTheCellHasBeenWritten
                 }

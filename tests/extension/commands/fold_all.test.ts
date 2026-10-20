@@ -63,16 +63,10 @@ describe("FoldAllCommand — folds and unfolds the whole document", () => {
 
 describe("FoldAllCommand — which of the two is drawn", () => {
     it("offers to fold a cell that is not folded", () => {
-        expect(FOLD_ALL.drawnWhenCellAttributeIs).toEqual({
-            attributeName: "folded",
-            attributeValue: "",
-        });
+        expect(FOLD_ALL.drawnWhenTheCellIsFolded).toBe(false);
     });
 
     it("offers to unfold a cell that is folded", () => {
-        expect(UNFOLD_ALL.drawnWhenCellAttributeIs).toEqual({
-            attributeName: "folded",
-            attributeValue: "true",
-        });
+        expect(UNFOLD_ALL.drawnWhenTheCellIsFolded).toBe(true);
     });
 });

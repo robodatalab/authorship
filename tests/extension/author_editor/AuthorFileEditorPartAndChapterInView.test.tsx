@@ -3,29 +3,25 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorPartAndChapterInView } from "../../../extension/webview/author_editor/AuthorFileEditorPartAndChapterInView";
-import type { WebviewCell } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
+import type { Cell } from "../../../extension/library/storydoc/cells/cell";
+import { parse } from "../../../extension/library/storydoc/parser";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function cell(kind: string, id: string, title = ""): WebviewCell {
-    return { kind, source: "", attrs: title ? { id, title } : { id } };
-}
-
-const A_STORY_IN_TWO_PARTS: WebviewCell[] = [
-    cell("title-page", "title"),
-    cell("part", "p1", "The Morning"),
-    cell("chapter", "c1", "Waking"),
-    cell("markdown", "m1"),
-    cell("chapter", "c2", "Breakfast"),
-    cell("markdown", "m2"),
-    cell("part", "p2", "The Evening"),
-    cell("chapter", "c3", "Drinks"),
-    cell("markdown", "m3"),
-];
+const A_STORY_IN_TWO_PARTS = parse(`<!-- cell: title-page id="title" -->
+<!-- cell: part id="p1" title="The Morning" -->
+<!-- cell: chapter id="c1" title="Waking" -->
+<!-- cell: markdown id="m1" -->
+<!-- cell: chapter id="c2" title="Breakfast" -->
+<!-- cell: markdown id="m2" -->
+<!-- cell: part id="p2" title="The Evening" -->
+<!-- cell: chapter id="c3" title="Drinks" -->
+<!-- cell: markdown id="m3" -->
+`);
 
 async function draw(
     cellIdInView: string | undefined,
-    cells: WebviewCell[] = A_STORY_IN_TWO_PARTS,
+    cells: Cell[] = A_STORY_IN_TWO_PARTS,
     wordsInTheDocument = 0,
 ): Promise<void> {
     document.body.innerHTML = "";
@@ -44,7 +40,7 @@ async function draw(
 
 async function saidAbout(
     cellIdInView: string | undefined,
-    cells: WebviewCell[] = A_STORY_IN_TWO_PARTS,
+    cells: Cell[] = A_STORY_IN_TWO_PARTS,
 ): Promise<string> {
     await draw(cellIdInView, cells);
     return (
@@ -68,19 +64,23 @@ describe("the part and chapter the author is looking at", () => {
 
     it("names the chapter alone in a story nobody divided into parts", async () => {
         expect(
-            await saidAbout("m1", [
-                cell("chapter", "c1", "Waking"),
-                cell("markdown", "m1"),
-            ]),
+            await saidAbout(
+                "m1",
+                parse(`<!-- cell: chapter id="c1" title="Waking" -->
+<!-- cell: markdown id="m1" -->
+`),
+            ),
         ).toBe("Waking");
     });
 
     it("says untitled for a section the author has not named", async () => {
         expect(
-            await saidAbout("m1", [
-                cell("chapter", "c1"),
-                cell("markdown", "m1"),
-            ]),
+            await saidAbout(
+                "m1",
+                parse(`<!-- cell: chapter id="c1" -->
+<!-- cell: markdown id="m1" -->
+`),
+            ),
         ).toBe("Untitled");
     });
 
