@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
     CharacterRangeSynchronizer,
     type SynchronizedRepresentation,
-} from "../../../../extension/vscode_runtime/storydoc/synchronizers/character_range_synchronizer";
-import { AuthorDocDiff } from "../../../../extension/vscode_runtime/storydoc/diff";
-import { Document } from "../../../../extension/vscode_runtime/storydoc/storydoc";
+} from "../../../../extension/library/storydoc/synchronizers/character_range_synchronizer";
+import { AuthorDocDiff } from "../../../../extension/library/storydoc/diff";
+import { Document } from "../../../../extension/library/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const SHE_SAW_NOTHING = '<!-- cell: markdown id="c1" -->\n\nShe  the door.\n';

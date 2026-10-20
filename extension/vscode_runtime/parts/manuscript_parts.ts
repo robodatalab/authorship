@@ -17,17 +17,17 @@
 // without launching an editor. Everything here deals in cells; divide_manuscript.ts
 // turns the parts into files.
 
-import { standsOutsideTheStory } from "../storydoc/story_sections";
-import { EXTENSION } from "../storydoc/storydoc";
-import { ABOUT } from "../storydoc/cells/about_cell";
-import type { Cell } from "../storydoc/cells/cell";
-import { ChapterCell } from "../storydoc/cells/chapter_cell";
-import { DISCLAIMER } from "../storydoc/cells/disclaimer_cell";
-import { DividerCell } from "../storydoc/cells/divider_cell";
-import { ImageCell } from "../storydoc/cells/image_cell";
-import { PartCell } from "../storydoc/cells/part_cell";
-import { TABLE_OF_CONTENTS } from "../storydoc/cells/table_of_contents_cell";
-import { TITLE_PAGE, TitlePageCell } from "../storydoc/cells/title_page_cell";
+import { standsOutsideTheStory } from "../../library/storydoc/story_sections";
+import { EXTENSION } from "../../library/storydoc/storydoc";
+import { ABOUT } from "../../library/storydoc/cells/about_cell";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
+import { DISCLAIMER } from "../../library/storydoc/cells/disclaimer_cell";
+import { DividerCell } from "../../library/storydoc/cells/divider_cell";
+import { ImageCell } from "../../library/storydoc/cells/image_cell";
+import { PartCell } from "../../library/storydoc/cells/part_cell";
+import { TABLE_OF_CONTENTS } from "../../library/storydoc/cells/table_of_contents_cell";
+import { TITLE_PAGE, TitlePageCell } from "../../library/storydoc/cells/title_page_cell";
 
 const KINDS_EVERY_PART_CARRIES = new Set([
     TITLE_PAGE,

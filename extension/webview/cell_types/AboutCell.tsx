@@ -17,7 +17,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { ABOUT } from "../../vscode_runtime/storydoc/cells/about_cell";
+import { ABOUT } from "../../library/storydoc/cells/about_cell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
 const FIELDS: AuthorFileEditorCellField[] = [

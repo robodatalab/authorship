@@ -35,7 +35,7 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import {
     MarkdownEditorMediator,
     type MarkdownEditorStoryTextHighlight,

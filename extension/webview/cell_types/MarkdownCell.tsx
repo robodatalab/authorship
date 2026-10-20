@@ -19,7 +19,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { MARKDOWN } from "../../vscode_runtime/storydoc/cells/markdown_cell";
+import { MARKDOWN } from "../../library/storydoc/cells/markdown_cell";
 
 interface MarkdownCellProps {
     cell: WebviewCell;

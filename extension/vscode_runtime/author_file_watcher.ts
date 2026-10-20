@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 
-import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { TheFileChangedUnderneath } from "../author_file_editor_messages";
-import type { MessageQueueBetweenVscodeAndWebview } from "../message_queue_between_vscode_and_webview";
+import type { AuthorFileEditorSession } from "./author_file_editor_session";
+import { TheFileChangedUnderneath } from "./author_file_editor_messages";
+import type { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
 
 export function watchTheAuthorFileForChanges(
     session: AuthorFileEditorSession,

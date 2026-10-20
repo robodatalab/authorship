@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { PlotEdge, PlotNode } from "../../../../extension/vscode_runtime/storydoc/cells/plot_cell";
-import { StoryWordRange } from "../../../../extension/vscode_runtime/storydoc/cells/story_word_range";
-import { AuthorDocDiff } from "../../../../extension/vscode_runtime/storydoc/diff";
-import { Document } from "../../../../extension/vscode_runtime/storydoc/storydoc";
-import { PassagesSynchronizer } from "../../../../extension/vscode_runtime/storydoc/synchronizers/passages_synchronizer";
+import { PlotEdge, PlotNode } from "../../../../extension/library/storydoc/cells/plot_cell";
+import { StoryWordRange } from "../../../../extension/library/storydoc/cells/story_word_range";
+import { AuthorDocDiff } from "../../../../extension/library/storydoc/diff";
+import { Document } from "../../../../extension/library/storydoc/storydoc";
+import { PassagesSynchronizer } from "../../../../extension/library/storydoc/synchronizers/passages_synchronizer";
 
 const THE_CHAPTER = '<!-- cell: chapter title="One" id="c1" -->\n';
 const THE_NOTE = '<!-- cell: note id="n1" -->\n\n<!--\nNot a story word.\n-->\n';

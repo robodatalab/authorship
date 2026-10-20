@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useWhereTheMarkdownEditorsDrawTheirText } from "../markdown/MarkdownEditor";
-import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import "./AuthorFileEditorOverviewRuler.css";
 
 const OVERVIEW_RULER_COLORS_THE_STYLESHEET_DEFINES = 6;

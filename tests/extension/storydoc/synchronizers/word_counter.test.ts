@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { Document } from "../../../../extension/vscode_runtime/storydoc/storydoc";
-import { AuthorDocDiff } from "../../../../extension/vscode_runtime/storydoc/diff";
-import { WordCounter } from "../../../../extension/vscode_runtime/storydoc/synchronizers/word_counter";
+import { Document } from "../../../../extension/library/storydoc/storydoc";
+import { AuthorDocDiff } from "../../../../extension/library/storydoc/diff";
+import { WordCounter } from "../../../../extension/library/storydoc/synchronizers/word_counter";
 
 const A_STORY_IN_TWO_PARTS = `
 <!-- cell: part title="The Morning" id="p1" -->

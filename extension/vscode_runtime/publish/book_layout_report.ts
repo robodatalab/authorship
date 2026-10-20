@@ -1,5 +1,5 @@
-import type { Cell } from "../storydoc/cells/cell";
-import { cellOfKind } from "../storydoc/parser";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { cellOfKind } from "../../library/storydoc/parser";
 
 const NEEDS_TEXT = "text";
 

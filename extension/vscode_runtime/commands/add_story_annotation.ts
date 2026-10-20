@@ -1,6 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { cellOfKind } from "../storydoc/parser";
+import { cellOfKind } from "../../library/storydoc/parser";
 
 export class AddStoryAnnotationCommand implements AuthorDocumentCommand {
     readonly commandName = "addStoryAnnotation";

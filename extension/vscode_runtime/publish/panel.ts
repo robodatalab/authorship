@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { authorDocumentCommand } from "../commands/author_document_commands";
 import { fetchFromServer } from "../server/fetch";
-import { StoryAnnotationsIterator } from "../storydoc/iterators/story_annotations_iterator";
+import { StoryAnnotationsIterator } from "../../library/storydoc/iterators/story_annotations_iterator";
 import { STORY_ANNOTATION_KINDS } from "../story_annotation_selection";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;

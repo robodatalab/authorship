@@ -15,8 +15,8 @@ import {
     partFileName,
     partNumber,
 } from "./manuscript_parts";
-import { Document } from "../storydoc/storydoc";
-import type { Cell } from "../storydoc/cells/cell";
+import { Document } from "../../library/storydoc/storydoc";
+import type { Cell } from "../../library/storydoc/cells/cell";
 
 /** What a division came to. */
 export interface DividedManuscript {

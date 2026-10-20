@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
-import { StoryWordRange } from "../../../extension/vscode_runtime/storydoc/cells/story_word_range";
+import { Document } from "../../../extension/library/storydoc/storydoc";
+import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import {
     StoryTextSpan,
     StoryWord,
     StoryWordsIterator,
-} from "../../../extension/vscode_runtime/storydoc/iterators/story_words_iterator";
-import { parse } from "../../../extension/vscode_runtime/storydoc/parser";
+} from "../../../extension/library/storydoc/iterators/story_words_iterator";
+import { parse } from "../../../extension/library/storydoc/parser";
 
 interface CorpusCase {
     name: string;

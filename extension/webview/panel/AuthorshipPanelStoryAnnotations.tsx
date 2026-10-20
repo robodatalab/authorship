@@ -8,9 +8,9 @@ import {
     MarkdownEditorMediator,
     useTimesTheHostRewroteIt,
 } from "../markdown/MarkdownEditor";
-import type { StoryAnnotationInTheStory } from "../../vscode_runtime/storydoc/iterators/story_annotations_iterator";
+import type { StoryAnnotationInTheStory } from "../../library/storydoc/iterators/story_annotations_iterator";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../vscode_runtime/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import "./AuthorshipPanelStoryAnnotations.css";
 
 const ANNOTATION_FIELDS: AuthorFileEditorCellField[] = [

@@ -14,7 +14,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { PART } from "../../vscode_runtime/storydoc/cells/part_cell";
+import { PART } from "../../library/storydoc/cells/part_cell";
 
 const FIELDS: AuthorFileEditorCellField[] = [
     { attributeName: "title", label: "Title" },

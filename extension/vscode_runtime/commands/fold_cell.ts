@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { FOLDED } from "../storydoc/parser";
+import { FOLDED } from "../../library/storydoc/parser";
 import type {
     AuthorDocumentCommand,
     CellAttributeCondition,

@@ -1,5 +1,3 @@
-import assert from "node:assert";
-
 import type { AuthorDocChange } from "../author_doc_change";
 import type { AuthorDocChangeVisitor } from "../author_doc_change_visitor";
 import type { Cell } from "../cells/cell";
@@ -21,7 +19,9 @@ export class CellsMoved implements AuthorDocChange {
     applyTo(cells: readonly Cell[]): Cell[] {
         return this.cellIdsAfter.map((cellId) => {
             const cellMoved = cells.find((cell) => cell.uniqueId === cellId);
-            assert(cellMoved !== undefined);
+            if (cellMoved === undefined) {
+                throw new Error(`Cell ${cellId} is not there to move`);
+            }
             return cellMoved;
         });
     }

@@ -1,8 +1,8 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import { PLOT, PlotCell } from "../storydoc/cells/plot_cell";
-import { SALIENT_CONCEPT, SalientConceptCell } from "../storydoc/cells/salient_concept_cell";
+import { PLOT, PlotCell } from "../../library/storydoc/cells/plot_cell";
+import { SALIENT_CONCEPT, SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 const DELETE = "Delete";

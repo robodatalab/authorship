@@ -1,6 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { SalientConceptCell } from "../storydoc/cells/salient_concept_cell";
-import { StoryWordsIterator } from "../storydoc/iterators/story_words_iterator";
+import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
+import { StoryWordsIterator } from "../../library/storydoc/iterators/story_words_iterator";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class AssignStoryTextCommand implements AuthorDocumentCommand {

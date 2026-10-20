@@ -15,7 +15,7 @@ import {
     type SendMessagesToVscode,
     type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { DISCLAIMER } from "../../vscode_runtime/storydoc/cells/disclaimer_cell";
+import { DISCLAIMER } from "../../library/storydoc/cells/disclaimer_cell";
 
 interface DisclaimerCellProps {
     cell: WebviewCell;

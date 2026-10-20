@@ -11,13 +11,13 @@ import {
 import {
     CHAPTER,
     ChapterCell,
-} from "../../../extension/vscode_runtime/storydoc/cells/chapter_cell";
+} from "../../../extension/library/storydoc/cells/chapter_cell";
 import {
     IMAGE,
     ImageCell,
-} from "../../../extension/vscode_runtime/storydoc/cells/image_cell";
-import { MarkdownCell } from "../../../extension/vscode_runtime/storydoc/cells/markdown_cell";
-import { UnknownCell } from "../../../extension/vscode_runtime/storydoc/cells/unknown_cell";
+} from "../../../extension/library/storydoc/cells/image_cell";
+import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
+import { UnknownCell } from "../../../extension/library/storydoc/cells/unknown_cell";
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {

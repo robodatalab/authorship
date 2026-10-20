@@ -1,5 +1,5 @@
-import { PLOT } from "./storydoc/cells/plot_cell";
-import { SALIENT_CONCEPT } from "./storydoc/cells/salient_concept_cell";
+import { PLOT } from "../library/storydoc/cells/plot_cell";
+import { SALIENT_CONCEPT } from "../library/storydoc/cells/salient_concept_cell";
 
 export const STORY_ANNOTATION_KINDS = [SALIENT_CONCEPT, PLOT];
 

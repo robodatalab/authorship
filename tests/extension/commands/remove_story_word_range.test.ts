@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveStoryWordRangeCommand } from "../../../extension/vscode_runtime/commands/remove_story_word_range";
-import { StoryWordRange } from "../../../extension/vscode_runtime/storydoc/cells/story_word_range";
+import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 function storyWithTheDoor(words: string) {

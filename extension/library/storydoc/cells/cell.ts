@@ -1,5 +1,3 @@
-import assert from "node:assert";
-
 import type { CellVisitor } from "./cell_visitor";
 
 export function splitlines(text: string): string[] {
@@ -27,7 +25,9 @@ export abstract class Cell {
     ) {}
 
     offsetOf(line: number, character: number): number {
-        assert(this.at !== null);
+        if (this.at === null) {
+            throw new Error(`Cell ${this.uniqueId} stands on no line`);
+        }
         const above = splitlines(this.source).slice(0, line - this.at[0]);
         return (
             above.reduce((sum, written) => sum + written.length + 1, 0) +

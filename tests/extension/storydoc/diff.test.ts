@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { AuthorDocDiff } from "../../../extension/vscode_runtime/storydoc/diff";
-import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
+import { AuthorDocDiff } from "../../../extension/library/storydoc/diff";
+import { Document } from "../../../extension/library/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const HE_HEARD = '<!-- cell: markdown id="c2" -->\n\nHe heard the bell.\n';

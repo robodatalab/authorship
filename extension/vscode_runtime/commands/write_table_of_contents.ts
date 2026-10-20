@@ -1,14 +1,14 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { type Document } from "../storydoc/storydoc";
-import type { Cell } from "../storydoc/cells/cell";
-import { ChapterCell } from "../storydoc/cells/chapter_cell";
-import { PartCell } from "../storydoc/cells/part_cell";
-import { TABLE_OF_CONTENTS } from "../storydoc/cells/table_of_contents_cell";
+import { type Document } from "../../library/storydoc/storydoc";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
+import { PartCell } from "../../library/storydoc/cells/part_cell";
+import { TABLE_OF_CONTENTS } from "../../library/storydoc/cells/table_of_contents_cell";
 import {
     cellsBySection,
     type CellsInASection,
-} from "../storydoc/story_sections";
+} from "../../library/storydoc/story_sections";
 
 const UNTITLED = "Untitled";
 const UNDER_THE_PART = "    ";

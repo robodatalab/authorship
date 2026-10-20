@@ -4,8 +4,8 @@ import {
     fromMarkdown,
     toMarkdown,
 } from "../../../extension/vscode_runtime/markdown/exporter";
-import { Document } from "../../../extension/vscode_runtime/storydoc/storydoc";
-import { Cell } from "../../../extension/vscode_runtime/storydoc/cells/cell";
+import { Document } from "../../../extension/library/storydoc/storydoc";
+import { Cell } from "../../../extension/library/storydoc/cells/cell";
 
 function cellsOf(text: string): Cell[] {
     return new Document(text).cells;

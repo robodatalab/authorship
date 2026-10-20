@@ -31,9 +31,6 @@
  * marker opens a new cell. Markdown has the same bargain with fences.
  */
 
-import assert from "node:assert";
-import { readFileSync, writeFileSync } from "node:fs";
-
 import { Cell, splitlines } from "./cells/cell";
 import { PlotCell } from "./cells/plot_cell";
 import { SalientConceptCell } from "./cells/salient_concept_cell";
@@ -83,15 +80,6 @@ export class Document {
 
     get lines(): string[] {
         return splitlines(this.text);
-    }
-
-    static load(path: string): Document {
-        return new Document(readFileSync(path, "utf-8"), path);
-    }
-
-    save(): void {
-        assert(this.path !== null);
-        writeFileSync(this.path, this.text, "utf-8");
     }
 
     /** What the book says of itself, blank in a document that says nothing. */
