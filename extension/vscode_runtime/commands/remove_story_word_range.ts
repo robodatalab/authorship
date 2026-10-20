@@ -1,9 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import {
-    STORY_WORD_RANGES,
-    storyWordRangesAsTheyAreWritten,
-    storyWordRangesOf,
-} from "../storydoc/story_words";
+import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
@@ -16,21 +12,27 @@ export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
         session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
+        const annotationCellId = commandArguments.annotationCellId as string;
         session.changeTheDocument((story) => {
-            const concept = story.cellWithId(
-                commandArguments.conceptCellId as string,
+            const annotationIndex = story.cells.findIndex(
+                (cell) => cell.uniqueId === annotationCellId,
             );
-            if (concept === undefined) {
+            const annotation = story.cells[annotationIndex];
+            if (!(annotation instanceof SalientConceptCell)) {
                 return;
             }
-            const rangesKept = storyWordRangesOf(concept).filter(
+            const rangesKept = annotation.storyWordRanges.filter(
                 (range) =>
                     range.firstWord !== commandArguments.firstWord ||
                     range.lastWord !== commandArguments.lastWord,
             );
-            concept.replaceAttribute(
-                STORY_WORD_RANGES,
-                storyWordRangesAsTheyAreWritten(rangesKept),
+            story.cells[annotationIndex] = new SalientConceptCell(
+                annotation.title,
+                rangesKept,
+                annotation.source,
+                annotation.folded,
+                annotation.at,
+                annotation.uniqueId,
             );
         });
     }

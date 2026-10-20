@@ -11,6 +11,7 @@ import {
     ReadTheDocumentBackFromItsFile,
     TheAuthorIsEditingTheCell,
     TheAuthorSelectedStoryText,
+    TheAuthorSelectedThePassage,
     TheAuthorTypedInTheCell,
     ThePageIsReady,
     WriteTheDocumentTo,
@@ -21,10 +22,10 @@ import {
     authorDocumentCommandCards,
 } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
-import type { PublishView } from "./publish/panel";
-import type { StoryTextSpan } from "./storydoc/story_words";
+import type { AuthorshipPanelProvider } from "./authorship_panel_provider";
+import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
 import { loadTemplates, watchSettings } from "./settings/file";
-import { watchTheAuthorFileForChanges } from "./storydoc/author_file_watcher";
+import { watchTheAuthorFileForChanges } from "./author_file_watcher";
 import { useTemplates } from "./settings/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorFileEditorSession> {
@@ -42,7 +43,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly log: vscode.LogOutputChannel,
-        private readonly authorshipPanel: PublishView,
+        private readonly authorshipPanel: AuthorshipPanelProvider,
     ) {}
 
     async openCustomDocument(
@@ -106,6 +107,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 commandArguments?: Record<string, unknown>;
                 markdown?: string;
                 storyTextSelected?: StoryTextSpan | null;
+                cellKind?: string;
+                passage?: number | null;
             }) => {
                 if (message?.type === "typed" && message.cellId) {
                     void documentChangesMessageQueue.post(
@@ -122,6 +125,16 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                     void documentChangesMessageQueue.post(
                         new TheAuthorSelectedStoryText(
                             message.storyTextSelected ?? null,
+                        ),
+                    );
+                } else if (
+                    message?.type === "selectPassage" &&
+                    message.cellKind
+                ) {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorSelectedThePassage(
+                            message.cellKind,
+                            message.passage ?? null,
                         ),
                     );
                 } else if (message?.type === "ready") {
@@ -155,6 +168,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const followingTheActiveEditor = panel.onDidChangeViewState(() => {
             if (panel.active) {
                 this.authorshipPanel.follow(session);
+            } else {
+                this.authorshipPanel.stopFollowing(session);
             }
         });
 

@@ -6,14 +6,10 @@ import {
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
-import type { ParagraphInStoryPlots } from "../../vscode_runtime/commands/identify_story_plots";
 import type { AuthorFileEditorFindHighlight } from "./AuthorFileEditorFind";
+import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
 import type {
-    AuthorFileEditorFindMatch,
-    AuthorFileEditorFindMatchInTheProse,
-} from "../../vscode_runtime/commands/find_in_the_document";
-import type {
-    MarkdownEditorSalientConceptHighlight,
+    MarkdownEditorStoryTextHighlight,
     MarkdownEditorStoryTextShown,
 } from "../markdown/MarkdownEditor";
 import "./AuthorFileEditorCell.css";
@@ -50,16 +46,17 @@ interface AuthorFileEditorCellStateProps {
     cellCommands: WebviewAuthorDocumentCommandCard[];
     runCommand?: WebviewAuthorDocumentCommandCard;
     cellId: string;
-    cellAttributes: Readonly<Record<string, string>>;
+    cellIsFolded: boolean;
+    timesTheHostWroteIt: number;
     proseErrors?: ProseCheckError[];
-    paragraphsInStoryPlots?: ParagraphInStoryPlots[];
-    salientConceptHighlights?: MarkdownEditorSalientConceptHighlight[];
+    storyTextHighlights?: MarkdownEditorStoryTextHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
     findMatches?: AuthorFileEditorFindMatch[];
     currentFindMatch?: AuthorFileEditorFindMatch | null;
     howFarTheCellHasBeenWritten?: number;
     wordsInTheSection?: number;
     onStoryTextSelected?: (selectedFrom: number, selectedTo: number) => void;
+    onStoryTextClicked?: (clickedAt: number) => void;
     onStoryTextShownAt?: (top: number, bottom: number) => void;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
@@ -71,16 +68,17 @@ const AuthorFileEditorCellStateContext = createContext<
     cellCommands: [],
     runCommand: undefined,
     cellId: "",
-    cellAttributes: {},
+    cellIsFolded: false,
+    timesTheHostWroteIt: 0,
     proseErrors: [],
-    paragraphsInStoryPlots: [],
-    salientConceptHighlights: undefined,
+    storyTextHighlights: undefined,
     storyTextShown: undefined,
     findMatches: [],
     currentFindMatch: null,
     howFarTheCellHasBeenWritten: undefined,
     wordsInTheSection: undefined,
     onStoryTextSelected: () => undefined,
+    onStoryTextClicked: () => undefined,
     onStoryTextShownAt: () => undefined,
     sendMessagesToVscode: () => undefined,
 });
@@ -89,16 +87,17 @@ export function AuthorFileEditorCellState({
     cellCommands,
     runCommand,
     cellId,
-    cellAttributes,
+    cellIsFolded,
+    timesTheHostWroteIt,
     proseErrors = [],
-    paragraphsInStoryPlots = [],
-    salientConceptHighlights,
+    storyTextHighlights,
     storyTextShown,
     findMatches = [],
     currentFindMatch = null,
     howFarTheCellHasBeenWritten,
     wordsInTheSection,
     onStoryTextSelected = () => undefined,
+    onStoryTextClicked = () => undefined,
     onStoryTextShownAt = () => undefined,
     sendMessagesToVscode,
     children,
@@ -109,16 +108,17 @@ export function AuthorFileEditorCellState({
                 cellCommands,
                 runCommand,
                 cellId,
-                cellAttributes,
+                cellIsFolded,
+                timesTheHostWroteIt,
                 proseErrors,
-                paragraphsInStoryPlots,
-                salientConceptHighlights,
+                storyTextHighlights,
                 storyTextShown,
                 findMatches,
                 currentFindMatch,
                 howFarTheCellHasBeenWritten,
                 wordsInTheSection,
                 onStoryTextSelected,
+                onStoryTextClicked,
                 onStoryTextShownAt,
                 sendMessagesToVscode,
             }}
@@ -130,22 +130,25 @@ export function AuthorFileEditorCellState({
 
 export function isDrawnOnCell(
     command: WebviewAuthorDocumentCommandCard,
-    cellAttributes: Readonly<Record<string, string>>,
+    cellIsFolded: boolean,
 ): boolean {
     return (
-        !command.drawnWhenCellAttributeIs ||
-        (cellAttributes[command.drawnWhenCellAttributeIs.attributeName] ??
-            "") === command.drawnWhenCellAttributeIs.attributeValue
+        command.drawnWhenTheCellIsFolded === undefined ||
+        command.drawnWhenTheCellIsFolded === cellIsFolded
     );
 }
 
+export function useAuthorFileEditorCellTimesTheHostWroteIt(): number {
+    return useContext(AuthorFileEditorCellStateContext).timesTheHostWroteIt;
+}
+
 export function AuthorFileEditorCellActions() {
-    const { cellCommands, cellId, cellAttributes, sendMessagesToVscode } =
+    const { cellCommands, cellId, cellIsFolded, sendMessagesToVscode } =
         useContext(AuthorFileEditorCellStateContext);
     return (
         <div className="author-file-editor-cell-actions">
             {cellCommands
-                .filter((command) => isDrawnOnCell(command, cellAttributes))
+                .filter((command) => isDrawnOnCell(command, cellIsFolded))
                 .map((command) => (
                     <button
                         key={command.commandName}
@@ -227,10 +230,10 @@ export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
     return useContext(AuthorFileEditorCellStateContext).proseErrors ?? [];
 }
 
-export function useAuthorFileEditorCellSalientConceptHighlights():
-    MarkdownEditorSalientConceptHighlight[] | undefined {
+export function useAuthorFileEditorCellStoryTextHighlights():
+    MarkdownEditorStoryTextHighlight[] | undefined {
     return useContext(AuthorFileEditorCellStateContext)
-        .salientConceptHighlights;
+        .storyTextHighlights;
 }
 
 export function useAuthorFileEditorCellStoryTextShown(): {
@@ -256,14 +259,16 @@ export function useAuthorFileEditorCellStoryTextSelected(): (
     );
 }
 
-export function useAuthorFileEditorCellParagraphsInStoryPlots(): ParagraphInStoryPlots[] {
+export function useAuthorFileEditorCellStoryTextClicked(): (
+    clickedAt: number,
+) => void {
     return (
-        useContext(AuthorFileEditorCellStateContext).paragraphsInStoryPlots ??
-        []
+        useContext(AuthorFileEditorCellStateContext).onStoryTextClicked ??
+        (() => undefined)
     );
 }
 
-export function useAuthorFileEditorCellFind(): {
+function useAuthorFileEditorCellFind(): {
     matches: AuthorFileEditorFindMatch[];
     current: AuthorFileEditorFindMatch | null;
 } {
@@ -276,16 +281,11 @@ export function useAuthorFileEditorCellFind(): {
 /** Where the cell's prose is to be marked, as the markdown editor takes it. */
 export function useAuthorFileEditorCellFindHighlights(): AuthorFileEditorFindHighlight[] {
     const { matches, current } = useAuthorFileEditorCellFind();
-    return matches
-        .filter(
-            (match): match is AuthorFileEditorFindMatchInTheProse =>
-                match.attributeName === null,
-        )
-        .map((match) => ({
-            at: match.startCharacterOffsetInCell,
-            end: match.endCharacterOffsetInCell,
-            isCurrent: match === current,
-        }));
+    return matches.map((match) => ({
+        at: match.startCharacterOffsetInCell,
+        end: match.endCharacterOffsetInCell,
+        isCurrent: match === current,
+    }));
 }
 
 export function AuthorFileEditorCellWords() {

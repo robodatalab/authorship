@@ -13,7 +13,19 @@ from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from server import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc import storydoc
+from server.storydoc.cells.about_cell import ABOUT, AboutCell
+from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.image_cell import ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.recap_cell import RECAP, RecapCell
+from server.storydoc.cells.table_of_contents_cell import (
+    TABLE_OF_CONTENTS,
+    TableOfContentsCell,
+)
+from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 DEFAULT_REPLY = (
@@ -98,13 +110,13 @@ class Jobs(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.manuscript = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = storydoc.dumps(
+        self.written = Document.from_cells(
             [
-                storydoc.chapter("One"),
-                storydoc.markdown("The lantern had gone out."),
-                storydoc.Cell(storydoc.BLURB),
+                ChapterCell("One"),
+                MarkdownCell("The lantern had gone out."),
+                BlurbCell(),
             ]
-        )
+        ).text
         self.manuscript.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
@@ -215,16 +227,16 @@ class GenerateBlurb(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = storydoc.dumps(
+        self.written = Document.from_cells(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
-                storydoc.chapter("Two"),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
-                storydoc.Cell(storydoc.BLURB, "", {}),
+                TitlePageCell(title="Veriona"),
+                ChapterCell("One"),
+                MarkdownCell(_unique_id="lantern", source="The lantern had gone out."),
+                ChapterCell("Two"),
+                MarkdownCell(_unique_id="door", source="The door stood open."),
+                BlurbCell(),
             ]
-        )
+        ).text
         self.document.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
@@ -248,7 +260,7 @@ class GenerateBlurb(unittest.TestCase):
         status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(status["text"], "A woman loses her name.")
-        self.assertEqual(status["kind"], storydoc.BLURB)
+        self.assertEqual(status["kind"], BLURB)
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_leaves_the_document_alone(self) -> None:
@@ -400,28 +412,28 @@ class GenerateRecap(unittest.TestCase):
         self.addCleanup(self._dir.cleanup)
         self.folder = Path(self._dir.name)
         self.document = self.folder / f"story{storydoc.EXTENSION}"
-        storydoc.save(
-            self.document,
+        Document.from_cells(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona III"}),
-                storydoc.Cell(storydoc.RECAP, "", {"documents": "a.author, b.author"}),
-                storydoc.chapter("One"),
-                storydoc.markdown("The road ended at a gate."),
+                TitlePageCell(title="Veriona III"),
+                RecapCell(documents="a.author, b.author"),
+                ChapterCell("One"),
+                MarkdownCell("The road ended at a gate."),
             ],
-        )
+            self.document,
+        ).save()
         self.written = self.document.read_text()
         for name, title, prose in [
             ("a.author", "Veriona", "The lantern had gone out."),
             ("b.author", "Veriona II", "The door stood open."),
         ]:
-            storydoc.save(
-                self.folder / name,
+            Document.from_cells(
                 [
-                    storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": title}),
-                    storydoc.chapter("One"),
-                    storydoc.markdown(prose),
+                    TitlePageCell(title=title),
+                    ChapterCell("One"),
+                    MarkdownCell(prose),
                 ],
-            )
+                self.folder / name,
+            ).save()
 
         def _restore_model():
             app.state.causal_model = None
@@ -451,7 +463,7 @@ class GenerateRecap(unittest.TestCase):
         status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(status["text"], "She has lost her name.")
-        self.assertEqual(status["kind"], storydoc.RECAP)
+        self.assertEqual(status["kind"], RECAP)
         self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
 
     def test_says_which_section_is_being_written(self) -> None:
@@ -460,7 +472,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("a.author")
         self.assertEqual(
-            wait_for_writing(client, started.json()["id"])["kind"], storydoc.RECAP
+            wait_for_writing(client, started.json()["id"])["kind"], RECAP
         )
 
     def test_the_documents_are_named_beside_the_one_that_asks(self) -> None:
@@ -519,40 +531,30 @@ class ExportEpub(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        storydoc.save(
-            self.document,
+        Document.from_cells(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Book"}),
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
+                TitlePageCell(title="Book"),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
             ],
-        )
+            self.document,
+        ).save()
 
     def _ready(self) -> None:
         """Write the document out with every section a book needs filled in."""
         (Path(self._dir.name) / "art.png").write_bytes(b"png")
-        storydoc.save(
-            self.document,
+        Document.from_cells(
             [
-                storydoc.image("art.png"),
-                storydoc.Cell(
-                    storydoc.TITLE_PAGE,
-                    "",
-                    {
-                        "title": "Book",
-                        "subtitle": "A Story",
-                        "author": "A. Writer",
-                        "publisher": "A Press",
-                        "date": "2026-09-02",
-                    },
-                ),
-                storydoc.table_of_contents(),
-                storydoc.Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
-                storydoc.Cell(storydoc.ABOUT, "I live by the sea."),
+                ImageCell("art.png"),
+                TitlePageCell(title="Book", subtitle="A Story", author="A. Writer", publisher="A Press", date="2026-09-02"),
+                TableOfContentsCell(),
+                BlurbCell(source="A lantern, and a stair."),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
+                AboutCell(source="I live by the sea."),
             ],
-        )
+            self.document,
+        ).save()
 
     def test_writes_the_epub_beside_the_document(self) -> None:
         self._ready()
@@ -591,13 +593,13 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
-            said["added"], [storydoc.TABLE_OF_CONTENTS, storydoc.BLURB, storydoc.ABOUT]
+            said["added"], [TABLE_OF_CONTENTS, BLURB, ABOUT]
         )
         wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
         # The title page is there, in place, and still not filled in — which is
         # the fault a document can have while looking complete.
         self.assertEqual(
-            wanting[storydoc.TITLE_PAGE],
+            wanting[TITLE_PAGE],
             ["subtitle", "author", "publisher", "date"],
         )
 
@@ -647,15 +649,15 @@ class FixStyle(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = storydoc.dumps(
+        self.written = Document.from_cells(
             [
-                storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-                storydoc.chapter("One"),
-                storydoc.Cell(storydoc.MARKDOWN, "The lantern had gone out.", {"id": "lantern"}),
-                storydoc.chapter("Two"),
-                storydoc.Cell(storydoc.MARKDOWN, "The door stood open.", {"id": "door"}),
+                TitlePageCell(title="Veriona"),
+                ChapterCell("One"),
+                MarkdownCell(_unique_id="lantern", source="The lantern had gone out."),
+                ChapterCell("Two"),
+                MarkdownCell(_unique_id="door", source="The door stood open."),
             ]
-        )
+        ).text
         self.document.write_text(self.written, encoding="utf-8")
         app.state.jobs = ParallelJobsManager()
 
@@ -715,7 +717,7 @@ class FixStyle(unittest.TestCase):
         self,
     ) -> None:
         self.document.write_text(
-            storydoc.dumps([storydoc.chapter("One")]), encoding="utf-8"
+            Document.from_cells([ChapterCell("One")]).text, encoding="utf-8"
         )
         status = self.start()
         self.assertIn("no prose", status["error"])

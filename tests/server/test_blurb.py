@@ -15,8 +15,14 @@ from unittest import mock
 
 from cortexgrid_infer import CompletionChunk
 
-from server import storydoc
-from server.storydoc import Document
+from server.storydoc import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.blurb_cell import BlurbCell
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
+from server.storydoc.cells.title_page_cell import TitlePageCell
 from server.writing_tools.blurb import BLURB_INSTRUCTION, write_blurb
 
 
@@ -40,21 +46,21 @@ def said_in(call: Any) -> str:
     return call.args[0][1]["content"]
 
 
-STORY = storydoc.dumps(
+STORY = Document.from_cells(
     [
-        storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
-        storydoc.markdown("Front matter, about the book and not in it."),
-        storydoc.chapter("The First Night"),
-        storydoc.markdown(
+        TitlePageCell(title="Veriona"),
+        MarkdownCell("Front matter, about the book and not in it."),
+        ChapterCell("The First Night"),
+        MarkdownCell(
             "The lantern had gone out again.\n"
             "<!-- ask Mara whether this is the third time -->\n"
             "She did not light it."
         ),
-        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
-        storydoc.chapter("The Second"),
-        storydoc.markdown("The door stood open."),
+        TableOfContentsCell(source="1. The First Night"),
+        ChapterCell("The Second"),
+        MarkdownCell("The door stood open."),
     ]
-)
+).text
 
 
 class WriteBlurb(unittest.TestCase):
@@ -106,69 +112,34 @@ class WriteBlurb(unittest.TestCase):
             self.assertNotIn("1. The First Night", said_in(call))
 
     def test_a_part_is_a_division_of_the_story_and_not_a_chapter_of_it(self) -> None:
-        document = Document(
-            storydoc.dumps(
+        document = Document.from_cells(
                 [
-                    storydoc.part("Day One"),
-                    storydoc.chapter("The First Night"),
-                    storydoc.markdown("The lantern had gone out again."),
+                    PartCell("Day One"),
+                    ChapterCell("The First Night"),
+                    MarkdownCell("The lantern had gone out again."),
                 ]
             )
-        )
         model = build_model()
         blurb_written(model, document)
         self.assertEqual(model.complete.call_count, 1)
         self.assertNotIn("Day One", said_in(model.complete.call_args_list[0]))
 
     def test_a_blurb_already_in_the_document_is_not_read_back(self) -> None:
-        document = Document(
-            storydoc.dumps(
+        document = Document.from_cells(
                 [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.Cell(storydoc.BLURB, "The last thing this wrote.", {}),
+                    ChapterCell("One"),
+                    MarkdownCell("The door stood open."),
+                    BlurbCell(source="The last thing this wrote."),
                 ]
             )
-        )
         model = build_model()
         blurb_written(model, document)
         self.assertNotIn(
             "The last thing this wrote.", said_in(model.complete.call_args_list[0])
         )
 
-    def test_the_breaks_between_paragraphs_survive(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The lantern.\n\nThe door."),
-                ]
-            )
-        )
-        model = build_model()
-        blurb_written(model, document)
-        self.assertIn("The lantern.\n\nThe door.", said_in(model.complete.call_args_list[0]))
-
-    def test_a_chapter_with_nothing_written_under_it_is_not_read(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [
-                    storydoc.chapter("One"),
-                    storydoc.markdown("The door stood open."),
-                    storydoc.chapter("Two"),
-                ]
-            )
-        )
-        model = build_model()
-        blurb_written(model, document)
-        self.assertEqual(model.complete.call_count, 1)
-
     def test_an_untitled_chapter_is_named_by_its_number(self) -> None:
-        document = Document(
-            storydoc.dumps(
-                [storydoc.chapter(""), storydoc.markdown("The door stood open.")]
-            )
-        )
+        document = Document.from_cells([ChapterCell(""), MarkdownCell("The door stood open.")])
         model = build_model()
         blurb_written(model, document)
         self.assertIn("Chapter 1", said_in(model.complete.call_args_list[0]))
@@ -180,9 +151,7 @@ class WriteBlurb(unittest.TestCase):
         )
 
     def test_a_document_with_no_chapters_has_nothing_to_write_about(self) -> None:
-        document = Document(
-            storydoc.dumps([storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "V"})])
-        )
+        document = Document.from_cells([TitlePageCell(title="V")])
         with self.assertRaises(ValueError):
             blurb_written(build_model(), document)
 

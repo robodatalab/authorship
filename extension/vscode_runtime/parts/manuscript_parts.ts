@@ -2,7 +2,7 @@
 // part is once they do.
 //
 // A part is an `.author` document like the story it was cut from — the book's
-// furniture carried over, its title page renumbered, and its share of the
+// part boilerplate carried over, its title page renumbered, and its share of the
 // chapters. That is the whole point of cutting into this format rather than into
 // markdown: everything that works on a story works on a part. It opens in the
 // same editor, exports to the same EPUB, and nothing here has to know how either
@@ -17,24 +17,28 @@
 // without launching an editor. Everything here deals in cells; divide_manuscript.ts
 // turns the parts into files.
 
-import {
-    isFrontOrBackMatter,
-    standsOutsideTheStory,
-} from "../storydoc/cell_kinds";
-import {
-    AUTHOR_FILE_EXTENSION,
-    CHAPTER,
-    DIVIDER,
-    ImmutableCell,
-    MutableCell,
-    IMAGE,
-    PART,
+import { standsOutsideTheStory } from "../../library/storydoc/story_sections";
+import { EXTENSION } from "../../library/storydoc/storydoc";
+import { ABOUT } from "../../library/storydoc/cells/about_cell";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
+import { DISCLAIMER } from "../../library/storydoc/cells/disclaimer_cell";
+import { DividerCell } from "../../library/storydoc/cells/divider_cell";
+import { ImageCell } from "../../library/storydoc/cells/image_cell";
+import { PartCell } from "../../library/storydoc/cells/part_cell";
+import { TABLE_OF_CONTENTS } from "../../library/storydoc/cells/table_of_contents_cell";
+import { TITLE_PAGE, TitlePageCell } from "../../library/storydoc/cells/title_page_cell";
+
+const KINDS_EVERY_PART_CARRIES = new Set([
     TITLE_PAGE,
-} from "../storydoc/model";
+    TABLE_OF_CONTENTS,
+    DISCLAIMER,
+    ABOUT,
+]);
 
 /** The cells of the story that travel together, as one part. */
 export interface Part {
-    cells: ImmutableCell[];
+    cells: Cell[];
     /** The part of the story these cells were taken from, or '' for the
      *  chapters that stand before the first Part. */
     under: string;
@@ -46,31 +50,31 @@ export interface Part {
  * Split at the story rather than listed by kind, so a disclaimer the author put
  * after the last chapter is still after the last chapter in every part.
  */
-export interface Furniture {
-    front: ImmutableCell[];
-    back: ImmutableCell[];
+export interface PartBoilerplate {
+    front: Cell[];
+    back: Cell[];
 }
 
 /** What stands before the story and what stands after it. */
-export function furnitureOf(cells: readonly ImmutableCell[]): Furniture {
-    const opens = cells.findIndex((cell) => cell.kind === CHAPTER);
-    // A story with no chapters has nothing for furniture to stand behind.
+export function partBoilerplateOf(cells: readonly Cell[]): PartBoilerplate {
+    const opens = cells.findIndex((cell) => cell instanceof ChapterCell);
+    // A story with no chapters has nothing for part boilerplate to stand behind.
     const story = opens < 0 ? cells.length : opens;
     const opening = picturesTheStoryOpensWith(cells);
-    const front: ImmutableCell[] = [];
-    const back: ImmutableCell[] = [];
+    const front: Cell[] = [];
+    const back: Cell[] = [];
 
     cells.forEach((cell, at) => {
-        if (at < opening || isFrontOrBackMatter(cell.kind)) {
+        if (at < opening || KINDS_EVERY_PART_CARRIES.has(cell.kind)) {
             (at < story ? front : back).push(cell);
         }
     });
     return { front, back };
 }
 
-function picturesTheStoryOpensWith(cells: readonly ImmutableCell[]): number {
+function picturesTheStoryOpensWith(cells: readonly Cell[]): number {
     let opening = 0;
-    while (cells[opening]?.kind === IMAGE) {
+    while (cells[opening] instanceof ImageCell) {
         opening += 1;
     }
     return opening;
@@ -88,7 +92,7 @@ function picturesTheStoryOpensWith(cells: readonly ImmutableCell[]): number {
  * A story with no Dividers at all is asking to be divided nowhere, so it divides
  * into nothing rather than into one file holding all of it.
  *
- * The book's furniture is not the story and belongs to every part rather than to
+ * The book's part boilerplate is not the story and belongs to every part rather than to
  * one; what the author keeps beside the story and publishes nowhere belongs to
  * neither. An aside is the exception: it was written about the passage it stands
  * beside, so it goes wherever that passage goes.
@@ -97,8 +101,8 @@ function picturesTheStoryOpensWith(cells: readonly ImmutableCell[]): number {
  * still a file of it. The Divider itself is written into neither file: it said
  * where to cut, which was the only thing it had to say.
  */
-export function intoParts(cells: readonly ImmutableCell[]): Part[] {
-    if (!cells.some((cell) => cell.kind === DIVIDER)) {
+export function intoParts(cells: readonly Cell[]): Part[] {
+    if (!cells.some((cell) => cell instanceof DividerCell)) {
         return [];
     }
     const parts: Part[] = [];
@@ -109,12 +113,12 @@ export function intoParts(cells: readonly ImmutableCell[]): Part[] {
         if (standsOutsideTheStory(cell.kind)) {
             continue;
         }
-        if (cell.kind === DIVIDER) {
+        if (cell instanceof DividerCell) {
             open = null;
             continue;
         }
-        if (cell.kind === PART) {
-            under = cell.attrs.title ?? "";
+        if (cell instanceof PartCell) {
+            under = cell.title;
         }
         if (!open) {
             open = { cells: [], under };
@@ -125,15 +129,17 @@ export function intoParts(cells: readonly ImmutableCell[]): Part[] {
     return parts;
 }
 
-/** A part as a document of its own: the furniture, then its share of the story. */
+/** A part as a document of its own: the part boilerplate, then its share of the story. */
 export function partCells(
-    furniture: Furniture,
+    partBoilerplate: PartBoilerplate,
     number: number,
     part: Part,
-): ImmutableCell[] {
-    return [...furniture.front, ...part.cells, ...furniture.back].map((cell) =>
-        carried(cell, number, part.under),
-    );
+): Cell[] {
+    return [
+        ...partBoilerplate.front,
+        ...part.cells,
+        ...partBoilerplate.back,
+    ].map((cell) => carried(cell, number, part.under));
 }
 
 /**
@@ -144,18 +150,26 @@ export function partCells(
  * picture names its art relative to the file naming it, so a part — which sits a
  * folder deeper than the story — has to name it from where it now stands.
  */
-function carried(
-    cell: ImmutableCell,
-    number: number,
-    under: string,
-): ImmutableCell {
-    if (cell.kind === TITLE_PAGE) {
-        return new MutableCell(cell.kind, cell.source, {
-            ...cell.attrs,
-            title: partTitle(cell.attrs.title ?? "", number, under),
-        });
+function carried(cell: Cell, number: number, under: string): Cell {
+    if (cell instanceof TitlePageCell) {
+        const title = partTitle(cell.title, number, under);
+        return new TitlePageCell(
+            title,
+            cell.subtitle,
+            cell.author,
+            cell.publisher,
+            cell.date,
+            cell.version,
+            cell.isbn,
+            cell.coverDesigner,
+            cell.language,
+            cell.source,
+            cell.folded,
+            cell.at,
+            cell.uniqueId,
+        );
     }
-    return cell.kind === IMAGE ? fromTheFolder(cell) : cell;
+    return cell instanceof ImageCell ? fromTheFolder(cell) : cell;
 }
 
 /**
@@ -166,16 +180,20 @@ function carried(
  * A path that already climbs out of the folder is climbed one further, which is
  * right for the same reason: it was written from where the story stands.
  */
-function fromTheFolder(cell: ImmutableCell): ImmutableCell {
-    const src = cell.attrs.src ?? "";
+function fromTheFolder(cell: ImageCell): ImageCell {
+    const src = cell.src;
     // An absolute path and a URL both already say where they are from.
     if (src === "" || src.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(src)) {
         return cell;
     }
-    return new MutableCell(cell.kind, cell.source, {
-        ...cell.attrs,
-        src: `../${src}`,
-    });
+    return new ImageCell(
+        `../${src}`,
+        cell.fullPage,
+        cell.source,
+        cell.folded,
+        cell.at,
+        cell.uniqueId,
+    );
 }
 
 /** What stands between the pieces of a part's name. */
@@ -198,7 +216,7 @@ export function partTitle(title: string, number: number, under = ""): string {
 export const PARTS_FOLDER = "parts";
 
 export function partFileName(number: number): string {
-    return `part_${number}${AUTHOR_FILE_EXTENSION}`;
+    return `part_${number}${EXTENSION}`;
 }
 
 /**
@@ -209,9 +227,6 @@ export function partFileName(number: number): string {
  * folder is a division's to remove.
  */
 export function partNumber(name: string): number | null {
-    const match = new RegExp(
-        `^part_(\\d+)\\${AUTHOR_FILE_EXTENSION}$`,
-        "i",
-    ).exec(name);
+    const match = new RegExp(`^part_(\\d+)\\${EXTENSION}$`, "i").exec(name);
     return match === null ? null : Number(match[1]);
 }

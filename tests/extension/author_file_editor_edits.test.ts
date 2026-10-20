@@ -4,7 +4,7 @@ import {
     openAuthorFileEditorSession,
     type AuthorFileEditorSession,
 } from "../../extension/vscode_runtime/author_file_editor_session";
-import { blankCellOfKind } from "../../extension/vscode_runtime/storydoc/cell_kinds";
+import { NoteCell } from "../../extension/library/storydoc/cells/note_cell";
 import { EventEmitter, Uri } from "./vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
@@ -126,9 +126,9 @@ describe("what a change to the document records", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
 
         typing(session, "c1", "She saw the door.", "!!");
-        session.changeTheDocument((story) =>
-            story.cellWithId("c0")?.fold(true),
-        );
+        session.changeTheDocument((story) => {
+            story.cells[0] = story.cells[0].withFolded(true);
+        });
         typing(session, "c1", "She saw the door.!!", "!!");
 
         expect(editsRecorded).toHaveLength(3);
@@ -221,9 +221,9 @@ describe("undoing and redoing what the author did", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
         const asItStood = session.document.text;
 
-        session.changeTheDocument((story) =>
-            story.insertBefore("c1", blankCellOfKind("note")),
-        );
+        session.changeTheDocument((story) => {
+            story.cells.splice(1, 0, new NoteCell());
+        });
         const withTheNote = cellsOf(session);
 
         expect(withTheNote).toHaveLength(4);
@@ -240,7 +240,9 @@ describe("undoing and redoing what the author did", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
         const asItStood = session.document.text;
 
-        session.changeTheDocument((story) => story.removeCell("c1"));
+        session.changeTheDocument((story) => {
+            story.cells.splice(1, 1);
+        });
 
         expect(cellsOf(session)).toEqual([
             "c0:chapter:",
@@ -261,7 +263,10 @@ describe("undoing and redoing what the author did", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
         const asItStood = session.document.text;
 
-        session.changeTheDocument((story) => story.moveCellsAt(2, 1, 0));
+        session.changeTheDocument((story) => {
+            const cellsMoved = story.cells.splice(2, 1);
+            story.cells.splice(0, 0, ...cellsMoved);
+        });
 
         expect(session.document.cells.map((cell) => cell.uniqueId)).toEqual([
             "c2",
@@ -284,17 +289,17 @@ describe("undoing and redoing what the author did", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
         const asItStood = session.document.text;
 
-        session.changeTheDocument((story) =>
-            story.cellWithId("c0")?.fold(true),
-        );
+        session.changeTheDocument((story) => {
+            story.cells[0] = story.cells[0].withFolded(true);
+        });
 
-        expect(session.document.cellWithId("c0")?.isFolded()).toBe(true);
+        expect(session.document.cellWithId("c0")?.folded).toBe(true);
 
         editsRecorded[0].undo();
         expect(session.document.text).toEqual(asItStood);
 
         editsRecorded[0].redo();
-        expect(session.document.cellWithId("c0")?.isFolded()).toBe(true);
+        expect(session.document.cellWithId("c0")?.folded).toBe(true);
     });
 
     it("undoes every change the author made, however many ways they changed it", () => {
@@ -303,11 +308,16 @@ describe("undoing and redoing what the author did", () => {
         const asItStood = session.document.text;
 
         session.theAuthorTypedInTheCell("c1", "She saw the gate.");
-        session.changeTheDocument((story) =>
-            story.insertBefore("c2", blankCellOfKind("note")),
-        );
-        session.changeTheDocument((story) => story.removeCell("c0"));
-        session.changeTheDocument((story) => story.moveCellsAt(0, 1, 1));
+        session.changeTheDocument((story) => {
+            story.cells.splice(2, 0, new NoteCell());
+        });
+        session.changeTheDocument((story) => {
+            story.cells.splice(0, 1);
+        });
+        session.changeTheDocument((story) => {
+            const cellsMoved = story.cells.splice(0, 1);
+            story.cells.splice(1, 0, ...cellsMoved);
+        });
         const asTheAuthorLeftIt = cellsOf(session);
 
         undoEverythingRecorded();

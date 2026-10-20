@@ -3,9 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import { RECAP, type ImmutableAuthorDocument } from "../storydoc/model";
-
-const DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES = "documents";
+import { RECAP, RecapCell } from "../../library/storydoc/cells/recap_cell";
 
 interface WrittenSection extends ServerJob {
     text: string;
@@ -31,12 +29,10 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
         const cell = session.document.cellWithId(cellId);
-        if (!cell) {
+        if (!(cell instanceof RecapCell)) {
             return;
         }
-        const documents = (
-            cell.attrs[DOCUMENTS_THE_STORY_SO_FAR_SUMMARISES] ?? ""
-        )
+        const documents = cell.documents
             .split(",")
             .map((named) => named.trim())
             .filter(Boolean);
@@ -50,7 +46,7 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
         try {
             session?.writingCell(cellId, 0);
             const jobId = await startServerJob("/generate/recap", {
-                path: session.document.uri.fsPath,
+                path: session.document.path,
                 text: session.document.text,
                 documents,
             });
@@ -59,9 +55,16 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
-            session?.changeTheDocument((story) =>
-                story.cellWithId(cellId)?.replaceMarkdown(storySoFar.text),
-            );
+            session?.changeTheDocument((story) => {
+                const cellIndex = story.cells.findIndex(
+                    (cell) => cell.uniqueId === cellId,
+                );
+                if (cellIndex === -1) {
+                    return;
+                }
+                const cell = story.cells[cellIndex];
+                story.cells[cellIndex] = cell.withSource(storySoFar.text);
+            });
         } catch (failure) {
             void vscode.window.showErrorMessage(
                 `Cannot write the story so far — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,

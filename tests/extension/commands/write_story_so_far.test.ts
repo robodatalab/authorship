@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WriteStorySoFarCommand } from "../../../extension/vscode_runtime/commands/write_story_so_far";
+import { parse } from "../../../extension/library/storydoc/parser";
 import { shownMessages } from "../vscode";
 import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
 
@@ -70,9 +71,9 @@ describe("WriteStorySoFarCommand — while the author keeps working", () => {
         vi.stubGlobal("fetch", (url: string) => {
             const stillRunning = url.includes("status") && statusAskedFor++ < 1;
             if (stillRunning) {
-                session.changeTheDocument((story) =>
-                    story.fromText(session.document.text),
-                );
+                session.changeTheDocument((story) => {
+                    story.cells = parse(session.document.text);
+                });
             }
             return Promise.resolve({
                 ok: true,

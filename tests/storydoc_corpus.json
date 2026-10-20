@@ -1,5 +1,5 @@
 {
-    "comment": "Documents both storydoc libraries must read AND write identically. Each case is run by tests/server/test_storydoc.py and tests/extension/storydoc/model.test.ts: `text` must parse to `cells`, and re-serialising must produce `dumped` byte for byte. Add a case here and both languages are held to it.",
+    "comment": "Documents both storydoc libraries must read AND write identically. Each case is run by tests/server/test_storydoc.py and tests/extension/storydoc/storydoc.test.ts: `text` must parse to `cells`, and re-serialising must produce `dumped` byte for byte. Add a case here and both languages are held to it.",
     "cases": [
         {
             "name": "an empty document has no cells",
@@ -15,259 +15,228 @@
         },
         {
             "name": "a marker opens a cell and the text below it is the source",
-            "text": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n",
+            "text": "<!-- cell: chapter id=\"c1\" title=\"The First Night\" -->\n\nThe lantern had gone out.\n",
             "cells": [
                 {
                     "kind": "chapter",
                     "source": "The lantern had gone out.",
-                    "attrs": {
-                        "title": "The First Night"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: chapter title=\"The First Night\" -->\n\nThe lantern had gone out.\n"
+            "dumped": "<!-- cell: chapter id=\"c1\" title=\"The First Night\" -->\n\nThe lantern had gone out.\n"
         },
         {
             "name": "a marker is read whatever spacing it was written with",
-            "text": "<!--cell:chapter   title=\"One\"-->\n\nProse.\n",
+            "text": "<!--cell:chapter id=\"c1\"   title=\"One\"-->\n\nProse.\n",
             "cells": [
                 {
                     "kind": "chapter",
                     "source": "Prose.",
-                    "attrs": {
-                        "title": "One"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+            "dumped": "<!-- cell: chapter id=\"c1\" title=\"One\" -->\n\nProse.\n"
         },
         {
             "name": "a document opening with a marker has no empty leading cell",
-            "text": "<!-- cell: contents -->\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n",
+            "text": "<!-- cell: contents id=\"c1\" -->\n\n<!-- cell: chapter id=\"c2\" title=\"One\" -->\n\nProse.\n",
             "cells": [
                 {
                     "kind": "contents",
                     "source": "",
-                    "attrs": {}
+                    "id": "c1"
                 },
                 {
                     "kind": "chapter",
                     "source": "Prose.",
-                    "attrs": {
-                        "title": "One"
-                    }
+                    "id": "c2"
                 }
             ],
-            "dumped": "<!-- cell: contents -->\n\n<!-- cell: chapter title=\"One\" -->\n\nProse.\n"
+            "dumped": "<!-- cell: contents id=\"c1\" -->\n\n<!-- cell: chapter id=\"c2\" title=\"One\" -->\n\nProse.\n"
         },
         {
             "name": "a cell with no body is kept, because its kind is the point",
-            "text": "<!-- cell: contents -->\n",
+            "text": "<!-- cell: contents id=\"c1\" -->\n",
             "cells": [
                 {
                     "kind": "contents",
                     "source": "",
-                    "attrs": {}
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: contents -->\n"
+            "dumped": "<!-- cell: contents id=\"c1\" -->\n"
         },
         {
             "name": "an unknown kind is carried through untouched",
-            "text": "<!-- cell: epigraph attribution=\"Anon\" -->\n\nA line of verse.\n",
+            "text": "<!-- cell: epigraph id=\"c1\" attribution=\"Anon\" -->\n\nA line of verse.\n",
             "cells": [
                 {
                     "kind": "epigraph",
                     "source": "A line of verse.",
-                    "attrs": {
-                        "attribution": "Anon"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: epigraph attribution=\"Anon\" -->\n\nA line of verse.\n"
+            "dumped": "<!-- cell: epigraph id=\"c1\" attribution=\"Anon\" -->\n\nA line of verse.\n"
         },
         {
             "name": "several attributes are read in order",
-            "text": "<!-- cell: cover src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n",
+            "text": "<!-- cell: cover id=\"c1\" src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n",
             "cells": [
                 {
                     "kind": "cover",
                     "source": "![The cover](art/cover.jpg)",
-                    "attrs": {
-                        "src": "art/cover.jpg",
-                        "alt": "The cover"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: cover src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n"
+            "dumped": "<!-- cell: cover id=\"c1\" src=\"art/cover.jpg\" alt=\"The cover\" -->\n\n![The cover](art/cover.jpg)\n"
         },
         {
             "name": "a quote inside an attribute survives escaping",
-            "text": "<!-- cell: chapter title=\"She said \\\"no\\\"\" -->\n\nProse.\n",
+            "text": "<!-- cell: chapter id=\"c1\" title=\"She said \\\"no\\\"\" -->\n\nProse.\n",
             "cells": [
                 {
                     "kind": "chapter",
                     "source": "Prose.",
-                    "attrs": {
-                        "title": "She said \"no\""
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: chapter title=\"She said \\\"no\\\"\" -->\n\nProse.\n"
+            "dumped": "<!-- cell: chapter id=\"c1\" title=\"She said \\\"no\\\"\" -->\n\nProse.\n"
         },
         {
             "name": "a backslash inside an attribute survives escaping",
-            "text": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n",
+            "text": "<!-- cell: cover id=\"c1\" src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n",
             "cells": [
                 {
                     "kind": "cover",
                     "source": "![Cover](art/cover.jpg)",
-                    "attrs": {
-                        "src": "art\\cover.jpg"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: cover src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n"
+            "dumped": "<!-- cell: cover id=\"c1\" src=\"art\\\\cover.jpg\" -->\n\n![Cover](art/cover.jpg)\n"
         },
         {
             "name": "blank lines inside a cell are the author's and are kept",
-            "text": "<!-- cell: chapter title=\"One\" -->\n\nFirst.\n\n\nSecond.\n",
+            "text": "<!-- cell: chapter id=\"c1\" title=\"One\" -->\n\nFirst.\n\n\nSecond.\n",
             "cells": [
                 {
                     "kind": "chapter",
                     "source": "First.\n\n\nSecond.",
-                    "attrs": {
-                        "title": "One"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: chapter title=\"One\" -->\n\nFirst.\n\n\nSecond.\n"
+            "dumped": "<!-- cell: chapter id=\"c1\" title=\"One\" -->\n\nFirst.\n\n\nSecond.\n"
         },
         {
             "name": "an ordinary html comment is not a marker",
-            "text": "<!-- cell: chapter title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n",
+            "text": "<!-- cell: chapter id=\"c1\" title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n",
             "cells": [
                 {
                     "kind": "chapter",
                     "source": "<!-- a note to myself -->\nProse.",
-                    "attrs": {
-                        "title": "One"
-                    }
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: chapter title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n"
+            "dumped": "<!-- cell: chapter id=\"c1\" title=\"One\" -->\n\n<!-- a note to myself -->\nProse.\n"
         },
         {
             "name": "a part opens a run of chapters and carries only its name",
-            "text": "<!-- cell: part title=\"Book One\" -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part title=\"Book Two\" -->\n\n<!-- cell: chapter title=\"After\" -->\n\nIt ended worse.\n",
+            "text": "<!-- cell: part id=\"c1\" title=\"Book One\" -->\n\n<!-- cell: chapter id=\"c2\" title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part id=\"c3\" title=\"Book Two\" -->\n\n<!-- cell: chapter id=\"c4\" title=\"After\" -->\n\nIt ended worse.\n",
             "cells": [
                 {
                     "kind": "part",
                     "source": "",
-                    "attrs": {
-                        "title": "Book One"
-                    }
+                    "id": "c1"
                 },
                 {
                     "kind": "chapter",
                     "source": "It began badly.",
-                    "attrs": {
-                        "title": "The First Night"
-                    }
+                    "id": "c2"
                 },
                 {
                     "kind": "part",
                     "source": "",
-                    "attrs": {
-                        "title": "Book Two"
-                    }
+                    "id": "c3"
                 },
                 {
                     "kind": "chapter",
                     "source": "It ended worse.",
-                    "attrs": {
-                        "title": "After"
-                    }
+                    "id": "c4"
                 }
             ],
-            "dumped": "<!-- cell: part title=\"Book One\" -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part title=\"Book Two\" -->\n\n<!-- cell: chapter title=\"After\" -->\n\nIt ended worse.\n"
+            "dumped": "<!-- cell: part id=\"c1\" title=\"Book One\" -->\n\n<!-- cell: chapter id=\"c2\" title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: part id=\"c3\" title=\"Book Two\" -->\n\n<!-- cell: chapter id=\"c4\" title=\"After\" -->\n\nIt ended worse.\n"
         },
         {
             "name": "a full publishing layout",
-            "text": "<!-- cell: cover src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about -->\n\n[My website](https://example.com)\n",
+            "text": "<!-- cell: cover id=\"c1\" src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page id=\"c2\" -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents id=\"c3\" -->\n\n<!-- cell: chapter id=\"c4\" title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer id=\"c5\" -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about id=\"c6\" -->\n\n[My website](https://example.com)\n",
             "cells": [
                 {
                     "kind": "cover",
                     "source": "![Cover](cover.jpg)",
-                    "attrs": {
-                        "src": "cover.jpg"
-                    }
+                    "id": "c1"
                 },
                 {
                     "kind": "title-page",
                     "source": "# The Lantern of Small Hours",
-                    "attrs": {}
+                    "id": "c2"
                 },
                 {
                     "kind": "contents",
                     "source": "",
-                    "attrs": {}
+                    "id": "c3"
                 },
                 {
                     "kind": "chapter",
                     "source": "It began badly.",
-                    "attrs": {
-                        "title": "The First Night"
-                    }
+                    "id": "c4"
                 },
                 {
                     "kind": "disclaimer",
                     "source": "Any resemblance is coincidental.",
-                    "attrs": {}
+                    "id": "c5"
                 },
                 {
                     "kind": "about",
                     "source": "[My website](https://example.com)",
-                    "attrs": {}
+                    "id": "c6"
                 }
             ],
-            "dumped": "<!-- cell: cover src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents -->\n\n<!-- cell: chapter title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about -->\n\n[My website](https://example.com)\n"
+            "dumped": "<!-- cell: cover id=\"c1\" src=\"cover.jpg\" -->\n\n![Cover](cover.jpg)\n\n<!-- cell: title-page id=\"c2\" -->\n\n# The Lantern of Small Hours\n\n<!-- cell: contents id=\"c3\" -->\n\n<!-- cell: chapter id=\"c4\" title=\"The First Night\" -->\n\nIt began badly.\n\n<!-- cell: disclaimer id=\"c5\" -->\n\nAny resemblance is coincidental.\n\n<!-- cell: about id=\"c6\" -->\n\n[My website](https://example.com)\n"
         },
         {
             "name": "text above the first marker belongs to no cell and is dropped",
-            "text": "Notes to myself.\n\n<!-- cell: markdown -->\n\nOne.\n",
+            "text": "Notes to myself.\n\n<!-- cell: markdown id=\"c1\" -->\n\nOne.\n",
             "cells": [
                 {
                     "kind": "markdown",
                     "source": "One.",
-                    "attrs": {}
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: markdown -->\n\nOne.\n"
+            "dumped": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\n"
         },
         {
             "name": "a form feed is a character the author wrote, not a line break",
-            "text": "<!-- cell: markdown -->\n\nOne.\fTwo.\n",
+            "text": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\fTwo.\n",
             "cells": [
                 {
                     "kind": "markdown",
                     "source": "One.\fTwo.",
-                    "attrs": {}
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: markdown -->\n\nOne.\fTwo.\n"
+            "dumped": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\fTwo.\n"
         },
         {
             "name": "a blank line the author left at the end of a cell is not theirs to keep",
-            "text": "<!-- cell: markdown -->\n\nOne.\n\n\n",
+            "text": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\n\n\n",
             "cells": [
                 {
                     "kind": "markdown",
                     "source": "One.",
-                    "attrs": {}
+                    "id": "c1"
                 }
             ],
-            "dumped": "<!-- cell: markdown -->\n\nOne.\n"
+            "dumped": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\n"
         }
     ]
 }

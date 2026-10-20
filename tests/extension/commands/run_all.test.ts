@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authorDocumentCommandThatRunsCellsOfKind } from "../../../extension/vscode_runtime/commands/author_document_commands";
 import { RunAllCommand } from "../../../extension/vscode_runtime/commands/run_all";
-import {
-    BLURB,
-    MutableCell,
-} from "../../../extension/vscode_runtime/storydoc/model";
+import { BlurbCell } from "../../../extension/library/storydoc/cells/blurb_cell";
 import { forgetWhatTheEditorDid, openStory } from "./open_story";
 
 const A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS = `
@@ -102,12 +99,13 @@ describe("RunAllCommand — while it runs", () => {
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
         const asked = serverThatWritesEveryBlurb(() =>
-            session.changeTheDocument((story) =>
-                story.insertBefore(
-                    "toc",
-                    new MutableCell(BLURB, "", { id: "b3" }),
-                ),
-            ),
+            session.changeTheDocument((story) => {
+                const tableOfContentsAt = story.cells.findIndex(
+                    (cell) => cell.uniqueId === "toc",
+                );
+                const blurbAdded = new BlurbCell("", false, null, "b3");
+                story.cells.splice(tableOfContentsAt, 0, blurbAdded);
+            }),
         );
 
         await new RunAllCommand(
@@ -123,7 +121,11 @@ describe("RunAllCommand — while it runs", () => {
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
         const asked = serverThatWritesEveryBlurb(() =>
-            session.changeTheDocument((story) => story.removeCell("b2")),
+            session.changeTheDocument((story) => {
+                story.cells = story.cells.filter(
+                    (cell) => cell.uniqueId !== "b2",
+                );
+            }),
         );
 
         await new RunAllCommand(

@@ -1,0 +1,21 @@
+import { AuthorFileEditorCellActions } from "../author_editor/AuthorFileEditorCell";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import { DIVIDER } from "../../library/storydoc/cells/divider_cell";
+import "./DividerCell.css";
+
+export function AuthorFileEditorDividerCell() {
+    return (
+        <section className="divider-cell">
+            <AuthorFileEditorCellActions />
+            <i className="codicon codicon-fold divider-cell-mark" />
+            <span className="divider-cell-label">Divider</span>
+            <i className="codicon codicon-fold divider-cell-mark" />
+        </section>
+    );
+}
+
+registerAuthorDocumentCellType({
+    cellKind: DIVIDER,
+    menuLabel: "Divider",
+    insertMenuGroup: "secondary",
+});

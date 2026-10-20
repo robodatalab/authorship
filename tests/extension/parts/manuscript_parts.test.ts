@@ -1,76 +1,57 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    furnitureOf,
+    partBoilerplateOf,
     intoParts,
     partCells,
     partFileName,
     partNumber,
     partTitle,
 } from "../../../extension/vscode_runtime/parts/manuscript_parts";
-import {
-    CHAPTER,
-    DIVIDER,
-    MutableCell,
-    MARKDOWN,
-    PART,
-} from "../../../extension/vscode_runtime/storydoc/model";
-
-function chapter(title: string): MutableCell {
-    return new MutableCell(CHAPTER, "", { title });
-}
-
-function markdown(source: string): MutableCell {
-    return new MutableCell(MARKDOWN, source, {});
-}
-
-function part(title: string): MutableCell {
-    return new MutableCell(PART, "", { title });
-}
-
-function divider(): MutableCell {
-    return new MutableCell(DIVIDER, "", {});
-}
-
-function titlePage(attrs: Record<string, string>): MutableCell {
-    return new MutableCell("title-page", "", attrs);
-}
-
-function image(src: string): MutableCell {
-    return new MutableCell("image", "", { src });
-}
+import { AboutCell } from "../../../extension/library/storydoc/cells/about_cell";
+import { BlurbCell } from "../../../extension/library/storydoc/cells/blurb_cell";
+import { ChapterCell } from "../../../extension/library/storydoc/cells/chapter_cell";
+import { DividerCell } from "../../../extension/library/storydoc/cells/divider_cell";
+import { ImageCell } from "../../../extension/library/storydoc/cells/image_cell";
+import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
+import { NoteCell } from "../../../extension/library/storydoc/cells/note_cell";
+import { PartCell } from "../../../extension/library/storydoc/cells/part_cell";
+import { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
+import { TitlePageCell } from "../../../extension/library/storydoc/cells/title_page_cell";
 
 /** Prose of a given length, for a story that has to look like one. */
-function prose(words: number): MutableCell {
-    return markdown(Array.from({ length: words }, () => "word").join(" "));
+function prose(words: number): MarkdownCell {
+    return new MarkdownCell(
+        Array.from({ length: words }, () => "word").join(" "),
+    );
 }
 
-describe("furnitureOf — what stands before the story and after it", () => {
+describe("partBoilerplateOf — what stands before the story and after it", () => {
     it("splits at the first chapter", () => {
-        const { front, back } = furnitureOf([
-            image("cover.jpg"),
-            titlePage({ title: "Veriona" }),
-            chapter("One"),
-            markdown("alpha"),
-            new MutableCell("about", "A. Writer lives by the sea.", {}),
+        const { front, back } = partBoilerplateOf([
+            new ImageCell("cover.jpg"),
+            new TitlePageCell("Veriona"),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new AboutCell().withSource("A. Writer lives by the sea."),
         ]);
         expect(front.map((cell) => cell.kind)).toEqual(["image", "title-page"]);
         expect(back.map((cell) => cell.kind)).toEqual(["about"]);
     });
 
-    it("a story with no chapters has all of its furniture in front", () => {
-        const { front, back } = furnitureOf([
-            titlePage({ title: "V" }),
-            markdown("a"),
+    it("a story with no chapters has all of its part boilerplate in front", () => {
+        const { front, back } = partBoilerplateOf([
+            new TitlePageCell("V"),
+            new MarkdownCell("a"),
         ]);
         expect(front.map((cell) => cell.kind)).toEqual(["title-page"]);
         expect(back).toEqual([]);
     });
 
     it("takes nothing that is the story", () => {
-        const { front, back } = furnitureOf([
-            chapter("One"),
-            markdown("alpha"),
+        const { front, back } = partBoilerplateOf([
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
         ]);
         expect(front).toEqual([]);
         expect(back).toEqual([]);
@@ -79,10 +60,10 @@ describe("furnitureOf — what stands before the story and after it", () => {
     it("takes no part of the story, not even the parts it is divided into", () => {
         // A part standing before the first chapter is still the story, and travels
         // with the chapters it names rather than with every part of the book.
-        const { front } = furnitureOf([
-            titlePage({ title: "Veriona" }),
-            part("Day One"),
-            chapter("One"),
+        const { front } = partBoilerplateOf([
+            new TitlePageCell("Veriona"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
         ]);
         expect(front.map((cell) => cell.kind)).toEqual(["title-page"]);
     });
@@ -91,11 +72,11 @@ describe("furnitureOf — what stands before the story and after it", () => {
 describe("intoParts — one file per Divider the author placed", () => {
     it("cuts where a divider stands", () => {
         const cells = [
-            part("Day One"),
-            chapter("One"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(10),
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(10),
         ];
         const parts = intoParts(cells);
@@ -112,11 +93,11 @@ describe("intoParts — one file per Divider the author placed", () => {
         // The author asked for a file that opens in the middle of a chapter, so
         // that is the file they get.
         const cells = [
-            chapter("One"),
-            markdown("alpha"),
-            divider(),
-            markdown("beta"),
-            chapter("Two"),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new DividerCell(),
+            new MarkdownCell("beta"),
+            new ChapterCell("Two"),
         ];
         expect(
             intoParts(cells).map((held) => held.cells.map((cell) => cell.kind)),
@@ -127,14 +108,23 @@ describe("intoParts — one file per Divider the author placed", () => {
     });
 
     it("writes the divider into neither file", () => {
-        const cells = [chapter("One"), divider(), chapter("Two")];
+        const cells = [
+            new ChapterCell("One"),
+            new DividerCell(),
+            new ChapterCell("Two"),
+        ];
         expect(
             intoParts(cells).flatMap((held) => held.cells.map((c) => c.kind)),
         ).toEqual(["chapter", "chapter"]);
     });
 
     it("two dividers in a row cut once, leaving no empty file", () => {
-        const cells = [chapter("One"), divider(), divider(), chapter("Two")];
+        const cells = [
+            new ChapterCell("One"),
+            new DividerCell(),
+            new DividerCell(),
+            new ChapterCell("Two"),
+        ];
         expect(intoParts(cells)).toHaveLength(2);
     });
 
@@ -142,18 +132,19 @@ describe("intoParts — one file per Divider the author placed", () => {
         // Length has nothing to do with it any more: a part is a file because the
         // author said it is one.
         const cells = [
-            chapter("One"),
+            new ChapterCell("One"),
             prose(9000),
-            chapter("Two"),
+            new ChapterCell("Two"),
             prose(9000),
-            divider(),
-            chapter("Three"),
+            new DividerCell(),
+            new ChapterCell("Three"),
             prose(10),
         ];
         expect(
             intoParts(cells).map(
                 (held) =>
-                    held.cells.filter((cell) => cell.kind === CHAPTER).length,
+                    held.cells.filter((cell) => cell instanceof ChapterCell)
+                        .length,
             ),
         ).toEqual([2, 1]);
     });
@@ -161,7 +152,12 @@ describe("intoParts — one file per Divider the author placed", () => {
     it("a story with no dividers at all divides into nothing", () => {
         // Nowhere was named as a place to break, and one file holding the whole
         // story is not a division of it.
-        const cells = [chapter("One"), prose(10), chapter("Two"), prose(10)];
+        const cells = [
+            new ChapterCell("One"),
+            prose(10),
+            new ChapterCell("Two"),
+            prose(10),
+        ];
         expect(intoParts(cells)).toEqual([]);
     });
 
@@ -171,13 +167,13 @@ describe("intoParts — one file per Divider the author placed", () => {
 
     it("names the part every file stands in", () => {
         const cells = [
-            part("Day One"),
-            chapter("One"),
-            divider(),
-            chapter("Two"),
-            part("Day Two"),
-            divider(),
-            chapter("Three"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
+            new DividerCell(),
+            new ChapterCell("Two"),
+            new PartCell("Day Two"),
+            new DividerCell(),
+            new ChapterCell("Three"),
         ];
         expect(intoParts(cells).map((held) => held.under)).toEqual([
             "Day One",
@@ -188,11 +184,11 @@ describe("intoParts — one file per Divider the author placed", () => {
 
     it("a file cut before the first part stands under none", () => {
         const cells = [
-            chapter("Prologue"),
+            new ChapterCell("Prologue"),
             prose(10),
-            divider(),
-            part("Day One"),
-            chapter("One"),
+            new DividerCell(),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(10),
         ];
         expect(intoParts(cells).map((held) => held.under)).toEqual([
@@ -201,32 +197,29 @@ describe("intoParts — one file per Divider the author placed", () => {
         ]);
     });
 
-    it("leaves the furniture, the blurb and the story so far out of the story", () => {
+    it("leaves the part boilerplate, the blurb and the story so far out of the story", () => {
         const cells = [
-            titlePage({ title: "Veriona" }),
-            new MutableCell("recap", "She has lost her name.", {}),
-            chapter("One"),
-            markdown("alpha"),
-            divider(),
-            new MutableCell("blurb", "A woman loses her name.", {}),
-            chapter("Two"),
-            new MutableCell("about", "A. Writer lives by the sea.", {}),
+            new TitlePageCell("Veriona"),
+            new RecapCell().withSource("She has lost her name."),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new DividerCell(),
+            new BlurbCell("A woman loses her name."),
+            new ChapterCell("Two"),
+            new AboutCell().withSource("A. Writer lives by the sea."),
         ];
         expect(
             intoParts(cells).map((held) => held.cells.map((cell) => cell.kind)),
-        ).toEqual([
-            ["chapter", "markdown"],
-            ["chapter"],
-        ]);
+        ).toEqual([["chapter", "markdown"], ["chapter"]]);
     });
 
     it("keeps a note with the chapter it was written under", () => {
         const cells = [
-            chapter("One"),
+            new ChapterCell("One"),
             prose(10),
-            new MutableCell("note", "She has to find the letter here.", {}),
-            divider(),
-            chapter("Two"),
+            new NoteCell("She has to find the letter here."),
+            new DividerCell(),
+            new ChapterCell("Two"),
         ];
         expect(intoParts(cells)[0].cells.map((cell) => cell.kind)).toEqual([
             "chapter",
@@ -237,20 +230,20 @@ describe("intoParts — one file per Divider the author placed", () => {
 
     it("every cell lands in exactly one part, in the order it was written", () => {
         const cells = [
-            chapter("Prologue"),
+            new ChapterCell("Prologue"),
             prose(10),
-            divider(),
-            part("Day One"),
-            chapter("One"),
+            new DividerCell(),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(10),
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(10),
         ];
         const titles = intoParts(cells).flatMap((held) =>
             held.cells
-                .filter((cell) => cell.kind === CHAPTER)
-                .map((cell) => cell.attrs.title),
+                .filter((cell) => cell instanceof ChapterCell)
+                .map((cell) => cell.title),
         );
         expect(titles).toEqual(["Prologue", "One", "Two"]);
     });
@@ -259,15 +252,15 @@ describe("intoParts — one file per Divider the author placed", () => {
         // Every part is one file in one folder, so the numbering is the folder's
         // and the name of the story's part is what tells them apart.
         const cells = [
-            part("Day One"),
-            chapter("One"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(10),
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(10),
-            divider(),
-            part("Day Two"),
-            chapter("Three"),
+            new DividerCell(),
+            new PartCell("Day Two"),
+            new ChapterCell("Three"),
             prose(10),
         ];
         const named = intoParts(cells).map((held, at) =>
@@ -282,19 +275,19 @@ describe("intoParts — one file per Divider the author placed", () => {
 });
 
 describe("partCells — a part as a document of its own", () => {
-    it("carries the furniture around its share of the story", () => {
+    it("carries the part boilerplate around its share of the story", () => {
         const cells = [
-            image("cover.jpg"),
-            titlePage({ title: "Veriona", subtitle: "A Queendom drama" }),
-            chapter("One"),
-            markdown("alpha"),
-            divider(),
-            chapter("Two"),
-            markdown("beta"),
-            new MutableCell("about", "A. Writer lives by the sea.", {}),
+            new ImageCell("cover.jpg"),
+            new TitlePageCell("Veriona", "A Queendom drama"),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new DividerCell(),
+            new ChapterCell("Two"),
+            new MarkdownCell("beta"),
+            new AboutCell().withSource("A. Writer lives by the sea."),
         ];
         const parts = intoParts(cells);
-        const second = partCells(furnitureOf(cells), 2, parts[1]);
+        const second = partCells(partBoilerplateOf(cells), 2, parts[1]);
 
         expect(second.map((cell) => cell.kind)).toEqual([
             "image",
@@ -307,40 +300,40 @@ describe("partCells — a part as a document of its own", () => {
     });
 
     it("carries a note into the part its chapter went to, and no other", () => {
-        const note = new MutableCell(
-            "note",
-            "She has to find the letter here.",
-            {},
-        );
+        const note = new NoteCell("She has to find the letter here.");
         const cells = [
-            chapter("One"),
+            new ChapterCell("One"),
             prose(10),
             note,
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(10),
         ];
         const parts = intoParts(cells);
 
         expect(parts).toHaveLength(2);
-        expect(partCells(furnitureOf(cells), 1, parts[0])).toContainEqual(note);
-        expect(partCells(furnitureOf(cells), 2, parts[1])).not.toContainEqual(
+        expect(partCells(partBoilerplateOf(cells), 1, parts[0])).toContainEqual(
             note,
         );
+        expect(
+            partCells(partBoilerplateOf(cells), 2, parts[1]),
+        ).not.toContainEqual(note);
     });
 
     it("renumbers the title page, and leaves the subtitle as it stands", () => {
         const cells = [
-            titlePage({ title: "Veriona", subtitle: "A Queendom drama" }),
-            divider(),
-            chapter("One"),
-            markdown("alpha"),
+            new TitlePageCell("Veriona", "A Queendom drama"),
+            new DividerCell(),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 3, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 3, parts[0]);
 
-        expect(only[0].attrs.title).toBe("Veriona — Part 3");
-        expect(only[0].attrs.subtitle).toBe("A Queendom drama");
+        expect(only[0]).toMatchObject({
+            title: "Veriona — Part 3",
+            subtitle: "A Queendom drama",
+        });
     });
 
     it("names a part by the story, the part of it it came from, and its number", () => {
@@ -354,108 +347,115 @@ describe("partCells — a part as a document of its own", () => {
 
     it("carries the name of the story’s part onto the title page", () => {
         const cells = [
-            titlePage({ title: "Veriona" }),
-            part("Day One"),
-            chapter("One"),
+            new TitlePageCell("Veriona"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(100),
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(100),
         ];
         const parts = intoParts(cells);
-        const second = partCells(furnitureOf(cells), 2, parts[1]);
+        const second = partCells(partBoilerplateOf(cells), 2, parts[1]);
 
-        expect(second[0].attrs.title).toBe("Veriona — Day One — Part 2");
+        expect(second[0]).toMatchObject({
+            title: "Veriona — Day One — Part 2",
+        });
     });
 
     it("opens the first file with the part the story opens with, and no other", () => {
         const cells = [
-            titlePage({ title: "Veriona" }),
-            part("Day One"),
-            chapter("One"),
+            new TitlePageCell("Veriona"),
+            new PartCell("Day One"),
+            new ChapterCell("One"),
             prose(100),
-            divider(),
-            chapter("Two"),
+            new DividerCell(),
+            new ChapterCell("Two"),
             prose(100),
         ];
         const parts = intoParts(cells);
-        const furniture = furnitureOf(cells);
+        const partBoilerplate = partBoilerplateOf(cells);
 
         expect(
-            partCells(furniture, 1, parts[0]).map((cell) => cell.kind),
+            partCells(partBoilerplate, 1, parts[0]).map((cell) => cell.kind),
         ).toEqual(["title-page", "part", "chapter", "markdown"]);
         expect(
-            partCells(furniture, 2, parts[1]).map((cell) => cell.kind),
+            partCells(partBoilerplate, 2, parts[1]).map((cell) => cell.kind),
         ).toEqual(["title-page", "chapter", "markdown"]);
     });
 
     it("points the cover at art that is now a folder away", () => {
         // The parts sit in `parts/`; the art did not move with them.
         const cells = [
-            image("art/cover.jpg"),
-            divider(),
-            chapter("One"),
-            markdown("alpha"),
+            new ImageCell("art/cover.jpg"),
+            new DividerCell(),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
-        expect(only[0].attrs.src).toBe("../art/cover.jpg");
+        expect(only[0]).toMatchObject({ src: "../art/cover.jpg" });
     });
 
     it("points a picture standing in the prose at art a folder away too", () => {
         const cells = [
-            divider(),
-            chapter("One"),
-            markdown("alpha"),
-            image("art/veriona.jpg"),
+            new DividerCell(),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new ImageCell("art/veriona.jpg"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
         expect(only.map((cell) => cell.kind)).toEqual([
             "chapter",
             "markdown",
             "image",
         ]);
-        expect(only[2].attrs.src).toBe("../art/veriona.jpg");
+        expect(only[2]).toMatchObject({ src: "../art/veriona.jpg" });
     });
 
     it("leaves a cover that already says where its art is from", () => {
         for (const src of ["https://art.example/c.jpg", "/shared/art/c.jpg"]) {
-            const cells = [image(src), divider(), chapter("One"), markdown("a")];
+            const cells = [
+                new ImageCell(src),
+                new DividerCell(),
+                new ChapterCell("One"),
+                new MarkdownCell("a"),
+            ];
             const parts = intoParts(cells);
-            const only = partCells(furnitureOf(cells), 1, parts[0]);
+            const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
-            expect(only[0].attrs.src, src).toBe(src);
+            expect(only[0], src).toMatchObject({ src });
         }
     });
 
     it("climbs one further out of a path that already climbs", () => {
         // Written from where the story stands, so a part stands one folder deeper.
         const cells = [
-            image("../shared/c.jpg"),
-            divider(),
-            chapter("One"),
-            markdown("a"),
+            new ImageCell("../shared/c.jpg"),
+            new DividerCell(),
+            new ChapterCell("One"),
+            new MarkdownCell("a"),
         ];
         const parts = intoParts(cells);
-        const only = partCells(furnitureOf(cells), 1, parts[0]);
+        const only = partCells(partBoilerplateOf(cells), 1, parts[0]);
 
-        expect(only[0].attrs.src).toBe("../../shared/c.jpg");
+        expect(only[0]).toMatchObject({ src: "../../shared/c.jpg" });
     });
 
-    it("a story with no furniture is a part of nothing but chapters", () => {
+    it("a story with no part boilerplate is a part of nothing but chapters", () => {
         const cells = [
-            chapter("One"),
-            markdown("alpha"),
-            divider(),
-            chapter("Two"),
-            markdown("beta"),
+            new ChapterCell("One"),
+            new MarkdownCell("alpha"),
+            new DividerCell(),
+            new ChapterCell("Two"),
+            new MarkdownCell("beta"),
         ];
         const parts = intoParts(cells);
         expect(
-            partCells(furnitureOf(cells), 1, parts[0]).map((c) => c.kind),
+            partCells(partBoilerplateOf(cells), 1, parts[0]).map((c) => c.kind),
         ).toEqual(["chapter", "markdown"]);
     });
 });

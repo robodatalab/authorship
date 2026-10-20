@@ -5,7 +5,10 @@ from dataclasses import dataclass
 
 from torch.utils.data import Dataset
 
-from server.storydoc import Document, SalientConceptInTheStory, StoryWordRange
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.story_word_range import StoryWordRange
+from server.storydoc.iterators.story_words_iterator import StoryWordsIterator
+from server.storydoc.storydoc import Document
 
 UNRELATED_TEXTS_PER_CONCEPT = 8
 FEWEST_EXAMPLES = 1
@@ -34,7 +37,7 @@ def distinct_ranges(word_ranges: list[StoryWordRange]) -> list[StoryWordRange]:
     return ranges
 
 
-def concept_covers(concept: SalientConceptInTheStory, span: StoryWordRange) -> bool:
+def concept_covers(concept: SalientConceptCell, span: StoryWordRange) -> bool:
     return any(
         concept_range.first_word <= span.first_word and span.last_word <= concept_range.last_word
         for concept_range in concept.story_word_ranges
@@ -42,20 +45,23 @@ def concept_covers(concept: SalientConceptInTheStory, span: StoryWordRange) -> b
 
 
 def salient_concept_texts(
-    concept: SalientConceptInTheStory, concepts_of_the_story: list[SalientConceptInTheStory]
-) -> SalientConceptTexts:
+        document: Document,
+        concept: SalientConceptCell,
+        concepts_of_the_story: list[SalientConceptCell]
+        ) -> SalientConceptTexts:
     own_ranges = distinct_ranges(concept.story_word_ranges)
-    examples = [word_range.text for word_range in own_ranges]
+    story_words = StoryWordsIterator(document)
+    examples = [story_words.text(r) for r in own_ranges]
     ranges_of_the_story = [
         word_range for other in concepts_of_the_story for word_range in other.story_word_ranges
     ]
     distinct_ranges_of_the_story = distinct_ranges(ranges_of_the_story)
     unrelated_texts = [
-        word_range.text
-        for word_range in distinct_ranges_of_the_story
-        if not concept_covers(concept, word_range)
+        story_words.text(r)
+        for r in distinct_ranges_of_the_story
+        if not concept_covers(concept, r)
     ]
-    texts = SalientConceptTexts(concept.abstract, examples, unrelated_texts)
+    texts = SalientConceptTexts(concept.source, examples, unrelated_texts)
     return texts
 
 
@@ -67,7 +73,7 @@ class SalientConceptsDataset(Dataset[SalientConceptExamples]):
         for story in annotated_stories:
             concepts_of_the_story = story.salient_concepts()
             for concept in concepts_of_the_story:
-                texts = salient_concept_texts(concept, concepts_of_the_story)
+                texts = salient_concept_texts(story, concept, concepts_of_the_story)
                 if len(texts.examples) >= FEWEST_EXAMPLES and texts.unrelated_texts:
                     self._concepts.append(texts)
 

@@ -1,76 +1,58 @@
 import { useState } from "react";
-import { useAuthorFileEditorCellFind } from "./AuthorFileEditorCell";
 import "./AuthorFileEditorCellFields.css";
 
 export interface AuthorFileEditorCellField {
-    attributeName: string;
     label: string;
+    said: string;
     placeholder?: string;
-    isCheckbox?: boolean;
+    onSaid: (said: string) => void;
+}
+
+export interface AuthorFileEditorCellCheckbox {
+    label: string;
+    isChecked: boolean;
+    onChecked: (isChecked: boolean) => void;
 }
 
 interface AuthorFileEditorCellFieldsProps {
     fields: AuthorFileEditorCellField[];
-    cellAttributes: Record<string, string>;
-    onAttributeChanged: (attributeName: string, attributeValue: string) => void;
+    checkboxes?: AuthorFileEditorCellCheckbox[];
 }
 
 export function AuthorFileEditorCellFields({
     fields,
-    cellAttributes,
-    onAttributeChanged,
+    checkboxes = [],
 }: AuthorFileEditorCellFieldsProps) {
-    const { matches, current } = useAuthorFileEditorCellFind();
-
-    // A title is a box, and a box cannot hold a mark around part of what it
-    // says, so the whole of it is marked instead.
-    function inputClassName(attributeName: string): string {
-        return [
-            "author-file-editor-cell-field-input",
-            matches.some((match) => match.attributeName === attributeName)
-                ? "author-file-editor-find-field"
-                : "",
-            current?.attributeName === attributeName
-                ? "author-file-editor-find-field-current"
-                : "",
-        ]
-            .filter((className) => className !== "")
-            .join(" ");
-    }
-
     return (
         <div className="author-file-editor-cell-fields">
             {fields.map((field) => (
-                <label
-                    className="author-file-editor-cell-field"
-                    key={field.attributeName}
-                >
+                <label className="author-file-editor-cell-field" key={field.label}>
                     <span className="author-file-editor-cell-field-label">
                         {field.label}
                     </span>
-                    {field.isCheckbox ? (
-                        <input
-                            type="checkbox"
-                            checked={
-                                cellAttributes[field.attributeName] !== "no"
-                            }
-                            onChange={(event) =>
-                                onAttributeChanged(
-                                    field.attributeName,
-                                    event.currentTarget.checked ? "yes" : "no",
-                                )
-                            }
-                        />
-                    ) : (
-                        <AuthorFileEditorCellFieldBox
-                            className={inputClassName(field.attributeName)}
-                            said={cellAttributes[field.attributeName] ?? ""}
-                            placeholder={field.placeholder ?? ""}
-                            onSaid={(said) =>
-                                onAttributeChanged(field.attributeName, said)
-                            }
-                        />
-                    )}
+                    <AuthorFileEditorCellFieldBox
+                        className="author-file-editor-cell-field-input"
+                        said={field.said}
+                        placeholder={field.placeholder ?? ""}
+                        onSaid={field.onSaid}
+                    />
+                </label>
+            ))}
+            {checkboxes.map((checkbox) => (
+                <label
+                    className="author-file-editor-cell-field"
+                    key={checkbox.label}
+                >
+                    <span className="author-file-editor-cell-field-label">
+                        {checkbox.label}
+                    </span>
+                    <input
+                        type="checkbox"
+                        checked={checkbox.isChecked}
+                        onChange={(event) =>
+                            checkbox.onChecked(event.currentTarget.checked)
+                        }
+                    />
                 </label>
             ))}
         </div>

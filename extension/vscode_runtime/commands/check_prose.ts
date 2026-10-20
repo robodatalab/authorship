@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
-import type { SynchronizedRepresentation } from "../storydoc/author_doc_synch";
+import type { SynchronizedRepresentation } from "../../library/storydoc/synchronizers/character_range_synchronizer";
 
 export interface ProseCheckError extends SynchronizedRepresentation {
     ruleThatFoundTheError: string;
@@ -26,7 +26,7 @@ export class CheckProseCommand implements AuthorDocumentCommand {
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         try {
             const jobId = await startServerJob("/check/errors", {
-                path: session.document.uri.fsPath,
+                path: session.document.path,
                 text: session.document.text,
             });
             const checked = await awaitServerJob<CheckErrorsJob>(

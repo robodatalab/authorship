@@ -1,0 +1,94 @@
+.authorship-panel-plot-trajectory {
+    position: relative;
+}
+
+.authorship-panel-plot-trajectory-lanes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.authorship-panel-plot-trajectory-lane-0 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-blue,
+        #3794ff
+    );
+}
+
+.authorship-panel-plot-trajectory-lane-1 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-purple,
+        #b180d7
+    );
+}
+
+.authorship-panel-plot-trajectory-lane-2 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-orange,
+        #d18616
+    );
+}
+
+.authorship-panel-plot-trajectory-lane-3 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-green,
+        #89d185
+    );
+}
+
+.authorship-panel-plot-trajectory-lane-4 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-red,
+        #f14c4c
+    );
+}
+
+.authorship-panel-plot-trajectory-lane-5 {
+    --authorship-panel-plot-trajectory-lane-color: var(
+        --vscode-charts-yellow,
+        #cca700
+    );
+}
+
+.authorship-panel-plot-trajectory-edge-line {
+    fill: none;
+    stroke: var(--authorship-panel-plot-trajectory-lane-color);
+    stroke-width: 2;
+}
+
+.authorship-panel-plot-trajectory-edge-arrowhead {
+    fill: var(--authorship-panel-plot-trajectory-lane-color);
+}
+
+.authorship-panel-plot-trajectory-edge-grip {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 10;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+.authorship-panel-plot-trajectory-edge:hover
+    .authorship-panel-plot-trajectory-edge-line {
+    stroke-width: 3;
+}
+
+.authorship-panel-plot-trajectory-node {
+    fill: var(--vscode-sideBar-background);
+    stroke: var(--authorship-panel-plot-trajectory-lane-color);
+    stroke-width: 2;
+    pointer-events: all;
+    cursor: crosshair;
+}
+
+.authorship-panel-plot-trajectory-node-selected {
+    fill: var(--authorship-panel-plot-trajectory-lane-color);
+}
+
+.authorship-panel-plot-trajectory-connection {
+    stroke: var(--vscode-focusBorder);
+    stroke-width: 2;
+    stroke-dasharray: 3 2;
+}

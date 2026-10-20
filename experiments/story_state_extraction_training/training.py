@@ -12,10 +12,10 @@ from experiments.story_state_extraction_training.dataset import (
     SalientConceptsDataset,
 )
 from experiments.story_state_extraction_training.loss import salient_point_classification_loss
-from server import storydoc
+from server.storydoc import storydoc
 from server.models import cluster
 from server.models.story_state_extraction_model import StoryStateExtractionModel
-from server.storydoc import Document
+from server.storydoc.storydoc import Document
 
 STORIES_REPOSITORY = Path.home() / "GitHub" / "smut"
 

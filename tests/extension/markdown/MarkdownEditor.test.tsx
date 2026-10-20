@@ -3,7 +3,6 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
-import type { ParagraphInStoryPlots } from "../../../extension/vscode_runtime/commands/identify_story_plots";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -20,8 +19,11 @@ vi.mock("monaco-editor/editor/editor.api", async () => {
 
 const { monacoEditorsOnThePage } = await import("./monaco_editor_double");
 
-const { MarkdownEditor, MarkdownEditorMediator } =
-    await import("../../../extension/webview/markdown/MarkdownEditor");
+const {
+    MarkdownEditor,
+    MarkdownEditorMediator,
+    useWhereTheMarkdownEditorsDrawTheirText,
+} = await import("../../../extension/webview/markdown/MarkdownEditor");
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -661,90 +663,6 @@ describe("what the checks found in the prose being written", () => {
     });
 });
 
-describe("the plots the paragraphs belong to", () => {
-    const THE_DOOR: ParagraphInStoryPlots = {
-        cellId: "c1",
-        startCharacterOffsetInCell: 14,
-        endCharacterOffsetInCell: 23,
-        wordsInTheCell: "The door.",
-        isVisible: true,
-        storyPlotIndices: [1, 8],
-    };
-
-    async function mountWithStoryPlots(): Promise<void> {
-        root = createRoot(emptyBody());
-        await act(async () => {
-            root.render(
-                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
-                    <MarkdownEditor
-                        cellId="c1"
-                        markdown={"The lantern.\n\nThe door.\n\nThe key."}
-                        highlights={[{ at: 4, end: 11, isCurrent: false }]}
-                        paragraphsInStoryPlots={[THE_DOOR]}
-                        onMarkdownCommitted={committedSpy()}
-                    />
-                </MarkdownEditorMediator>,
-            );
-        });
-    }
-
-    it("borders the rendered paragraph once for every plot it belongs to", async () => {
-        await mountWithStoryPlots();
-
-        const inStoryPlots = [
-            ...document.querySelectorAll(
-                ".markdown-rendered-paragraph-in-story-plots",
-            ),
-        ];
-        expect(
-            inStoryPlots.map((paragraph) => paragraph.textContent),
-        ).toEqual(["The door.\n"]);
-        expect(
-            [
-                ...inStoryPlots[0].querySelectorAll(
-                    ".markdown-editor-story-plot-border",
-                ),
-            ].map((border) => border.className),
-        ).toEqual([
-            "markdown-editor-story-plot-border markdown-editor-story-plot-1",
-            "markdown-editor-story-plot-border markdown-editor-story-plot-2",
-        ]);
-    });
-
-    it("borders the lines of the paragraph in the editor", async () => {
-        await mountWithStoryPlots();
-
-        await doubleClick(document.querySelector(".markdown-rendered"));
-
-        expect(latestEditor().marks()).toEqual(
-            expect.arrayContaining([
-                {
-                    range: {
-                        from: { lineNumber: 1, column: 15 },
-                        to: { lineNumber: 1, column: 24 },
-                    },
-                    options: {
-                        isWholeLine: true,
-                        className:
-                            "markdown-editor-story-plot-border markdown-editor-story-plot-1",
-                    },
-                },
-                {
-                    range: {
-                        from: { lineNumber: 1, column: 15 },
-                        to: { lineNumber: 1, column: 24 },
-                    },
-                    options: {
-                        isWholeLine: true,
-                        className:
-                            "markdown-editor-story-plot-border markdown-editor-story-plot-2",
-                    },
-                },
-            ]),
-        );
-    });
-});
-
 describe("selecting text", () => {
     it("says where the selection starts and ends in the markdown", async () => {
         const selected = vi.fn();
@@ -865,7 +783,8 @@ describe("the words of a salient concept", () => {
         {
             startCharacterOffsetInCell: 8,
             endCharacterOffsetInCell: 21,
-            salientConceptColor: 1,
+            highlightColor: 1,
+            emphasized: false,
         },
     ];
 
@@ -878,7 +797,7 @@ describe("the words of a salient concept", () => {
                         cellId="c1"
                         markdown="She saw **the** door."
                         onMarkdownCommitted={committedSpy()}
-                        salientConceptHighlights={THE_DOOR_HIGHLIGHTED}
+                        storyTextHighlights={THE_DOOR_HIGHLIGHTED}
                     />
                 </MarkdownEditorMediator>,
             );
@@ -894,7 +813,7 @@ describe("the words of a salient concept", () => {
 
         expect(
             [
-                ...(highlights.get("markdown-editor-salient-concept-1") ?? []),
+                ...(highlights.get("markdown-editor-story-text-highlight-1") ?? []),
             ].map((range) => range.toString()),
         ).toEqual(["the door."]);
         vi.unstubAllGlobals();
@@ -911,7 +830,67 @@ describe("the words of a salient concept", () => {
             },
             options: {
                 inlineClassName:
-                    "markdown-editor-salient-concept markdown-editor-story-plot-1",
+                    "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
+            },
+        });
+    });
+});
+
+describe("story text highlighted with emphasis", () => {
+    const THE_DOOR_EMPHASIZED = [
+        {
+            startCharacterOffsetInCell: 8,
+            endCharacterOffsetInCell: 21,
+            highlightColor: 1,
+            emphasized: true,
+        },
+    ];
+
+    async function mountEmphasized(): Promise<void> {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw **the** door."
+                        onMarkdownCommitted={committedSpy()}
+                        storyTextHighlights={THE_DOOR_EMPHASIZED}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+    }
+
+    it("is highlighted in the rendered text with the emphasized shade of its colour", async () => {
+        const highlights = new Map<string, Set<Range>>();
+        vi.stubGlobal("Highlight", Set);
+        vi.stubGlobal("CSS", { highlights });
+
+        await mountEmphasized();
+
+        const emphasized = [
+            ...(highlights.get(
+                "markdown-editor-story-text-highlight-emphasized-1",
+            ) ?? []),
+        ].map((range) => range.toString());
+        expect(emphasized).toEqual(["the door."]);
+        vi.unstubAllGlobals();
+    });
+
+    it("is highlighted in the editor with the emphasized shade of its colour", async () => {
+        await mountEmphasized();
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        const marksDrawn = latestEditor().marks();
+        expect(marksDrawn).toContainEqual({
+            range: {
+                from: { lineNumber: 1, column: 9 },
+                to: { lineNumber: 1, column: 22 },
+            },
+            options: {
+                inlineClassName:
+                    "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-emphasized markdown-editor-story-text-highlight-1",
             },
         });
     });
@@ -960,5 +939,172 @@ describe("showing a salient concept's words", () => {
         await mountShowing(THE_DOOR_SHOWN, shownAt);
 
         expect(shownAt).toHaveBeenLastCalledWith(10, 28);
+    });
+});
+
+describe("clicking the text", () => {
+    it.each([
+        {
+            clicked: "inside a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 0,
+            caretAt: 5,
+            clickedAt: 4,
+        },
+        {
+            clicked: "on the first letter of a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 2,
+            caretAt: 1,
+            clickedAt: 16,
+        },
+        {
+            clicked: "just past the last letter of a word",
+            markdown: "She saw **the** door.",
+            textDrawn: 0,
+            caretAt: 7,
+            clickedAt: 4,
+        },
+        {
+            clicked: "inside a word drawn bold",
+            markdown: "She saw **the** door.",
+            textDrawn: 1,
+            caretAt: 1,
+            clickedAt: 8,
+        },
+        {
+            clicked: "past the end of the line",
+            markdown: "She saw **the** door.",
+            textDrawn: 2,
+            caretAt: 6,
+            clickedAt: 16,
+        },
+        {
+            clicked: "between two spaces after a word",
+            markdown: "She saw  the door.",
+            textDrawn: 0,
+            caretAt: 8,
+            clickedAt: 8,
+        },
+    ])(
+        "says which word of the markdown the author clicked $clicked",
+        async ({ markdown, textDrawn, caretAt, clickedAt }) => {
+            const clicked = vi.fn();
+            root = createRoot(emptyBody());
+            await act(async () => {
+                root.render(
+                    <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                        <MarkdownEditor
+                            cellId="c1"
+                            markdown={markdown}
+                            onMarkdownCommitted={committedSpy()}
+                            onTextClicked={clicked}
+                        />
+                    </MarkdownEditorMediator>,
+                );
+            });
+            const rendered = document.querySelector(".markdown-rendered")!;
+            const textNodes: Text[] = [];
+            const walking = document.createTreeWalker(
+                rendered,
+                NodeFilter.SHOW_TEXT,
+            );
+            while (walking.nextNode()) {
+                textNodes.push(walking.currentNode as Text);
+            }
+            const caret = document.createRange();
+            caret.setStart(textNodes[textDrawn], caretAt);
+            caret.collapse(true);
+
+            await act(async () => {
+                document.getSelection()!.removeAllRanges();
+                document.getSelection()!.addRange(caret);
+                rendered.dispatchEvent(
+                    new MouseEvent("click", { bubbles: true }),
+                );
+            });
+
+            expect(clicked).toHaveBeenCalledWith(clickedAt);
+        },
+    );
+
+    it("says where in the markdown the author clicked while typing", async () => {
+        const clicked = vi.fn();
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw the door."
+                        onMarkdownCommitted={committedSpy()}
+                        onTextClicked={clicked}
+                    />
+                </MarkdownEditorMediator>,
+            );
+        });
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        await act(async () => {
+            latestEditor().click(12);
+        });
+
+        expect(clicked).toHaveBeenCalledWith(12);
+    });
+});
+
+describe("where an editor draws its text", () => {
+    function SaysWhereTheDoorIsDrawn() {
+        const { whereTheTextIsDrawn, timesTheEditorsWereDrawn } =
+            useWhereTheMarkdownEditorsDrawTheirText();
+        const doorDrawnAt = whereTheTextIsDrawn("c1", 12, 16);
+        return (
+            <div
+                className="test-door-drawn-at"
+                data-times-drawn={timesTheEditorsWereDrawn}
+                data-drawn-at={JSON.stringify(doorDrawnAt)}
+            />
+        );
+    }
+
+    it("is where the editor the author types in draws it", async () => {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <MarkdownEditor
+                        cellId="c1"
+                        markdown="She saw the door."
+                        onMarkdownCommitted={committedSpy()}
+                    />
+                    <SaysWhereTheDoorIsDrawn />
+                </MarkdownEditorMediator>,
+            );
+        });
+        await doubleClick(document.querySelector(".markdown-rendered"));
+
+        const doorDrawnAt = document.querySelector<HTMLElement>(
+            ".test-door-drawn-at",
+        )!.dataset.drawnAt!;
+        expect(JSON.parse(doorDrawnAt)).toEqual({
+            startsAt: { x: 20, top: 10, bottom: 28 },
+            endsAt: { x: 20, top: 10, bottom: 28 },
+        });
+    });
+
+    it("is nowhere for an editor the mediator does not hold", async () => {
+        root = createRoot(emptyBody());
+        await act(async () => {
+            root.render(
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <SaysWhereTheDoorIsDrawn />
+                </MarkdownEditorMediator>,
+            );
+        });
+
+        const doorDrawnAt = document.querySelector<HTMLElement>(
+            ".test-door-drawn-at",
+        )!.dataset.drawnAt!;
+        expect(JSON.parse(doorDrawnAt)).toBe(null);
     });
 });

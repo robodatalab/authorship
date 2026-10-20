@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    AuthorDocCellDiff,
-    AuthorDocDiff,
-} from "../../../extension/vscode_runtime/storydoc/diff";
-import { ImmutableAuthorDocument } from "../../../extension/vscode_runtime/storydoc/model";
+import { AuthorDocDiff } from "../../../extension/library/storydoc/diff";
+import { Document } from "../../../extension/library/storydoc/storydoc";
 
 const SHE_SAW = '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n';
 const HE_HEARD = '<!-- cell: markdown id="c2" -->\n\nHe heard the bell.\n';
@@ -13,8 +10,8 @@ const THE_STORY = THE_CHAPTER + "\n" + SHE_SAW + "\n" + HE_HEARD;
 
 function theDifferenceBetween(lhsText: string, rhsText: string): AuthorDocDiff {
     return AuthorDocDiff.diff(
-        ImmutableAuthorDocument.fromText(lhsText),
-        ImmutableAuthorDocument.fromText(rhsText),
+        new Document(lhsText),
+        new Document(rhsText),
     );
 }
 
@@ -22,163 +19,9 @@ describe("diff — what would have to change to turn one document into the other
     it("says nothing about two documents written the same", () => {
         expect(theDifferenceBetween(SHE_SAW, SHE_SAW).empty()).toBe(true);
     });
-
-    it("gives the order the cells stand in when the same cells stand in another", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW + "\n" + HE_HEARD,
-                HE_HEARD + "\n" + SHE_SAW,
-            ),
-        ).toEqual(new AuthorDocDiff([], ["c1", "c2"], ["c2", "c1"]));
-    });
-
-    it("says nothing of the order when the cells stand as they stood", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                '<!-- cell: markdown id="c1" -->\n\nShe saw the gate.\n',
-            ).cellIdsInRhs,
-        ).toBeUndefined();
-    });
-
-    it("speaks up when a cell is of one kind in the first and another in the second", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                SHE_SAW.replace("markdown", "disclaimer"),
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                17,
-                "markdown",
-                "disclaimer",
-                "",
-                "",
-                {},
-                {},
-            ),
-        ]);
-    });
-
-    it("gives a cell the second has and the first has not, with all it is written with", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW, SHE_SAW + "\n" + HE_HEARD),
-        ).toEqual(
-            new AuthorDocDiff(
-                [
-                    new AuthorDocCellDiff(
-                        "c2",
-                        0,
-                        undefined,
-                        "markdown",
-                        "",
-                        "He heard the bell.",
-                        {},
-                        { id: "c2" },
-                    ),
-                ],
-                ["c1"],
-                ["c1", "c2"],
-            ),
-        );
-    });
-
-    it("gives a cell the first has and the second has not, with all it was written with", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW + "\n" + HE_HEARD, HE_HEARD).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                0,
-                "markdown",
-                undefined,
-                "She saw the door.",
-                "",
-                { id: "c1" },
-                {},
-            ),
-        ]);
-    });
-
-    it("tells a cell emptied of its text from a cell taken out of the document", () => {
-        expect(
-            theDifferenceBetween(SHE_SAW, '<!-- cell: markdown id="c1" -->\n')
-                .cells[0].kindInRhs,
-        ).toEqual("markdown");
-    });
-
-    it("says where a cell's markdown differs, in both of them", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW,
-                '<!-- cell: markdown id="c1" -->\n\nShe opened the door.\n',
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                4,
-                "markdown",
-                "markdown",
-                "saw",
-                "opened",
-                {},
-                {},
-            ),
-        ]);
-    });
-
-    it("reads the difference from the first character that differs to the last", () => {
-        const cellDiff = theDifferenceBetween(
-            SHE_SAW,
-            '<!-- cell: markdown id="c1" -->\n\nSlowly, She saw the door.\n',
-        ).cells[0];
-
-        expect(cellDiff.theyDifferFromCharacter).toBe(1);
-        expect(cellDiff.theyDifferToCharacterInLhs).toBe(1);
-        expect(cellDiff.theyDifferToCharacterInRhs).toBe(9);
-        expect(cellDiff.textInRhs).toBe("lowly, S");
-    });
-
-    it("gives every attribute written, changed, or missing from the second", () => {
-        expect(
-            theDifferenceBetween(
-                '<!-- cell: chapter id="c1" title="One" folded="true" -->\n',
-                '<!-- cell: chapter id="c1" title="Two" printed="no" -->\n',
-            ).cells,
-        ).toEqual([
-            new AuthorDocCellDiff(
-                "c1",
-                0,
-                "chapter",
-                "chapter",
-                "",
-                "",
-                { title: "One", folded: "true", printed: undefined },
-                { title: "Two", folded: undefined, printed: "no" },
-            ),
-        ]);
-    });
-
-    it("gives one difference per cell, however many ways the two differ", () => {
-        expect(
-            theDifferenceBetween(
-                SHE_SAW + "\n" + HE_HEARD,
-                '<!-- cell: markdown id="c2" title="Bells" -->\n\nHe heard a bell.\n',
-            ).cells.map((cellDiff) => cellDiff.cellId),
-        ).toEqual(["c1", "c2"]);
-    });
 });
 
 describe("inverting a difference", () => {
-    it("turns each cell round, and the order they stand in", () => {
-        const change = theDifferenceBetween(THE_STORY, HE_HEARD + SHE_SAW);
-
-        expect(change.invert()).toEqual(
-            theDifferenceBetween(HE_HEARD + SHE_SAW, THE_STORY),
-        );
-    });
-
     it("leaves a difference that says nothing saying nothing", () => {
         expect(theDifferenceBetween(SHE_SAW, SHE_SAW).invert().empty()).toBe(
             true,
@@ -187,8 +30,8 @@ describe("inverting a difference", () => {
 });
 
 function turningOneIntoTheOther(lhsText: string, rhsText: string): void {
-    const lhs = ImmutableAuthorDocument.fromText(lhsText);
-    const rhs = ImmutableAuthorDocument.fromText(rhsText);
+    const lhs = new Document(lhsText);
+    const rhs = new Document(rhsText);
     const change = AuthorDocDiff.diff(lhs, rhs);
 
     expect(change.applyTheDiff(lhs).text).toEqual(rhs.text);

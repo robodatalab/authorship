@@ -1,221 +1,158 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
-import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import {
-    MarkdownEditor,
-    MarkdownEditorMediator,
-} from "../markdown/MarkdownEditor";
-import { fieldsOfCellKind } from "../../vscode_runtime/storydoc/cell_kinds";
-import { SALIENT_CONCEPT } from "../../vscode_runtime/storydoc/model";
-import type {
-    SalientConceptInTheStory,
-    StoryTextSpan,
-} from "../../vscode_runtime/storydoc/story_words";
-import "./AuthorshipPanelSalientConcepts.css";
+    AuthorshipPanelStoryAnnotationsList,
+    type AuthorshipPanelStoryAnnotationsListWording,
+} from "./AuthorshipPanelStoryAnnotationsList";
+import { AuthorshipPanelStoryAnnotationTitleAndDescription } from "./AuthorshipPanelStoryAnnotationTitleAndDescription";
+import { StoryAnnotationRetitled } from "./StoryAnnotationRetitled";
+import { replaceTheCell } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    StoryAnnotationsIterator,
+    type StoryAnnotationInTheStory,
+} from "../../library/storydoc/iterators/story_annotations_iterator";
+import { SALIENT_CONCEPT } from "../../library/storydoc/cells/salient_concept_cell";
+import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
+import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import type { Document } from "../../library/storydoc/storydoc";
+import "./AuthorshipPanelStoryAnnotations.css";
+
+const SALIENT_CONCEPTS_LIST_WORDING: AuthorshipPanelStoryAnnotationsListWording =
+    {
+        addAnAnnotation: "Add a salient concept",
+        noAnnotationsYet: "No salient concepts yet",
+        deleteTheAnnotation: "Delete this concept",
+        passagesCounted: "Examples",
+    };
+const ASSIGN_THE_WORDS_SELECTED = "Assign the selected words to this concept";
+const TAKE_THE_REFERENCE_OUT = "Take these words out of the concept";
 
 interface AuthorshipPanelSalientConceptsProps {
-    salientConcepts: SalientConceptInTheStory[] | null;
-    salientConceptSelected: string | null;
+    story: Document | null;
+    storyAnnotationSelected: StoryAnnotationSelected;
     storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorshipPanelSalientConcepts({
-    salientConcepts,
-    salientConceptSelected,
+    story,
+    storyAnnotationSelected,
     storyTextSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelSalientConceptsProps) {
-    if (salientConcepts === null) {
+    const salientConcepts = useMemo(() => {
+        if (story === null) {
+            return null;
+        }
+        const salientConceptsInTheStory = new StoryAnnotationsIterator(
+            story,
+            SALIENT_CONCEPT,
+        );
+        return Array.from(salientConceptsInTheStory);
+    }, [story]);
+    if (story === null || salientConcepts === null) {
         return <div className="authorship-panel-idle">No manuscript open</div>;
     }
-    const conceptSelected = salientConcepts.find(
-        (concept) => concept.conceptCellId === salientConceptSelected,
+    const salientConceptShown = salientConcepts.find(
+        (salientConcept) =>
+            salientConcept.annotationCellId ===
+            storyAnnotationSelected.annotationCellId,
     );
 
+    function retitleTheSalientConcept(
+        salientConceptCellId: string,
+        title: string,
+    ): void {
+        const salientConceptCell = story?.cellWithId(salientConceptCellId);
+        if (salientConceptCell === undefined) {
+            return;
+        }
+        const retitling = new StoryAnnotationRetitled(title);
+        const retitled = salientConceptCell.accept<Cell>(retitling);
+        replaceTheCell(sendMessagesToVscode, retitled);
+    }
+
     return (
-        <div className="authorship-panel-salient-concepts">
-            <header className="authorship-panel-toolbar">
-                <button
-                    type="button"
-                    className="authorship-panel-toolbar-button"
-                    title="Add a salient concept"
-                    aria-label="Add a salient concept"
-                    onClick={() =>
-                        sendMessagesToVscode({
-                            type: "invoke",
-                            commandName: "addSalientConcept",
-                            commandArguments: {},
-                        })
-                    }
-                >
-                    <i className="codicon codicon-add" />
-                </button>
-            </header>
-            {salientConcepts.length === 0 ? (
-                <div className="authorship-panel-idle">
-                    No salient concepts yet
-                </div>
-            ) : (
-                <>
-                    <ul className="authorship-panel-salient-concepts-list authorship-panel-swatches">
-                        {salientConcepts.map((concept) => (
-                            <li
-                                key={concept.conceptCellId}
-                                className={
-                                    concept === conceptSelected
-                                        ? "authorship-panel-salient-concept authorship-panel-salient-concept-selected"
-                                        : "authorship-panel-salient-concept"
-                                }
-                            >
-                                <button
-                                    type="button"
-                                    className="authorship-panel-salient-concept-title"
-                                    aria-pressed={concept === conceptSelected}
-                                    onClick={() =>
-                                        sendMessagesToVscode({
-                                            type: "selectSalientConcept",
-                                            conceptCellId:
-                                                concept === conceptSelected
-                                                    ? null
-                                                    : concept.conceptCellId,
-                                        })
-                                    }
-                                >
-                                    <span className="authorship-panel-swatch" />
-                                    {concept.title}
-                                </button>
-                                <span
-                                    className="authorship-panel-salient-concept-examples-count"
-                                    title="Examples"
-                                >
-                                    {concept.storyWordRanges.length}
-                                </span>
-                                <button
-                                    type="button"
-                                    className="authorship-panel-salient-concept-deleted"
-                                    title="Delete this concept"
-                                    aria-label="Delete this concept"
-                                    onClick={() =>
-                                        sendMessagesToVscode({
-                                            type: "invoke",
-                                            commandName: "deleteSalientConcept",
-                                            commandArguments: {
-                                                conceptCellId: concept.conceptCellId,
-                                            },
-                                        })
-                                    }
-                                >
-                                    <i className="codicon codicon-trash" />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                    {conceptSelected === undefined ? (
-                        <section className="authorship-panel-salient-concept-details">
-                            <div className="authorship-panel-idle">
-                                Select a concept to see its description and examples
-                            </div>
-                        </section>
-                    ) : (
-                        <AuthorshipPanelSalientConceptDetails
-                            key={conceptSelected.conceptCellId}
-                            concept={conceptSelected}
-                            storyTextSelected={storyTextSelected}
-                            sendMessagesToVscode={sendMessagesToVscode}
-                        />
-                    )}
-                </>
-            )}
+        <div className="authorship-panel-story-annotations">
+            <AuthorshipPanelStoryAnnotationsList
+                cellKind={SALIENT_CONCEPT}
+                storyAnnotations={salientConcepts}
+                annotationShown={salientConceptShown}
+                wording={SALIENT_CONCEPTS_LIST_WORDING}
+                sendMessagesToVscode={sendMessagesToVscode}
+            />
+            {salientConcepts.length > 0 &&
+                (salientConceptShown === undefined ? (
+                    <section className="authorship-panel-story-annotation-details">
+                        <div className="authorship-panel-idle">
+                            Select a concept to see its description and
+                            examples
+                        </div>
+                    </section>
+                ) : (
+                    <AuthorshipPanelSalientConcept
+                        key={salientConceptShown.annotationCellId}
+                        salientConcept={salientConceptShown}
+                        referenceSelected={storyAnnotationSelected.passage}
+                        storyTextSelected={storyTextSelected}
+                        onRetitled={(title) =>
+                            retitleTheSalientConcept(
+                                salientConceptShown.annotationCellId,
+                                title,
+                            )
+                        }
+                        sendMessagesToVscode={sendMessagesToVscode}
+                    />
+                ))}
         </div>
     );
 }
 
-interface AuthorshipPanelSalientConceptDetailsProps {
-    concept: SalientConceptInTheStory;
+interface AuthorshipPanelSalientConceptProps {
+    salientConcept: StoryAnnotationInTheStory;
+    referenceSelected: number | null;
     storyTextSelected: StoryTextSpan | null;
+    onRetitled: (title: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-function useTimesTheHostRewroteIt(markdown: string): {
-    timesTheHostRewroteIt: number;
-    theAuthorTyped: (markdown: string) => void;
-} {
-    const typedAndNotYetEchoed = useRef<string[]>([]);
-    const [timesTheHostRewroteIt, countAHostRewrite] = useState(0);
-
-    useEffect(() => {
-        const echoed = typedAndNotYetEchoed.current.indexOf(markdown);
-        if (echoed >= 0) {
-            typedAndNotYetEchoed.current.splice(0, echoed + 1);
-            return;
-        }
-        typedAndNotYetEchoed.current = [];
-        countAHostRewrite((times) => times + 1);
-    }, [markdown]);
-
-    return {
-        timesTheHostRewroteIt,
-        theAuthorTyped: (typed) => typedAndNotYetEchoed.current.push(typed),
-    };
-}
-
-function AuthorshipPanelSalientConceptDetails({
-    concept,
+function AuthorshipPanelSalientConcept({
+    salientConcept,
+    referenceSelected,
     storyTextSelected,
+    onRetitled,
     sendMessagesToVscode,
-}: AuthorshipPanelSalientConceptDetailsProps) {
-    const description = useTimesTheHostRewroteIt(concept.description);
-    const examplesNewestFirst = [...concept.storyWordRanges].reverse();
+}: AuthorshipPanelSalientConceptProps) {
+    const referencesInTheStory = salientConcept.passages.map(
+        (storyWordRange, reference) => ({ storyWordRange, reference }),
+    );
+    const referencesNewestFirst = referencesInTheStory.reverse();
 
     return (
-        <section className="authorship-panel-salient-concept-details">
-            <AuthorFileEditorCellFields
-                fields={fieldsOfCellKind(SALIENT_CONCEPT)}
-                cellAttributes={{ title: concept.title }}
-                onAttributeChanged={(attributeName, attributeValue) =>
-                    sendMessagesToVscode({
-                        type: "invoke",
-                        commandName: "replaceAttribute",
-                        commandArguments: {
-                            cellId: concept.conceptCellId,
-                            attributeName,
-                            attributeValue,
-                        },
-                    })
-                }
+        <section className="authorship-panel-story-annotation-details">
+            <AuthorshipPanelStoryAnnotationTitleAndDescription
+                annotationCellId={salientConcept.annotationCellId}
+                title={salientConcept.title}
+                description={salientConcept.description}
+                onRetitled={onRetitled}
+                sendMessagesToVscode={sendMessagesToVscode}
             />
-            <div className="authorship-panel-salient-concept-description">
-                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
-                    <MarkdownEditor
-                        cellId={concept.conceptCellId}
-                        markdown={concept.description}
-                        timesTheHostWroteIt={description.timesTheHostRewroteIt}
-                        onMarkdownCommitted={(markdown) => {
-                            description.theAuthorTyped(markdown);
-                            sendMessagesToVscode({
-                                type: "typed",
-                                cellId: concept.conceptCellId,
-                                markdown,
-                            });
-                        }}
-                    />
-                </MarkdownEditorMediator>
-            </div>
-            <div className="authorship-panel-salient-concept-examples-heading">
+            <div className="authorship-panel-story-annotation-passages-heading">
                 <h4>Examples</h4>
                 <button
                     type="button"
-                    className="authorship-panel-salient-concept-assign"
-                    title="Assign the selected words to this concept"
-                    aria-label="Assign the selected words to this concept"
+                    className="authorship-panel-story-annotation-assign"
+                    title={ASSIGN_THE_WORDS_SELECTED}
+                    aria-label={ASSIGN_THE_WORDS_SELECTED}
                     disabled={storyTextSelected === null}
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
                             commandName: "assignStoryText",
                             commandArguments: {
-                                conceptCellId: concept.conceptCellId,
+                                annotationCellId:
+                                    salientConcept.annotationCellId,
                                 ...storyTextSelected,
                             },
                         })
@@ -224,51 +161,66 @@ function AuthorshipPanelSalientConceptDetails({
                     <i className="codicon codicon-add" />
                 </button>
             </div>
-            {examplesNewestFirst.length === 0 ? (
-                <div className="authorship-panel-idle">No words assigned yet</div>
+            {referencesNewestFirst.length === 0 ? (
+                <div className="authorship-panel-idle">
+                    No words assigned yet
+                </div>
             ) : (
-                <ul className="authorship-panel-salient-concept-examples">
-                    {examplesNewestFirst.map((storyWordRange) => (
-                        <li
-                            key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
-                            className="authorship-panel-salient-concept-example"
-                        >
-                            <button
-                                type="button"
-                                className="authorship-panel-salient-concept-example-shown"
-                                title={storyWordRange.wordsItCovers}
-                                onClick={() =>
-                                    sendMessagesToVscode({
-                                        type: "showStoryWordRange",
-                                        firstWord: storyWordRange.firstWord,
-                                        lastWord: storyWordRange.lastWord,
-                                    })
+                <ul className="authorship-panel-story-annotation-passages">
+                    {referencesNewestFirst.map(
+                        ({ storyWordRange, reference }) => (
+                            <li
+                                key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                                className={
+                                    reference === referenceSelected
+                                        ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
+                                        : "authorship-panel-story-annotation-passage"
                                 }
                             >
-                                {storyWordRange.wordsItCovers}
-                            </button>
-                            <button
-                                type="button"
-                                className="authorship-panel-salient-concept-example-removed"
-                                title="Take these words out of the concept"
-                                aria-label="Take these words out of the concept"
-                                onClick={() =>
-                                    sendMessagesToVscode({
-                                        type: "invoke",
-                                        commandName: "removeStoryWordRange",
-                                        commandArguments: {
-                                            conceptCellId:
-                                                concept.conceptCellId,
+                                <button
+                                    type="button"
+                                    className="authorship-panel-story-annotation-passage-shown"
+                                    title={storyWordRange.wordsItCovers}
+                                    aria-pressed={reference === referenceSelected}
+                                    onClick={() => {
+                                        sendMessagesToVscode({
+                                            type: "selectPassage",
+                                            cellKind: SALIENT_CONCEPT,
+                                            passage: reference,
+                                        });
+                                        sendMessagesToVscode({
+                                            type: "showStoryWordRange",
                                             firstWord: storyWordRange.firstWord,
                                             lastWord: storyWordRange.lastWord,
-                                        },
-                                    })
-                                }
-                            >
-                                <i className="codicon codicon-close" />
-                            </button>
-                        </li>
-                    ))}
+                                        });
+                                    }}
+                                >
+                                    {storyWordRange.wordsItCovers}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="authorship-panel-story-annotation-passage-removed"
+                                    title={TAKE_THE_REFERENCE_OUT}
+                                    aria-label={TAKE_THE_REFERENCE_OUT}
+                                    onClick={() =>
+                                        sendMessagesToVscode({
+                                            type: "invoke",
+                                            commandName: "removeStoryWordRange",
+                                            commandArguments: {
+                                                annotationCellId:
+                                                    salientConcept.annotationCellId,
+                                                firstWord:
+                                                    storyWordRange.firstWord,
+                                                lastWord: storyWordRange.lastWord,
+                                            },
+                                        })
+                                    }
+                                >
+                                    <i className="codicon codicon-close" />
+                                </button>
+                            </li>
+                        ),
+                    )}
                 </ul>
             )}
         </section>

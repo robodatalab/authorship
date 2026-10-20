@@ -12,26 +12,27 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from server.storydoc import (
-    ABOUT,
-    BLURB,
-    GENERATED_CELLS,
-    CHAPTER,
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.about_cell import ABOUT, AboutCell
+from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.cell_visitor import CellVisitor
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.disclaimer_cell import DisclaimerCell
+from server.storydoc.cells.divider_cell import DividerCell
+from server.storydoc.cells.image_cell import IMAGE, ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.plot_cell import PlotCell
+from server.storydoc.cells.recap_cell import RecapCell
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.table_of_contents_cell import (
     TABLE_OF_CONTENTS,
-    DISCLAIMER,
-    IMAGE,
-    PART,
-    PUBLISHING_METADATA_CELLS,
-    STORY_ANNOTATION_CELLS,
-    TITLE_PAGE,
-    Cell,
-    Document,
-    is_full_page,
+    TableOfContentsCell,
 )
-
-# A cell whose text is neither a page of the book nor part of one: built from the
-# document, or kept beside it and published nowhere.
-UNPRINTED = GENERATED_CELLS | PUBLISHING_METADATA_CELLS | STORY_ANNOTATION_CELLS
+from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from server.storydoc.cells.unknown_cell import UnknownCell
 
 # What the book opens with, in the order it opens with it, and what closes it.
 # The document's order is otherwise the author's, and the story between these is
@@ -133,17 +134,17 @@ class Imprint:
 
 
 def imprint_of(document: Document) -> Imprint:
-    said = document.title_page.attrs
+    said = document.title_page
     return Imprint(
         title=document.title,
-        subtitle=said.get("subtitle", ""),
-        author=said.get("author", ""),
-        publisher=said.get("publisher", ""),
-        date=said.get("date", ""),
-        version=said.get("version", ""),
-        isbn=said.get("isbn", ""),
-        cover_designer=said.get("cover-designer", ""),
-        language=said.get("language") or DEFAULT_LANGUAGE,
+        subtitle=said.subtitle,
+        author=said.author,
+        publisher=said.publisher,
+        date=said.date,
+        version=said.version,
+        isbn=said.isbn,
+        cover_designer=said.cover_designer,
+        language=said.language or DEFAULT_LANGUAGE,
     )
 
 
@@ -262,68 +263,114 @@ def read_book(document: Document) -> Book:
     """
     imprint = imprint_of(document)
     root = document.path.parent if document.path else Path()
-    documents: list[Chapter | Page] = []
-    listings: list[Page] = []
-    art: list[Art] = []
-    cover: Art | None = None
-    chapters = 0
-    parts = 0
-
+    binding = _BookBinding(imprint, root)
     for cell in document.cells:
-        if cell.kind == CHAPTER:
-            documents.append(Chapter(chapters, cell.title, []))
-            chapters += 1
-        elif cell.kind == PART:
-            documents.append(build_part_page(parts, cell))
-            parts += 1
-        elif cell.kind == TITLE_PAGE:
-            documents.append(build_title_page(imprint))
-            documents.append(build_copyright_page(imprint))
-        elif cell.kind == IMAGE:
-            source = _art_file(root, cell.attrs.get("src", ""))
-            if source is None:
-                continue
-            picture = Art(f"art_{len(art):03d}", source)
-            art.append(picture)
-            if not is_full_page(cell):
-                _add_lines(documents, [f"![]({picture.href})"])
-            elif cover is None and chapters == 0:
-                cover = picture
-                documents.append(build_cover_page(picture, imprint.title))
-            else:
-                documents.append(build_image_page(picture))
-        elif cell.kind == TABLE_OF_CONTENTS:
-            # Built here rather than taken from the cell: on the page a table of
-            # contents is a list of names, in a book it is a list of links.
-            listing = Page("contents", "Contents", "")
-            listings.append(listing)
-            documents.append(listing)
-        elif cell.kind == DISCLAIMER:
-            page = build_disclaimer_page(cell)
-            if page:
-                documents.append(page)
-        elif cell.kind == ABOUT:
-            portrait = _art_file(root, cell.attrs.get("portrait", ""))
-            drawn = (
-                Art(f"art_{len(art):03d}", portrait)
-                if portrait is not None
-                else None
-            )
-            page = build_about_page(
-                cell, drawn.href if drawn else "", imprint.author
-            )
-            if page:
-                if drawn:
-                    art.append(drawn)
-                documents.append(page)
-        elif cell.source and cell.kind not in UNPRINTED:
-            _add_lines(documents, cell.source.splitlines())
+        cell.accept(binding)
 
-    _name_apart(documents)
-    built = contents_xhtml(listing_of(documents))
-    for page in listings:
+    _name_apart(binding.documents)
+    listing = listing_of(binding.documents)
+    built = contents_xhtml(listing)
+    for page in binding.listings:
         page.body_xhtml = built
-    return Book(imprint, documents, art, cover, _wanting(document.cells, imprint))
+    wanting = _wanting(document.cells, imprint)
+    return Book(imprint, binding.documents, binding.art, binding.cover, wanting)
+
+
+class _BookBinding(CellVisitor[None]):
+    def __init__(self, imprint: Imprint, root: Path) -> None:
+        self.imprint = imprint
+        self.root = root
+        self.documents: list[Chapter | Page] = []
+        self.listings: list[Page] = []
+        self.art: list[Art] = []
+        self.cover: Art | None = None
+        self.chapters = 0
+        self.parts = 0
+
+    def visit_markdown(self, cell: MarkdownCell) -> None:
+        if cell.source:
+            _add_lines(self.documents, cell.source.splitlines())
+
+    def visit_chapter(self, cell: ChapterCell) -> None:
+        chapter = Chapter(self.chapters, cell.title, [])
+        self.documents.append(chapter)
+        self.chapters += 1
+
+    def visit_part(self, cell: PartCell) -> None:
+        part = build_part_page(self.parts, cell)
+        self.documents.append(part)
+        self.parts += 1
+
+    def visit_title_page(self, cell: TitlePageCell) -> None:
+        title_page = build_title_page(self.imprint)
+        copyright_page = build_copyright_page(self.imprint)
+        self.documents.append(title_page)
+        self.documents.append(copyright_page)
+
+    def visit_image(self, cell: ImageCell) -> None:
+        source = _art_file(self.root, cell.src)
+        if source is None:
+            return
+        picture = Art(f"art_{len(self.art):03d}", source)
+        self.art.append(picture)
+        if not cell.full_page:
+            _add_lines(self.documents, [f"![]({picture.href})"])
+        elif self.cover is None and self.chapters == 0:
+            self.cover = picture
+            cover_page = build_cover_page(picture, self.imprint.title)
+            self.documents.append(cover_page)
+        else:
+            image_page = build_image_page(picture)
+            self.documents.append(image_page)
+
+    def visit_table_of_contents(self, cell: TableOfContentsCell) -> None:
+        # Built here rather than taken from the cell: on the page a table of
+        # contents is a list of names, in a book it is a list of links.
+        listing = Page("contents", "Contents", "")
+        self.listings.append(listing)
+        self.documents.append(listing)
+
+    def visit_disclaimer(self, cell: DisclaimerCell) -> None:
+        page = build_disclaimer_page(cell)
+        if page:
+            self.documents.append(page)
+
+    def visit_about(self, cell: AboutCell) -> None:
+        portrait = _art_file(self.root, cell.portrait)
+        drawn = (
+            Art(f"art_{len(self.art):03d}", portrait)
+            if portrait is not None
+            else None
+        )
+        page = build_about_page(cell, drawn.href if drawn else "", self.imprint.author)
+        if page:
+            if drawn:
+                self.art.append(drawn)
+            self.documents.append(page)
+
+    def visit_unknown(self, cell: UnknownCell) -> None:
+        if cell.source:
+            _add_lines(self.documents, cell.source.splitlines())
+
+    # A cell whose text is neither a page of the book nor part of one: built from the
+    # document, or kept beside it and published nowhere.
+    def visit_divider(self, cell: DividerCell) -> None:
+        pass
+
+    def visit_blurb(self, cell: BlurbCell) -> None:
+        pass
+
+    def visit_note(self, cell: NoteCell) -> None:
+        pass
+
+    def visit_recap(self, cell: RecapCell) -> None:
+        pass
+
+    def visit_salient_concept(self, cell: SalientConceptCell) -> None:
+        pass
+
+    def visit_plot(self, cell: PlotCell) -> None:
+        pass
 
 
 def _first_of(cells: list[Cell]) -> dict[str, int]:
@@ -375,7 +422,7 @@ def _wants(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
     if kind == ABOUT:
         # Every field on it is optional, so somewhere to send the reader is as
         # good as a page about them — but a page with neither is not printed.
-        return () if cell and build_about_page(cell) else (TEXT,)
+        return () if isinstance(cell, AboutCell) and build_about_page(cell) else (TEXT,)
     return ()
 
 
@@ -709,7 +756,7 @@ def build_image_page(art: Art) -> Page:
     )
 
 
-def build_part_page(idx: int, cell: Cell) -> Part:
+def build_part_page(idx: int, cell: PartCell) -> Part:
     """The divider a reader turns to before the chapters under it.
 
     A page of its own carrying one line: every document in the spine opens a
@@ -773,7 +820,7 @@ def _of_the_story(listing: list["Listing"]) -> list["Listing"]:
     ]
 
 
-def build_disclaimer_page(cell: Cell) -> Page | None:
+def build_disclaimer_page(cell: DisclaimerCell) -> Page | None:
     """The page the reader turns past on the way in, headed by its own name."""
     if not cell.source.strip():
         return None
@@ -788,18 +835,12 @@ def build_disclaimer_page(cell: Cell) -> Page | None:
     )
 
 
-# Where the reader is sent once the story has let them go. Mirrors the editor's
-# own list, so a link added there is a link printed here.
-AUTHOR_LINKS = [
-    ("kdp", "Books on Amazon"),
-    ("website", "Website"),
-    ("substack", "Substack"),
-]
-
 ABOUT_TITLE = "About the Author"
 
 
-def build_about_page(cell: Cell, portrait: str = "", named: str = "") -> Page | None:
+def build_about_page(
+    cell: AboutCell, portrait: str = "", named: str = ""
+) -> Page | None:
     """The author, in their own words, and where to find them.
 
     Every part of it is optional, and a page with nothing written and nowhere to
@@ -807,9 +848,14 @@ def build_about_page(cell: Cell, portrait: str = "", named: str = "") -> Page | 
     page at all. A portrait is not one of the parts that make the page worth
     printing: it stands beside the links on a page that was already going out.
     """
-    sent = [
-        (label, cell.attrs[name]) for name, label in AUTHOR_LINKS if cell.attrs.get(name)
+    # Where the reader is sent once the story has let them go. Mirrors the editor's
+    # own list, so a link added there is a link printed here.
+    author_links = [
+        ("Books on Amazon", cell.kdp),
+        ("Website", cell.website),
+        ("Substack", cell.substack),
     ]
+    sent = [(label, link) for label, link in author_links if link]
     blurb = cell.source.strip()
     if not sent and not blurb:
         return None

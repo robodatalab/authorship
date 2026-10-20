@@ -9,7 +9,8 @@ from typing import Any
 
 from cortexgrid_infer import CompletingModel
 
-from server.storydoc import Document
+from server.storydoc.iterators.chapters_iterator import ChaptersIterator
+from server.storydoc.storydoc import Document
 
 
 SUMMARY_TOKENS = 300
@@ -30,9 +31,9 @@ async def write_recap(
     progress: Callable[[int, int], None] = lambda read, chapters: None,
 ) -> str:
     chapters = [
-        prose
+        chapter_lines.text()
         for document in documents
-        for _, prose in document.chapters
+        for _, chapter_lines in ChaptersIterator(document)
     ]
     if not chapters:
         raise ValueError("There is no story in those documents to summarise.")

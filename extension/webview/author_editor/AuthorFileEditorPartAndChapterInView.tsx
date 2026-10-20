@@ -1,13 +1,14 @@
-import type { WebviewCell } from "./AuthorFileEditorCanvas";
-import { CHAPTER, PART } from "../../vscode_runtime/storydoc/model";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
+import { PartCell } from "../../library/storydoc/cells/part_cell";
 import {
     cellsBySection,
     whereACellStands,
-} from "../../vscode_runtime/storydoc/sections";
+} from "../../library/storydoc/story_sections";
 import "./AuthorFileEditorPartAndChapterInView.css";
 
 interface AuthorFileEditorPartAndChapterInViewProps {
-    cells: WebviewCell[];
+    cells: Cell[];
     cellIdInView?: string;
     wordsInTheDocument?: number;
 }
@@ -20,28 +21,27 @@ interface PartAndChapter {
 }
 
 function partAndChapterAt(
-    cells: WebviewCell[],
+    cells: Cell[],
     cellIdInView: string | undefined,
 ): PartAndChapter {
+    const sections = cellsBySection(cells);
     const standing = cellIdInView
-        ? whereACellStands(cellsBySection(cells), cellIdInView)
+        ? whereACellStands(sections, cellIdInView)
         : undefined;
     if (!standing) {
         return { partTitle: "", chapterTitle: "" };
     }
-    const sectionsItStandsIn = [...standing.under, standing.section];
+    const cellsItStandsIn = [...standing.under, standing.section].map(
+        (section) => section.cell,
+    );
+    const part = cellsItStandsIn.find((cell) => cell instanceof PartCell);
+    const chapter = cellsItStandsIn.find(
+        (cell) => cell instanceof ChapterCell,
+    );
     return {
-        partTitle: titleOfTheSectionOfKind(sectionsItStandsIn, PART),
-        chapterTitle: titleOfTheSectionOfKind(sectionsItStandsIn, CHAPTER),
+        partTitle: part ? part.title || UNTITLED : "",
+        chapterTitle: chapter ? chapter.title || UNTITLED : "",
     };
-}
-
-function titleOfTheSectionOfKind(
-    sectionsItStandsIn: { cell: WebviewCell }[],
-    kind: string,
-): string {
-    const section = sectionsItStandsIn.find(({ cell }) => cell.kind === kind);
-    return section ? section.cell.attrs.title || UNTITLED : "";
 }
 
 export function AuthorFileEditorPartAndChapterInView({

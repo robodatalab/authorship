@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, TypeVar
+from uuid import uuid4
+
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.story_word_range import StoryWordRange
+
+if TYPE_CHECKING:
+    from server.storydoc.cells.cell_visitor import CellVisitor
+
+PLOT = "plot"
+
+
+@dataclass(frozen=True)
+class PlotNode:
+    node_id: str
+    story_word_range: StoryWordRange
+
+
+@dataclass(frozen=True)
+class PlotEdge:
+    edge_id: str
+    from_node_id: str
+    to_node_id: str
+
+_Result = TypeVar("_Result")
+
+
+@dataclass(frozen=True)
+class PlotCell(Cell):
+    kind: str = field(default=PLOT, init=False)
+    title: str = ""
+    nodes: list[PlotNode] = field(default_factory=list)
+    edges: list[PlotEdge] = field(default_factory=list)
+    source: str = ""
+    folded: bool = False
+    at: tuple[int, int] | None = field(default=None, compare=False)
+    _unique_id: str = field(default_factory=lambda: str(uuid4()))
+
+    def with_source(self, source: str) -> PlotCell:
+        return replace(self, source=source)
+
+    def with_folded(self, folded: bool) -> PlotCell:
+        return replace(self, folded=folded)
+
+    def accept(self, visitor: CellVisitor[_Result]) -> _Result:
+        return visitor.visit_plot(self)

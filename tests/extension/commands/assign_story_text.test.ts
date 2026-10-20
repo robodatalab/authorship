@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AssignStoryTextCommand } from "../../../extension/vscode_runtime/commands/assign_story_text";
+import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 function storyWithTheDoor(words: string) {
@@ -20,40 +21,62 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
         const session = storyWithTheDoor("");
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
         });
 
-        expect(session.document.cellWithId("k1")?.attrs.words).toBe("1-3");
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [new StoryWordRange(1, 3)],
+        });
     });
 
     it("adds them to the words the concept already holds", () => {
         const session = storyWithTheDoor('words="0-0"');
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
         });
 
-        expect(session.document.cellWithId("k1")?.attrs.words).toBe(
-            "0-0, 1-3",
-        );
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [
+                new StoryWordRange(0, 0),
+                new StoryWordRange(1, 3),
+            ],
+        });
+    });
+
+    it("leaves the words as they are when they are assigned already", () => {
+        const session = storyWithTheDoor('words="1-3"');
+
+        new AssignStoryTextCommand().invoke(session, {
+            annotationCellId: "k1",
+            cellId: "c1",
+            startCharacterOffsetInCell: 5,
+            endCharacterOffsetInCell: 13,
+        });
+
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [new StoryWordRange(1, 3)],
+        });
     });
 
     it("assigns nothing when the selection touches no word", () => {
         const session = storyWithTheDoor("");
 
         new AssignStoryTextCommand().invoke(session, {
-            conceptCellId: "k1",
+            annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 3,
             endCharacterOffsetInCell: 4,
         });
 
-        expect(session.document.cellWithId("k1")?.attrs.words).toBe(undefined);
+        expect(session.document.cellWithId("k1")).toMatchObject({
+            storyWordRanges: [],
+        });
     });
 });

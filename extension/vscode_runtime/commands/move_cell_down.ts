@@ -1,6 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { ImmutableAuthorDocument } from "../storydoc/model";
-import { moveTheSectionDown } from "../storydoc/sections";
+import { moveTheSectionDown } from "../../library/storydoc/story_sections";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class MoveCellDownCommand implements AuthorDocumentCommand {

@@ -11,10 +11,6 @@ from fastapi import FastAPI
 
 from server import log
 from server.models import cluster
-from server.models.causal_event_trajectory_classifier import (
-    CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME,
-    deploy_causal_event_trajectory_classifier,
-)
 from server.models.long_context_qwen import (
     LONG_CONTEXT_QWEN,
     LONG_CONTEXT_QWEN_DEPLOYMENT,
@@ -60,11 +56,4 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
         app.state.style_model = style_deployment.client()
-        causal_event_trajectory_classifier_deployment = deploy_causal_event_trajectory_classifier()
-        app.state.inference_models[CAUSAL_EVENT_TRAJECTORY_CLASSIFIER_NAME] = (
-            causal_event_trajectory_classifier_deployment.key
-        )
-        app.state.causal_event_trajectory_classifier = (
-            causal_event_trajectory_classifier_deployment.client()
-        )
     _log.info("Completion models created")

@@ -1,37 +1,39 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { type Document } from "../../library/storydoc/storydoc";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
+import { PartCell } from "../../library/storydoc/cells/part_cell";
+import { TABLE_OF_CONTENTS } from "../../library/storydoc/cells/table_of_contents_cell";
 import {
-    CHAPTER,
-    TABLE_OF_CONTENTS,
-    PART,
-    type ImmutableAuthorDocument,
-    type ImmutableCell,
-} from "../storydoc/model";
-import { cellsBySection, type CellsInASection } from "../storydoc/sections";
+    cellsBySection,
+    type CellsInASection,
+} from "../../library/storydoc/story_sections";
 
 const UNTITLED = "Untitled";
 const UNDER_THE_PART = "    ";
 
-function tableOfContentsOf(document: ImmutableAuthorDocument): string {
+function tableOfContentsOf(document: Document): string {
     return linesOfTheContents(cellsBySection(document.cells), "").join("\n");
 }
 
 function linesOfTheContents(
-    sections: CellsInASection<ImmutableCell>[],
+    sections: CellsInASection<Cell>[],
     indent: string,
 ): string[] {
     return sections.flatMap((section) => {
-        const listed = `${indent}1. ${section.cell.attrs.title || UNTITLED}`;
-        if (section.cell.kind === CHAPTER) {
-            return [listed];
+        if (section.cell instanceof ChapterCell) {
+            return [`${indent}1. ${section.cell.title || UNTITLED}`];
         }
-        if (section.cell.kind !== PART) {
+        if (!(section.cell instanceof PartCell)) {
             return [];
         }
-        return [
-            listed,
-            ...linesOfTheContents(section.within, `${indent}${UNDER_THE_PART}`),
-        ];
+        const listed = `${indent}1. ${section.cell.title || UNTITLED}`;
+        const listedWithin = linesOfTheContents(
+            section.within,
+            `${indent}${UNDER_THE_PART}`,
+        );
+        return [listed, ...listedWithin];
     });
 }
 
@@ -46,10 +48,17 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
         session: AuthorFileEditorSession,
         commandArguments: Record<string, unknown>,
     ): void {
-        session.changeTheDocument((story) =>
-            story
-                .cellWithId(commandArguments.cellId as string)
-                ?.replaceMarkdown(tableOfContentsOf(session.document)),
-        );
+        const cellId = commandArguments.cellId as string;
+        const tableOfContents = tableOfContentsOf(session.document);
+        session.changeTheDocument((story) => {
+            const cellIndex = story.cells.findIndex(
+                (cell) => cell.uniqueId === cellId,
+            );
+            if (cellIndex === -1) {
+                return;
+            }
+            const cell = story.cells[cellIndex];
+            story.cells[cellIndex] = cell.withSource(tableOfContents);
+        });
     }
 }

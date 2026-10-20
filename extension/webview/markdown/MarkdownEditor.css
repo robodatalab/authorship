@@ -1,6 +1,5 @@
 :root {
     --markdown-editor-line-height-to-font-size: 1.5;
-    --markdown-editor-story-plot-gutter: 32px;
 }
 
 .markdown-editor {
@@ -55,7 +54,6 @@
 .markdown-rendered {
     flex: 1 1 auto;
     min-height: 1.4em;
-    padding-right: var(--markdown-editor-story-plot-gutter);
     font-family: var(--vscode-editor-font-family);
     font-size: var(--vscode-editor-font-size);
     font-weight: var(--vscode-editor-font-weight);
@@ -84,72 +82,47 @@
     max-width: 100%;
 }
 
-.markdown-rendered-paragraph-in-story-plots {
-    position: relative;
-    margin-right: calc(-1 * var(--markdown-editor-story-plot-gutter));
-    padding-right: var(--markdown-editor-story-plot-gutter);
+.markdown-editor-story-text-highlight-0 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-blue, #3794ff);
 }
 
-.markdown-rendered-paragraph-in-story-plots > :first-child {
-    margin: 0;
+.markdown-editor-story-text-highlight-1 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-orange, #d18616);
 }
 
-.markdown-rendered-paragraph-in-story-plots
-    > .markdown-editor-story-plot-border {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+.markdown-editor-story-text-highlight-2 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-green, #89d185);
 }
 
-.markdown-editor-story-plot-border::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: calc(var(--markdown-editor-story-plot-lane) * 5px);
-    width: 3px;
-    background: var(--markdown-editor-story-plot-color);
+.markdown-editor-story-text-highlight-3 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-purple, #b180d7);
 }
 
-.markdown-editor-story-plot-0 {
-    --markdown-editor-story-plot-lane: 0;
-    --markdown-editor-story-plot-color: var(--vscode-charts-blue, #3794ff);
+.markdown-editor-story-text-highlight-4 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-red, #f14c4c);
 }
 
-.markdown-editor-story-plot-1 {
-    --markdown-editor-story-plot-lane: 1;
-    --markdown-editor-story-plot-color: var(--vscode-charts-orange, #d18616);
+.markdown-editor-story-text-highlight-5 {
+    --markdown-editor-story-text-highlight-color: var(--vscode-charts-yellow, #cca700);
 }
 
-.markdown-editor-story-plot-2 {
-    --markdown-editor-story-plot-lane: 2;
-    --markdown-editor-story-plot-color: var(--vscode-charts-green, #89d185);
-}
-
-.markdown-editor-story-plot-3 {
-    --markdown-editor-story-plot-lane: 3;
-    --markdown-editor-story-plot-color: var(--vscode-charts-purple, #b180d7);
-}
-
-.markdown-editor-story-plot-4 {
-    --markdown-editor-story-plot-lane: 4;
-    --markdown-editor-story-plot-color: var(--vscode-charts-red, #f14c4c);
-}
-
-.markdown-editor-story-plot-5 {
-    --markdown-editor-story-plot-lane: 5;
-    --markdown-editor-story-plot-color: var(--vscode-charts-yellow, #cca700);
-}
-
-.markdown-editor-salient-concept {
+.markdown-editor-story-text-highlight {
     background-color: color-mix(
         in srgb,
-        var(--markdown-editor-story-plot-color) 30%,
+        var(--markdown-editor-story-text-highlight-color) 30%,
         transparent
     );
 }
 
-::highlight(markdown-editor-salient-concept-0) {
+.markdown-editor-story-text-highlight-emphasized {
+    background-color: color-mix(
+        in srgb,
+        var(--markdown-editor-story-text-highlight-color) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-0) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-blue, #3794ff) 30%,
@@ -157,7 +130,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-1) {
+::highlight(markdown-editor-story-text-highlight-1) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-orange, #d18616) 30%,
@@ -165,7 +138,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-2) {
+::highlight(markdown-editor-story-text-highlight-2) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-green, #89d185) 30%,
@@ -173,7 +146,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-3) {
+::highlight(markdown-editor-story-text-highlight-3) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-purple, #b180d7) 30%,
@@ -181,7 +154,7 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-4) {
+::highlight(markdown-editor-story-text-highlight-4) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-red, #f14c4c) 30%,
@@ -189,10 +162,58 @@
     );
 }
 
-::highlight(markdown-editor-salient-concept-5) {
+::highlight(markdown-editor-story-text-highlight-5) {
     background-color: color-mix(
         in srgb,
         var(--vscode-charts-yellow, #cca700) 30%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-0) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-blue, #3794ff) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-1) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-orange, #d18616) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-2) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-green, #89d185) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-3) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-purple, #b180d7) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-4) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-red, #f14c4c) 65%,
+        transparent
+    );
+}
+
+::highlight(markdown-editor-story-text-highlight-emphasized-5) {
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-charts-yellow, #cca700) 65%,
         transparent
     );
 }

@@ -9,13 +9,14 @@ import * as vscode from "vscode";
 
 import {
     PARTS_FOLDER,
-    furnitureOf,
+    partBoilerplateOf,
     intoParts,
     partCells,
     partFileName,
     partNumber,
 } from "./manuscript_parts";
-import { type ImmutableCell } from "../storydoc/model";
+import { Document } from "../../library/storydoc/storydoc";
+import type { Cell } from "../../library/storydoc/cells/cell";
 
 /** What a division came to. */
 export interface DividedManuscript {
@@ -35,22 +36,9 @@ export interface DividedManuscript {
  * and a story with none divides into nothing.
  */
 
-function authorFileText(cells: readonly ImmutableCell[]): string {
-    const lines: string[] = [];
-    for (const cell of cells) {
-        lines.push(cell.marker());
-        lines.push("");
-        if (cell.source) {
-            lines.push(cell.source);
-            lines.push("");
-        }
-    }
-    return lines.join("\n");
-}
-
 export async function divideManuscript(
     document: vscode.Uri,
-    cells: readonly ImmutableCell[],
+    cells: readonly Cell[],
 ): Promise<DividedManuscript> {
     const parts = intoParts(cells);
     const partsFolder = vscode.Uri.joinPath(document, "..", PARTS_FOLDER);
@@ -58,7 +46,7 @@ export async function divideManuscript(
         return { partsFolder, partFilesWritten: 0 };
     }
 
-    const furniture = furnitureOf(cells);
+    const partBoilerplate = partBoilerplateOf(cells);
     await vscode.workspace.fs.createDirectory(partsFolder);
     await clearParts(partsFolder);
 
@@ -66,12 +54,13 @@ export async function divideManuscript(
     // state anyone has to reason about.
     for (const [index, part] of parts.entries()) {
         const number = index + 1;
-        await vscode.workspace.fs.writeFile(
-            vscode.Uri.joinPath(partsFolder, partFileName(number)),
-            new TextEncoder().encode(
-                authorFileText(partCells(furniture, number, part)),
-            ),
-        );
+        const partFileNameOnDisk = partFileName(number);
+        const partFile = vscode.Uri.joinPath(partsFolder, partFileNameOnDisk);
+        const cellsOfThePart = partCells(partBoilerplate, number, part);
+        const documentOfThePart = Document.fromCells(cellsOfThePart);
+        const textOfThePart = documentOfThePart.text;
+        const bytesOfThePart = new TextEncoder().encode(textOfThePart);
+        await vscode.workspace.fs.writeFile(partFile, bytesOfThePart);
     }
 
     return { partsFolder, partFilesWritten: parts.length };

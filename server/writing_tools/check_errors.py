@@ -10,7 +10,8 @@ from typing import Any
 from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
-from server.storydoc import Document
+from server.storydoc.iterators.story_lines_iterator import StoryLinesIterator
+from server.storydoc.storydoc import Document
 from server.writing_tools import grammar_check, prose_check
 
 
@@ -75,13 +76,13 @@ class CheckErrorsJob(Job):
     async def execute(self) -> None:
         start, end = self._selection or (0, len(self._document.lines) - 1)
         crutches = (
-            prose_check.crutch_lemmas(list(self._document.story_lines()))
+            prose_check.crutch_lemmas(list(StoryLinesIterator(self._document)))
             if self._selection is None
             else frozenset()
         )
         if self.cancelled:
             return
-        passage = list(self._document.story_lines(start, end))
+        passage = list(StoryLinesIterator(self._document, start, end))
         by_the_rules = [
             error
             for finding in await asyncio.to_thread(prose_check.check, passage, crutches)

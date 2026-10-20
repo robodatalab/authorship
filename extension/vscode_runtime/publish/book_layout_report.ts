@@ -1,9 +1,5 @@
-import {
-    blankCellOfKind,
-    fieldsOfCellKind,
-    labelOfCellKind,
-} from "../storydoc/cell_kinds";
-import type { ImmutableCell } from "../storydoc/model";
+import type { Cell } from "../../library/storydoc/cells/cell";
+import { cellOfKind } from "../../library/storydoc/parser";
 
 const NEEDS_TEXT = "text";
 
@@ -27,11 +23,11 @@ export interface BookLayoutReport {
 }
 
 export function cellsLaidOutByPlan(
-    cells: readonly ImmutableCell[],
+    cells: readonly Cell[],
     plan: PlannedSection[],
-): ImmutableCell[] {
+): Cell[] {
     return plan.map((section) =>
-        section.at === null ? blankCellOfKind(section.kind) : cells[section.at],
+        section.at === null ? cellOfKind(section.kind) : cells[section.at],
     );
 }
 
@@ -39,26 +35,10 @@ export function kindsStillToWrite(report: BookLayoutReport): string[] {
     return report.wanting.map((section) => section.kind);
 }
 
-export function wordsForWhatIsMissing(
-    cellKind: string,
-    missing: string[],
-): string {
-    const fields = fieldsOfCellKind(cellKind);
+export function wordsForWhatIsMissing(missing: string[]): string {
     return missing
-        .map((name) => {
-            if (name === NEEDS_TEXT) {
-                return "something written in it";
-            }
-            return (
-                fields.find((field) => field.attributeName === name)?.label ??
-                name
-            );
-        })
+        .map((name) => (name === NEEDS_TEXT ? "something written in it" : name))
         .join(", ");
-}
-
-function labelsFor(kinds: string[]): string {
-    return kinds.map((kind) => labelOfCellKind(kind)).join(", ");
 }
 
 export function askedBeforeBinding(
@@ -67,14 +47,14 @@ export function askedBeforeBinding(
 ): { message: string; detail: string } {
     const lines: string[] = [];
     if (report.added.length) {
-        lines.push(`Missing: ${labelsFor(report.added)}`);
+        lines.push(`Missing: ${report.added.join(", ")}`);
     }
     if (report.moved.length) {
-        lines.push(`Out of place: ${labelsFor(report.moved)}`);
+        lines.push(`Out of place: ${report.moved.join(", ")}`);
     }
     for (const section of report.wanting) {
         lines.push(
-            `${labelOfCellKind(section.kind)} needs ${wordsForWhatIsMissing(section.kind, section.needs)}`,
+            `${section.kind} needs ${wordsForWhatIsMissing(section.needs)}`,
         );
     }
     lines.push(
@@ -93,8 +73,8 @@ export function saidAfterLayingOut(
     report: BookLayoutReport,
 ): string {
     const lines = [
-        report.added.length && `Added ${labelsFor(report.added)}`,
-        report.moved.length && `moved ${labelsFor(report.moved)} into place`,
+        report.added.length && `Added ${report.added.join(", ")}`,
+        report.moved.length && `moved ${report.moved.join(", ")} into place`,
     ].filter(Boolean);
 
     const laidOut = lines.length

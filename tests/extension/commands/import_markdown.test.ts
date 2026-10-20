@@ -29,8 +29,10 @@ describe("ImportMarkdownCommand — imports markdown into the document", () => {
         await new ImportMarkdownCommand().invoke(theStoryOpenInTheEditor());
 
         const written = files.get(STORY_FILE) ?? "";
-        expect(written).toContain('<!-- cell: title-page title="Veriona"');
-        expect(written).toContain('<!-- cell: chapter title="One"');
+        expect(written).toMatch(
+            /<!-- cell: title-page id="[^"]+" title="Veriona" -->/,
+        );
+        expect(written).toMatch(/<!-- cell: chapter id="[^"]+" title="One" -->/);
         expect(written).toContain("She saw the door.");
     });
 

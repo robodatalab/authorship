@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
-import { PublishView } from "../../../extension/vscode_runtime/publish/panel";
+import { AuthorshipPanelProvider } from "../../../extension/vscode_runtime/authorship_panel_provider";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 vi.mock(
@@ -36,7 +36,10 @@ interface OpenEditor {
     documentText(): string;
     undoTheNewestEdit(): Promise<void>;
     redoTheNewestEdit(): Promise<void>;
-    selectTheSalientConcept(conceptCellId: string): Promise<void>;
+    selectTheStoryAnnotation(
+        cellKind: string,
+        annotationCellId: string,
+    ): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -49,7 +52,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider(
         { extensionUri: Uri.file("/extension") } as never,
         vscodeWindow.createOutputChannel("Authorship") as never,
-        new PublishView({ extensionUri: Uri.file("/extension") } as never),
+        new AuthorshipPanelProvider({ extensionUri: Uri.file("/extension") } as never),
     );
     const editsRecorded: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
@@ -100,7 +103,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
         addEventListenerItself(type, listener, options);
     }) as typeof window.addEventListener;
     await act(async () => {
-        await import("../../../extension/webview/cell_types/MarkdownCell");
+        await import("../../../extension/webview/cell_types/AuthorFileEditorMarkdownCell");
         await import("../../../extension/webview/message_queue_between_vscode_and_webview");
     });
     window.addEventListener = addEventListenerItself;
@@ -134,9 +137,12 @@ async function openEditor(text: string): Promise<OpenEditor> {
             await watchersOnTheFiles[0].theFileChanged();
             await settle();
         },
-        selectTheSalientConcept: async (conceptCellId: string) => {
+        selectTheStoryAnnotation: async (
+            cellKind: string,
+            annotationCellId: string,
+        ) => {
             await act(async () => {
-                session.selectTheSalientConcept(conceptCellId);
+                session.selectTheStoryAnnotation(cellKind, annotationCellId);
             });
             await settle();
         },
@@ -477,7 +483,7 @@ describe("the words of a salient concept while the author types", () => {
                     "",
                 ].join("\n"),
             );
-            await editor.selectTheSalientConcept("k1");
+            await editor.selectTheStoryAnnotation("salient-concept", "k1");
             await openTheCellForTyping();
 
             expect(theCellBeingTyped().marks()).toEqual([
@@ -485,7 +491,7 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightBefore,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                            "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-0",
                     },
                 },
             ]);
@@ -501,12 +507,61 @@ describe("the words of a salient concept while the author types", () => {
                     range: highlightAfter,
                     options: {
                         inlineClassName:
-                            "markdown-editor-salient-concept markdown-editor-story-plot-0",
+                            "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-0",
                     },
                 },
             ]);
         },
     );
+});
+
+describe("the trajectory of a plot while the author types", () => {
+    it("moves with the plot's words, each span highlighted in the plot's colour", async () => {
+        editor = await openEditor(
+            [
+                '<!-- cell: markdown id="m1" -->',
+                "",
+                "She waited for him. A Companion knelt.",
+                "",
+                '<!-- cell: plot id="p1" title="The vigil" nodes="n1:0-0" -->',
+                "",
+                "She keeps watch.",
+                "",
+                '<!-- cell: plot id="p2" title="The Companion" nodes="n1:5-6, n2:0-2" edges="e1:n1>n2" -->',
+                "",
+                "He kneels before her.",
+                "",
+            ].join("\n"),
+        );
+        await editor.selectTheStoryAnnotation("plot", "p2");
+        await openTheCellForTyping();
+        theCellBeingTyped().putTheCursorAt(0);
+        await typeCharacter("So ");
+
+        const marksDrawn = theCellBeingTyped().marks();
+        expect(marksDrawn).toEqual([
+            {
+                range: {
+                    from: { lineNumber: 1, column: 26 },
+                    to: { lineNumber: 1, column: 42 },
+                },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
+                },
+            },
+            {
+                range: {
+                    from: { lineNumber: 1, column: 4 },
+                    to: { lineNumber: 1, column: 18 },
+                },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-1",
+                },
+            },
+        ]);
+    });
 });
 
 describe("the words found while the author types", () => {

@@ -1,5 +1,4 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import type { ProseCheckError } from "./check_prose";
 
@@ -15,13 +14,14 @@ export class FixProseCommand implements AuthorDocumentCommand {
     ): void {
         const error = commandArguments as unknown as ProseCheckError;
         session.changeTheDocument((story) => {
-            const cell = story.cells.find(
+            const cellIndex = story.cells.findIndex(
                 (cell) => cell.uniqueId === error.cellId,
             );
-            if (!cell || error.correctVersion === "") {
+            if (cellIndex === -1 || error.correctVersion === "") {
                 return;
             }
-            cell.replaceMarkdown(
+            const cell = story.cells[cellIndex];
+            story.cells[cellIndex] = cell.withSource(
                 cell.source.slice(0, error.startCharacterOffsetInCell) +
                     error.correctVersion +
                     cell.source.slice(error.endCharacterOffsetInCell),

@@ -1,10 +1,10 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { AddSalientConceptCommand } from "./add_salient_concept";
+import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextCommand } from "./assign_story_text";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
-import { DeleteSalientConceptCommand } from "./delete_salient_concept";
+import { DeleteStoryAnnotationCommand } from "./delete_story_annotation";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
@@ -16,14 +16,13 @@ import { FixProseCommand } from "./fix_prose";
 import { FixStyleCommand } from "./fix_style";
 import { FoldAllCommand } from "./fold_all";
 import { FoldCellCommand } from "./fold_cell";
-import { IdentifyStoryPlotsCommand } from "./identify_story_plots";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
-import { ReplaceAttributeCommand } from "./replace_attribute";
+import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
@@ -59,11 +58,11 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new MoveCellDownCommand(),
     new DeleteCellCommand(),
     new InsertCellCommand(),
-    new ReplaceAttributeCommand(),
+    new ReplaceCellCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
-    new AddSalientConceptCommand(),
-    new DeleteSalientConceptCommand(),
+    new AddStoryAnnotationCommand(),
+    new DeleteStoryAnnotationCommand(),
     new AssignStoryTextCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),
@@ -73,7 +72,6 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new CheckProseCommand(),
     new FixProseCommand(),
     new FixStyleCommand(),
-    new IdentifyStoryPlotsCommand(),
     new OpenAsTextCommand(),
     new WriteBlurbCommand(),
     new WriteStorySoFarCommand(),
@@ -90,7 +88,7 @@ export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[]
         buttonGroup: command.buttonGroup,
         iconClassName: command.iconClassName,
         tooltip: command.tooltip,
-        drawnWhenCellAttributeIs: command.drawnWhenCellAttributeIs,
+        drawnWhenTheCellIsFolded: command.drawnWhenTheCellIsFolded,
         runsCellsOfKind: command.runsCellsOfKind,
     }));
 }

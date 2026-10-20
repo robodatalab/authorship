@@ -1,6 +1,6 @@
 """Tests for binding a story document into an EPUB.
 
-The documents are built through `storydoc.save` rather than written out by hand,
+The documents are built through `Document.save` rather than written out by hand,
 so a change to how the format is written cannot leave these testing a layout that
 no longer exists. Each one is built where a real book is built — in a directory,
 from a file — because the cover is a path the document points at.
@@ -23,23 +23,36 @@ from server.publishing.epub_exporter import (
     read_book,
     report_of,
 )
-from server import storydoc
-from server.storydoc import Cell, Document
+from server.storydoc import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.about_cell import ABOUT, AboutCell
+from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.chapter_cell import CHAPTER, ChapterCell
+from server.storydoc.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
+from server.storydoc.cells.divider_cell import DividerCell
+from server.storydoc.cells.image_cell import ImageCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.part_cell import PartCell
+from server.storydoc.cells.recap_cell import RecapCell
+from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.table_of_contents_cell import (
+    TABLE_OF_CONTENTS,
+    TableOfContentsCell,
+)
+from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 def document(*cells: Cell) -> Document:
     """A document written the way the format writes one."""
-    return Document(storydoc.dumps(list(cells)))
-
-
-def title_page(**attrs: str) -> Cell:
-    return Cell(storydoc.TITLE_PAGE, "", attrs)
+    return Document.from_cells(list(cells))
 
 
 def written(root: Path, *cells: Cell, name: str = "story") -> Path:
     """The EPUB that `cells` bind into, built from a file the way a real one is."""
     path = root / f"{name}{storydoc.EXTENSION}"
-    storydoc.save(path, list(cells))
+    Document.from_cells(list(cells), path).save()
     out_path = root / f"{name}.epub"
     build_epub(Document.load(path), out_path)
     return out_path
@@ -114,10 +127,10 @@ class Chapters(unittest.TestCase):
     def test_a_chapter_per_chapter_cell(self) -> None:
         chapters = chapters_of(
             document(
-                storydoc.chapter("One"),
-                storydoc.markdown("a"),
-                storydoc.chapter("Two"),
-                storydoc.markdown("b"),
+                ChapterCell("One"),
+                MarkdownCell("a"),
+                ChapterCell("Two"),
+                MarkdownCell("b"),
             )
         )
         self.assertEqual([c.title for c in chapters], ["One", "Two"])
@@ -125,31 +138,31 @@ class Chapters(unittest.TestCase):
     def test_front_matter_before_the_first_chapter_is_not_a_chapter(self) -> None:
         chapters = chapters_of(
             document(
-                title_page(title="Book"),
-                storydoc.markdown("intro"),
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
+                TitlePageCell(title="Book"),
+                MarkdownCell("intro"),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
             )
         )
         # The book's title opens the title page, not a chapter of its own.
         self.assertEqual([c.title for c in chapters], ["One"])
 
     def test_a_document_with_no_chapter_cells_has_no_chapters(self) -> None:
-        chapters = chapters_of(document(storydoc.markdown("just some prose\nand more")))
+        chapters = chapters_of(document(MarkdownCell("just some prose\nand more")))
         self.assertEqual(chapters, [])
 
     def test_a_heading_in_the_prose_is_prose(self) -> None:
         # The kind is the cell's identity; what someone wrote in a paragraph is
         # not a place in the book.
-        chapters = chapters_of(document(storydoc.markdown("## Not A Chapter\n\nprose")))
+        chapters = chapters_of(document(MarkdownCell("## Not A Chapter\n\nprose")))
         self.assertEqual(chapters, [])
 
     def test_the_prose_under_a_chapter_is_its_body(self) -> None:
         chapters = chapters_of(
             document(
-                storydoc.chapter("One"),
-                storydoc.markdown("first"),
-                storydoc.markdown("second"),
+                ChapterCell("One"),
+                MarkdownCell("first"),
+                MarkdownCell("second"),
             )
         )
         self.assertEqual(chapters[0].body_lines, ["first", "second"])
@@ -157,10 +170,10 @@ class Chapters(unittest.TestCase):
     def test_chapters_are_numbered_in_order(self) -> None:
         chapters = chapters_of(
             document(
-                storydoc.chapter("A"),
-                storydoc.markdown("x"),
-                storydoc.chapter("B"),
-                storydoc.markdown("y"),
+                ChapterCell("A"),
+                MarkdownCell("x"),
+                ChapterCell("B"),
+                MarkdownCell("y"),
             )
         )
         self.assertEqual(
@@ -173,11 +186,11 @@ class Chapters(unittest.TestCase):
         # never the chapter it happens to follow.
         chapters = chapters_of(
             document(
-                storydoc.chapter("One"),
-                storydoc.markdown("prose"),
-                Cell(storydoc.DISCLAIMER, "All fiction.", {"title": "Disclaimer"}),
-                storydoc.chapter("Two"),
-                storydoc.markdown("more"),
+                ChapterCell("One"),
+                MarkdownCell("prose"),
+                DisclaimerCell(title="Disclaimer", source="All fiction."),
+                ChapterCell("Two"),
+                MarkdownCell("more"),
             )
         )
         self.assertEqual([c.body_lines for c in chapters], [["prose"], ["more"]])
@@ -193,11 +206,11 @@ class BuildEpub(unittest.TestCase):
     def test_writes_a_zip_with_the_epub_skeleton(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("more"),
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            ChapterCell("Two"),
+            MarkdownCell("more"),
         )
 
         self.assertTrue(zipfile.is_zipfile(out))
@@ -215,7 +228,7 @@ class BuildEpub(unittest.TestCase):
             self.assertEqual(z.read("mimetype"), b"application/epub+zip")
 
     def test_mimetype_is_first_and_stored_uncompressed(self) -> None:
-        out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
+        out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
         with zipfile.ZipFile(out) as z:
             first = z.infolist()[0]
@@ -227,12 +240,12 @@ class BuildEpub(unittest.TestCase):
     def test_one_xhtml_per_chapter(self) -> None:
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("b"),
-            storydoc.chapter("Three"),
-            storydoc.markdown("c"),
+            ChapterCell("One"),
+            MarkdownCell("a"),
+            ChapterCell("Two"),
+            MarkdownCell("b"),
+            ChapterCell("Three"),
+            MarkdownCell("c"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -241,7 +254,7 @@ class BuildEpub(unittest.TestCase):
 
     def test_a_chapter_carries_its_name_onto_its_page(self) -> None:
         out = written(
-            self.root, storydoc.chapter("The First Night"), storydoc.markdown("prose")
+            self.root, ChapterCell("The First Night"), MarkdownCell("prose")
         )
 
         with zipfile.ZipFile(out) as z:
@@ -257,9 +270,9 @@ class BuildEpub(unittest.TestCase):
         (self.root / "art.png").write_bytes(b"\x89PNG\r\n\x1a\n not really a png")
         out = written(
             self.root,
-            storydoc.image("art.png"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            ImageCell("art.png"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -276,10 +289,10 @@ class BuildEpub(unittest.TestCase):
         (self.root / "veriona.png").write_bytes(b"png")
         out = written(
             self.root,
-            storydoc.image("art.png"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.image("veriona.png"),
+            ImageCell("art.png"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            ImageCell("veriona.png"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -297,10 +310,10 @@ class BuildEpub(unittest.TestCase):
         (self.root / "veriona.png").write_bytes(b"png")
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.image("veriona.png", full_page=False),
-            storydoc.markdown("Read [Veriona](https://amazon.example/veriona)."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            ImageCell("veriona.png", full_page=False),
+            MarkdownCell("Read [Veriona](https://amazon.example/veriona)."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -313,7 +326,7 @@ class BuildEpub(unittest.TestCase):
         self.assertIn('<a href="https://amazon.example/veriona">Veriona</a>', page)
 
     def test_a_book_with_no_image_has_no_cover(self) -> None:
-        out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
+        out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
         with zipfile.ZipFile(out) as z:
             self.assertNotIn("OEBPS/cover.xhtml", z.namelist())
@@ -322,9 +335,9 @@ class BuildEpub(unittest.TestCase):
         # A book goes out without the picture rather than not at all.
         out = written(
             self.root,
-            storydoc.image("cover.jpg"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            ImageCell("cover.jpg"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -334,9 +347,9 @@ class BuildEpub(unittest.TestCase):
     def test_the_title_page_carries_the_book_title_and_the_author(self) -> None:
         out = written(
             self.root,
-            title_page(title="My Book", author="A. Writer"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="My Book", author="A. Writer"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -351,9 +364,9 @@ class BuildEpub(unittest.TestCase):
     def test_the_title_page_carries_the_subtitle_and_publisher(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book", subtitle="A Novel", publisher="Riverlight Press"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book", subtitle="A Novel", publisher="Riverlight Press"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -367,14 +380,14 @@ class BuildEpub(unittest.TestCase):
     def test_the_edition_is_printed_and_catalogued(self) -> None:
         out = written(
             self.root,
-            title_page(
+            TitlePageCell(
                 title="Book",
                 date="2026-08-17",
                 version="1.2",
                 isbn="978-0-000-00000-0",
             ),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -390,14 +403,14 @@ class BuildEpub(unittest.TestCase):
     def test_the_title_page_is_followed_by_a_copyright_page(self) -> None:
         out = written(
             self.root,
-            title_page(
+            TitlePageCell(
                 title="Book",
                 author="Pierre Dupied",
                 publisher="Cuir Et Soie",
                 date="2026-08-17",
             ),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -427,9 +440,9 @@ class BuildEpub(unittest.TestCase):
     def test_the_cover_designer_is_credited_where_they_are_named(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book", **{"cover-designer": "A. Painter"}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book", cover_designer="A. Painter"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -438,7 +451,7 @@ class BuildEpub(unittest.TestCase):
         self.assertIn("Cover design by A. Painter", page)
 
     def test_a_book_with_no_title_page_still_binds(self) -> None:
-        out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
+        out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
         with zipfile.ZipFile(out) as z:
             names = z.namelist()
@@ -450,11 +463,11 @@ class BuildEpub(unittest.TestCase):
     def test_the_contents_cell_prints_a_page_linking_every_chapter(self) -> None:
         out = written(
             self.root,
-            storydoc.table_of_contents(),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("b"),
+            TableOfContentsCell(),
+            ChapterCell("One"),
+            MarkdownCell("a"),
+            ChapterCell("Two"),
+            MarkdownCell("b"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -464,7 +477,7 @@ class BuildEpub(unittest.TestCase):
         self.assertIn('<a href="chap_001.xhtml">Two</a>', page)
 
     def test_a_book_that_asks_for_no_contents_gets_none(self) -> None:
-        out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
+        out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
         with zipfile.ZipFile(out) as z:
             self.assertNotIn("OEBPS/contents.xhtml", z.namelist())
@@ -472,14 +485,10 @@ class BuildEpub(unittest.TestCase):
     def test_a_disclaimer_gets_a_page_under_its_own_name(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(
-                storydoc.DISCLAIMER,
-                "Any resemblance is coincidental.",
-                {"title": "Heads Up"},
-            ),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            DisclaimerCell(title="Heads Up", source="Any resemblance is coincidental."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -491,10 +500,10 @@ class BuildEpub(unittest.TestCase):
     def test_a_part_gets_a_page_of_its_own_carrying_only_its_name(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -515,10 +524,10 @@ class BuildEpub(unittest.TestCase):
     ) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.chapter("One"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            ChapterCell("Two"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -533,9 +542,9 @@ class BuildEpub(unittest.TestCase):
         (self.root / "art.png").write_bytes(b"png")
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.image("art.png", full_page=False),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            ImageCell("art.png", full_page=False),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -546,13 +555,13 @@ class BuildEpub(unittest.TestCase):
     def test_a_part_opens_a_page_the_chapters_under_it_do_not_share(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.part("Book Two"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("more"),
+            TitlePageCell(title="Book"),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            PartCell("Book Two"),
+            ChapterCell("Two"),
+            MarkdownCell("more"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -571,12 +580,12 @@ class BuildEpub(unittest.TestCase):
     def test_a_part_with_no_name_is_numbered_by_where_it_stands(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(storydoc.PART, "", {}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.PART, "", {}),
-            storydoc.chapter("Two"),
+            TitlePageCell(title="Book"),
+            PartCell(),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            PartCell(),
+            ChapterCell("Two"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -591,12 +600,12 @@ class BuildEpub(unittest.TestCase):
         # the reader turns from one chapter to the next without meeting the cut.
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            storydoc.divider(),
-            storydoc.chapter("Two"),
-            storydoc.markdown("more"),
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            DividerCell(),
+            ChapterCell("Two"),
+            MarkdownCell("more"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -618,13 +627,13 @@ class BuildEpub(unittest.TestCase):
         # second part of the book, not the third.
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(storydoc.PART, "", {}),
-            storydoc.chapter("One"),
-            storydoc.divider(),
-            storydoc.chapter("Two"),
-            Cell(storydoc.PART, "", {}),
-            storydoc.chapter("Three"),
+            TitlePageCell(title="Book"),
+            PartCell(),
+            ChapterCell("One"),
+            DividerCell(),
+            ChapterCell("Two"),
+            PartCell(),
+            ChapterCell("Three"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -637,10 +646,10 @@ class BuildEpub(unittest.TestCase):
     def test_a_part_is_somewhere_the_reader_can_navigate_to(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -651,14 +660,14 @@ class BuildEpub(unittest.TestCase):
     def test_the_contents_page_lists_the_chapters_under_their_part(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.table_of_contents(),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
-            storydoc.part("Book Two"),
-            storydoc.chapter("Two"),
-            storydoc.markdown("b"),
+            TitlePageCell(title="Book"),
+            TableOfContentsCell(),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("a"),
+            PartCell("Book Two"),
+            ChapterCell("Two"),
+            MarkdownCell("b"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -677,10 +686,10 @@ class BuildEpub(unittest.TestCase):
     def test_the_contents_page_is_numbered_and_read_down_the_page(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.table_of_contents(),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
+            TitlePageCell(title="Book"),
+            TableOfContentsCell(),
+            ChapterCell("One"),
+            MarkdownCell("a"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -693,11 +702,11 @@ class BuildEpub(unittest.TestCase):
     def test_a_divider_reaches_no_line_of_the_contents(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.table_of_contents(),
-            storydoc.divider(),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
+            TitlePageCell(title="Book"),
+            TableOfContentsCell(),
+            DividerCell(),
+            ChapterCell("One"),
+            MarkdownCell("a"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -709,10 +718,10 @@ class BuildEpub(unittest.TestCase):
     def test_the_navigation_holds_the_chapters_under_their_part(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
+            TitlePageCell(title="Book"),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("a"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -740,11 +749,11 @@ class BuildEpub(unittest.TestCase):
     ) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.part("Book One"),
-            storydoc.chapter("One"),
-            storydoc.markdown("a"),
-            Cell(storydoc.ABOUT, "", {"website": "https://writer.example"}),
+            TitlePageCell(title="Book"),
+            PartCell("Book One"),
+            ChapterCell("One"),
+            MarkdownCell("a"),
+            AboutCell(website="https://writer.example"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -755,7 +764,7 @@ class BuildEpub(unittest.TestCase):
         )
 
     def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
-        out = written(self.root, storydoc.chapter("One"), storydoc.markdown("prose"))
+        out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
         with zipfile.ZipFile(out) as z:
             self.assertNotIn("OEBPS/disclaimer.xhtml", z.namelist())
@@ -763,18 +772,10 @@ class BuildEpub(unittest.TestCase):
     def test_the_authors_page_carries_the_blurb_and_the_links(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book", author="A. Writer"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(
-                storydoc.ABOUT,
-                "A. Writer lives by the sea.",
-                {
-                    "kdp": "https://amazon.example/author/1",
-                    "website": "https://writer.example",
-                    "substack": "https://writer.substack.example",
-                },
-            ),
+            TitlePageCell(title="Book", author="A. Writer"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(kdp="https://amazon.example/author/1", website="https://writer.example", substack="https://writer.substack.example", source="A. Writer lives by the sea."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -798,13 +799,9 @@ class BuildEpub(unittest.TestCase):
     def test_the_authors_links_stand_apart_and_one_to_a_line(self) -> None:
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(
-                storydoc.ABOUT,
-                "A. Writer lives by the sea.",
-                {"kdp": "https://amazon.example/author/1", "website": "https://writer.example"},
-            ),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(kdp="https://amazon.example/author/1", website="https://writer.example", source="A. Writer lives by the sea."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -820,17 +817,10 @@ class BuildEpub(unittest.TestCase):
         (self.root / "author.jpg").write_bytes(b"jpg")
         out = written(
             self.root,
-            title_page(title="Book", author="A. Writer"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(
-                storydoc.ABOUT,
-                "A. Writer lives by the sea.",
-                {
-                    "kdp": "https://amazon.example/author/1",
-                    "portrait": "author.jpg",
-                },
-            ),
+            TitlePageCell(title="Book", author="A. Writer"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(kdp="https://amazon.example/author/1", portrait="author.jpg", source="A. Writer lives by the sea."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -855,13 +845,9 @@ class BuildEpub(unittest.TestCase):
     ) -> None:
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(
-                storydoc.ABOUT,
-                "A. Writer lives by the sea.",
-                {"portrait": "nobody.jpg"},
-            ),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(portrait="nobody.jpg", source="A. Writer lives by the sea."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -874,9 +860,9 @@ class BuildEpub(unittest.TestCase):
     def test_an_author_page_with_nothing_on_it_is_not_printed(self) -> None:
         out = written(
             self.root,
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.ABOUT, "", {}),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -886,13 +872,13 @@ class BuildEpub(unittest.TestCase):
         (self.root / "art.png").write_bytes(b"\x89PNG\r\n\x1a\n not really a png")
         out = written(
             self.root,
-            storydoc.image("art.png"),
-            title_page(title="Book"),
-            storydoc.table_of_contents(),
-            Cell(storydoc.DISCLAIMER, "All fiction.", {"title": "Disclaimer"}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.ABOUT, "", {"website": "https://writer.example"}),
+            ImageCell("art.png"),
+            TitlePageCell(title="Book"),
+            TableOfContentsCell(),
+            DisclaimerCell(title="Disclaimer", source="All fiction."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(website="https://writer.example"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -919,10 +905,10 @@ class BuildEpub(unittest.TestCase):
     def test_prose_standing_outside_every_chapter_is_still_printed(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.markdown("For my mother."),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            MarkdownCell("For my mother."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -934,11 +920,11 @@ class BuildEpub(unittest.TestCase):
     def test_the_table_of_contents_names_the_chapters_and_the_named_pages(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(storydoc.DISCLAIMER, "All fiction.", {"title": "Disclaimer"}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.ABOUT, "", {"website": "https://writer.example"}),
+            TitlePageCell(title="Book"),
+            DisclaimerCell(title="Disclaimer", source="All fiction."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            AboutCell(website="https://writer.example"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -954,10 +940,10 @@ class BuildEpub(unittest.TestCase):
         # It is what the author writes to sell the story, not part of the story.
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(storydoc.BLURB, "A woman loses her name.", {}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            BlurbCell(source="A woman loses her name."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -975,14 +961,10 @@ class BuildEpub(unittest.TestCase):
         # manuscript with the blurb and is bound into nothing.
         out = written(
             self.root,
-            title_page(title="Book"),
-            Cell(
-                storydoc.RECAP,
-                "She has lost her name.",
-                {"documents": "a.author, b.author"},
-            ),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            TitlePageCell(title="Book"),
+            RecapCell(documents="a.author, b.author", source="She has lost her name."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -999,10 +981,10 @@ class BuildEpub(unittest.TestCase):
         # the story and is printed nowhere in it.
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.NOTE, "She has to find the letter here.", {}),
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            NoteCell(source="She has to find the letter here."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -1017,10 +999,10 @@ class BuildEpub(unittest.TestCase):
     def test_a_salient_concept_reaches_no_part_of_the_book(self) -> None:
         out = written(
             self.root,
-            title_page(title="Book"),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
-            Cell(storydoc.SALIENT_CONCEPT, "Sarah's husband.", {"title": "Michael"}),
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            SalientConceptCell(title="Michael", source="Sarah's husband."),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -1036,10 +1018,10 @@ class BuildEpub(unittest.TestCase):
         # Two manifest items under one id is a book no reader will open.
         out = written(
             self.root,
-            Cell(storydoc.DISCLAIMER, "First.", {"title": "Disclaimer"}),
-            Cell(storydoc.DISCLAIMER, "Second.", {"title": "Disclaimer"}),
-            storydoc.chapter("One"),
-            storydoc.markdown("prose"),
+            DisclaimerCell(title="Disclaimer", source="First."),
+            DisclaimerCell(title="Disclaimer", source="Second."),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
         )
 
         with zipfile.ZipFile(out) as z:
@@ -1054,7 +1036,7 @@ class BuildEpub(unittest.TestCase):
 def placed(root: Path, *cells: Cell, name: str = "story") -> Document:
     """A document on disk, so the cover art it points at can be looked for."""
     path = root / f"{name}{storydoc.EXTENSION}"
-    storydoc.save(path, list(cells))
+    Document.from_cells(list(cells), path).save()
     return Document.load(path)
 
 
@@ -1067,7 +1049,7 @@ def filled_title_page(**over: str) -> Cell:
         "date": "2026-09-02",
     }
     said.update(over)
-    return title_page(**said)
+    return TitlePageCell(**said)
 
 
 class WhatTheBindingCouldNotPrint(unittest.TestCase):
@@ -1087,52 +1069,52 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
         return {item.kind: item.needs for item in book.wanting}
 
     def test_a_title_page_nobody_filled_in(self) -> None:
-        said = self.wanting(title_page(title="Untitled"))
+        said = self.wanting(TitlePageCell(title="Untitled"))
         self.assertEqual(
-            said[storydoc.TITLE_PAGE],
+            said[TITLE_PAGE],
             ("title", "subtitle", "author", "publisher", "date"),
         )
 
     def test_it_names_only_the_fields_that_are_empty(self) -> None:
         said = self.wanting(filled_title_page(author="", date="   "))
-        self.assertEqual(said[storydoc.TITLE_PAGE], ("author", "date"))
+        self.assertEqual(said[TITLE_PAGE], ("author", "date"))
 
     def test_a_version_is_never_wanted(self) -> None:
         # A fact about an edition, like an ISBN, not a thing a book waits for.
         said = self.wanting(filled_title_page(version=""))
-        self.assertNotIn(storydoc.TITLE_PAGE, said)
+        self.assertNotIn(TITLE_PAGE, said)
 
     def test_an_isbn_is_never_wanted(self) -> None:
         # Many editions have none, so it is not a fact a book waits for.
         said = self.wanting(filled_title_page())
-        self.assertNotIn(storydoc.TITLE_PAGE, said)
+        self.assertNotIn(TITLE_PAGE, said)
 
     def test_an_about_page_with_nothing_on_it(self) -> None:
         # `build_about_page` already answers None here.
-        said = self.wanting(Cell(storydoc.ABOUT, ""))
-        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+        said = self.wanting(AboutCell())
+        self.assertEqual(said[ABOUT], (TEXT,))
 
     def test_an_about_page_with_only_a_link_is_written(self) -> None:
-        said = self.wanting(Cell(storydoc.ABOUT, "", {"website": "https://x.com"}))
-        self.assertNotIn(storydoc.ABOUT, said)
+        said = self.wanting(AboutCell(website="https://x.com"))
+        self.assertNotIn(ABOUT, said)
 
     def test_an_empty_blurb(self) -> None:
-        said = self.wanting(Cell(storydoc.BLURB, ""))
-        self.assertEqual(said[storydoc.BLURB], (TEXT,))
+        said = self.wanting(BlurbCell())
+        self.assertEqual(said[BLURB], (TEXT,))
 
     def test_the_table_of_contents_is_never_wanting(self) -> None:
         # It is built from the chapters whatever the cell holds.
-        said = self.wanting(storydoc.table_of_contents())
-        self.assertNotIn(storydoc.TABLE_OF_CONTENTS, said)
+        said = self.wanting(TableOfContentsCell())
+        self.assertNotIn(TABLE_OF_CONTENTS, said)
 
     def test_a_section_that_is_not_there_wants_everything(self) -> None:
-        said = self.wanting(storydoc.chapter("One"))
-        self.assertEqual(said[storydoc.BLURB], (TEXT,))
-        self.assertEqual(said[storydoc.ABOUT], (TEXT,))
+        said = self.wanting(ChapterCell("One"))
+        self.assertEqual(said[BLURB], (TEXT,))
+        self.assertEqual(said[ABOUT], (TEXT,))
 
     def test_a_disclaimer_is_not_a_section_the_book_requires(self) -> None:
-        said = self.wanting(Cell(storydoc.DISCLAIMER, ""), storydoc.chapter("One"))
-        self.assertNotIn(storydoc.DISCLAIMER, said)
+        said = self.wanting(DisclaimerCell(), ChapterCell("One"))
+        self.assertNotIn(DISCLAIMER, said)
 
 
 class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
@@ -1142,48 +1124,48 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.root = Path(self._dir.name)
 
     def test_a_bare_story_is_missing_all_four(self) -> None:
-        found = report_of(placed(self.root, storydoc.chapter("One")))
+        found = report_of(placed(self.root, ChapterCell("One")))
         self.assertEqual(found.added, REQUIRED)
         self.assertFalse(found.ready)
 
     def test_the_plan_opens_and_closes_the_document(self) -> None:
-        found = report_of(placed(self.root, storydoc.chapter("One")))
+        found = report_of(placed(self.root, ChapterCell("One")))
         self.assertEqual(
             [slot.kind for slot in found.plan],
-            [*OPENING, storydoc.CHAPTER, *CLOSING],
+            [*OPENING, CHAPTER, *CLOSING],
         )
 
     def test_a_section_already_there_is_carried_by_index(self) -> None:
         found = report_of(
-            placed(self.root, storydoc.chapter("One"), filled_title_page())
+            placed(self.root, ChapterCell("One"), filled_title_page())
         )
-        self.assertNotIn(storydoc.TITLE_PAGE, found.added)
+        self.assertNotIn(TITLE_PAGE, found.added)
         self.assertEqual(found.plan[0].at, 1)
 
     def test_the_story_keeps_the_order_it_was_written_in(self) -> None:
         found = report_of(
             placed(
                 self.root,
-                storydoc.chapter("One"),
-                storydoc.markdown("The lantern."),
-                storydoc.chapter("Two"),
+                ChapterCell("One"),
+                MarkdownCell("The lantern."),
+                ChapterCell("Two"),
             )
         )
         self.assertEqual([s.at for s in found.plan if s.at is not None], [0, 1, 2])
 
     def test_a_section_that_passed_the_story_has_moved(self) -> None:
         found = report_of(
-            placed(self.root, storydoc.chapter("One"), storydoc.table_of_contents())
+            placed(self.root, ChapterCell("One"), TableOfContentsCell())
         )
-        self.assertIn(storydoc.TABLE_OF_CONTENTS, found.moved)
+        self.assertIn(TABLE_OF_CONTENTS, found.moved)
 
     def test_writing_a_section_in_moves_nothing(self) -> None:
         # The about page is last before and last after; only its index changed.
         found = report_of(
             placed(
                 self.root,
-                storydoc.chapter("One"),
-                Cell(storydoc.ABOUT, "I live by the sea."),
+                ChapterCell("One"),
+                AboutCell(source="I live by the sea."),
             )
         )
         self.assertEqual(found.moved, ())
@@ -1192,11 +1174,11 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         found = report_of(
             placed(
                 self.root,
-                Cell(storydoc.ABOUT, "I live by the sea."),
-                Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.table_of_contents(),
+                AboutCell(source="I live by the sea."),
+                BlurbCell(source="A lantern, and a stair."),
+                TableOfContentsCell(),
                 filled_title_page(),
-                storydoc.chapter("One"),
+                ChapterCell("One"),
             )
         )
         self.assertEqual(found.added, ())
@@ -1206,12 +1188,12 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         found = report_of(
             placed(
                 self.root,
-                storydoc.image("art.png"),
+                ImageCell("art.png"),
                 filled_title_page(),
-                storydoc.table_of_contents(),
-                Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.chapter("One"),
-                Cell(storydoc.ABOUT, "I live by the sea."),
+                TableOfContentsCell(),
+                BlurbCell(source="A lantern, and a stair."),
+                ChapterCell("One"),
+                AboutCell(source="I live by the sea."),
             )
         )
         self.assertEqual(found.moved, ())
@@ -1221,22 +1203,22 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         found = report_of(
             placed(
                 self.root,
-                Cell(storydoc.DISCLAIMER, "All fiction."),
-                storydoc.chapter("One"),
+                DisclaimerCell(source="All fiction."),
+                ChapterCell("One"),
             )
         )
         self.assertEqual(
             [slot.kind for slot in found.plan],
-            [*OPENING, storydoc.DISCLAIMER, storydoc.CHAPTER, *CLOSING],
+            [*OPENING, DISCLAIMER, CHAPTER, *CLOSING],
         )
 
     def test_only_the_first_of_a_kind_is_claimed(self) -> None:
         found = report_of(
             placed(
                 self.root,
-                storydoc.chapter("One"),
-                storydoc.table_of_contents(),
-                storydoc.table_of_contents(),
+                ChapterCell("One"),
+                TableOfContentsCell(),
+                TableOfContentsCell(),
             )
         )
         self.assertEqual(found.plan[1].at, 1)
@@ -1247,10 +1229,10 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             placed(
                 self.root,
                 filled_title_page(),
-                storydoc.table_of_contents(),
-                Cell(storydoc.BLURB, ""),  # written in, never filled
-                storydoc.chapter("One"),
-                Cell(storydoc.ABOUT, "I live by the sea."),
+                TableOfContentsCell(),
+                BlurbCell(),  # written in, never filled
+                ChapterCell("One"),
+                AboutCell(source="I live by the sea."),
             )
         )
         self.assertEqual(found.added, ())
@@ -1262,10 +1244,10 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             placed(
                 self.root,
                 filled_title_page(),
-                storydoc.table_of_contents(),
-                Cell(storydoc.BLURB, "A lantern, and a stair."),
-                storydoc.chapter("One"),
-                Cell(storydoc.ABOUT, "I live by the sea."),
+                TableOfContentsCell(),
+                BlurbCell(source="A lantern, and a stair."),
+                ChapterCell("One"),
+                AboutCell(source="I live by the sea."),
             )
         )
         self.assertTrue(found.ready)

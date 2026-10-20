@@ -1,7 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { fromMarkdown } from "../markdown/exporter";
 
@@ -16,7 +15,7 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         const chosenFiles = await vscode.window.showOpenDialog({
             title: "Import Markdown",
             openLabel: "Import",
-            defaultUri: vscode.Uri.joinPath(session.document.uri, ".."),
+            defaultUri: vscode.Uri.joinPath(session.uri, ".."),
             canSelectFiles: true,
             canSelectFolders: false,
             canSelectMany: false,
@@ -30,7 +29,7 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         }
         const manuscript = chosenFiles[0];
         const answer = await vscode.window.showWarningMessage(
-            `Replace everything in ${vscode.workspace.asRelativePath(session.document.uri)} with ${vscode.workspace.asRelativePath(manuscript)}?`,
+            `Replace everything in ${vscode.workspace.asRelativePath(session.uri)} with ${vscode.workspace.asRelativePath(manuscript)}?`,
             { modal: true },
             "Replace",
         );
@@ -44,7 +43,7 @@ export class ImportMarkdownCommand implements AuthorDocumentCommand {
         );
         await session?.writeTheDocumentToItsFile();
         void vscode.window.showInformationMessage(
-            `Imported ${vscode.workspace.asRelativePath(manuscript)} into ${vscode.workspace.asRelativePath(session.document.uri)}`,
+            `Imported ${vscode.workspace.asRelativePath(manuscript)} into ${vscode.workspace.asRelativePath(session.uri)}`,
         );
     }
 }

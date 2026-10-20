@@ -8,9 +8,10 @@ from typing import Any
 
 from cortexgrid_infer import CompletingModel
 
-from server import storydoc
 from server.jobs import Job
-from server.storydoc import Cell, Document
+from server.storydoc.iterators.prose_cells_iterator import ProseCellsIterator
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.cell import Cell
 
 _FENCED = re.compile(r"\A\s*```[a-zA-Z]*\n(?P<body>.*)\n```\s*\Z", re.DOTALL)
 THINKING_HEADROOM = 8192
@@ -43,7 +44,7 @@ async def fix_style(
     revised: Callable[[str, str], None] = lambda cell_id, source: None,
     left_alone: Callable[[str, str], None] = lambda opening, why: None,
 ) -> None:
-    sections = [cell for cell in document.markdown_cells() if cell.source.strip()]
+    sections = [cell for cell in ProseCellsIterator(document) if cell.source.strip()]
     if not sections:
         raise ValueError("There is no prose there to correct.")
 

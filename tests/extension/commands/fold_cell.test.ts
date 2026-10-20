@@ -9,12 +9,12 @@ describe("FoldCellCommand — folds a cell", () => {
         new FoldCellCommand("foldCell", "", "", true).invoke(session, {
             cellId: "c2",
         });
-        expect(session.document.cells[1].isFolded()).toBe(true);
+        expect(session.document.cells[1].folded).toBe(true);
 
         new FoldCellCommand("unfoldCell", "", "", false).invoke(session, {
             cellId: "c2",
         });
-        expect(session.document.cells[1].isFolded()).toBe(false);
+        expect(session.document.cells[1].folded).toBe(false);
     });
 
     it("leaves the document alone when there is no cell at that index", () => {

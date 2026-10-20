@@ -5,8 +5,14 @@ from unittest import mock
 
 from cortexgrid_infer import CompletionChunk
 
-from server import storydoc
-from server.storydoc import Document
+from server.storydoc import storydoc
+from server.storydoc.storydoc import Document
+from server.storydoc.cells.cell import Cell
+from server.storydoc.cells.chapter_cell import ChapterCell
+from server.storydoc.cells.markdown_cell import MarkdownCell
+from server.storydoc.cells.note_cell import NoteCell
+from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
+from server.storydoc.cells.title_page_cell import TitlePageCell
 from server.writing_tools.style import (
     FIX_REQUEST,
     STYLE_INSTRUCTION,
@@ -54,23 +60,23 @@ def styled(*arguments: object, **named: object) -> None:
     asyncio.run(fix_style(*arguments, **named))
 
 
-def markdown(source: str, cell_id: str) -> storydoc.Cell:
-    return storydoc.Cell(storydoc.MARKDOWN, source, {"id": cell_id})
+def markdown(source: str, cell_id: str) -> Cell:
+    return MarkdownCell(_unique_id=cell_id, source=source)
 
 
-STORY = storydoc.dumps(
+STORY = Document.from_cells(
     [
-        storydoc.Cell(storydoc.TITLE_PAGE, "", {"title": "Veriona"}),
+        TitlePageCell(title="Veriona"),
         markdown(FRONT, FRONT_CELL_ID),
-        storydoc.chapter("The First Night"),
+        ChapterCell("The First Night"),
         markdown(FIRST, FIRST_CELL_ID),
         markdown(SECOND, SECOND_CELL_ID),
-        storydoc.Cell(storydoc.NOTE, "Ask Mara whether this is the third time.", {}),
-        storydoc.Cell(storydoc.TABLE_OF_CONTENTS, "1. The First Night", {}),
-        storydoc.chapter("The Second"),
+        NoteCell(source="Ask Mara whether this is the third time."),
+        TableOfContentsCell(source="1. The First Night"),
+        ChapterCell("The Second"),
         markdown(THIRD, THIRD_CELL_ID),
     ]
-)
+).text
 
 
 def collect(model: mock.MagicMock) -> dict[str, str]:
@@ -236,7 +242,7 @@ class FixStyle(unittest.TestCase):
 
     def test_a_document_with_no_prose_is_refused(self) -> None:
         with self.assertRaises(ValueError):
-            styled(build_model(), Document(storydoc.dumps([storydoc.chapter("One")])))
+            styled(build_model(), Document.from_cells([ChapterCell("One")]))
 
 
 if __name__ == "__main__":
