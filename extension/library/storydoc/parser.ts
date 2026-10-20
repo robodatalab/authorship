@@ -26,6 +26,7 @@ import {
     COVER_DESIGNER,
     DATE,
     DOCUMENTS,
+    FOLDED,
     FULL_PAGE,
     ISBN,
     KDP,
@@ -40,14 +41,12 @@ import {
     SUBSTACK,
     SUBTITLE,
     TITLE,
+    TRUE,
+    UNIQUE_ID,
     VERSION,
     WEBSITE,
     MarkerAttributes,
 } from "./visitors/marker_attributes";
-
-const UNIQUE_ID = "id";
-export const FOLDED = "folded";
-const TRUE = "true";
 
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;

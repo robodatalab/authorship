@@ -1,6 +1,5 @@
 import {
     AuthorFileEditorCell,
-    AuthorFileEditorCellRun,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
@@ -8,73 +7,99 @@ import {
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
-import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
+    replaceTheCell,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { RECAP } from "../../library/storydoc/cells/recap_cell";
+import { ABOUT, AboutCell } from "../../library/storydoc/cells/about_cell";
+import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
-const FIELDS: AuthorFileEditorCellField[] = [
-    {
-        attributeName: "documents",
-        label: "Documents",
-        placeholder: "parts/part_1.author, parts/part_2.author",
-    },
-];
-
-interface RecapCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorAboutCellProps {
+    cell: AboutCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function RecapCell({
+export function AuthorFileEditorAboutCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: RecapCellProps) {
+}: AuthorFileEditorAboutCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
+
+    const saidAboutTheAuthor = {
+        kdp: cell.kdp,
+        website: cell.website,
+        substack: cell.substack,
+        portrait: cell.portrait,
+    };
+
+    function sayAboutTheAuthor(
+        changed: Partial<typeof saidAboutTheAuthor>,
+    ): void {
+        const said = { ...saidAboutTheAuthor, ...changed };
+        const about = new AboutCell(
+            said.kdp,
+            said.website,
+            said.substack,
+            said.portrait,
+            cell.source,
+            cell.folded,
+            cell.at,
+            cell.uniqueId,
+        );
+        replaceTheCell(sendMessagesToVscode, about);
+    }
+
+    const fields: AuthorFileEditorCellField[] = [
+        {
+            label: "KDP",
+            said: cell.kdp,
+            placeholder: "https://amazon.com/author/…",
+            onSaid: (kdp) => sayAboutTheAuthor({ kdp }),
+        },
+        {
+            label: "Website",
+            said: cell.website,
+            placeholder: "https://…",
+            onSaid: (website) => sayAboutTheAuthor({ website }),
+        },
+        {
+            label: "Substack",
+            said: cell.substack,
+            placeholder: "https://….substack.com",
+            onSaid: (substack) => sayAboutTheAuthor({ substack }),
+        },
+        {
+            label: "Portrait",
+            said: cell.portrait,
+            placeholder: "author.jpg",
+            onSaid: (portrait) => sayAboutTheAuthor({ portrait }),
+        },
+    ];
 
     return (
-        <AuthorFileEditorCell
-            sidebar={
-                <>
-                    <AuthorFileEditorCellRun />
-                    <AuthorFileEditorCellWarning />
-                </>
-            }
-        >
+        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
             <AuthorFileEditorCellHeader>
-                The Story So Far
+                About the Author
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
-                    <AuthorFileEditorCellFields
-                        fields={FIELDS}
-                        cellAttributes={cell.attrs}
-                        onAttributeChanged={(attributeName, attributeValue) =>
-                            invokeAuthorDocumentCommand(
-                                sendMessagesToVscode,
-                                "replaceAttribute",
-                                { cellId, attributeName, attributeValue },
-                            )
-                        }
-                    />
+                    <AuthorFileEditorCellFields fields={fields} />
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
-                        cellId={cellId}
+                        cellId={cell.uniqueId}
                         highlights={findHighlights}
                         markdown={cell.source}
-                        timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                        timesTheHostWroteIt={timesTheHostWroteIt}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
                             invokeAuthorDocumentCommand(
@@ -88,7 +113,7 @@ export function RecapCell({
                         onMarkdownCommitted={(markdown) =>
                             sayTheAuthorTypedInTheCell(
                                 sendMessagesToVscode,
-                                cellId,
+                                cell.uniqueId,
                                 markdown,
                             )
                         }
@@ -101,14 +126,7 @@ export function RecapCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: RECAP,
-    menuLabel: "The Story So Far",
+    cellKind: ABOUT,
+    menuLabel: "About the Author",
     insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <RecapCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

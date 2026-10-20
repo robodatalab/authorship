@@ -3,36 +3,21 @@ import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
 import type {
     SendMessagesToVscode,
     WebviewAuthorDocumentCommandCard,
-    WebviewCell,
 } from "./author_editor/AuthorFileEditorCanvas";
-import {
-    authorDocumentCellRenderers,
-    authorDocumentCellTypes,
-} from "../vscode_runtime/commands/author_document_cell_types";
+import { AuthorFileEditorCellRenderer } from "./author_editor/AuthorFileEditorCellRenderer";
+import { authorDocumentCellTypes } from "../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
+import type { Cell } from "../library/storydoc/cells/cell";
 import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
+import { parse } from "../library/storydoc/parser";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
-declare const require: {
-    context(
-        directory: string,
-        useSubdirectories: boolean,
-        expression: RegExp,
-    ): { keys(): string[]; (id: string): unknown };
-};
-
-try {
-    const cellTypeModules = require.context("./cell_types", false, /\.tsx$/);
-    cellTypeModules.keys().forEach(cellTypeModules);
-} catch {
-    void 0;
-}
-
 interface WhatTheWebviewDraws {
-    cells: WebviewCell[];
+    cells: Cell[];
+    timesTheHostWroteEachCell: Record<string, number>;
     commands: WebviewAuthorDocumentCommandCard[];
     proseErrors: ProseCheckError[];
     storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
@@ -43,17 +28,15 @@ interface WhatTheWebviewDraws {
     wordsInTheDocument: number;
 }
 
-function asTheHostWroteIt(
-    cell: WebviewCell,
-    asTheyWereDrawn: WebviewCell[],
-): WebviewCell {
-    const drawn = asTheyWereDrawn.find(
-        (drawing) => drawing.attrs.id === cell.attrs.id,
-    );
-    return {
-        ...cell,
-        timesTheHostWroteIt: (drawn?.timesTheHostWroteIt ?? 0) + 1,
-    };
+function cellsAsTheHostWroteThem(written: string[]): Cell[] {
+    return written.flatMap((writtenCell) => parse(writtenCell));
+}
+
+function theHostWrote(cells: Cell[], drawn: WhatTheWebviewDraws): void {
+    for (const cell of cells) {
+        const timesBefore = drawn.timesTheHostWroteEachCell[cell.uniqueId] ?? 0;
+        drawn.timesTheHostWroteEachCell[cell.uniqueId] = timesBefore + 1;
+    }
 }
 
 function processMessageFromVscode(
@@ -61,29 +44,21 @@ function processMessageFromVscode(
     drawn: WhatTheWebviewDraws,
 ): boolean {
     if (message.data?.type === "document") {
-        drawn.cells = (message.data.cells as WebviewCell[]).map((cell) =>
-            asTheHostWroteIt(cell, drawn.cells),
-        );
+        const cells = cellsAsTheHostWroteThem(message.data.cells as string[]);
+        theHostWrote(cells, drawn);
+        drawn.cells = cells;
     } else if (message.data?.type === "cells") {
-        const changed = message.data.cells as WebviewCell[];
-        const typed = message.data.cellsThePageTyped as WebviewCell[];
-        drawn.cells = drawn.cells.map((drawing) => {
-            const written = changed.find(
-                (cell) => cell.attrs.id === drawing.attrs.id,
-            );
-            if (written) {
-                return asTheHostWroteIt(written, drawn.cells);
-            }
-            const typedOnThePage = typed.find(
-                (cell) => cell.attrs.id === drawing.attrs.id,
-            );
-            return typedOnThePage
-                ? {
-                      ...typedOnThePage,
-                      timesTheHostWroteIt: drawing.timesTheHostWroteIt,
-                  }
-                : drawing;
-        });
+        const changed = cellsAsTheHostWroteThem(message.data.cells as string[]);
+        const typed = cellsAsTheHostWroteThem(
+            message.data.cellsThePageTyped as string[],
+        );
+        theHostWrote(changed, drawn);
+        drawn.cells = drawn.cells.map(
+            (drawing) =>
+                changed.find((cell) => cell.uniqueId === drawing.uniqueId) ??
+                typed.find((cell) => cell.uniqueId === drawing.uniqueId) ??
+                drawing,
+        );
     } else if (message.data?.type === "commands") {
         drawn.commands = message.data
             .commands as WebviewAuthorDocumentCommandCard[];
@@ -122,6 +97,7 @@ function openTheAuthorFileEditor(): void {
     );
     const drawn: WhatTheWebviewDraws = {
         cells: [],
+        timesTheHostWroteEachCell: {},
         commands: [],
         proseErrors: [],
         storyAnnotationsSelected: {},
@@ -132,14 +108,17 @@ function openTheAuthorFileEditor(): void {
         wordsInTheDocument: 0,
     };
 
+    const cellRenderer = new AuthorFileEditorCellRenderer(sendMessagesToVscode);
+
     function drawTheCanvas(): void {
         root.render(
             <AuthorFileEditorCanvas
                 cells={drawn.cells}
+                timesTheHostWroteEachCell={drawn.timesTheHostWroteEachCell}
                 commands={drawn.commands}
                 cellTypes={authorDocumentCellTypes()}
                 sendMessagesToVscode={sendMessagesToVscode}
-                cellRenderers={authorDocumentCellRenderers()}
+                cellRenderer={cellRenderer}
                 proseErrors={drawn.proseErrors}
                 storyAnnotationsSelected={drawn.storyAnnotationsSelected}
                 storyTextShown={drawn.storyTextShown}

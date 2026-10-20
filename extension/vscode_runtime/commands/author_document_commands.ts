@@ -22,7 +22,7 @@ import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
-import { ReplaceAttributeCommand } from "./replace_attribute";
+import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
@@ -58,7 +58,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new MoveCellDownCommand(),
     new DeleteCellCommand(),
     new InsertCellCommand(),
-    new ReplaceAttributeCommand(),
+    new ReplaceCellCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
     new AddStoryAnnotationCommand(),
@@ -88,7 +88,7 @@ export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[]
         buttonGroup: command.buttonGroup,
         iconClassName: command.iconClassName,
         tooltip: command.tooltip,
-        drawnWhenCellAttributeIs: command.drawnWhenCellAttributeIs,
+        drawnWhenTheCellIsFolded: command.drawnWhenTheCellIsFolded,
         runsCellsOfKind: command.runsCellsOfKind,
     }));
 }

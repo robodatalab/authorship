@@ -1,12 +1,12 @@
 import {
     AuthorFileEditorCell,
-    AuthorFileEditorCellRun,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -14,40 +14,34 @@ import {
     invokeAuthorDocumentCommand,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { BLURB } from "../../library/storydoc/cells/blurb_cell";
+import {
+    DISCLAIMER,
+    type DisclaimerCell,
+} from "../../library/storydoc/cells/disclaimer_cell";
 
-interface BlurbCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorDisclaimerCellProps {
+    cell: DisclaimerCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function BlurbCell({
+export function AuthorFileEditorDisclaimerCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: BlurbCellProps) {
+}: AuthorFileEditorDisclaimerCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
 
     return (
-        <AuthorFileEditorCell
-            sidebar={
-                <>
-                    <AuthorFileEditorCellRun />
-                    <AuthorFileEditorCellWarning />
-                </>
-            }
-        >
-            <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
+        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
+            <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
-                    cellId={cellId}
+                    cellId={cell.uniqueId}
                     highlights={findHighlights}
                     markdown={cell.source}
-                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                    timesTheHostWroteIt={timesTheHostWroteIt}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
                         invokeAuthorDocumentCommand(
@@ -61,7 +55,7 @@ export function BlurbCell({
                     onMarkdownCommitted={(markdown) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            cellId,
+                            cell.uniqueId,
                             markdown,
                         )
                     }
@@ -73,14 +67,7 @@ export function BlurbCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: BLURB,
-    menuLabel: "Blurb",
+    cellKind: DISCLAIMER,
+    menuLabel: "Disclaimer",
     insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <BlurbCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

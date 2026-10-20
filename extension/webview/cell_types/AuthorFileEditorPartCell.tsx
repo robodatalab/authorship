@@ -10,45 +10,45 @@ import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCel
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
-    invokeAuthorDocumentCommand,
+    replaceTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { PART } from "../../library/storydoc/cells/part_cell";
+import { PART, PartCell } from "../../library/storydoc/cells/part_cell";
 
-const FIELDS: AuthorFileEditorCellField[] = [
-    { attributeName: "title", label: "Title" },
-];
-
-interface PartCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorPartCellProps {
+    cell: PartCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function PartCell({
+export function AuthorFileEditorPartCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: PartCellProps) {
+}: AuthorFileEditorPartCellProps) {
+    const fields: AuthorFileEditorCellField[] = [
+        {
+            label: "Title",
+            said: cell.title,
+            onSaid: (title) => {
+                const retitled = new PartCell(
+                    title,
+                    cell.source,
+                    cell.folded,
+                    cell.at,
+                    cell.uniqueId,
+                );
+                replaceTheCell(sendMessagesToVscode, retitled);
+            },
+        },
+    ];
+
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>
                 Part
-                <AuthorFileEditorCellHeaderTitle title={cell.attrs.title} />
+                <AuthorFileEditorCellHeaderTitle title={cell.title} />
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                <AuthorFileEditorCellFields
-                    fields={FIELDS}
-                    cellAttributes={cell.attrs}
-                    onAttributeChanged={(attributeName, attributeValue) =>
-                        invokeAuthorDocumentCommand(
-                            sendMessagesToVscode,
-                            "replaceAttribute",
-                            { cellId, attributeName, attributeValue },
-                        )
-                    }
-                />
+                <AuthorFileEditorCellFields fields={fields} />
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter>
                 <AuthorFileEditorCellWords />
@@ -61,11 +61,4 @@ registerAuthorDocumentCellType({
     cellKind: PART,
     menuLabel: "Part",
     insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <PartCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

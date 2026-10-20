@@ -1,5 +1,6 @@
 import {
     AuthorFileEditorCell,
+    AuthorFileEditorCellRun,
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
@@ -7,73 +8,72 @@ import {
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
+import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
+    replaceTheCell,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { ABOUT } from "../../library/storydoc/cells/about_cell";
-import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { RECAP, RecapCell } from "../../library/storydoc/cells/recap_cell";
 
-const FIELDS: AuthorFileEditorCellField[] = [
-    {
-        attributeName: "kdp",
-        label: "KDP",
-        placeholder: "https://amazon.com/author/…",
-    },
-    { attributeName: "website", label: "Website", placeholder: "https://…" },
-    {
-        attributeName: "substack",
-        label: "Substack",
-        placeholder: "https://….substack.com",
-    },
-    { attributeName: "portrait", label: "Portrait", placeholder: "author.jpg" },
-];
-
-interface AboutCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorRecapCellProps {
+    cell: RecapCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function AboutCell({
+export function AuthorFileEditorRecapCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: AboutCellProps) {
+}: AuthorFileEditorRecapCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
+    const fields: AuthorFileEditorCellField[] = [
+        {
+            label: "Documents",
+            said: cell.documents,
+            placeholder: "parts/part_1.author, parts/part_2.author",
+            onSaid: (documents) => {
+                const recap = new RecapCell(
+                    documents,
+                    cell.source,
+                    cell.folded,
+                    cell.at,
+                    cell.uniqueId,
+                );
+                replaceTheCell(sendMessagesToVscode, recap);
+            },
+        },
+    ];
 
     return (
-        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
+        <AuthorFileEditorCell
+            sidebar={
+                <>
+                    <AuthorFileEditorCellRun />
+                    <AuthorFileEditorCellWarning />
+                </>
+            }
+        >
             <AuthorFileEditorCellHeader>
-                About the Author
+                The Story So Far
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>
-                    <AuthorFileEditorCellFields
-                        fields={FIELDS}
-                        cellAttributes={cell.attrs}
-                        onAttributeChanged={(attributeName, attributeValue) =>
-                            invokeAuthorDocumentCommand(
-                                sendMessagesToVscode,
-                                "replaceAttribute",
-                                { cellId, attributeName, attributeValue },
-                            )
-                        }
-                    />
+                    <AuthorFileEditorCellFields fields={fields} />
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
                     <MarkdownEditor
-                        cellId={cellId}
+                        cellId={cell.uniqueId}
                         highlights={findHighlights}
                         markdown={cell.source}
-                        timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                        timesTheHostWroteIt={timesTheHostWroteIt}
                         errors={proseErrors}
                         onFixAsked={(proseError) =>
                             invokeAuthorDocumentCommand(
@@ -87,7 +87,7 @@ export function AboutCell({
                         onMarkdownCommitted={(markdown) =>
                             sayTheAuthorTypedInTheCell(
                                 sendMessagesToVscode,
-                                cellId,
+                                cell.uniqueId,
                                 markdown,
                             )
                         }
@@ -100,14 +100,7 @@ export function AboutCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: ABOUT,
-    menuLabel: "About the Author",
+    cellKind: RECAP,
+    menuLabel: "The Story So Far",
     insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <AboutCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

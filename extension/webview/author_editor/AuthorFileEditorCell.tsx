@@ -46,7 +46,8 @@ interface AuthorFileEditorCellStateProps {
     cellCommands: WebviewAuthorDocumentCommandCard[];
     runCommand?: WebviewAuthorDocumentCommandCard;
     cellId: string;
-    cellAttributes: Readonly<Record<string, string>>;
+    cellIsFolded: boolean;
+    timesTheHostWroteIt: number;
     proseErrors?: ProseCheckError[];
     storyTextHighlights?: MarkdownEditorStoryTextHighlight[];
     storyTextShown?: MarkdownEditorStoryTextShown;
@@ -67,7 +68,8 @@ const AuthorFileEditorCellStateContext = createContext<
     cellCommands: [],
     runCommand: undefined,
     cellId: "",
-    cellAttributes: {},
+    cellIsFolded: false,
+    timesTheHostWroteIt: 0,
     proseErrors: [],
     storyTextHighlights: undefined,
     storyTextShown: undefined,
@@ -85,7 +87,8 @@ export function AuthorFileEditorCellState({
     cellCommands,
     runCommand,
     cellId,
-    cellAttributes,
+    cellIsFolded,
+    timesTheHostWroteIt,
     proseErrors = [],
     storyTextHighlights,
     storyTextShown,
@@ -105,7 +108,8 @@ export function AuthorFileEditorCellState({
                 cellCommands,
                 runCommand,
                 cellId,
-                cellAttributes,
+                cellIsFolded,
+                timesTheHostWroteIt,
                 proseErrors,
                 storyTextHighlights,
                 storyTextShown,
@@ -126,22 +130,25 @@ export function AuthorFileEditorCellState({
 
 export function isDrawnOnCell(
     command: WebviewAuthorDocumentCommandCard,
-    cellAttributes: Readonly<Record<string, string>>,
+    cellIsFolded: boolean,
 ): boolean {
     return (
-        !command.drawnWhenCellAttributeIs ||
-        (cellAttributes[command.drawnWhenCellAttributeIs.attributeName] ??
-            "") === command.drawnWhenCellAttributeIs.attributeValue
+        command.drawnWhenTheCellIsFolded === undefined ||
+        command.drawnWhenTheCellIsFolded === cellIsFolded
     );
 }
 
+export function useAuthorFileEditorCellTimesTheHostWroteIt(): number {
+    return useContext(AuthorFileEditorCellStateContext).timesTheHostWroteIt;
+}
+
 export function AuthorFileEditorCellActions() {
-    const { cellCommands, cellId, cellAttributes, sendMessagesToVscode } =
+    const { cellCommands, cellId, cellIsFolded, sendMessagesToVscode } =
         useContext(AuthorFileEditorCellStateContext);
     return (
         <div className="author-file-editor-cell-actions">
             {cellCommands
-                .filter((command) => isDrawnOnCell(command, cellAttributes))
+                .filter((command) => isDrawnOnCell(command, cellIsFolded))
                 .map((command) => (
                     <button
                         key={command.commandName}

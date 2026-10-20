@@ -6,6 +6,11 @@ import {
     AuthorFileEditorCellWarning,
     useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellStoryTextHighlights,
+    useAuthorFileEditorCellStoryTextClicked,
+    useAuthorFileEditorCellStoryTextSelected,
+    useAuthorFileEditorCellStoryTextShown,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -13,33 +18,45 @@ import {
     invokeAuthorDocumentCommand,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { DISCLAIMER } from "../../library/storydoc/cells/disclaimer_cell";
+import {
+    MARKDOWN,
+    type MarkdownCell,
+} from "../../library/storydoc/cells/markdown_cell";
 
-interface DisclaimerCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorMarkdownCellProps {
+    cell: MarkdownCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function DisclaimerCell({
+export function AuthorFileEditorMarkdownCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: DisclaimerCellProps) {
+}: AuthorFileEditorMarkdownCellProps) {
     const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
+    const storyTextClicked = useAuthorFileEditorCellStoryTextClicked();
+    const storyTextHighlights =
+        useAuthorFileEditorCellStoryTextHighlights();
+    const { storyTextShown, onStoryTextShownAt } =
+        useAuthorFileEditorCellStoryTextShown();
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
 
     return (
         <AuthorFileEditorCell sidebar={<AuthorFileEditorCellWarning />}>
-            <AuthorFileEditorCellHeader>Disclaimer</AuthorFileEditorCellHeader>
+            <AuthorFileEditorCellHeader>Markdown</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
-                    cellId={cellId}
+                    cellId={cell.uniqueId}
                     highlights={findHighlights}
+                    storyTextHighlights={storyTextHighlights}
+                    storyTextShown={storyTextShown}
+                    onTextSelected={storyTextSelected}
+                    onTextClicked={storyTextClicked}
+                    onStoryTextShownAt={onStoryTextShownAt}
                     markdown={cell.source}
-                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                    timesTheHostWroteIt={timesTheHostWroteIt}
                     errors={proseErrors}
                     onFixAsked={(proseError) =>
                         invokeAuthorDocumentCommand(
@@ -53,7 +70,7 @@ export function DisclaimerCell({
                     onMarkdownCommitted={(markdown) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            cellId,
+                            cell.uniqueId,
                             markdown,
                         )
                     }
@@ -65,14 +82,7 @@ export function DisclaimerCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: DISCLAIMER,
-    menuLabel: "Disclaimer",
-    insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <DisclaimerCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
+    cellKind: MARKDOWN,
+    menuLabel: "Markdown",
+    insertMenuGroup: "primary",
 });

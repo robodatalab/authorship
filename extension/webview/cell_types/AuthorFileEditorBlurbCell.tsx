@@ -4,7 +4,10 @@ import {
     AuthorFileEditorCellHeader,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    AuthorFileEditorCellWarning,
+    useAuthorFileEditorCellProseErrors,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
@@ -12,38 +15,52 @@ import {
     invokeAuthorDocumentCommand,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { TABLE_OF_CONTENTS } from "../../library/storydoc/cells/table_of_contents_cell";
+import { BLURB, type BlurbCell } from "../../library/storydoc/cells/blurb_cell";
 
-interface TableOfContentsCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorBlurbCellProps {
+    cell: BlurbCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function TableOfContentsCell({
+export function AuthorFileEditorBlurbCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: TableOfContentsCellProps) {
+}: AuthorFileEditorBlurbCellProps) {
+    const proseErrors = useAuthorFileEditorCellProseErrors();
     const findHighlights = useAuthorFileEditorCellFindHighlights();
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
 
     return (
-        <AuthorFileEditorCell sidebar={<AuthorFileEditorCellRun />}>
-            <AuthorFileEditorCellHeader>
-                Table of Contents
-            </AuthorFileEditorCellHeader>
+        <AuthorFileEditorCell
+            sidebar={
+                <>
+                    <AuthorFileEditorCellRun />
+                    <AuthorFileEditorCellWarning />
+                </>
+            }
+        >
+            <AuthorFileEditorCellHeader>Blurb</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
-                    cellId={cellId}
+                    cellId={cell.uniqueId}
                     highlights={findHighlights}
                     markdown={cell.source}
-                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                    timesTheHostWroteIt={timesTheHostWroteIt}
+                    errors={proseErrors}
+                    onFixAsked={(proseError) =>
+                        invokeAuthorDocumentCommand(
+                            sendMessagesToVscode,
+                            "fixProse",
+                            {
+                                ...proseError,
+                            },
+                        )
+                    }
                     onMarkdownCommitted={(markdown) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            cellId,
+                            cell.uniqueId,
                             markdown,
                         )
                     }
@@ -55,14 +72,7 @@ export function TableOfContentsCell({
 }
 
 registerAuthorDocumentCellType({
-    cellKind: TABLE_OF_CONTENTS,
-    menuLabel: "Table of Contents",
+    cellKind: BLURB,
+    menuLabel: "Blurb",
     insertMenuGroup: "secondary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <TableOfContentsCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

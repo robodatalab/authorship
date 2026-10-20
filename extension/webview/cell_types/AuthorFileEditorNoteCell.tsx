@@ -4,30 +4,27 @@ import {
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
     useAuthorFileEditorCellFindHighlights,
+    useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { markedText } from "../author_editor/AuthorFileEditorFind";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import {
-    invokeAuthorDocumentCommand,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
-    type WebviewCell,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { NOTE } from "../../library/storydoc/cells/note_cell";
+import { NOTE, type NoteCell } from "../../library/storydoc/cells/note_cell";
 import "./NotesCell.css";
 
-interface NotesCellProps {
-    cell: WebviewCell;
-    cellId: string;
+interface AuthorFileEditorNoteCellProps {
+    cell: NoteCell;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
-export function NotesCell({
+export function AuthorFileEditorNoteCell({
     cell,
-    cellId,
     sendMessagesToVscode,
-}: NotesCellProps) {
+}: AuthorFileEditorNoteCellProps) {
     const note = noteWithinComment(cell.source);
     // A note's prose is the comment it is written inside, so the matches are
     // placed against that and have to be brought back to where the note starts.
@@ -41,20 +38,21 @@ export function NotesCell({
         .filter(
             (highlight) => highlight.at >= 0 && highlight.end <= note.length,
         );
+    const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
 
     return (
         <AuthorFileEditorCell>
             <AuthorFileEditorCellHeader>Note</AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <MarkdownEditor
-                    cellId={cellId}
+                    cellId={cell.uniqueId}
                     highlights={findHighlights}
                     markdown={note}
-                    timesTheHostWroteIt={cell.timesTheHostWroteIt}
+                    timesTheHostWroteIt={timesTheHostWroteIt}
                     onMarkdownCommitted={(editedNote) =>
                         sayTheAuthorTypedInTheCell(
                             sendMessagesToVscode,
-                            cellId,
+                            cell.uniqueId,
                             `<!--\n${editedNote}\n-->`,
                         )
                     }
@@ -103,11 +101,4 @@ registerAuthorDocumentCellType({
     cellKind: NOTE,
     menuLabel: "Note",
     insertMenuGroup: "primary",
-    render: (cell, cellId, sendMessagesToVscode) => (
-        <NotesCell
-            cell={cell}
-            cellId={cellId}
-            sendMessagesToVscode={sendMessagesToVscode}
-        />
-    ),
 });

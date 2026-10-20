@@ -3,7 +3,7 @@ import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/au
 import { DIVIDER } from "../../library/storydoc/cells/divider_cell";
 import "./DividerCell.css";
 
-export function DividerCell() {
+export function AuthorFileEditorDividerCell() {
     return (
         <section className="divider-cell">
             <AuthorFileEditorCellActions />
@@ -18,5 +18,4 @@ registerAuthorDocumentCellType({
     cellKind: DIVIDER,
     menuLabel: "Divider",
     insertMenuGroup: "secondary",
-    render: () => <DividerCell />,
 });

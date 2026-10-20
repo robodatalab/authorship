@@ -1,13 +1,9 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { FOLDED } from "../../library/storydoc/parser";
-import type {
-    AuthorDocumentCommand,
-    CellAttributeCondition,
-} from "./author_document_command";
+import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class FoldAllCommand implements AuthorDocumentCommand {
     readonly buttonGroup = "all_cells";
-    readonly drawnWhenCellAttributeIs: CellAttributeCondition;
+    readonly drawnWhenTheCellIsFolded: boolean;
 
     constructor(
         readonly commandName: string,
@@ -15,10 +11,7 @@ export class FoldAllCommand implements AuthorDocumentCommand {
         readonly tooltip: string,
         private readonly folded: boolean,
     ) {
-        this.drawnWhenCellAttributeIs = {
-            attributeName: FOLDED,
-            attributeValue: folded ? "" : "true",
-        };
+        this.drawnWhenTheCellIsFolded = !folded;
     }
 
     invoke(session: AuthorFileEditorSession): void {

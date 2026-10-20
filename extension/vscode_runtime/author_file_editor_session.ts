@@ -380,11 +380,9 @@ export class AuthorFileEditorSession
         const changed = this.documentAsItStands.cells.filter(
             (cell, standing) => {
                 const before = asItStoodBefore.cells[standing];
-                return (
-                    cell.source !== before.source ||
-                    cell.kind !== before.kind ||
-                    cell.marker() !== before.marker()
-                );
+                const writtenBefore = asThePageDrawsIt(before);
+                const writtenNow = asThePageDrawsIt(cell);
+                return writtenNow !== writtenBefore;
             },
         );
         const thePageTypedIt = (cell: Cell): boolean =>
@@ -468,12 +466,9 @@ class TypingBurst implements AuthorDocChangeVisitor<boolean> {
     }
 }
 
-function asThePageDrawsIt(cell: Cell): {
-    kind: string;
-    source: string;
-    attrs: Readonly<Record<string, string>>;
-} {
-    return { kind: cell.kind, source: cell.source, attrs: cell.attrs };
+function asThePageDrawsIt(cell: Cell): string {
+    const written = Document.fromCells([cell]);
+    return written.text;
 }
 
 export function openAuthorFileEditorSession(
