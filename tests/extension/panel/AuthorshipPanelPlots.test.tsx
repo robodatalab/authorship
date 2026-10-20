@@ -44,6 +44,11 @@ const THE_DOOR_ON_BOTH_PASSAGES = `<!-- cell: plot id="p1" title="The door" node
 She finds the door.
 `;
 
+const THE_DOOR_LEADING_TO_THE_BELL = `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="e1:n1>n2" -->
+
+She finds the door.
+`;
+
 const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3" -->
 
 She finds the door.
@@ -87,6 +92,20 @@ describe("the plots tab", () => {
     async function click(element: Element): Promise<void> {
         await act(async () => {
             element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+    }
+
+    async function press(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true }),
+            );
+        });
+    }
+
+    async function letGo(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
         });
     }
 
@@ -255,4 +274,146 @@ describe("the plots tab", () => {
             },
         ]);
     });
+
+    it.each([
+        { droppedOn: "its row", target: ".authorship-panel-story-annotation-passage" },
+        { droppedOn: "its node", target: ".authorship-panel-plot-trajectory-node" },
+    ])(
+        "asks for the node dragged from to be connected to the node dropped on $droppedOn",
+        async ({ target }) => {
+            vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
+                "3f1c0e2a-0000-4000-8000-000000000001",
+            );
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "p1",
+                    passage: null,
+                },
+            });
+            const secondNode = document.querySelectorAll(
+                ".authorship-panel-plot-trajectory-node",
+            )[1];
+            const firstTarget = document.querySelectorAll(target)[0];
+
+            await press(secondNode);
+            await letGo(firstTarget);
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "replaceCell",
+                    commandArguments: {
+                        cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="3f1c0e2a-0000-4000-8000-000000000001:n2>n1" -->\n\nShe finds the door.\n',
+                    },
+                },
+            ]);
+        },
+    );
+
+    it("connects nothing when the drag ends on the node it started from", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+        });
+        const firstNode = document.querySelectorAll(
+            ".authorship-panel-plot-trajectory-node",
+        )[0];
+
+        await press(firstNode);
+        await letGo(firstNode);
+
+        expect(posted).toEqual([]);
+    });
+
+    it("connects nothing the trajectory already connects", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+        });
+        const firstNode = document.querySelectorAll(
+            ".authorship-panel-plot-trajectory-node",
+        )[0];
+        const secondRow = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        )[1];
+
+        await press(firstNode);
+        await letGo(secondRow);
+
+        expect(posted).toEqual([]);
+    });
+
+    it("connects nothing once a drag was let go outside the trajectory", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+        });
+        const firstNode = document.querySelectorAll(
+            ".authorship-panel-plot-trajectory-node",
+        )[0];
+        const secondRow = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        )[1];
+
+        await press(firstNode);
+        await letGo(document.body);
+        await letGo(secondRow);
+
+        expect(posted).toEqual([]);
+    });
+
+    it("asks for the nodes whose line is clicked to be disconnected", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+        });
+        const edge = document.querySelector(
+            ".authorship-panel-plot-trajectory-edge",
+        )!;
+
+        await click(edge);
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "replaceCell",
+                commandArguments: {
+                    cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" -->\n\nShe finds the door.\n',
+                },
+            },
+        ]);
+    });
+
+    it.each([
+        {
+            edge: "to a node written later",
+            edges: "e1:n1>n2",
+            arrowhead: "M 3.5 19.5 L 10.5 19.5 L 7 24.5 Z",
+        },
+        {
+            edge: "back to a node written earlier",
+            edges: "e1:n2>n1",
+            arrowhead: "M 3.5 24.5 L 10.5 24.5 L 7 19.5 Z",
+        },
+    ])(
+        "points the line of an edge $edge at the node it reaches",
+        async ({ edges, arrowhead }) => {
+            await mountPlots({
+                story: [
+                    THE_STORY,
+                    `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="${edges}" -->\n\nShe finds the door.\n`,
+                ].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "p1",
+                    passage: null,
+                },
+            });
+
+            const arrowheadDrawn = document
+                .querySelector(".authorship-panel-plot-trajectory-edge-arrowhead")
+                ?.getAttribute("d");
+            expect(arrowheadDrawn).toBe(arrowhead);
+        },
+    );
 });

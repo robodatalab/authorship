@@ -27,7 +27,11 @@ import type { ImageCell } from "../../../extension/library/storydoc/cells/image_
 import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
 import type { NoteCell } from "../../../extension/library/storydoc/cells/note_cell";
 import { PartCell } from "../../../extension/library/storydoc/cells/part_cell";
-import { PlotCell, PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
+import {
+    PlotCell,
+    PlotEdge,
+    PlotNode,
+} from "../../../extension/library/storydoc/cells/plot_cell";
 import type { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
 import { SalientConceptCell } from "../../../extension/library/storydoc/cells/salient_concept_cell";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
@@ -1316,7 +1320,10 @@ describe("the plots the story weaves", () => {
                             new PlotNode("n2", new StoryWordRange(0, 1)),
                             new PlotNode("n3", new StoryWordRange(3, 4)),
                         ],
-                        [],
+                        [
+                            new PlotEdge("e1", "n1", "n2"),
+                            new PlotEdge("e2", "n2", "n3"),
+                        ],
                         "The door opens to the bell.",
                         false,
                         null,
@@ -1329,11 +1336,27 @@ describe("the plots the story weaves", () => {
                             new PlotNode("n2", new StoryWordRange(2, 2)),
                             new PlotNode("n3", new StoryWordRange(3, 4)),
                         ],
-                        [],
+                        [
+                            new PlotEdge("e1", "n1", "n2"),
+                            new PlotEdge("e2", "n2", "n3"),
+                        ],
                         "The door opens, then he hears it.",
                         false,
                         null,
                         "p2",
+                    ),
+                    new PlotCell(
+                        "Told backwards",
+                        [
+                            new PlotNode("n1", new StoryWordRange(0, 1)),
+                            new PlotNode("n2", new StoryWordRange(2, 2)),
+                            new PlotNode("n3", new StoryWordRange(3, 4)),
+                        ],
+                        [new PlotEdge("e1", "n3", "n1")],
+                        "He heard it before the door opened.",
+                        false,
+                        null,
+                        "p3",
                     ),
                 ],
                 cellDrawings: {
@@ -1482,6 +1505,54 @@ describe("the plots the story weaves", () => {
                     [MARKED, "150", "9"],
                 ],
                 arrows: ["M 16 6.75 H 22 V 152.25 H 16"],
+            },
+            {
+                selected: "the passage of a plot that leads back to an earlier one",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p3", passage: 2 },
+                },
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-2",
+                        "0",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-2",
+                        "10",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-2",
+                        "150",
+                        "9",
+                    ],
+                ],
+                arrows: ["M 16 156.75 H 22 V 2.25 H 16"],
+            },
+            {
+                selected: "the passage of a plot that nothing connects",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p3", passage: 1 },
+                },
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-2",
+                        "0",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-2",
+                        "10",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-2",
+                        "150",
+                        "9",
+                    ],
+                ],
+                arrows: [],
             },
             {
                 selected: "a concept and a passage of a plot",

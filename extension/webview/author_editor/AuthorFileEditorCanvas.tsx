@@ -21,7 +21,6 @@ import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/fi
 import type { Cell } from "../../library/storydoc/cells/cell";
 import type { CellVisitor } from "../../library/storydoc/cells/cell_visitor";
 import { PART } from "../../library/storydoc/cells/part_cell";
-import { PLOT } from "../../library/storydoc/cells/plot_cell";
 import { StoryAnnotationsIterator } from "../../library/storydoc/iterators/story_annotations_iterator";
 import {
     StoryWordsIterator,
@@ -177,6 +176,7 @@ export function AuthorFileEditorCanvas({
                 );
                 return {
                     cellKind,
+                    annotationCellId: selected.annotationCellId,
                     highlightColor,
                     passages,
                     passageSelected: selected.passage,
@@ -224,28 +224,31 @@ export function AuthorFileEditorCanvas({
                 }),
             );
             const passageSelected = annotation.passageSelected;
-            if (
-                annotation.cellKind !== PLOT ||
-                passageSelected === null ||
-                annotation.passages[passageSelected] === undefined
-            ) {
+            const plotCell = storyDocument
+                .plots()
+                .find((plot) => plot.uniqueId === annotation.annotationCellId);
+            if (plotCell === undefined || passageSelected === null) {
                 continue;
             }
-            if (annotation.passages[passageSelected - 1] !== undefined) {
+            const nodeIds = plotCell.nodes.map((node) => node.nodeId);
+            const nodeSelected = nodeIds[passageSelected];
+            for (const edge of plotCell.edges) {
+                const fromPassage = nodeIds.indexOf(edge.fromNodeId);
+                const toPassage = nodeIds.indexOf(edge.toNodeId);
+                const touchesTheNodeSelected =
+                    edge.fromNodeId === nodeSelected ||
+                    edge.toNodeId === nodeSelected;
+                if (!touchesTheNodeSelected || fromPassage < 0 || toPassage < 0) {
+                    continue;
+                }
                 arrows.push({
-                    fromMark: firstMark + passageSelected - 1,
-                    toMark: firstMark + passageSelected,
-                });
-            }
-            if (annotation.passages[passageSelected + 1] !== undefined) {
-                arrows.push({
-                    fromMark: firstMark + passageSelected,
-                    toMark: firstMark + passageSelected + 1,
+                    fromMark: firstMark + fromPassage,
+                    toMark: firstMark + toPassage,
                 });
             }
         }
         return { marks, arrows };
-    }, [storyAnnotationsShown]);
+    }, [storyAnnotationsShown, storyDocument]);
 
     function selectThePassagesClicked(cellId: string, clickedAt: number): void {
         for (const annotation of storyAnnotationsShown) {
