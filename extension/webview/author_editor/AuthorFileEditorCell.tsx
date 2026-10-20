@@ -7,10 +7,7 @@ import {
 } from "./AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindHighlight } from "./AuthorFileEditorFind";
-import type {
-    AuthorFileEditorFindMatch,
-    AuthorFileEditorFindMatchInTheProse,
-} from "../../vscode_runtime/commands/find_in_the_document";
+import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
 import type {
     MarkdownEditorStoryTextHighlight,
     MarkdownEditorStoryTextShown,
@@ -264,7 +261,7 @@ export function useAuthorFileEditorCellStoryTextClicked(): (
     );
 }
 
-export function useAuthorFileEditorCellFind(): {
+function useAuthorFileEditorCellFind(): {
     matches: AuthorFileEditorFindMatch[];
     current: AuthorFileEditorFindMatch | null;
 } {
@@ -277,16 +274,11 @@ export function useAuthorFileEditorCellFind(): {
 /** Where the cell's prose is to be marked, as the markdown editor takes it. */
 export function useAuthorFileEditorCellFindHighlights(): AuthorFileEditorFindHighlight[] {
     const { matches, current } = useAuthorFileEditorCellFind();
-    return matches
-        .filter(
-            (match): match is AuthorFileEditorFindMatchInTheProse =>
-                match.attributeName === null,
-        )
-        .map((match) => ({
-            at: match.startCharacterOffsetInCell,
-            end: match.endCharacterOffsetInCell,
-            isCurrent: match === current,
-        }));
+    return matches.map((match) => ({
+        at: match.startCharacterOffsetInCell,
+        end: match.endCharacterOffsetInCell,
+        isCurrent: match === current,
+    }));
 }
 
 export function AuthorFileEditorCellWords() {

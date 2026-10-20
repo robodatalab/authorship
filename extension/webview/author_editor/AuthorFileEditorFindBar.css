@@ -137,15 +137,3 @@
     background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
     outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
 }
-
-/* A title is a box, and a box cannot hold a mark around part of what it says. */
-.author-file-editor-find-field {
-    background: var(
-        --vscode-editor-findMatchHighlightBackground,
-        rgba(234, 92, 0, 0.33)
-    );
-}
-
-.author-file-editor-find-field-current {
-    background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.6));
-}

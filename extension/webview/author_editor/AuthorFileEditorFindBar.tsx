@@ -177,9 +177,7 @@ export function useAuthorFileEditorFind(
         const drawn = requestAnimationFrame(() => {
             const scrolled = cellsOnThePage.current;
             const shown =
-                document.querySelector(
-                    ".author-file-editor-find-match-current, .author-file-editor-find-field-current",
-                ) ??
+                document.querySelector(".author-file-editor-find-match-current") ??
                 (cellStoodOn
                     ? scrolled?.querySelector(
                           `li[data-cell-id="${cellStoodOn}"]`,
@@ -214,7 +212,7 @@ export function useAuthorFileEditorFind(
 }
 
 function isShown(findMatch: AuthorFileEditorFindMatch): boolean {
-    return findMatch.attributeName !== null || findMatch.isVisible;
+    return findMatch.isVisible;
 }
 
 /** Ctrl+F, and Cmd+F on a Mac. */

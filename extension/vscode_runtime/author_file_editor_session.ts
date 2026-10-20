@@ -1,10 +1,7 @@
 import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./commands/check_prose";
-import type {
-    AuthorFileEditorFindMatch,
-    AuthorFileEditorFindMatchInTheProse,
-} from "./commands/find_in_the_document";
+import type { AuthorFileEditorFindMatch } from "./commands/find_in_the_document";
 import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
@@ -38,8 +35,6 @@ export class AuthorFileEditorSession
 {
     private readonly proseErrors: ProseCheckError[] = [];
     private readonly findMatches: AuthorFileEditorFindMatch[] = [];
-    private readonly findMatchesInTheProse: AuthorFileEditorFindMatchInTheProse[] =
-        [];
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
     private readonly wordCounter = new WordCounter();
     private readonly synchronizers: AuthorDocSynchronizer[];
@@ -77,12 +72,13 @@ export class AuthorFileEditorSession
         const proseErrorsSynchronizer = new CharacterRangeSynchronizer(
             this.proseErrors,
         );
-        const findMatchesInTheProseSynchronizer =
-            new CharacterRangeSynchronizer(this.findMatchesInTheProse);
+        const findMatchesSynchronizer = new CharacterRangeSynchronizer(
+            this.findMatches,
+        );
         const passagesSynchronizer = new PassagesSynchronizer();
         this.synchronizers = [
             proseErrorsSynchronizer,
-            findMatchesInTheProseSynchronizer,
+            findMatchesSynchronizer,
             this.wordCounter,
             passagesSynchronizer,
         ];
@@ -303,15 +299,6 @@ export class AuthorFileEditorSession
 
     showFindMatches(findMatches: AuthorFileEditorFindMatch[]): void {
         this.findMatches.splice(0, this.findMatches.length, ...findMatches);
-        const findMatchesInTheProse = findMatches.filter(
-            (findMatch): findMatch is AuthorFileEditorFindMatchInTheProse =>
-                findMatch.attributeName === null,
-        );
-        this.findMatchesInTheProse.splice(
-            0,
-            this.findMatchesInTheProse.length,
-            ...findMatchesInTheProse,
-        );
         this.sendFindMatches();
     }
 

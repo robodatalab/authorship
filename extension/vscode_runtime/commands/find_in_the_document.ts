@@ -4,16 +4,10 @@
 // about Ctrl+F reaches in here. So the widget is ours, and this is what it asks:
 // where the matches are, and what a cell says once one is replaced. Free of the
 // DOM, so it can be unit tested without a page.
-//
-// A cell holds two kinds of text and both are searched. The prose is the obvious
-// one. The other is the facts it records — a chapter's title is in the document
-// as much as the chapter is, and an author renaming a character must not have to
-// rename them twice.
 
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import type { Document } from "../storydoc/storydoc";
 import type { SynchronizedRepresentation } from "../storydoc/synchronizers/character_range_synchronizer";
-import { fieldsOfCellKind } from "../storydoc/cell_kinds";
-import type { ImmutableAuthorDocument } from "../storydoc/model";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export interface AuthorFileEditorFindQuery {
@@ -23,21 +17,8 @@ export interface AuthorFileEditorFindQuery {
     regex: boolean;
 }
 
-export interface AuthorFileEditorFindMatchInTheProse extends SynchronizedRepresentation {
-    attributeName: null;
-}
-
-export interface AuthorFileEditorFindMatchInAField {
-    cellId: string;
-    attributeName: string;
-    startCharacterOffsetInField: number;
-    endCharacterOffsetInField: number;
-    wordsInTheField: string;
-}
-
-/** One match: which cell, which of its texts, and where in it. */
-export type AuthorFileEditorFindMatch =
-    AuthorFileEditorFindMatchInTheProse | AuthorFileEditorFindMatchInAField;
+/** One match: which cell, and where in its text. */
+export interface AuthorFileEditorFindMatch extends SynchronizedRepresentation {}
 
 /**
  * What breaks a word, so that "whole word" here means what it means in the
@@ -81,34 +62,22 @@ export class ReplaceFindMatchesCommand implements AuthorDocumentCommand {
         session.changeTheDocument((story) => {
             // Backwards, so that writing over one match does not move the next.
             for (const findMatch of findMatchesFromTheLast) {
-                const cell = story.cellWithId(findMatch.cellId);
-                if (!cell) {
+                const cellIndex = story.cells.findIndex(
+                    (cell) => cell.uniqueId === findMatch.cellId,
+                );
+                if (cellIndex === -1) {
                     continue;
                 }
-                if (findMatch.attributeName === null) {
-                    const proseReplaced = replacedIn(
-                        cell.source,
-                        findMatch.startCharacterOffsetInCell,
-                        findMatch.endCharacterOffsetInCell,
-                        findMatch.wordsInTheCell,
-                        query,
-                        replacement,
-                    );
-                    cell.replaceMarkdown(proseReplaced);
-                } else {
-                    const fieldReplaced = replacedIn(
-                        cell.attrs[findMatch.attributeName] ?? "",
-                        findMatch.startCharacterOffsetInField,
-                        findMatch.endCharacterOffsetInField,
-                        findMatch.wordsInTheField,
-                        query,
-                        replacement,
-                    );
-                    cell.replaceAttribute(
-                        findMatch.attributeName,
-                        fieldReplaced,
-                    );
-                }
+                const cell = story.cells[cellIndex];
+                const proseReplaced = replacedIn(
+                    cell.source,
+                    findMatch.startCharacterOffsetInCell,
+                    findMatch.endCharacterOffsetInCell,
+                    findMatch.wordsInTheCell,
+                    query,
+                    replacement,
+                );
+                story.cells[cellIndex] = cell.withSource(proseReplaced);
             }
         });
     }
@@ -125,7 +94,7 @@ export function isUnderstood(query: AuthorFileEditorFindQuery): boolean {
 }
 
 function findMatchesIn(
-    document: ImmutableAuthorDocument,
+    document: Document,
     query: AuthorFileEditorFindQuery,
 ): AuthorFileEditorFindMatch[] {
     const pattern = patternOf(query);
@@ -134,27 +103,14 @@ function findMatchesIn(
     }
     const found: AuthorFileEditorFindMatch[] = [];
     for (const cell of document.cells) {
-        // The facts before the prose, which is the order the file itself is in:
-        // the marker line carries the attributes and the text follows under it.
-        for (const field of fieldsOfCellKind(cell.kind)) {
-            const fieldText = cell.attrs[field.attributeName] ?? "";
-            for (const span of spansIn(fieldText, pattern, query)) {
-                found.push({
-                    cellId: cell.uniqueId,
-                    attributeName: field.attributeName,
-                    startCharacterOffsetInField: span.at,
-                    endCharacterOffsetInField: span.end,
-                    wordsInTheField: fieldText.slice(span.at, span.end),
-                });
-            }
-        }
-        for (const span of spansIn(cell.source, pattern, query)) {
+        const spans = spansIn(cell.source, pattern, query);
+        for (const span of spans) {
+            const wordsInTheCell = cell.source.slice(span.at, span.end);
             found.push({
                 cellId: cell.uniqueId,
-                attributeName: null,
                 startCharacterOffsetInCell: span.at,
                 endCharacterOffsetInCell: span.end,
-                wordsInTheCell: cell.source.slice(span.at, span.end),
+                wordsInTheCell,
                 isVisible: true,
             });
         }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useAuthorFileEditorCellFind } from "./AuthorFileEditorCell";
 import "./AuthorFileEditorCellFields.css";
 
 export interface AuthorFileEditorCellField {
@@ -20,24 +19,6 @@ export function AuthorFileEditorCellFields({
     cellAttributes,
     onAttributeChanged,
 }: AuthorFileEditorCellFieldsProps) {
-    const { matches, current } = useAuthorFileEditorCellFind();
-
-    // A title is a box, and a box cannot hold a mark around part of what it
-    // says, so the whole of it is marked instead.
-    function inputClassName(attributeName: string): string {
-        return [
-            "author-file-editor-cell-field-input",
-            matches.some((match) => match.attributeName === attributeName)
-                ? "author-file-editor-find-field"
-                : "",
-            current?.attributeName === attributeName
-                ? "author-file-editor-find-field-current"
-                : "",
-        ]
-            .filter((className) => className !== "")
-            .join(" ");
-    }
-
     return (
         <div className="author-file-editor-cell-fields">
             {fields.map((field) => (
@@ -63,7 +44,7 @@ export function AuthorFileEditorCellFields({
                         />
                     ) : (
                         <AuthorFileEditorCellFieldBox
-                            className={inputClassName(field.attributeName)}
+                            className="author-file-editor-cell-field-input"
                             said={cellAttributes[field.attributeName] ?? ""}
                             placeholder={field.placeholder ?? ""}
                             onSaid={(said) =>
