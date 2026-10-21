@@ -42,18 +42,18 @@ describe("AddStoryAnnotationCommand — adds a story annotation and selects it",
             selected: {
                 "salient-concept": {
                     annotationCellId: "00000000-0000-4000-8000-000000000009",
-                    passage: null,
+                    passageId: null,
                 },
-                plot: { annotationCellId: null, passage: null },
+                plot: { annotationCellId: null, passageId: null },
             },
         },
         {
             cellKind: "plot",
             selected: {
-                "salient-concept": { annotationCellId: null, passage: null },
+                "salient-concept": { annotationCellId: null, passageId: null },
                 plot: {
                     annotationCellId: "00000000-0000-4000-8000-000000000009",
-                    passage: null,
+                    passageId: null,
                 },
             },
         },

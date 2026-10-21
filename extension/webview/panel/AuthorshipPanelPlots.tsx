@@ -22,11 +22,7 @@ import {
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
 } from "../../library/storydoc/iterators/story_annotations_iterator";
-import {
-    PLOT,
-    PlotCell,
-    PlotEdge,
-} from "../../library/storydoc/cells/plot_cell";
+import { PLOT, PlotCell } from "../../library/storydoc/cells/plot_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import type { Cell } from "../../library/storydoc/cells/cell";
@@ -115,7 +111,7 @@ export function AuthorshipPanelPlots({
                         key={plotShown.annotationCellId}
                         plot={plotShown}
                         plotCell={plotCellShown}
-                        nodeSelected={storyAnnotationSelected.passage}
+                        nodeIdSelected={storyAnnotationSelected.passageId}
                         storyTextSelected={storyTextSelected}
                         onRetitled={(title) =>
                             retitleThePlot(plotShown.annotationCellId, title)
@@ -130,7 +126,7 @@ export function AuthorshipPanelPlots({
 interface AuthorshipPanelPlotProps {
     plot: StoryAnnotationInTheStory;
     plotCell: PlotCell;
-    nodeSelected: number | null;
+    nodeIdSelected: string | null;
     storyTextSelected: StoryTextSpan | null;
     onRetitled: (title: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
@@ -139,7 +135,7 @@ interface AuthorshipPanelPlotProps {
 function AuthorshipPanelPlot({
     plot,
     plotCell,
-    nodeSelected,
+    nodeIdSelected,
     storyTextSelected,
     onRetitled,
     sendMessagesToVscode,
@@ -164,7 +160,7 @@ function AuthorshipPanelPlot({
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
-                            commandName: "assignStoryText",
+                            commandName: "assignStoryTextToPlot",
                             commandArguments: {
                                 annotationCellId: plot.annotationCellId,
                                 ...storyTextSelected,
@@ -183,7 +179,7 @@ function AuthorshipPanelPlot({
                 <AuthorshipPanelPlotTrajectory
                     plotCell={plotCell}
                     passages={plot.passages}
-                    nodeSelected={nodeSelected}
+                    nodeIdSelected={nodeIdSelected}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             )}
@@ -194,14 +190,14 @@ function AuthorshipPanelPlot({
 interface AuthorshipPanelPlotTrajectoryProps {
     plotCell: PlotCell;
     passages: readonly StoryWordRangeInTheStory[];
-    nodeSelected: number | null;
+    nodeIdSelected: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorshipPanelPlotTrajectory({
     plotCell,
     passages,
-    nodeSelected,
+    nodeIdSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotTrajectoryProps) {
     const lanesDrawn = useRef<SVGSVGElement>(null);
@@ -242,43 +238,26 @@ function AuthorshipPanelPlotTrajectory({
         if (rowConnectedFrom === null || rowConnectedFrom === row) {
             return;
         }
-        const fromNodeId = nodeIds[rowConnectedFrom];
-        const toNodeId = nodeIds[row];
-        const alreadyConnected = plotCell.edges.some(
-            (edge) =>
-                edge.fromNodeId === fromNodeId && edge.toNodeId === toNodeId,
-        );
-        if (alreadyConnected) {
-            return;
-        }
-        const edgeId = crypto.randomUUID();
-        const edgeAdded = new PlotEdge(edgeId, fromNodeId, toNodeId);
-        const connected = new PlotCell(
-            plotCell.title,
-            plotCell.nodes,
-            [...plotCell.edges, edgeAdded],
-            plotCell.source,
-            plotCell.folded,
-            plotCell.at,
-            plotCell.uniqueId,
-        );
-        replaceTheCell(sendMessagesToVscode, connected);
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "addEdgeToPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                fromNodeId: nodeIds[rowConnectedFrom],
+                toNodeId: nodeIds[row],
+            },
+        });
     }
 
     function disconnect(edgeId: string): void {
-        const edgesKept = plotCell.edges.filter(
-            (edge) => edge.edgeId !== edgeId,
-        );
-        const disconnected = new PlotCell(
-            plotCell.title,
-            plotCell.nodes,
-            edgesKept,
-            plotCell.source,
-            plotCell.folded,
-            plotCell.at,
-            plotCell.uniqueId,
-        );
-        replaceTheCell(sendMessagesToVscode, disconnected);
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "removeEdgeFromPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                edgeId,
+            },
+        });
     }
 
     function followThePointer(event: ReactMouseEvent): void {
@@ -303,9 +282,9 @@ function AuthorshipPanelPlotTrajectory({
             >
                 {passages.map((storyWordRange, node) => (
                     <li
-                        key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                        key={storyWordRange.passageId}
                         className={
-                            node === nodeSelected
+                            storyWordRange.passageId === nodeIdSelected
                                 ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
                                 : "authorship-panel-story-annotation-passage"
                         }
@@ -316,12 +295,14 @@ function AuthorshipPanelPlotTrajectory({
                             type="button"
                             className="authorship-panel-story-annotation-passage-shown"
                             title={storyWordRange.wordsItCovers}
-                            aria-pressed={node === nodeSelected}
+                            aria-pressed={
+                                storyWordRange.passageId === nodeIdSelected
+                            }
                             onClick={() => {
                                 sendMessagesToVscode({
                                     type: "selectPassage",
                                     cellKind: PLOT,
-                                    passage: node,
+                                    passageId: storyWordRange.passageId,
                                 });
                                 sendMessagesToVscode({
                                     type: "showStoryWordRange",
@@ -340,11 +321,10 @@ function AuthorshipPanelPlotTrajectory({
                             onClick={() =>
                                 sendMessagesToVscode({
                                     type: "invoke",
-                                    commandName: "removeStoryWordRange",
+                                    commandName: "removeNodeFromPlot",
                                     commandArguments: {
                                         annotationCellId: plotCell.uniqueId,
-                                        firstWord: storyWordRange.firstWord,
-                                        lastWord: storyWordRange.lastWord,
+                                        nodeId: storyWordRange.passageId,
                                     },
                                 })
                             }
@@ -394,7 +374,7 @@ function AuthorshipPanelPlotTrajectory({
                         <circle
                             key={nodeIds[node]}
                             className={
-                                node === nodeSelected
+                                nodeIds[node] === nodeIdSelected
                                     ? `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-node-selected authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
                                     : `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
                             }

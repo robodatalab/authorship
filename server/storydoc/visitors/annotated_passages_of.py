@@ -29,7 +29,10 @@ class AnnotatedPassages:
 
 class AnnotatedPassagesOf(CellVisitor["AnnotatedPassages | None"]):
     def visit_salient_concept(self, cell: SalientConceptCell) -> AnnotatedPassages:
-        return AnnotatedPassages(cell.title, cell.story_word_ranges)
+        story_word_ranges = [
+            reference.story_word_range for reference in cell.references
+        ]
+        return AnnotatedPassages(cell.title, story_word_ranges)
 
     def visit_plot(self, cell: PlotCell) -> AnnotatedPassages:
         story_word_ranges = [node.story_word_range for node in cell.nodes]

@@ -94,7 +94,7 @@ export function AuthorshipPanelSalientConcepts({
                     <AuthorshipPanelSalientConcept
                         key={salientConceptShown.annotationCellId}
                         salientConcept={salientConceptShown}
-                        referenceSelected={storyAnnotationSelected.passage}
+                        referenceIdSelected={storyAnnotationSelected.passageId}
                         storyTextSelected={storyTextSelected}
                         onRetitled={(title) =>
                             retitleTheSalientConcept(
@@ -111,7 +111,7 @@ export function AuthorshipPanelSalientConcepts({
 
 interface AuthorshipPanelSalientConceptProps {
     salientConcept: StoryAnnotationInTheStory;
-    referenceSelected: number | null;
+    referenceIdSelected: string | null;
     storyTextSelected: StoryTextSpan | null;
     onRetitled: (title: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
@@ -119,15 +119,12 @@ interface AuthorshipPanelSalientConceptProps {
 
 function AuthorshipPanelSalientConcept({
     salientConcept,
-    referenceSelected,
+    referenceIdSelected,
     storyTextSelected,
     onRetitled,
     sendMessagesToVscode,
 }: AuthorshipPanelSalientConceptProps) {
-    const referencesInTheStory = salientConcept.passages.map(
-        (storyWordRange, reference) => ({ storyWordRange, reference }),
-    );
-    const referencesNewestFirst = referencesInTheStory.reverse();
+    const referencesNewestFirst = [...salientConcept.passages].reverse();
 
     return (
         <section className="authorship-panel-story-annotation-details">
@@ -149,7 +146,7 @@ function AuthorshipPanelSalientConcept({
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
-                            commandName: "assignStoryText",
+                            commandName: "assignStoryTextToSalientConcept",
                             commandArguments: {
                                 annotationCellId:
                                     salientConcept.annotationCellId,
@@ -168,11 +165,12 @@ function AuthorshipPanelSalientConcept({
             ) : (
                 <ul className="authorship-panel-story-annotation-passages">
                     {referencesNewestFirst.map(
-                        ({ storyWordRange, reference }) => (
+                        (storyWordRange) => (
                             <li
-                                key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                                key={storyWordRange.passageId}
                                 className={
-                                    reference === referenceSelected
+                                    storyWordRange.passageId ===
+                                    referenceIdSelected
                                         ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
                                         : "authorship-panel-story-annotation-passage"
                                 }
@@ -181,12 +179,16 @@ function AuthorshipPanelSalientConcept({
                                     type="button"
                                     className="authorship-panel-story-annotation-passage-shown"
                                     title={storyWordRange.wordsItCovers}
-                                    aria-pressed={reference === referenceSelected}
+                                    aria-pressed={
+                                        storyWordRange.passageId ===
+                                        referenceIdSelected
+                                    }
                                     onClick={() => {
                                         sendMessagesToVscode({
                                             type: "selectPassage",
                                             cellKind: SALIENT_CONCEPT,
-                                            passage: reference,
+                                            passageId:
+                                                storyWordRange.passageId,
                                         });
                                         sendMessagesToVscode({
                                             type: "showStoryWordRange",
@@ -205,13 +207,12 @@ function AuthorshipPanelSalientConcept({
                                     onClick={() =>
                                         sendMessagesToVscode({
                                             type: "invoke",
-                                            commandName: "removeStoryWordRange",
+                                            commandName: "removeReferenceFromSalientConcept",
                                             commandArguments: {
                                                 annotationCellId:
                                                     salientConcept.annotationCellId,
-                                                firstWord:
-                                                    storyWordRange.firstWord,
-                                                lastWord: storyWordRange.lastWord,
+                                                referenceId:
+                                                    storyWordRange.passageId,
                                             },
                                         })
                                     }

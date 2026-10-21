@@ -4,12 +4,19 @@ import type { StoryWordRange } from "./story_word_range";
 
 export const SALIENT_CONCEPT = "salient-concept";
 
+export class SalientConceptReference {
+    constructor(
+        readonly referenceId: string,
+        readonly storyWordRange: StoryWordRange,
+    ) {}
+}
+
 export class SalientConceptCell extends Cell {
     readonly kind = SALIENT_CONCEPT;
 
     constructor(
         readonly title: string = "",
-        readonly storyWordRanges: readonly StoryWordRange[] = [],
+        readonly references: readonly SalientConceptReference[] = [],
         source: string = "",
         folded: boolean = false,
         at: readonly [number, number] | null = null,
@@ -21,7 +28,7 @@ export class SalientConceptCell extends Cell {
     withSource(source: string): SalientConceptCell {
         return new SalientConceptCell(
             this.title,
-            this.storyWordRanges,
+            this.references,
             source,
             this.folded,
             this.at,
@@ -32,7 +39,7 @@ export class SalientConceptCell extends Cell {
     withFolded(folded: boolean): SalientConceptCell {
         return new SalientConceptCell(
             this.title,
-            this.storyWordRanges,
+            this.references,
             this.source,
             folded,
             this.at,

@@ -79,7 +79,7 @@ describe("the plots tab", () => {
                     storyAnnotationSelected={
                         options.storyAnnotationSelected ?? {
                             annotationCellId: null,
-                            passage: null,
+                            passageId: null,
                         }
                     }
                     storyTextSelected={options.storyTextSelected ?? null}
@@ -118,7 +118,7 @@ describe("the plots tab", () => {
     it("shows the selected plot's title, description and trajectory below the list", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
 
         const titleShown = document.querySelector<HTMLInputElement>(
@@ -138,7 +138,7 @@ describe("the plots tab", () => {
     it("asks for the plot's title to be replaced as the author types it", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
         const titleBox = document.querySelector<HTMLInputElement>(
             ".author-file-editor-cell-field-input",
@@ -167,7 +167,7 @@ describe("the plots tab", () => {
     it("lists the trajectory in the order it is written", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
 
         const nodesShown = [
@@ -178,10 +178,24 @@ describe("the plots tab", () => {
         expect(nodesShown).toEqual(["the door.", "the bell."]);
     });
 
+    it("keeps two nodes holding the same words apart", async () => {
+        const reactSaid = vi.spyOn(console, "error");
+
+        await mountPlots({
+            story: [
+                THE_STORY,
+                '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:2-3" -->\n\nShe finds the door.\n',
+            ].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+
+        expect(reactSaid).not.toHaveBeenCalled();
+    });
+
     it("asks the host to select the second node of the trajectory, and to show its words", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
         const secondNode = document.querySelectorAll(
             ".authorship-panel-story-annotation-passage-shown",
@@ -190,7 +204,7 @@ describe("the plots tab", () => {
         await click(secondNode);
 
         expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "plot", passage: 1 },
+            { type: "selectPassage", cellKind: "plot", passageId: "n2" },
             { type: "showStoryWordRange", firstWord: 6, lastWord: 7 },
         ]);
     });
@@ -198,7 +212,7 @@ describe("the plots tab", () => {
     it("marks the node selected", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: 0 },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: "n1" },
         });
 
         const nodesMarked = [
@@ -209,25 +223,58 @@ describe("the plots tab", () => {
         expect(nodesMarked).toEqual(["true", "false"]);
     });
 
-    it("asks for a node's words to be taken out of the trajectory", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
-        });
-        const removeButton = document.querySelector(
-            ".authorship-panel-story-annotation-passage-removed",
-        )!;
+    it.each([
+        {
+            trajectory: "once a node above it is taken out",
+            nodes: "n2:6-7",
+            nodesMarked: ["true"],
+        },
+        {
+            trajectory: "once the node selected is taken out",
+            nodes: "n1:2-3",
+            nodesMarked: ["false"],
+        },
+    ])(
+        "marks the node selected, and only that node, $trajectory",
+        async ({ nodes, nodesMarked }) => {
+            await mountPlots({
+                story: [
+                    THE_STORY,
+                    `<!-- cell: plot id="p1" title="The door" nodes="${nodes}" -->\n\nShe finds the door.\n`,
+                ].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "p1",
+                    passageId: "n2",
+                },
+            });
 
-        await click(removeButton);
+            const nodesShownMarked = [
+                ...document.querySelectorAll(
+                    ".authorship-panel-story-annotation-passage-shown",
+                ),
+            ].map((node) => node.getAttribute("aria-pressed"));
+            expect(nodesShownMarked).toEqual(nodesMarked);
+        },
+    );
+
+    it("asks for a node to be taken out of the trajectory", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const secondRemoveButton = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage-removed",
+        )[1];
+
+        await click(secondRemoveButton);
 
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "removeStoryWordRange",
+                commandName: "removeNodeFromPlot",
                 commandArguments: {
                     annotationCellId: "p1",
-                    firstWord: 2,
-                    lastWord: 3,
+                    nodeId: "n2",
                 },
             },
         ]);
@@ -236,7 +283,7 @@ describe("the plots tab", () => {
     it("cannot add anything to the trajectory until words are selected", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
 
         const assignButton = document.querySelector<HTMLButtonElement>(
@@ -248,7 +295,7 @@ describe("the plots tab", () => {
     it("asks for the selected words to be added to the selected plot", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
             storyTextSelected: {
                 cellId: "m1",
                 startCharacterOffsetInCell: 4,
@@ -264,7 +311,7 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "assignStoryText",
+                commandName: "assignStoryTextToPlot",
                 commandArguments: {
                     annotationCellId: "p1",
                     cellId: "m1",
@@ -281,14 +328,11 @@ describe("the plots tab", () => {
     ])(
         "asks for the node dragged from to be connected to the node dropped on $droppedOn",
         async ({ target }) => {
-            vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
-                "3f1c0e2a-0000-4000-8000-000000000001",
-            );
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
                 storyAnnotationSelected: {
                     annotationCellId: "p1",
-                    passage: null,
+                    passageId: null,
                 },
             });
             const secondNode = document.querySelectorAll(
@@ -302,9 +346,11 @@ describe("the plots tab", () => {
             expect(posted).toEqual([
                 {
                     type: "invoke",
-                    commandName: "replaceCell",
+                    commandName: "addEdgeToPlot",
                     commandArguments: {
-                        cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="3f1c0e2a-0000-4000-8000-000000000001:n2>n1" -->\n\nShe finds the door.\n',
+                        annotationCellId: "p1",
+                        fromNodeId: "n2",
+                        toNodeId: "n1",
                     },
                 },
             ]);
@@ -314,7 +360,7 @@ describe("the plots tab", () => {
     it("connects nothing when the drag ends on the node it started from", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
         const firstNode = document.querySelectorAll(
             ".authorship-panel-plot-trajectory-node",
@@ -326,28 +372,10 @@ describe("the plots tab", () => {
         expect(posted).toEqual([]);
     });
 
-    it("connects nothing the trajectory already connects", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
-        });
-        const firstNode = document.querySelectorAll(
-            ".authorship-panel-plot-trajectory-node",
-        )[0];
-        const secondRow = document.querySelectorAll(
-            ".authorship-panel-story-annotation-passage",
-        )[1];
-
-        await press(firstNode);
-        await letGo(secondRow);
-
-        expect(posted).toEqual([]);
-    });
-
     it("connects nothing once a drag was let go outside the trajectory", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
         const firstNode = document.querySelectorAll(
             ".authorship-panel-plot-trajectory-node",
@@ -366,7 +394,7 @@ describe("the plots tab", () => {
     it("asks for the nodes whose line is clicked to be disconnected", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
         const edge = document.querySelector(
             ".authorship-panel-plot-trajectory-edge",
@@ -377,9 +405,10 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "replaceCell",
+                commandName: "removeEdgeFromPlot",
                 commandArguments: {
-                    cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" -->\n\nShe finds the door.\n',
+                    annotationCellId: "p1",
+                    edgeId: "e1",
                 },
             },
         ]);
@@ -406,7 +435,7 @@ describe("the plots tab", () => {
                 ].join("\n"),
                 storyAnnotationSelected: {
                     annotationCellId: "p1",
-                    passage: null,
+                    passageId: null,
                 },
             });
 

@@ -123,19 +123,19 @@ export class AuthorFileEditorSession
     ): void {
         this.storyAnnotationsSelected.set(cellKind, {
             annotationCellId,
-            passage: null,
+            passageId: null,
         });
         this.sendStoryAnnotationsSelected();
         this.documentOrSelectionChanged.fire();
     }
 
-    selectThePassage(cellKind: string, passage: number | null): void {
+    selectThePassage(cellKind: string, passageId: string | null): void {
         const annotationSelected =
             this.storyAnnotationsSelected.get(cellKind) ??
             NO_STORY_ANNOTATION_SELECTED;
         this.storyAnnotationsSelected.set(cellKind, {
             annotationCellId: annotationSelected.annotationCellId,
-            passage,
+            passageId,
         });
         this.sendStoryAnnotationsSelected();
         this.documentOrSelectionChanged.fire();

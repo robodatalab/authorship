@@ -1,10 +1,13 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
+import {
+    SalientConceptCell,
+    SalientConceptReference,
+} from "../../library/storydoc/cells/salient_concept_cell";
 import { StoryWordsIterator } from "../../library/storydoc/iterators/story_words_iterator";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
-export class AssignStoryTextCommand implements AuthorDocumentCommand {
-    readonly commandName = "assignStoryText";
+export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCommand {
+    readonly commandName = "assignStoryTextToSalientConcept";
     readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
@@ -32,21 +35,25 @@ export class AssignStoryTextCommand implements AuthorDocumentCommand {
                 return;
             }
             if (
-                annotation.storyWordRanges.some(
-                    (range) =>
-                        range.firstWord === wordsAssigned.firstWord &&
-                        range.lastWord === wordsAssigned.lastWord,
+                annotation.references.some(
+                    (reference) =>
+                        reference.storyWordRange.firstWord ===
+                            wordsAssigned.firstWord &&
+                        reference.storyWordRange.lastWord ===
+                            wordsAssigned.lastWord,
                 )
             ) {
                 return;
             }
-            const storyWordRanges = [
-                ...annotation.storyWordRanges,
+            const referenceId = crypto.randomUUID();
+            const referenceAdded = new SalientConceptReference(
+                referenceId,
                 wordsAssigned,
-            ];
+            );
+            const references = [...annotation.references, referenceAdded];
             story.cells[annotationIndex] = new SalientConceptCell(
                 annotation.title,
-                storyWordRanges,
+                references,
                 annotation.source,
                 annotation.folded,
                 annotation.at,

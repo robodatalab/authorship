@@ -174,12 +174,21 @@ export function AuthorFileEditorCanvas({
                 const passages = passagesOfTheAnnotation.map(
                     (storyWordRange) => storyWords.spans(storyWordRange),
                 );
+                const passageIds = passagesOfTheAnnotation.map(
+                    (storyWordRange) => storyWordRange.passageId,
+                );
+                const passageSelected = passagesOfTheAnnotation.findIndex(
+                    (storyWordRange) =>
+                        storyWordRange.passageId === selected.passageId,
+                );
                 return {
                     cellKind,
                     annotationCellId: selected.annotationCellId,
                     highlightColor,
                     passages,
-                    passageSelected: selected.passage,
+                    passageIds,
+                    passageSelected:
+                        passageSelected === -1 ? null : passageSelected,
                 };
             }),
         [storyDocument, storyWords, storyAnnotationsSelected],
@@ -264,7 +273,7 @@ export function AuthorFileEditorCanvas({
                 sendMessagesToVscode({
                     type: "selectPassage",
                     cellKind: annotation.cellKind,
-                    passage: passageClicked,
+                    passageId: annotation.passageIds[passageClicked],
                 });
             }
         }

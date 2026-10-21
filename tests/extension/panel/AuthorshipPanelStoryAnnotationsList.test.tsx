@@ -170,8 +170,8 @@ describe("the list of a kind of story annotation", () => {
         await mountStoryAnnotationsList({
             storyAnnotations: [
                 new StoryAnnotationInTheStory("p1", "The door", "", [
-                    new StoryWordRangeInTheStory(2, 3, "c2", "the door."),
-                    new StoryWordRangeInTheStory(6, 7, "c3", "the bell."),
+                    new StoryWordRangeInTheStory("n1", 2, 3, "c2", "the door."),
+                    new StoryWordRangeInTheStory("n2", 6, 7, "c3", "the bell."),
                 ]),
                 new StoryAnnotationInTheStory("p2", "The bell", "", []),
             ],

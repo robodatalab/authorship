@@ -6,8 +6,10 @@ import type { ImageCell } from "../cells/image_cell";
 import type { PartCell } from "../cells/part_cell";
 import type { PlotCell, PlotEdge, PlotNode } from "../cells/plot_cell";
 import type { RecapCell } from "../cells/recap_cell";
-import type { SalientConceptCell } from "../cells/salient_concept_cell";
-import type { StoryWordRange } from "../cells/story_word_range";
+import type {
+    SalientConceptCell,
+    SalientConceptReference,
+} from "../cells/salient_concept_cell";
 import type { TitlePageCell } from "../cells/title_page_cell";
 import type { UnknownCell } from "../cells/unknown_cell";
 
@@ -36,7 +38,7 @@ export const SUBSTACK = "substack";
 export const PORTRAIT = "portrait";
 export const DOCUMENTS = "documents";
 
-export const STORY_WORD_RANGES = "words";
+export const SALIENT_CONCEPT_REFERENCES = "words";
 
 export const PLOT_NODES = "nodes";
 export const PLOT_EDGES = "edges";
@@ -48,11 +50,14 @@ function withoutTheOnesNothingIsSaidAbout(
     return Object.fromEntries(said);
 }
 
-function writtenStoryWordRanges(
-    storyWordRanges: readonly StoryWordRange[],
+function writtenSalientConceptReferences(
+    references: readonly SalientConceptReference[],
 ): string {
-    return storyWordRanges
-        .map((range) => `${range.firstWord}-${range.lastWord}`)
+    return references
+        .map(
+            (reference) =>
+                `${reference.referenceId}:${reference.storyWordRange.firstWord}-${reference.storyWordRange.lastWord}`,
+        )
         .join(", ");
 }
 
@@ -141,10 +146,10 @@ export class MarkerAttributes implements CellVisitor<Record<string, string>> {
     }
 
     visitSalientConcept(cell: SalientConceptCell): Record<string, string> {
-        const storyWordRanges = writtenStoryWordRanges(cell.storyWordRanges);
+        const references = writtenSalientConceptReferences(cell.references);
         return withoutTheOnesNothingIsSaidAbout({
             [TITLE]: cell.title,
-            [STORY_WORD_RANGES]: storyWordRanges,
+            [SALIENT_CONCEPT_REFERENCES]: references,
         });
     }
 

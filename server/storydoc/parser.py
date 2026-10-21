@@ -18,6 +18,7 @@ from server.storydoc.cells.recap_cell import RECAP, RecapCell
 from server.storydoc.cells.salient_concept_cell import (
     SALIENT_CONCEPT,
     SalientConceptCell,
+    SalientConceptReference,
 )
 from server.storydoc.cells.table_of_contents_cell import (
     TABLE_OF_CONTENTS,
@@ -40,8 +41,8 @@ from server.storydoc.visitors.marker_attributes import (
     PLOT_NODES,
     PORTRAIT,
     PUBLISHER,
+    SALIENT_CONCEPT_REFERENCES,
     SRC,
-    STORY_WORD_RANGES,
     SUBSTACK,
     SUBTITLE,
     TITLE,
@@ -57,7 +58,7 @@ _TRUE = "true"
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
 _ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
 
-_STORY_WORD_RANGE = re.compile(r"^\s*(\d+)-(\d+)\s*$")
+_SALIENT_CONCEPT_REFERENCE = re.compile(r"^\s*(?:([^:\s]+):)?(\d+)-(\d+)\s*$")
 
 _PLOT_NODE = re.compile(r"^\s*([^:\s]+):(\d+)-(\d+)\s*$")
 _PLOT_EDGE = re.compile(r"^\s*([^:\s]+):([^>\s]+)>(\S+)\s*$")
@@ -117,17 +118,19 @@ def _unescape(value: str) -> str:
     return re.sub(r"\\(.)", r"\1", value)
 
 
-def _story_word_ranges_in(written: str) -> list[StoryWordRange]:
-    story_word_ranges: list[StoryWordRange] = []
-    for written_range in written.split(","):
-        read_range = _STORY_WORD_RANGE.match(written_range)
-        if read_range is None:
+def _salient_concept_references_in(written: str) -> list[SalientConceptReference]:
+    references: list[SalientConceptReference] = []
+    for written_reference in written.split(","):
+        read_reference = _SALIENT_CONCEPT_REFERENCE.match(written_reference)
+        if read_reference is None:
             continue
-        first_word = int(read_range.group(1))
-        last_word = int(read_range.group(2))
+        reference_id = read_reference.group(1) or str(uuid4())
+        first_word = int(read_reference.group(2))
+        last_word = int(read_reference.group(3))
         story_word_range = StoryWordRange(first_word, last_word)
-        story_word_ranges.append(story_word_range)
-    return story_word_ranges
+        reference = SalientConceptReference(reference_id, story_word_range)
+        references.append(reference)
+    return references
 
 
 def _plot_nodes_in(written: str) -> list[PlotNode]:
@@ -218,9 +221,11 @@ def _cell_from_marker(
     if kind == RECAP:
         return RecapCell(attrs.get(DOCUMENTS, ""), source, folded, at, unique_id)
     if kind == SALIENT_CONCEPT:
-        story_word_ranges = _story_word_ranges_in(attrs.get(STORY_WORD_RANGES, ""))
+        references = _salient_concept_references_in(
+            attrs.get(SALIENT_CONCEPT_REFERENCES, "")
+        )
         return SalientConceptCell(
-            attrs.get(TITLE, ""), story_word_ranges, source, folded, at, unique_id
+            attrs.get(TITLE, ""), references, source, folded, at, unique_id
         )
     if kind == PLOT:
         nodes = _plot_nodes_in(attrs.get(PLOT_NODES, ""))

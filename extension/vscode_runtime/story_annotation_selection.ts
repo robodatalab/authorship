@@ -5,10 +5,10 @@ export const STORY_ANNOTATION_KINDS = [SALIENT_CONCEPT, PLOT];
 
 export interface StoryAnnotationSelected {
     annotationCellId: string | null;
-    passage: number | null;
+    passageId: string | null;
 }
 
 export const NO_STORY_ANNOTATION_SELECTED: StoryAnnotationSelected = {
     annotationCellId: null,
-    passage: null,
+    passageId: null,
 };

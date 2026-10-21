@@ -40,11 +40,11 @@ export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
 export class TheAuthorSelectedThePassage implements AuthorFileEditorMessage {
     constructor(
         private readonly cellKind: string,
-        private readonly passage: number | null,
+        private readonly passageId: string | null,
     ) {}
 
     invoke(session: AuthorFileEditorSession): void {
-        session.selectThePassage(this.cellKind, this.passage);
+        session.selectThePassage(this.cellKind, this.passageId);
     }
 }
 

@@ -2,8 +2,8 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
-export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
-    readonly commandName = "removeStoryWordRange";
+export class RemoveReferenceFromSalientConceptCommand implements AuthorDocumentCommand {
+    readonly commandName = "removeReferenceFromSalientConcept";
     readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
@@ -13,6 +13,7 @@ export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
         commandArguments: Record<string, unknown>,
     ): void {
         const annotationCellId = commandArguments.annotationCellId as string;
+        const referenceId = commandArguments.referenceId as string;
         session.changeTheDocument((story) => {
             const annotationIndex = story.cells.findIndex(
                 (cell) => cell.uniqueId === annotationCellId,
@@ -21,14 +22,12 @@ export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
             if (!(annotation instanceof SalientConceptCell)) {
                 return;
             }
-            const rangesKept = annotation.storyWordRanges.filter(
-                (range) =>
-                    range.firstWord !== commandArguments.firstWord ||
-                    range.lastWord !== commandArguments.lastWord,
+            const referencesKept = annotation.references.filter(
+                (reference) => reference.referenceId !== referenceId,
             );
             story.cells[annotationIndex] = new SalientConceptCell(
                 annotation.title,
-                rangesKept,
+                referencesKept,
                 annotation.source,
                 annotation.folded,
                 annotation.at,

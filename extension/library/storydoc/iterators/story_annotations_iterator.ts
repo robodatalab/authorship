@@ -5,6 +5,7 @@ import { StoryWordsIterator } from "./story_words_iterator";
 
 export class StoryWordRangeInTheStory extends StoryWordRange {
     constructor(
+        readonly passageId: string,
         firstWord: number,
         lastWord: number,
         readonly cellId: string,
@@ -41,12 +42,14 @@ export class StoryAnnotationsIterator implements Iterable<StoryAnnotationInTheSt
             if (annotated === null) {
                 continue;
             }
-            const passages = annotated.storyWordRanges.map((range) => {
+            const passages = annotated.passages.map((passage) => {
+                const range = passage.storyWordRange;
                 const wordsCovered = storyWords
                     .slice(range.firstWord, range.lastWord + 1)
                     .map((word) => word.text);
                 const cellId = storyWords[range.firstWord]?.cellId ?? "";
                 return new StoryWordRangeInTheStory(
+                    passage.passageId,
                     range.firstWord,
                     range.lastWord,
                     cellId,

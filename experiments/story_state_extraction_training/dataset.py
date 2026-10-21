@@ -39,8 +39,9 @@ def distinct_ranges(word_ranges: list[StoryWordRange]) -> list[StoryWordRange]:
 
 def concept_covers(concept: SalientConceptCell, span: StoryWordRange) -> bool:
     return any(
-        concept_range.first_word <= span.first_word and span.last_word <= concept_range.last_word
-        for concept_range in concept.story_word_ranges
+        reference.story_word_range.first_word <= span.first_word
+        and span.last_word <= reference.story_word_range.last_word
+        for reference in concept.references
     )
 
 
@@ -49,11 +50,14 @@ def salient_concept_texts(
         concept: SalientConceptCell,
         concepts_of_the_story: list[SalientConceptCell]
         ) -> SalientConceptTexts:
-    own_ranges = distinct_ranges(concept.story_word_ranges)
+    concept_ranges = [reference.story_word_range for reference in concept.references]
+    own_ranges = distinct_ranges(concept_ranges)
     story_words = StoryWordsIterator(document)
     examples = [story_words.text(r) for r in own_ranges]
     ranges_of_the_story = [
-        word_range for other in concepts_of_the_story for word_range in other.story_word_ranges
+        reference.story_word_range
+        for other in concepts_of_the_story
+        for reference in other.references
     ]
     distinct_ranges_of_the_story = distinct_ranges(ranges_of_the_story)
     unrelated_texts = [

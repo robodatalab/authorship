@@ -1,7 +1,9 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
-import { AssignStoryTextCommand } from "./assign_story_text";
+import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
+import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
 import { DeleteStoryAnnotationCommand } from "./delete_story_annotation";
@@ -21,7 +23,9 @@ import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
-import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
+import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
+import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
+import { RemoveReferenceFromSalientConceptCommand } from "./remove_reference_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
@@ -63,8 +67,12 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceFindMatchesCommand(),
     new AddStoryAnnotationCommand(),
     new DeleteStoryAnnotationCommand(),
-    new AssignStoryTextCommand(),
-    new RemoveStoryWordRangeCommand(),
+    new AssignStoryTextToSalientConceptCommand(),
+    new AssignStoryTextToPlotCommand(),
+    new RemoveReferenceFromSalientConceptCommand(),
+    new RemoveNodeFromPlotCommand(),
+    new AddEdgeToPlotCommand(),
+    new RemoveEdgeFromPlotCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),
