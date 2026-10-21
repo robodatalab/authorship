@@ -987,7 +987,7 @@ describe("the salient concepts the story holds", () => {
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
             cellDrawings: { markdown: () => <SelectsTheDoor /> },
             storyAnnotationsSelected: {
-                "salient-concept": { annotationCellId: "k1", passage: null },
+                "salient-concept": { annotationCellId: "k1", passageId: null },
             },
         });
 
@@ -1099,7 +1099,7 @@ describe("the plots the story weaves", () => {
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
             cellDrawings: { markdown: () => <ShowsTheHighlights /> },
             storyAnnotationsSelected: {
-                plot: { annotationCellId: "p2", passage: null },
+                plot: { annotationCellId: "p2", passageId: null },
             },
         });
 
@@ -1127,7 +1127,7 @@ describe("the plots the story weaves", () => {
             cells: [markdownCell("The door opens.", "m1"), THE_BELL, THE_DOOR],
             cellDrawings: { markdown: () => <ShowsTheHighlights /> },
             storyAnnotationsSelected: {
-                plot: { annotationCellId: "p2", passage: 1 },
+                plot: { annotationCellId: "p2", passageId: "n2" },
             },
         });
 
@@ -1161,11 +1161,11 @@ describe("the plots the story weaves", () => {
     }
 
     it.each([
-        { clicked: "inside the plot's first passage", clickedAt: 10, passage: 0 },
-        { clicked: "inside the plot's second passage", clickedAt: 2, passage: 1 },
+        { clicked: "inside the plot's first passage", clickedAt: 10, passageId: "n1" },
+        { clicked: "inside the plot's second passage", clickedAt: 2, passageId: "n2" },
     ])(
         "asks the host to select the passage when the author clicks $clicked",
-        async ({ clickedAt, passage }) => {
+        async ({ clickedAt, passageId }) => {
             await mountCanvas({
                 cells: [
                     markdownCell("The door opens.", "m1"),
@@ -1176,7 +1176,7 @@ describe("the plots the story weaves", () => {
                     markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
                 },
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p2", passage: null },
+                    plot: { annotationCellId: "p2", passageId: null },
                 },
             });
             const storyText = document.querySelector(
@@ -1186,7 +1186,7 @@ describe("the plots the story weaves", () => {
             await click(storyText);
 
             expect(posted).toEqual([
-                { type: "selectPassage", cellKind: "plot", passage },
+                { type: "selectPassage", cellKind: "plot", passageId },
             ]);
         },
     );
@@ -1210,8 +1210,8 @@ describe("the plots the story weaves", () => {
                 markdown: () => <ClicksTheStoryText clickedAt={2} />,
             },
             storyAnnotationsSelected: {
-                "salient-concept": { annotationCellId: "k1", passage: null },
-                plot: { annotationCellId: "p2", passage: null },
+                "salient-concept": { annotationCellId: "k1", passageId: null },
+                plot: { annotationCellId: "p2", passageId: null },
             },
         });
         const storyText = document.querySelector(
@@ -1221,8 +1221,8 @@ describe("the plots the story weaves", () => {
         await click(storyText);
 
         expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "salient-concept", passage: 0 },
-            { type: "selectPassage", cellKind: "plot", passage: 1 },
+            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
+            { type: "selectPassage", cellKind: "plot", passageId: "n2" },
         ]);
     });
 
@@ -1234,7 +1234,7 @@ describe("the plots the story weaves", () => {
         {
             clicked: "outside every passage of the plot",
             storyAnnotationsSelected: {
-                plot: { annotationCellId: "p1", passage: null },
+                plot: { annotationCellId: "p1", passageId: null },
             },
             clickedAt: 10,
         },
@@ -1415,7 +1415,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passage: null },
+                    "salient-concept": { annotationCellId: "k1", passageId: null },
                 },
                 marks: [
                     [MARKED, "0", "9"],
@@ -1426,7 +1426,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept and one of its examples",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passage: 1 },
+                    "salient-concept": { annotationCellId: "k1", passageId: "r2" },
                 },
                 marks: [
                     [MARKED_DIMMED, "0", "9"],
@@ -1437,7 +1437,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a plot",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p1", passage: null },
+                    plot: { annotationCellId: "p1", passageId: null },
                 },
                 marks: [
                     [MARKED, "10", "9"],
@@ -1449,7 +1449,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the first passage of a plot",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p1", passage: 0 },
+                    plot: { annotationCellId: "p1", passageId: "n1" },
                 },
                 marks: [
                     [MARKED, "10", "9"],
@@ -1461,7 +1461,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the second passage of a plot",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p1", passage: 1 },
+                    plot: { annotationCellId: "p1", passageId: "n2" },
                 },
                 marks: [
                     [MARKED_DIMMED, "10", "9"],
@@ -1476,7 +1476,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the middle passage of a plot told in order",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p2", passage: 1 },
+                    plot: { annotationCellId: "p2", passageId: "n2" },
                 },
                 marks: [
                     [
@@ -1503,7 +1503,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the last passage of a plot",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p1", passage: 2 },
+                    plot: { annotationCellId: "p1", passageId: "n3" },
                 },
                 marks: [
                     [MARKED_DIMMED, "10", "9"],
@@ -1515,7 +1515,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the passage of a plot that leads back to an earlier one",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p3", passage: 2 },
+                    plot: { annotationCellId: "p3", passageId: "n3" },
                 },
                 marks: [
                     [
@@ -1539,7 +1539,7 @@ describe("the plots the story weaves", () => {
             {
                 selected: "the passage of a plot that nothing connects",
                 storyAnnotationsSelected: {
-                    plot: { annotationCellId: "p3", passage: 1 },
+                    plot: { annotationCellId: "p3", passageId: "n2" },
                 },
                 marks: [
                     [
@@ -1563,8 +1563,8 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept and a passage of a plot",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passage: null },
-                    plot: { annotationCellId: "p1", passage: 1 },
+                    "salient-concept": { annotationCellId: "k1", passageId: null },
+                    plot: { annotationCellId: "p1", passageId: "n2" },
                 },
                 marks: [
                     [MARKED, "0", "9"],

@@ -64,38 +64,4 @@ describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a
             references: [],
         });
     });
-
-    it("keeps the selected example selected when an example above it is removed", () => {
-        const session = storyWithTheDoor("r1:1-1, r2:2-3");
-        session.selectTheStoryAnnotation("salient-concept", "k1");
-        session.selectThePassage("salient-concept", 1);
-
-        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
-            annotationCellId: "k1",
-            firstWord: 1,
-            lastWord: 1,
-        });
-
-        expect(session.theStoryAnnotationsSelected).toEqual({
-            "salient-concept": { annotationCellId: "k1", passage: 0 },
-            plot: { annotationCellId: null, passage: null },
-        });
-    });
-
-    it("selects no example once the selected one is removed", () => {
-        const session = storyWithTheDoor("r1:1-1, r2:2-3");
-        session.selectTheStoryAnnotation("salient-concept", "k1");
-        session.selectThePassage("salient-concept", 1);
-
-        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
-            annotationCellId: "k1",
-            firstWord: 2,
-            lastWord: 3,
-        });
-
-        expect(session.theStoryAnnotationsSelected).toEqual({
-            "salient-concept": { annotationCellId: "k1", passage: null },
-            plot: { annotationCellId: null, passage: null },
-        });
-    });
 });

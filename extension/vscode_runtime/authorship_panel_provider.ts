@@ -42,7 +42,7 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
             } else if (message?.type === "selectPassage") {
                 this.sessionFollowed?.selectThePassage(
                     message.cellKind as string,
-                    message.passage as number | null,
+                    message.passageId as string | null,
                 );
             } else if (message?.type === "typed") {
                 this.sessionFollowed?.theAuthorTypedInTheCell(

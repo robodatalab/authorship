@@ -111,7 +111,7 @@ export function AuthorshipPanelPlots({
                         key={plotShown.annotationCellId}
                         plot={plotShown}
                         plotCell={plotCellShown}
-                        nodeSelected={storyAnnotationSelected.passage}
+                        nodeIdSelected={storyAnnotationSelected.passageId}
                         storyTextSelected={storyTextSelected}
                         onRetitled={(title) =>
                             retitleThePlot(plotShown.annotationCellId, title)
@@ -126,7 +126,7 @@ export function AuthorshipPanelPlots({
 interface AuthorshipPanelPlotProps {
     plot: StoryAnnotationInTheStory;
     plotCell: PlotCell;
-    nodeSelected: number | null;
+    nodeIdSelected: string | null;
     storyTextSelected: StoryTextSpan | null;
     onRetitled: (title: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
@@ -135,7 +135,7 @@ interface AuthorshipPanelPlotProps {
 function AuthorshipPanelPlot({
     plot,
     plotCell,
-    nodeSelected,
+    nodeIdSelected,
     storyTextSelected,
     onRetitled,
     sendMessagesToVscode,
@@ -179,7 +179,7 @@ function AuthorshipPanelPlot({
                 <AuthorshipPanelPlotTrajectory
                     plotCell={plotCell}
                     passages={plot.passages}
-                    nodeSelected={nodeSelected}
+                    nodeIdSelected={nodeIdSelected}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             )}
@@ -190,14 +190,14 @@ function AuthorshipPanelPlot({
 interface AuthorshipPanelPlotTrajectoryProps {
     plotCell: PlotCell;
     passages: readonly StoryWordRangeInTheStory[];
-    nodeSelected: number | null;
+    nodeIdSelected: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 function AuthorshipPanelPlotTrajectory({
     plotCell,
     passages,
-    nodeSelected,
+    nodeIdSelected,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotTrajectoryProps) {
     const lanesDrawn = useRef<SVGSVGElement>(null);
@@ -284,7 +284,7 @@ function AuthorshipPanelPlotTrajectory({
                     <li
                         key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
                         className={
-                            node === nodeSelected
+                            storyWordRange.passageId === nodeIdSelected
                                 ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
                                 : "authorship-panel-story-annotation-passage"
                         }
@@ -295,12 +295,14 @@ function AuthorshipPanelPlotTrajectory({
                             type="button"
                             className="authorship-panel-story-annotation-passage-shown"
                             title={storyWordRange.wordsItCovers}
-                            aria-pressed={node === nodeSelected}
+                            aria-pressed={
+                                storyWordRange.passageId === nodeIdSelected
+                            }
                             onClick={() => {
                                 sendMessagesToVscode({
                                     type: "selectPassage",
                                     cellKind: PLOT,
-                                    passage: node,
+                                    passageId: storyWordRange.passageId,
                                 });
                                 sendMessagesToVscode({
                                     type: "showStoryWordRange",
@@ -373,7 +375,7 @@ function AuthorshipPanelPlotTrajectory({
                         <circle
                             key={nodeIds[node]}
                             className={
-                                node === nodeSelected
+                                nodeIds[node] === nodeIdSelected
                                     ? `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-node-selected authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
                                     : `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
                             }

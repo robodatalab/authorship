@@ -16,24 +16,37 @@ import type { TableOfContentsCell } from "../cells/table_of_contents_cell";
 import type { TitlePageCell } from "../cells/title_page_cell";
 import type { UnknownCell } from "../cells/unknown_cell";
 
+export class AnnotatedPassage {
+    constructor(
+        readonly passageId: string,
+        readonly storyWordRange: StoryWordRange,
+    ) {}
+}
+
 export class AnnotatedPassages {
     constructor(
         readonly title: string,
-        readonly storyWordRanges: readonly StoryWordRange[],
+        readonly passages: readonly AnnotatedPassage[],
     ) {}
 }
 
 export class AnnotatedPassagesOf implements CellVisitor<AnnotatedPassages | null> {
     visitSalientConcept(cell: SalientConceptCell): AnnotatedPassages {
-        const storyWordRanges = cell.references.map(
-            (reference) => reference.storyWordRange,
+        const passages = cell.references.map(
+            (reference) =>
+                new AnnotatedPassage(
+                    reference.referenceId,
+                    reference.storyWordRange,
+                ),
         );
-        return new AnnotatedPassages(cell.title, storyWordRanges);
+        return new AnnotatedPassages(cell.title, passages);
     }
 
     visitPlot(cell: PlotCell): AnnotatedPassages {
-        const storyWordRanges = cell.nodes.map((node) => node.storyWordRange);
-        return new AnnotatedPassages(cell.title, storyWordRanges);
+        const passages = cell.nodes.map(
+            (node) => new AnnotatedPassage(node.nodeId, node.storyWordRange),
+        );
+        return new AnnotatedPassages(cell.title, passages);
     }
 
     visitMarkdown(_cell: MarkdownCell): null {

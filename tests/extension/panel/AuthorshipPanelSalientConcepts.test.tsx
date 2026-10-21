@@ -39,12 +39,12 @@ const THE_DOOR = `<!-- cell: salient-concept id="k1" title="The door" -->
 She finds the door.
 `;
 
-const THE_DOOR_ON_BOTH_PASSAGES = `<!-- cell: salient-concept id="k1" title="The door" words="2-3, 6-7" -->
+const THE_DOOR_ON_BOTH_PASSAGES = `<!-- cell: salient-concept id="k1" title="The door" words="r1:2-3, r2:6-7" -->
 
 She finds the door.
 `;
 
-const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: salient-concept id="k1" title="The door" words="2-3" -->
+const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: salient-concept id="k1" title="The door" words="r1:2-3" -->
 
 She finds the door.
 `;
@@ -74,7 +74,7 @@ describe("the salient concepts tab", () => {
                     storyAnnotationSelected={
                         options.storyAnnotationSelected ?? {
                             annotationCellId: null,
-                            passage: null,
+                            passageId: null,
                         }
                     }
                     storyTextSelected={options.storyTextSelected ?? null}
@@ -99,7 +99,7 @@ describe("the salient concepts tab", () => {
     it("shows the selected concept's title, description and references below the list", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
 
         const titleShown = document.querySelector<HTMLInputElement>(
@@ -119,7 +119,7 @@ describe("the salient concepts tab", () => {
     it("asks for the concept's title to be replaced as the author types it", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
         const titleBox = document.querySelector<HTMLInputElement>(
             ".author-file-editor-cell-field-input",
@@ -148,7 +148,7 @@ describe("the salient concepts tab", () => {
     it("lists the references newest first", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
 
         const referencesShown = [
@@ -162,7 +162,7 @@ describe("the salient concepts tab", () => {
     it("asks the host to select the second reference listed, and to show its words", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
         const secondReference = document.querySelectorAll(
             ".authorship-panel-story-annotation-passage-shown",
@@ -171,7 +171,7 @@ describe("the salient concepts tab", () => {
         await click(secondReference);
 
         expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "salient-concept", passage: 0 },
+            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
             { type: "showStoryWordRange", firstWord: 2, lastWord: 3 },
         ]);
     });
@@ -179,7 +179,7 @@ describe("the salient concepts tab", () => {
     it("marks the reference selected", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: 0 },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: "r1" },
         });
 
         const referencesMarked = [
@@ -190,10 +190,44 @@ describe("the salient concepts tab", () => {
         expect(referencesMarked).toEqual(["false", "true"]);
     });
 
+    it.each([
+        {
+            concept: "once a reference above it is taken out",
+            words: "r2:6-7",
+            referencesMarked: ["true"],
+        },
+        {
+            concept: "once the reference selected is taken out",
+            words: "r1:2-3",
+            referencesMarked: ["false"],
+        },
+    ])(
+        "marks the reference selected, and only that reference, $concept",
+        async ({ words, referencesMarked }) => {
+            await mountSalientConcepts({
+                story: [
+                    THE_STORY,
+                    `<!-- cell: salient-concept id="k1" title="The door" words="${words}" -->\n`,
+                ].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "k1",
+                    passageId: "r2",
+                },
+            });
+
+            const referencesShownMarked = [
+                ...document.querySelectorAll(
+                    ".authorship-panel-story-annotation-passage-shown",
+                ),
+            ].map((reference) => reference.getAttribute("aria-pressed"));
+            expect(referencesShownMarked).toEqual(referencesMarked);
+        },
+    );
+
     it("asks for a reference's words to be taken out of the concept", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
         const removeButton = document.querySelector(
             ".authorship-panel-story-annotation-passage-removed",
@@ -217,7 +251,7 @@ describe("the salient concepts tab", () => {
     it("cannot assign anything until words are selected", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
         });
 
         const assignButton = document.querySelector<HTMLButtonElement>(
@@ -229,7 +263,7 @@ describe("the salient concepts tab", () => {
     it("asks for the selected words to be assigned to the selected concept", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passage: null },
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
             storyTextSelected: {
                 cellId: "m1",
                 startCharacterOffsetInCell: 4,
