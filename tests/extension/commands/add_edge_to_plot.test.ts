@@ -53,4 +53,29 @@ She finds the door.
             edges: [new PlotEdge("e1", "n1", "n2")],
         });
     });
+
+    it.each([
+        { reaching: "a node the plot no longer holds", toNodeId: "n3" },
+        { reaching: "the node it starts at", toNodeId: "n1" },
+    ])("adds nothing when the line would reach $reaching", ({ toNodeId }) => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: plot title="The door" nodes="n1:2-3, n2:6-7" id="p1" -->
+
+She finds the door.
+`);
+
+        new AddEdgeToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            fromNodeId: "n1",
+            toNodeId,
+        });
+
+        expect(session.document.cellWithId("p1")).toMatchObject({
+            edges: [],
+        });
+    });
 });

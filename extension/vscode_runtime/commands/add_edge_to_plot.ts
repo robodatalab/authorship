@@ -23,6 +23,14 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
             if (!(plot instanceof PlotCell)) {
                 return;
             }
+            const nodeIds = plot.nodes.map((node) => node.nodeId);
+            if (
+                !nodeIds.includes(fromNodeId) ||
+                !nodeIds.includes(toNodeId) ||
+                fromNodeId === toNodeId
+            ) {
+                return;
+            }
             if (
                 plot.edges.some(
                     (edge) =>
