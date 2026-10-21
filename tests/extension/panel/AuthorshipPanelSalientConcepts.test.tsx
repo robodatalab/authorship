@@ -204,7 +204,7 @@ describe("the salient concepts tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "removeStoryWordRange",
+                commandName: "removeStoryWordRangeFromSalientConcept",
                 commandArguments: {
                     annotationCellId: "k1",
                     firstWord: 2,

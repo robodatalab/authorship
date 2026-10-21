@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RemoveStoryWordRangeCommand } from "../../../extension/vscode_runtime/commands/remove_story_word_range";
+import { RemoveStoryWordRangeFromSalientConceptCommand } from "../../../extension/vscode_runtime/commands/remove_story_word_range_from_salient_concept";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
@@ -16,11 +16,11 @@ What she saw.
 `);
 }
 
-describe("RemoveStoryWordRangeCommand — takes words out of a salient concept", () => {
+describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a salient concept", () => {
     it("removes the range it was asked to and keeps the others", () => {
         const session = storyWithTheDoor("1-1, 2-3");
 
-        new RemoveStoryWordRangeCommand().invoke(session, {
+        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             firstWord: 2,
             lastWord: 3,
@@ -34,7 +34,7 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
     it("keeps the ranges it was not asked to remove in the order they are written", () => {
         const session = storyWithTheDoor("3-3, 1-1, 0-0");
 
-        new RemoveStoryWordRangeCommand().invoke(session, {
+        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             firstWord: 1,
             lastWord: 1,
@@ -51,7 +51,7 @@ describe("RemoveStoryWordRangeCommand — takes words out of a salient concept",
     it("leaves the concept without words once its last range is removed", () => {
         const session = storyWithTheDoor("2-3");
 
-        new RemoveStoryWordRangeCommand().invoke(session, {
+        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             firstWord: 2,
             lastWord: 3,

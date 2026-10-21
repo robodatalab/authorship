@@ -205,7 +205,7 @@ function AuthorshipPanelSalientConcept({
                                     onClick={() =>
                                         sendMessagesToVscode({
                                             type: "invoke",
-                                            commandName: "removeStoryWordRange",
+                                            commandName: "removeStoryWordRangeFromSalientConcept",
                                             commandArguments: {
                                                 annotationCellId:
                                                     salientConcept.annotationCellId,

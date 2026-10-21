@@ -22,7 +22,7 @@ import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
-import { RemoveStoryWordRangeCommand } from "./remove_story_word_range";
+import { RemoveStoryWordRangeFromSalientConceptCommand } from "./remove_story_word_range_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
@@ -66,7 +66,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DeleteStoryAnnotationCommand(),
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
-    new RemoveStoryWordRangeCommand(),
+    new RemoveStoryWordRangeFromSalientConceptCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

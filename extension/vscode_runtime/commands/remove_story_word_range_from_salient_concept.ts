@@ -2,8 +2,8 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
-export class RemoveStoryWordRangeCommand implements AuthorDocumentCommand {
-    readonly commandName = "removeStoryWordRange";
+export class RemoveStoryWordRangeFromSalientConceptCommand implements AuthorDocumentCommand {
+    readonly commandName = "removeStoryWordRangeFromSalientConcept";
     readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
