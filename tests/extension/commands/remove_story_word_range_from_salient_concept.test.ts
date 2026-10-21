@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveStoryWordRangeFromSalientConceptCommand } from "../../../extension/vscode_runtime/commands/remove_story_word_range_from_salient_concept";
+import { SalientConceptReference } from "../../../extension/library/storydoc/cells/salient_concept_cell";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
@@ -18,7 +19,7 @@ What she saw.
 
 describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a salient concept", () => {
     it("removes the range it was asked to and keeps the others", () => {
-        const session = storyWithTheDoor("1-1, 2-3");
+        const session = storyWithTheDoor("r1:1-1, r2:2-3");
 
         new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
@@ -27,12 +28,14 @@ describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a
         });
 
         expect(session.document.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(1, 1)],
+            references: [
+                new SalientConceptReference("r1", new StoryWordRange(1, 1)),
+            ],
         });
     });
 
     it("keeps the ranges it was not asked to remove in the order they are written", () => {
-        const session = storyWithTheDoor("3-3, 1-1, 0-0");
+        const session = storyWithTheDoor("r1:3-3, r2:1-1, r3:0-0");
 
         new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
@@ -41,15 +44,15 @@ describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a
         });
 
         expect(session.document.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [
-                new StoryWordRange(3, 3),
-                new StoryWordRange(0, 0),
+            references: [
+                new SalientConceptReference("r1", new StoryWordRange(3, 3)),
+                new SalientConceptReference("r3", new StoryWordRange(0, 0)),
             ],
         });
     });
 
     it("leaves the concept without words once its last range is removed", () => {
-        const session = storyWithTheDoor("2-3");
+        const session = storyWithTheDoor("r1:2-3");
 
         new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
@@ -58,7 +61,41 @@ describe("RemoveStoryWordRangeFromSalientConceptCommand — takes words out of a
         });
 
         expect(session.document.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [],
+            references: [],
+        });
+    });
+
+    it("keeps the selected example selected when an example above it is removed", () => {
+        const session = storyWithTheDoor("r1:1-1, r2:2-3");
+        session.selectTheStoryAnnotation("salient-concept", "k1");
+        session.selectThePassage("salient-concept", 1);
+
+        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
+            annotationCellId: "k1",
+            firstWord: 1,
+            lastWord: 1,
+        });
+
+        expect(session.theStoryAnnotationsSelected).toEqual({
+            "salient-concept": { annotationCellId: "k1", passage: 0 },
+            plot: { annotationCellId: null, passage: null },
+        });
+    });
+
+    it("selects no example once the selected one is removed", () => {
+        const session = storyWithTheDoor("r1:1-1, r2:2-3");
+        session.selectTheStoryAnnotation("salient-concept", "k1");
+        session.selectThePassage("salient-concept", 1);
+
+        new RemoveStoryWordRangeFromSalientConceptCommand().invoke(session, {
+            annotationCellId: "k1",
+            firstWord: 2,
+            lastWord: 3,
+        });
+
+        expect(session.theStoryAnnotationsSelected).toEqual({
+            "salient-concept": { annotationCellId: "k1", passage: null },
+            plot: { annotationCellId: null, passage: null },
         });
     });
 });

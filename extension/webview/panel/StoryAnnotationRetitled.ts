@@ -22,7 +22,7 @@ export class StoryAnnotationRetitled implements CellVisitor<Cell> {
     visitSalientConcept(cell: SalientConceptCell): SalientConceptCell {
         return new SalientConceptCell(
             this.title,
-            cell.storyWordRanges,
+            cell.references,
             cell.source,
             cell.folded,
             cell.at,

@@ -33,7 +33,10 @@ import {
     PlotNode,
 } from "../../../extension/library/storydoc/cells/plot_cell";
 import type { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
-import { SalientConceptCell } from "../../../extension/library/storydoc/cells/salient_concept_cell";
+import {
+    SalientConceptCell,
+    SalientConceptReference,
+} from "../../../extension/library/storydoc/cells/salient_concept_cell";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import type { TableOfContentsCell } from "../../../extension/library/storydoc/cells/table_of_contents_cell";
 import type { TitlePageCell } from "../../../extension/library/storydoc/cells/title_page_cell";
@@ -938,7 +941,7 @@ describe("a folded cell", () => {
 describe("the salient concepts the story holds", () => {
     const THE_DOOR = new SalientConceptCell(
         "Door",
-        [new StoryWordRange(1, 2)],
+        [new SalientConceptReference("r1", new StoryWordRange(1, 2))],
         "What she saw.",
         false,
         null,
@@ -1194,7 +1197,7 @@ describe("the plots the story weaves", () => {
                 markdownCell("The door opens.", "m1"),
                 new SalientConceptCell(
                     "Door",
-                    [new StoryWordRange(0, 1)],
+                    [new SalientConceptReference("r1", new StoryWordRange(0, 1))],
                     "What she saw.",
                     false,
                     null,
@@ -1307,7 +1310,10 @@ describe("the plots the story weaves", () => {
                     markdownCell("He heard it.", "m2"),
                     new SalientConceptCell(
                         "Hearing",
-                        [new StoryWordRange(0, 1), new StoryWordRange(3, 4)],
+                        [
+                            new SalientConceptReference("r1", new StoryWordRange(0, 1)),
+                            new SalientConceptReference("r2", new StoryWordRange(3, 4)),
+                        ],
                         "What he heard.",
                         false,
                         null,

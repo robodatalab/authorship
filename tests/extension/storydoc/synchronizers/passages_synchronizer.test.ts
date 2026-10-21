@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PlotEdge, PlotNode } from "../../../../extension/library/storydoc/cells/plot_cell";
+import { SalientConceptReference } from "../../../../extension/library/storydoc/cells/salient_concept_cell";
 import { StoryWordRange } from "../../../../extension/library/storydoc/cells/story_word_range";
 import { AuthorDocDiff } from "../../../../extension/library/storydoc/diff";
 import { Document } from "../../../../extension/library/storydoc/storydoc";
@@ -37,87 +38,87 @@ function withThePassagesInStep(beforeText: string, afterText: string): Document 
 describe("a salient concept's passages, as the author writes in a cell", () => {
     it("move on when a word is written before them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("6-7")].join("\n"),
-            [sheSaw("She saw the old door."), HE_HEARD, theConcept("6-7")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [sheSaw("She saw the old door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(7, 8)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(7, 8))],
         });
     });
 
     it("take in a word written among them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("1-3")].join("\n"),
-            [sheSaw("She saw the old door."), HE_HEARD, theConcept("1-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:1-3")].join("\n"),
+            [sheSaw("She saw the old door."), HE_HEARD, theConcept("r1:1-3")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(1, 4)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(1, 4))],
         });
     });
 
     it("leave out a word written just before them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("2-3")].join("\n"),
-            [sheSaw("She saw quietly the door."), HE_HEARD, theConcept("2-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:2-3")].join("\n"),
+            [sheSaw("She saw quietly the door."), HE_HEARD, theConcept("r1:2-3")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(3, 4)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(3, 4))],
         });
     });
 
     it("leave out a word written just after them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("1-2")].join("\n"),
-            [sheSaw("She saw the old door."), HE_HEARD, theConcept("1-2")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:1-2")].join("\n"),
+            [sheSaw("She saw the old door."), HE_HEARD, theConcept("r1:1-2")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(1, 2)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(1, 2))],
         });
     });
 
     it("keep a word of theirs that was written over", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("1-3")].join("\n"),
-            [sheSaw("She sees the door."), HE_HEARD, theConcept("1-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:1-3")].join("\n"),
+            [sheSaw("She sees the door."), HE_HEARD, theConcept("r1:1-3")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(1, 3)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(1, 3))],
         });
     });
 
     it("lose a passage whose words were all deleted", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("1-1, 2-3")].join("\n"),
-            [sheSaw("She saw"), HE_HEARD, theConcept("1-1, 2-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:1-1, r2:2-3")].join("\n"),
+            [sheSaw("She saw"), HE_HEARD, theConcept("r1:1-1, r2:2-3")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(1, 1)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(1, 1))],
         });
     });
 
     it("are gone when every one of them was deleted", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("2-3")].join("\n"),
-            [sheSaw("She saw"), HE_HEARD, theConcept("2-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:2-3")].join("\n"),
+            [sheSaw("She saw"), HE_HEARD, theConcept("r1:2-3")].join("\n"),
         );
 
-        expect(story.cellWithId("k1")).toMatchObject({ storyWordRanges: [] });
+        expect(story.cellWithId("k1")).toMatchObject({ references: [] });
     });
 
     it("count no words of a cell that is not prose", () => {
         const story = withThePassagesInStep(
-            [THE_CHAPTER, sheSaw("She saw the door."), THE_NOTE, HE_HEARD, theConcept("6-7")].join("\n"),
-            [THE_CHAPTER, sheSaw("She saw the old door."), THE_NOTE, HE_HEARD, theConcept("6-7")].join("\n"),
+            [THE_CHAPTER, sheSaw("She saw the door."), THE_NOTE, HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [THE_CHAPTER, sheSaw("She saw the old door."), THE_NOTE, HE_HEARD, theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(7, 8)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(7, 8))],
         });
     });
 });
@@ -125,45 +126,45 @@ describe("a salient concept's passages, as the author writes in a cell", () => {
 describe("a salient concept's passages, as the author adds, takes out and moves cells", () => {
     it("move on when a cell is written before them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("6-7")].join("\n"),
-            [sheSaw("She saw the door."), IT_RANG, HE_HEARD, theConcept("6-7")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [sheSaw("She saw the door."), IT_RANG, HE_HEARD, theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(8, 9)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(8, 9))],
         });
     });
 
     it("move back when a cell before them is taken out", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("6-7")].join("\n"),
-            [HE_HEARD, theConcept("6-7")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [HE_HEARD, theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(2, 3)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(2, 3))],
         });
     });
 
     it("go with the cell they stand in when it moves", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("6-7")].join("\n"),
-            [HE_HEARD, sheSaw("She saw the door."), theConcept("6-7")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [HE_HEARD, sheSaw("She saw the door."), theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(2, 3)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(2, 3))],
         });
     });
 
     it("are gone with the cell they stand in", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("2-3, 6-7")].join("\n"),
-            [HE_HEARD, theConcept("2-3, 6-7")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:2-3, r2:6-7")].join("\n"),
+            [HE_HEARD, theConcept("r1:2-3, r2:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(2, 3)],
+            references: [new SalientConceptReference("r2", new StoryWordRange(2, 3))],
         });
     });
 });
@@ -171,23 +172,23 @@ describe("a salient concept's passages, as the author adds, takes out and moves 
 describe("a salient concept's passages the change writes itself", () => {
     it("are left as the change writes them", () => {
         const story = withThePassagesInStep(
-            [sheSaw("She saw the door."), HE_HEARD, theConcept("6-7")].join("\n"),
-            [sheSaw("She saw the old door."), HE_HEARD, theConcept("2-3")].join("\n"),
+            [sheSaw("She saw the door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
+            [sheSaw("She saw the old door."), HE_HEARD, theConcept("r1:2-3")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(2, 3)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(2, 3))],
         });
     });
 
     it("are left as they come when the concept is added", () => {
         const story = withThePassagesInStep(
             [sheSaw("She saw the door."), HE_HEARD].join("\n"),
-            [sheSaw("She saw the old door."), HE_HEARD, theConcept("6-7")].join("\n"),
+            [sheSaw("She saw the old door."), HE_HEARD, theConcept("r1:6-7")].join("\n"),
         );
 
         expect(story.cellWithId("k1")).toMatchObject({
-            storyWordRanges: [new StoryWordRange(6, 7)],
+            references: [new SalientConceptReference("r1", new StoryWordRange(6, 7))],
         });
     });
 });

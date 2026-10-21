@@ -25,7 +25,10 @@ export class AnnotatedPassages {
 
 export class AnnotatedPassagesOf implements CellVisitor<AnnotatedPassages | null> {
     visitSalientConcept(cell: SalientConceptCell): AnnotatedPassages {
-        return new AnnotatedPassages(cell.title, cell.storyWordRanges);
+        const storyWordRanges = cell.references.map(
+            (reference) => reference.storyWordRange,
+        );
+        return new AnnotatedPassages(cell.title, storyWordRanges);
     }
 
     visitPlot(cell: PlotCell): AnnotatedPassages {

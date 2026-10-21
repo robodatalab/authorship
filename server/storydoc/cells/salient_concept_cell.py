@@ -12,6 +12,12 @@ if TYPE_CHECKING:
 
 SALIENT_CONCEPT = "salient-concept"
 
+
+@dataclass(frozen=True)
+class SalientConceptReference:
+    reference_id: str
+    story_word_range: StoryWordRange
+
 _Result = TypeVar("_Result")
 
 
@@ -19,7 +25,7 @@ _Result = TypeVar("_Result")
 class SalientConceptCell(Cell):
     kind: str = field(default=SALIENT_CONCEPT, init=False)
     title: str = ""
-    story_word_ranges: list[StoryWordRange] = field(default_factory=list)
+    references: list[SalientConceptReference] = field(default_factory=list)
     source: str = ""
     folded: bool = False
     at: tuple[int, int] | None = field(default=None, compare=False)

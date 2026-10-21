@@ -141,6 +141,28 @@ export class AuthorFileEditorSession
         this.documentOrSelectionChanged.fire();
     }
 
+    thePassageWasRemoved(
+        cellKind: string,
+        annotationCellId: string,
+        passageRemoved: number,
+    ): void {
+        const annotationSelected =
+            this.storyAnnotationsSelected.get(cellKind) ??
+            NO_STORY_ANNOTATION_SELECTED;
+        if (
+            annotationSelected.annotationCellId !== annotationCellId ||
+            annotationSelected.passage === null
+        ) {
+            return;
+        }
+        if (annotationSelected.passage === passageRemoved) {
+            this.selectThePassage(cellKind, null);
+        }
+        if (annotationSelected.passage > passageRemoved) {
+            this.selectThePassage(cellKind, annotationSelected.passage - 1);
+        }
+    }
+
     theAuthorSelectedStoryText(storyTextSelected: StoryTextSpan | null): void {
         this.storyTextSelected = storyTextSelected;
         this.documentOrSelectionChanged.fire();

@@ -2,6 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+from uuid import UUID
 
 from parameterized import parameterized
 
@@ -21,7 +23,10 @@ from server.storydoc.cells.note_cell import NoteCell
 from server.storydoc.cells.part_cell import PartCell
 from server.storydoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
 from server.storydoc.cells.recap_cell import RecapCell
-from server.storydoc.cells.salient_concept_cell import SalientConceptCell
+from server.storydoc.cells.salient_concept_cell import (
+    SalientConceptCell,
+    SalientConceptReference,
+)
 from server.storydoc.cells.story_word_range import StoryWordRange
 from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
 from server.storydoc.cells.title_page_cell import TitlePageCell
@@ -252,10 +257,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3" -->\n'
             '\n'
             'What she saw.\n',
-            [SalientConceptCell("Door", [StoryWordRange(2, 3)], "What she saw.", False, None, "k1")],
+            [SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 3))], "What she saw.", False, None, "k1")],
         ),
         (
             "a_range_of_one_word",
@@ -263,8 +268,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Her" words="0-0" -->\n',
-            [SalientConceptCell("Her", [StoryWordRange(0, 0)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Her" words="r1:0-0" -->\n',
+            [SalientConceptCell("Her", [SalientConceptReference("r1", StoryWordRange(0, 0))], "", False, None, "k1")],
         ),
         (
             "a_range_across_paragraphs_of_a_cell",
@@ -274,8 +279,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Arrival" words="2-5" -->\n',
-            [SalientConceptCell("Arrival", [StoryWordRange(2, 5)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Arrival" words="r1:2-5" -->\n',
+            [SalientConceptCell("Arrival", [SalientConceptReference("r1", StoryWordRange(2, 5))], "", False, None, "k1")],
         ),
         (
             "a_range_across_markdown_cells",
@@ -287,8 +292,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Arrival" words="3-5" -->\n',
-            [SalientConceptCell("Arrival", [StoryWordRange(3, 5)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Arrival" words="r1:3-5" -->\n',
+            [SalientConceptCell("Arrival", [SalientConceptReference("r1", StoryWordRange(3, 5))], "", False, None, "k1")],
         ),
         (
             "cells_other_than_markdown_hold_no_story_words",
@@ -306,10 +311,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Him" words="4-4" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Him" words="r1:4-4" -->\n'
             '\n'
             'The one who heard.\n',
-            [SalientConceptCell("Him", [StoryWordRange(4, 4)], "The one who heard.", False, None, "k1")],
+            [SalientConceptCell("Him", [SalientConceptReference("r1", StoryWordRange(4, 4))], "The one who heard.", False, None, "k1")],
         ),
         (
             "a_run_without_a_letter_or_a_digit_is_not_a_word",
@@ -317,8 +322,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She — saw 2 doors.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Seeing" words="0-2" -->\n',
-            [SalientConceptCell("Seeing", [StoryWordRange(0, 2)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Seeing" words="r1:0-2" -->\n',
+            [SalientConceptCell("Seeing", [SalientConceptReference("r1", StoryWordRange(0, 2))], "", False, None, "k1")],
         ),
         (
             "a_run_of_letters_outside_ascii_alone_is_not_a_word",
@@ -326,8 +331,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw é café.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Café" words="2-2" -->\n',
-            [SalientConceptCell("Café", [StoryWordRange(2, 2)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Café" words="r1:2-2" -->\n',
+            [SalientConceptCell("Café", [SalientConceptReference("r1", StoryWordRange(2, 2))], "", False, None, "k1")],
         ),
         (
             "the_words_of_a_comment_in_a_markdown_cell_are_story_words",
@@ -335,8 +340,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw <!-- a note --> the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="4-5" -->\n',
-            [SalientConceptCell("Door", [StoryWordRange(4, 5)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:4-5" -->\n',
+            [SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(4, 5))], "", False, None, "k1")],
         ),
         (
             "ranges_keep_the_order_they_are_written_in",
@@ -344,9 +349,9 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="2-3, 0-1" -->\n',
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, r2:0-1" -->\n',
             [
-                SalientConceptCell("Door", [StoryWordRange(2, 3), StoryWordRange(0, 1)], "", False, None, "k1")
+                SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 3)), SalientConceptReference("r2", StoryWordRange(0, 1))], "", False, None, "k1")
             ],
         ),
         (
@@ -355,9 +360,9 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="2-3, x, 5-, -1, 0-0" -->\n',
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, x, 5-, -1, r2:0-0" -->\n',
             [
-                SalientConceptCell("Door", [StoryWordRange(2, 3), StoryWordRange(0, 0)], "", False, None, "k1")
+                SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 3)), SalientConceptReference("r2", StoryWordRange(0, 0))], "", False, None, "k1")
             ],
         ),
         (
@@ -366,8 +371,8 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="10-12" -->\n',
-            [SalientConceptCell("Door", [StoryWordRange(10, 12)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:10-12" -->\n',
+            [SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(10, 12))], "", False, None, "k1")],
         ),
         (
             "a_range_running_past_the_end_covers_the_words_up_to_the_end",
@@ -375,12 +380,12 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="2-12" -->\n',
-            [SalientConceptCell("Door", [StoryWordRange(2, 12)], "", False, None, "k1")],
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-12" -->\n',
+            [SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 12))], "", False, None, "k1")],
         ),
         (
             "several_concepts_in_the_order_of_the_document",
-            '<!-- cell: salient-concept id="k1" title="Bell" words="6-7" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Bell" words="r1:6-7" -->\n'
             '\n'
             '<!-- cell: markdown -->\n'
             '\n'
@@ -390,10 +395,10 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'He heard the bell.\n'
             '\n'
-            '<!-- cell: salient-concept id="k2" title="Door" words="2-3" -->\n',
+            '<!-- cell: salient-concept id="k2" title="Door" words="r1:2-3" -->\n',
             [
-                SalientConceptCell("Bell", [StoryWordRange(6, 7)], "", False, None, "k1"),
-                SalientConceptCell("Door", [StoryWordRange(2, 3)], "", False, None, "k2"),
+                SalientConceptCell("Bell", [SalientConceptReference("r1", StoryWordRange(6, 7))], "", False, None, "k1"),
+                SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 3))], "", False, None, "k2"),
             ],
         ),
         (
@@ -402,12 +407,12 @@ class SalientConcepts(unittest.TestCase):
             '\n'
             'She saw the door.\n'
             '\n'
-            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n'
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3" -->\n'
             '\n'
-            '<!-- cell: salient-concept id="k2" title="Seeing" words="0-3" -->\n',
+            '<!-- cell: salient-concept id="k2" title="Seeing" words="r1:0-3" -->\n',
             [
-                SalientConceptCell("Door", [StoryWordRange(2, 3)], "", False, None, "k1"),
-                SalientConceptCell("Seeing", [StoryWordRange(0, 3)], "", False, None, "k2"),
+                SalientConceptCell("Door", [SalientConceptReference("r1", StoryWordRange(2, 3))], "", False, None, "k1"),
+                SalientConceptCell("Seeing", [SalientConceptReference("r1", StoryWordRange(0, 3))], "", False, None, "k2"),
             ],
         ),
     ])
@@ -419,6 +424,37 @@ class SalientConcepts(unittest.TestCase):
         salient_concepts = document.salient_concepts()
 
         self.assertEqual(salient_concepts, expected)
+
+    @patch("server.storydoc.parser.uuid4", return_value=UUID("3f1c0e2a-0000-4000-8000-000000000001"))
+    def test_a_reference_written_without_an_id_is_given_one(self, _uuid4) -> None:
+        document = Document(
+            '<!-- cell: markdown id="m1" -->\n'
+            '\n'
+            'She saw the door.\n'
+            '\n'
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n'
+        )
+
+        salient_concepts = document.salient_concepts()
+
+        self.assertEqual(
+            salient_concepts,
+            [
+                SalientConceptCell("Door", [
+                        SalientConceptReference("3f1c0e2a-0000-4000-8000-000000000001", StoryWordRange(2, 3)),
+                    ], "", False, None, "k1")
+            ],
+        )
+
+    def test_are_written_with_the_ids_of_their_references(self) -> None:
+        written = Document.from_cells([
+            SalientConceptCell("Door", [
+                    SalientConceptReference("r1", StoryWordRange(2, 3)),
+                    SalientConceptReference("r2", StoryWordRange(0, 1)),
+                ], "", False, None, "k1")
+        ]).text
+
+        self.assertEqual(written, '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, r2:0-1" -->\n')
 
 
 class Plots(unittest.TestCase):

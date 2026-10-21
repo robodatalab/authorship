@@ -46,7 +46,7 @@ describe("InsertCellCommand — inserts a cell", () => {
         expect(session.document.cells[1]).toMatchObject({
             kind: "salient-concept",
             title: "",
-            storyWordRanges: [],
+            references: [],
         });
     });
 

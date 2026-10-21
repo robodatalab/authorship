@@ -15,7 +15,10 @@ import type { NoteCell } from "../cells/note_cell";
 import type { PartCell } from "../cells/part_cell";
 import { PlotCell, PlotNode } from "../cells/plot_cell";
 import type { RecapCell } from "../cells/recap_cell";
-import { SalientConceptCell } from "../cells/salient_concept_cell";
+import {
+    SalientConceptCell,
+    SalientConceptReference,
+} from "../cells/salient_concept_cell";
 import { StoryWordRange } from "../cells/story_word_range";
 import type { TableOfContentsCell } from "../cells/table_of_contents_cell";
 import type { TitlePageCell } from "../cells/title_page_cell";
@@ -192,12 +195,22 @@ class PassagesKeptInStep implements CellVisitor<Cell> {
     constructor(private readonly whereTheWordsWent: WhereTheStoryWordsWent) {}
 
     visitSalientConcept(cell: SalientConceptCell): SalientConceptCell {
-        const rangesKeptInStep = cell.storyWordRanges
-            .map((range) => this.whereTheWordsWent.rangeKeptInStep(range))
-            .filter((range) => range !== null);
+        const referencesKeptInStep: SalientConceptReference[] = [];
+        for (const reference of cell.references) {
+            const rangeKeptInStep = this.whereTheWordsWent.rangeKeptInStep(
+                reference.storyWordRange,
+            );
+            if (rangeKeptInStep !== null) {
+                const referenceKeptInStep = new SalientConceptReference(
+                    reference.referenceId,
+                    rangeKeptInStep,
+                );
+                referencesKeptInStep.push(referenceKeptInStep);
+            }
+        }
         return new SalientConceptCell(
             cell.title,
-            rangesKeptInStep,
+            referencesKeptInStep,
             cell.source,
             cell.folded,
             cell.at,

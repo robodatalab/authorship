@@ -17,6 +17,7 @@ import { RECAP, RecapCell } from "./cells/recap_cell";
 import {
     SALIENT_CONCEPT,
     SalientConceptCell,
+    SalientConceptReference,
 } from "./cells/salient_concept_cell";
 import { PLOT, PlotCell, PlotEdge, PlotNode } from "./cells/plot_cell";
 import { StoryWordRange } from "./cells/story_word_range";
@@ -36,8 +37,8 @@ import {
     PLOT_NODES,
     PORTRAIT,
     PUBLISHER,
+    SALIENT_CONCEPT_REFERENCES,
     SRC,
-    STORY_WORD_RANGES,
     SUBSTACK,
     SUBTITLE,
     TITLE,
@@ -51,7 +52,7 @@ import {
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
 const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
-const STORY_WORD_RANGE = /^\s*(\d+)-(\d+)\s*$/;
+const SALIENT_CONCEPT_REFERENCE = /^\s*(?:([^:\s]+):)?(\d+)-(\d+)\s*$/;
 
 const PLOT_NODE = /^\s*([^:\s]+):(\d+)-(\d+)\s*$/;
 const PLOT_EDGE = /^\s*([^:\s]+):([^>\s]+)>(\S+)\s*$/;
@@ -136,19 +137,26 @@ function unescape(value: string): string {
     return value.replace(/\\(.)/g, "$1");
 }
 
-function storyWordRangesIn(written: string): StoryWordRange[] {
-    const storyWordRanges: StoryWordRange[] = [];
-    for (const writtenRange of written.split(",")) {
-        const readRange = STORY_WORD_RANGE.exec(writtenRange);
-        if (readRange === null) {
+function salientConceptReferencesIn(
+    written: string,
+): SalientConceptReference[] {
+    const references: SalientConceptReference[] = [];
+    for (const writtenReference of written.split(",")) {
+        const readReference = SALIENT_CONCEPT_REFERENCE.exec(writtenReference);
+        if (readReference === null) {
             continue;
         }
-        const firstWord = Number(readRange[1]);
-        const lastWord = Number(readRange[2]);
+        const referenceId = readReference[1] ?? crypto.randomUUID();
+        const firstWord = Number(readReference[2]);
+        const lastWord = Number(readReference[3]);
         const storyWordRange = new StoryWordRange(firstWord, lastWord);
-        storyWordRanges.push(storyWordRange);
+        const reference = new SalientConceptReference(
+            referenceId,
+            storyWordRange,
+        );
+        references.push(reference);
     }
-    return storyWordRanges;
+    return references;
 }
 
 function plotNodesIn(written: string): PlotNode[] {
@@ -268,12 +276,12 @@ function cellFromMarker(
                 uniqueId,
             );
         case SALIENT_CONCEPT: {
-            const storyWordRanges = storyWordRangesIn(
-                attrs[STORY_WORD_RANGES] ?? "",
+            const references = salientConceptReferencesIn(
+                attrs[SALIENT_CONCEPT_REFERENCES] ?? "",
             );
             return new SalientConceptCell(
                 attrs[TITLE] ?? "",
-                storyWordRanges,
+                references,
                 source,
                 folded,
                 at,

@@ -1,8 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Document } from "../../../extension/library/storydoc/storydoc";
+import {
+    SalientConceptCell,
+    SalientConceptReference,
+} from "../../../extension/library/storydoc/cells/salient_concept_cell";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import {
     StoryTextSpan,
@@ -52,6 +56,63 @@ describe("the shared corpus — the same documents server/storydoc/parser.py rea
         const writtenAgain = readBack.text;
 
         expect(writtenAgain).toBe(written);
+    });
+});
+
+describe("a salient concept's references", () => {
+    it("are read with their ids", () => {
+        const document = new Document(
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, r2:0-1" -->\n',
+        );
+
+        const [salientConcept] = document.cells;
+
+        expect(salientConcept).toMatchObject({
+            references: [
+                new SalientConceptReference("r1", new StoryWordRange(2, 3)),
+                new SalientConceptReference("r2", new StoryWordRange(0, 1)),
+            ],
+        });
+    });
+
+    it("are given an id when written without one", () => {
+        vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
+            "3f1c0e2a-0000-4000-8000-000000000001",
+        );
+        const document = new Document(
+            '<!-- cell: salient-concept id="k1" title="Door" words="2-3" -->\n',
+        );
+
+        const [salientConcept] = document.cells;
+
+        expect(salientConcept).toMatchObject({
+            references: [
+                new SalientConceptReference(
+                    "3f1c0e2a-0000-4000-8000-000000000001",
+                    new StoryWordRange(2, 3),
+                ),
+            ],
+        });
+    });
+
+    it("are written with their ids", () => {
+        const salientConcept = new SalientConceptCell(
+            "Door",
+            [
+                new SalientConceptReference("r1", new StoryWordRange(2, 3)),
+                new SalientConceptReference("r2", new StoryWordRange(0, 1)),
+            ],
+            "",
+            false,
+            null,
+            "k1",
+        );
+
+        const written = Document.fromCells([salientConcept]).text;
+
+        expect(written).toBe(
+            '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, r2:0-1" -->\n',
+        );
     });
 });
 

@@ -31,4 +31,54 @@ She finds the door.
             edges: [new PlotEdge("e2", "n3", "n1")],
         });
     });
+
+    it("keeps the selected node selected when a node above it is removed", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: plot title="The door" nodes="n1:2-3, n2:6-7" id="p1" -->
+
+She finds the door.
+`);
+        session.selectTheStoryAnnotation("plot", "p1");
+        session.selectThePassage("plot", 1);
+
+        new RemoveStoryWordRangeFromPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            firstWord: 2,
+            lastWord: 3,
+        });
+
+        expect(session.theStoryAnnotationsSelected).toEqual({
+            "salient-concept": { annotationCellId: null, passage: null },
+            plot: { annotationCellId: "p1", passage: 0 },
+        });
+    });
+
+    it("selects no node once the selected one is removed", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: plot title="The door" nodes="n1:2-3, n2:6-7" id="p1" -->
+
+She finds the door.
+`);
+        session.selectTheStoryAnnotation("plot", "p1");
+        session.selectThePassage("plot", 1);
+
+        new RemoveStoryWordRangeFromPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            firstWord: 6,
+            lastWord: 7,
+        });
+
+        expect(session.theStoryAnnotationsSelected).toEqual({
+            "salient-concept": { annotationCellId: null, passage: null },
+            plot: { annotationCellId: "p1", passage: null },
+        });
+    });
 });
