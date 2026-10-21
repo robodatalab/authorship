@@ -209,9 +209,9 @@ describe("the plots tab", () => {
         expect(nodesMarked).toEqual(["true", "false"]);
     });
 
-    it("asks for a node, and the lines that reach it, to be taken out of the trajectory", async () => {
+    it("asks for a node's words to be taken out of the trajectory", async () => {
         await mountPlots({
-            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
         const secondRemoveButton = document.querySelectorAll(
@@ -223,9 +223,11 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "replaceCell",
+                commandName: "removeStoryWordRangeFromPlot",
                 commandArguments: {
-                    cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3" -->\n\nShe finds the door.\n',
+                    annotationCellId: "p1",
+                    firstWord: 6,
+                    lastWord: 7,
                 },
             },
         ]);
@@ -279,9 +281,6 @@ describe("the plots tab", () => {
     ])(
         "asks for the node dragged from to be connected to the node dropped on $droppedOn",
         async ({ target }) => {
-            vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
-                "3f1c0e2a-0000-4000-8000-000000000001",
-            );
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
                 storyAnnotationSelected: {
@@ -300,9 +299,11 @@ describe("the plots tab", () => {
             expect(posted).toEqual([
                 {
                     type: "invoke",
-                    commandName: "replaceCell",
+                    commandName: "addEdgeToPlot",
                     commandArguments: {
-                        cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="3f1c0e2a-0000-4000-8000-000000000001:n2>n1" -->\n\nShe finds the door.\n',
+                        annotationCellId: "p1",
+                        fromNodeId: "n2",
+                        toNodeId: "n1",
                     },
                 },
             ]);
@@ -320,24 +321,6 @@ describe("the plots tab", () => {
 
         await press(firstNode);
         await letGo(firstNode);
-
-        expect(posted).toEqual([]);
-    });
-
-    it("connects nothing the trajectory already connects", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "p1", passage: null },
-        });
-        const firstNode = document.querySelectorAll(
-            ".authorship-panel-plot-trajectory-node",
-        )[0];
-        const secondRow = document.querySelectorAll(
-            ".authorship-panel-story-annotation-passage",
-        )[1];
-
-        await press(firstNode);
-        await letGo(secondRow);
 
         expect(posted).toEqual([]);
     });
@@ -375,9 +358,10 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "replaceCell",
+                commandName: "removeEdgeFromPlot",
                 commandArguments: {
-                    cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" -->\n\nShe finds the door.\n',
+                    annotationCellId: "p1",
+                    edgeId: "e1",
                 },
             },
         ]);

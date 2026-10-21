@@ -1,5 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
 import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
@@ -22,6 +23,8 @@ import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
+import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
+import { RemoveStoryWordRangeFromPlotCommand } from "./remove_story_word_range_from_plot";
 import { RemoveStoryWordRangeFromSalientConceptCommand } from "./remove_story_word_range_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
@@ -67,6 +70,9 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
     new RemoveStoryWordRangeFromSalientConceptCommand(),
+    new RemoveStoryWordRangeFromPlotCommand(),
+    new AddEdgeToPlotCommand(),
+    new RemoveEdgeFromPlotCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

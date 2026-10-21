@@ -22,11 +22,7 @@ import {
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
 } from "../../library/storydoc/iterators/story_annotations_iterator";
-import {
-    PLOT,
-    PlotCell,
-    PlotEdge,
-} from "../../library/storydoc/cells/plot_cell";
+import { PLOT, PlotCell } from "../../library/storydoc/cells/plot_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import type { Cell } from "../../library/storydoc/cells/cell";
@@ -242,62 +238,26 @@ function AuthorshipPanelPlotTrajectory({
         if (rowConnectedFrom === null || rowConnectedFrom === row) {
             return;
         }
-        const fromNodeId = nodeIds[rowConnectedFrom];
-        const toNodeId = nodeIds[row];
-        const alreadyConnected = plotCell.edges.some(
-            (edge) =>
-                edge.fromNodeId === fromNodeId && edge.toNodeId === toNodeId,
-        );
-        if (alreadyConnected) {
-            return;
-        }
-        const edgeId = crypto.randomUUID();
-        const edgeAdded = new PlotEdge(edgeId, fromNodeId, toNodeId);
-        const connected = new PlotCell(
-            plotCell.title,
-            plotCell.nodes,
-            [...plotCell.edges, edgeAdded],
-            plotCell.source,
-            plotCell.folded,
-            plotCell.at,
-            plotCell.uniqueId,
-        );
-        replaceTheCell(sendMessagesToVscode, connected);
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "addEdgeToPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                fromNodeId: nodeIds[rowConnectedFrom],
+                toNodeId: nodeIds[row],
+            },
+        });
     }
 
     function disconnect(edgeId: string): void {
-        const edgesKept = plotCell.edges.filter(
-            (edge) => edge.edgeId !== edgeId,
-        );
-        const disconnected = new PlotCell(
-            plotCell.title,
-            plotCell.nodes,
-            edgesKept,
-            plotCell.source,
-            plotCell.folded,
-            plotCell.at,
-            plotCell.uniqueId,
-        );
-        replaceTheCell(sendMessagesToVscode, disconnected);
-    }
-
-    function takeOut(nodeId: string): void {
-        const nodesKept = plotCell.nodes.filter(
-            (node) => node.nodeId !== nodeId,
-        );
-        const edgesKept = plotCell.edges.filter(
-            (edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId,
-        );
-        const takenOut = new PlotCell(
-            plotCell.title,
-            nodesKept,
-            edgesKept,
-            plotCell.source,
-            plotCell.folded,
-            plotCell.at,
-            plotCell.uniqueId,
-        );
-        replaceTheCell(sendMessagesToVscode, takenOut);
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "removeEdgeFromPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                edgeId,
+            },
+        });
     }
 
     function followThePointer(event: ReactMouseEvent): void {
@@ -356,7 +316,17 @@ function AuthorshipPanelPlotTrajectory({
                             className="authorship-panel-story-annotation-passage-removed"
                             title={TAKE_THE_NODE_OUT}
                             aria-label={TAKE_THE_NODE_OUT}
-                            onClick={() => takeOut(nodeIds[node])}
+                            onClick={() =>
+                                sendMessagesToVscode({
+                                    type: "invoke",
+                                    commandName: "removeStoryWordRangeFromPlot",
+                                    commandArguments: {
+                                        annotationCellId: plotCell.uniqueId,
+                                        firstWord: storyWordRange.firstWord,
+                                        lastWord: storyWordRange.lastWord,
+                                    },
+                                })
+                            }
                         >
                             <i className="codicon codicon-close" />
                         </button>
