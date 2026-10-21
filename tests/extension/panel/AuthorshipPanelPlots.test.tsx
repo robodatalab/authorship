@@ -178,6 +178,20 @@ describe("the plots tab", () => {
         expect(nodesShown).toEqual(["the door.", "the bell."]);
     });
 
+    it("keeps two nodes holding the same words apart", async () => {
+        const reactSaid = vi.spyOn(console, "error");
+
+        await mountPlots({
+            story: [
+                THE_STORY,
+                '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:2-3" -->\n\nShe finds the door.\n',
+            ].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+
+        expect(reactSaid).not.toHaveBeenCalled();
+    });
+
     it("asks the host to select the second node of the trajectory, and to show its words", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
@@ -243,7 +257,7 @@ describe("the plots tab", () => {
         },
     );
 
-    it("asks for a node's words to be taken out of the trajectory", async () => {
+    it("asks for a node to be taken out of the trajectory", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
@@ -257,11 +271,10 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "removeStoryWordRangeFromPlot",
+                commandName: "removeNodeFromPlot",
                 commandArguments: {
                     annotationCellId: "p1",
-                    firstWord: 6,
-                    lastWord: 7,
+                    nodeId: "n2",
                 },
             },
         ]);

@@ -2,8 +2,8 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlotCell } from "../../library/storydoc/cells/plot_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
-export class RemoveStoryWordRangeFromPlotCommand implements AuthorDocumentCommand {
-    readonly commandName = "removeStoryWordRangeFromPlot";
+export class RemoveNodeFromPlotCommand implements AuthorDocumentCommand {
+    readonly commandName = "removeNodeFromPlot";
     readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
@@ -13,6 +13,7 @@ export class RemoveStoryWordRangeFromPlotCommand implements AuthorDocumentComman
         commandArguments: Record<string, unknown>,
     ): void {
         const annotationCellId = commandArguments.annotationCellId as string;
+        const nodeId = commandArguments.nodeId as string;
         session.changeTheDocument((story) => {
             const plotIndex = story.cells.findIndex(
                 (cell) => cell.uniqueId === annotationCellId,
@@ -22,16 +23,10 @@ export class RemoveStoryWordRangeFromPlotCommand implements AuthorDocumentComman
                 return;
             }
             const nodesKept = plot.nodes.filter(
-                (node) =>
-                    node.storyWordRange.firstWord !==
-                        commandArguments.firstWord ||
-                    node.storyWordRange.lastWord !== commandArguments.lastWord,
+                (node) => node.nodeId !== nodeId,
             );
-            const nodeIdsKept = nodesKept.map((node) => node.nodeId);
             const edgesKept = plot.edges.filter(
-                (edge) =>
-                    nodeIdsKept.includes(edge.fromNodeId) &&
-                    nodeIdsKept.includes(edge.toNodeId),
+                (edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId,
             );
             story.cells[plotIndex] = new PlotCell(
                 plot.title,

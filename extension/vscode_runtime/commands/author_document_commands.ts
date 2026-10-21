@@ -24,8 +24,8 @@ import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
-import { RemoveStoryWordRangeFromPlotCommand } from "./remove_story_word_range_from_plot";
-import { RemoveStoryWordRangeFromSalientConceptCommand } from "./remove_story_word_range_from_salient_concept";
+import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
+import { RemoveReferenceFromSalientConceptCommand } from "./remove_reference_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
 import { WriteBlurbCommand } from "./write_blurb";
@@ -69,8 +69,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DeleteStoryAnnotationCommand(),
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
-    new RemoveStoryWordRangeFromSalientConceptCommand(),
-    new RemoveStoryWordRangeFromPlotCommand(),
+    new RemoveReferenceFromSalientConceptCommand(),
+    new RemoveNodeFromPlotCommand(),
     new AddEdgeToPlotCommand(),
     new RemoveEdgeFromPlotCommand(),
     new ImportMarkdownCommand(),

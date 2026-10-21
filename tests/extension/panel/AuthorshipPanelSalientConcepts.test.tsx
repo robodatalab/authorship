@@ -159,6 +159,20 @@ describe("the salient concepts tab", () => {
         expect(referencesShown).toEqual(["the bell.", "the door."]);
     });
 
+    it("keeps two references to the same words apart", async () => {
+        const reactSaid = vi.spyOn(console, "error");
+
+        await mountSalientConcepts({
+            story: [
+                THE_STORY,
+                '<!-- cell: salient-concept id="k1" title="The door" words="r1:2-3, r2:2-3" -->\n',
+            ].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+        });
+
+        expect(reactSaid).not.toHaveBeenCalled();
+    });
+
     it("asks the host to select the second reference listed, and to show its words", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
@@ -224,7 +238,7 @@ describe("the salient concepts tab", () => {
         },
     );
 
-    it("asks for a reference's words to be taken out of the concept", async () => {
+    it("asks for a reference to be taken out of the concept", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
             storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
@@ -238,11 +252,10 @@ describe("the salient concepts tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "removeStoryWordRangeFromSalientConcept",
+                commandName: "removeReferenceFromSalientConcept",
                 commandArguments: {
                     annotationCellId: "k1",
-                    firstWord: 2,
-                    lastWord: 3,
+                    referenceId: "r1",
                 },
             },
         ]);

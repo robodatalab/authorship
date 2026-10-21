@@ -36,4 +36,50 @@ She finds the door.
             ],
         });
     });
+
+    it("adds nothing when the words are a node already", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door.
+
+<!-- cell: plot title="The door" nodes="n1:1-3" id="p1" -->
+
+She finds the door.
+`);
+
+        new AssignStoryTextToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            cellId: "c1",
+            startCharacterOffsetInCell: 5,
+            endCharacterOffsetInCell: 13,
+        });
+
+        expect(session.document.cellWithId("p1")).toMatchObject({
+            nodes: [new PlotNode("n1", new StoryWordRange(1, 3))],
+        });
+    });
+
+    it("adds nothing when the selection touches no word", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door.
+
+<!-- cell: plot title="The door" id="p1" -->
+
+She finds the door.
+`);
+
+        new AssignStoryTextToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            cellId: "c1",
+            startCharacterOffsetInCell: 3,
+            endCharacterOffsetInCell: 4,
+        });
+
+        expect(session.document.cellWithId("p1")).toMatchObject({
+            nodes: [],
+        });
+    });
 });

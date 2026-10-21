@@ -282,7 +282,7 @@ function AuthorshipPanelPlotTrajectory({
             >
                 {passages.map((storyWordRange, node) => (
                     <li
-                        key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                        key={storyWordRange.passageId}
                         className={
                             storyWordRange.passageId === nodeIdSelected
                                 ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
@@ -321,11 +321,10 @@ function AuthorshipPanelPlotTrajectory({
                             onClick={() =>
                                 sendMessagesToVscode({
                                     type: "invoke",
-                                    commandName: "removeStoryWordRangeFromPlot",
+                                    commandName: "removeNodeFromPlot",
                                     commandArguments: {
                                         annotationCellId: plotCell.uniqueId,
-                                        firstWord: storyWordRange.firstWord,
-                                        lastWord: storyWordRange.lastWord,
+                                        nodeId: storyWordRange.passageId,
                                     },
                                 })
                             }

@@ -167,7 +167,7 @@ function AuthorshipPanelSalientConcept({
                     {referencesNewestFirst.map(
                         (storyWordRange) => (
                             <li
-                                key={`${storyWordRange.firstWord}-${storyWordRange.lastWord}`}
+                                key={storyWordRange.passageId}
                                 className={
                                     storyWordRange.passageId ===
                                     referenceIdSelected
@@ -207,13 +207,12 @@ function AuthorshipPanelSalientConcept({
                                     onClick={() =>
                                         sendMessagesToVscode({
                                             type: "invoke",
-                                            commandName: "removeStoryWordRangeFromSalientConcept",
+                                            commandName: "removeReferenceFromSalientConcept",
                                             commandArguments: {
                                                 annotationCellId:
                                                     salientConcept.annotationCellId,
-                                                firstWord:
-                                                    storyWordRange.firstWord,
-                                                lastWord: storyWordRange.lastWord,
+                                                referenceId:
+                                                    storyWordRange.passageId,
                                             },
                                         })
                                     }
