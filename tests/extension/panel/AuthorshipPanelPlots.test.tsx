@@ -209,25 +209,23 @@ describe("the plots tab", () => {
         expect(nodesMarked).toEqual(["true", "false"]);
     });
 
-    it("asks for a node's words to be taken out of the trajectory", async () => {
+    it("asks for a node, and the lines that reach it, to be taken out of the trajectory", async () => {
         await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
+            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passage: null },
         });
-        const removeButton = document.querySelector(
+        const secondRemoveButton = document.querySelectorAll(
             ".authorship-panel-story-annotation-passage-removed",
-        )!;
+        )[1];
 
-        await click(removeButton);
+        await click(secondRemoveButton);
 
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "removeStoryWordRange",
+                commandName: "replaceCell",
                 commandArguments: {
-                    annotationCellId: "p1",
-                    firstWord: 2,
-                    lastWord: 3,
+                    cell: '<!-- cell: plot id="p1" title="The door" nodes="n1:2-3" -->\n\nShe finds the door.\n',
                 },
             },
         ]);
@@ -264,7 +262,7 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "assignStoryText",
+                commandName: "assignStoryTextToPlot",
                 commandArguments: {
                     annotationCellId: "p1",
                     cellId: "m1",

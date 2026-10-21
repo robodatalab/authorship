@@ -245,7 +245,7 @@ describe("the salient concepts tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "assignStoryText",
+                commandName: "assignStoryTextToSalientConcept",
                 commandArguments: {
                     annotationCellId: "k1",
                     cellId: "m1",

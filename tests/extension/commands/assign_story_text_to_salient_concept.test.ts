@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AssignStoryTextCommand } from "../../../extension/vscode_runtime/commands/assign_story_text";
+import { AssignStoryTextToSalientConceptCommand } from "../../../extension/vscode_runtime/commands/assign_story_text_to_salient_concept";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
@@ -16,11 +16,11 @@ What she saw.
 `);
 }
 
-describe("AssignStoryTextCommand — assigns the selected words to a salient concept", () => {
+describe("AssignStoryTextToSalientConceptCommand — assigns the selected words to a salient concept", () => {
     it("assigns every word the selection touches", () => {
         const session = storyWithTheDoor("");
 
-        new AssignStoryTextCommand().invoke(session, {
+        new AssignStoryTextToSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
@@ -35,7 +35,7 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
     it("adds them to the words the concept already holds", () => {
         const session = storyWithTheDoor('words="0-0"');
 
-        new AssignStoryTextCommand().invoke(session, {
+        new AssignStoryTextToSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
@@ -53,7 +53,7 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
     it("leaves the words as they are when they are assigned already", () => {
         const session = storyWithTheDoor('words="1-3"');
 
-        new AssignStoryTextCommand().invoke(session, {
+        new AssignStoryTextToSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
@@ -68,7 +68,7 @@ describe("AssignStoryTextCommand — assigns the selected words to a salient con
     it("assigns nothing when the selection touches no word", () => {
         const session = storyWithTheDoor("");
 
-        new AssignStoryTextCommand().invoke(session, {
+        new AssignStoryTextToSalientConceptCommand().invoke(session, {
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 3,

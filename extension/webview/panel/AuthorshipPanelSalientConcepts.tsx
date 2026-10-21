@@ -149,7 +149,7 @@ function AuthorshipPanelSalientConcept({
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
-                            commandName: "assignStoryText",
+                            commandName: "assignStoryTextToSalientConcept",
                             commandArguments: {
                                 annotationCellId:
                                     salientConcept.annotationCellId,

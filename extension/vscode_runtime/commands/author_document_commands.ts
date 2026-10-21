@@ -1,7 +1,8 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
-import { AssignStoryTextCommand } from "./assign_story_text";
+import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
+import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
 import { DeleteStoryAnnotationCommand } from "./delete_story_annotation";
@@ -63,7 +64,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new ReplaceFindMatchesCommand(),
     new AddStoryAnnotationCommand(),
     new DeleteStoryAnnotationCommand(),
-    new AssignStoryTextCommand(),
+    new AssignStoryTextToSalientConceptCommand(),
+    new AssignStoryTextToPlotCommand(),
     new RemoveStoryWordRangeCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),

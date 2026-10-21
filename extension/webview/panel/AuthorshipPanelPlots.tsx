@@ -164,7 +164,7 @@ function AuthorshipPanelPlot({
                     onClick={() =>
                         sendMessagesToVscode({
                             type: "invoke",
-                            commandName: "assignStoryText",
+                            commandName: "assignStoryTextToPlot",
                             commandArguments: {
                                 annotationCellId: plot.annotationCellId,
                                 ...storyTextSelected,
@@ -281,6 +281,25 @@ function AuthorshipPanelPlotTrajectory({
         replaceTheCell(sendMessagesToVscode, disconnected);
     }
 
+    function takeOut(nodeId: string): void {
+        const nodesKept = plotCell.nodes.filter(
+            (node) => node.nodeId !== nodeId,
+        );
+        const edgesKept = plotCell.edges.filter(
+            (edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId,
+        );
+        const takenOut = new PlotCell(
+            plotCell.title,
+            nodesKept,
+            edgesKept,
+            plotCell.source,
+            plotCell.folded,
+            plotCell.at,
+            plotCell.uniqueId,
+        );
+        replaceTheCell(sendMessagesToVscode, takenOut);
+    }
+
     function followThePointer(event: ReactMouseEvent): void {
         if (rowConnectedFrom === null || lanesDrawn.current === null) {
             return;
@@ -337,17 +356,7 @@ function AuthorshipPanelPlotTrajectory({
                             className="authorship-panel-story-annotation-passage-removed"
                             title={TAKE_THE_NODE_OUT}
                             aria-label={TAKE_THE_NODE_OUT}
-                            onClick={() =>
-                                sendMessagesToVscode({
-                                    type: "invoke",
-                                    commandName: "removeStoryWordRange",
-                                    commandArguments: {
-                                        annotationCellId: plotCell.uniqueId,
-                                        firstWord: storyWordRange.firstWord,
-                                        lastWord: storyWordRange.lastWord,
-                                    },
-                                })
-                            }
+                            onClick={() => takeOut(nodeIds[node])}
                         >
                             <i className="codicon codicon-close" />
                         </button>

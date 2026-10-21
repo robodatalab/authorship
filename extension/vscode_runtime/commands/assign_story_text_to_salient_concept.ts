@@ -3,8 +3,8 @@ import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept
 import { StoryWordsIterator } from "../../library/storydoc/iterators/story_words_iterator";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
-export class AssignStoryTextCommand implements AuthorDocumentCommand {
-    readonly commandName = "assignStoryText";
+export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCommand {
+    readonly commandName = "assignStoryTextToSalientConcept";
     readonly buttonGroup = "edit";
     readonly iconClassName = "";
     readonly tooltip = "";
