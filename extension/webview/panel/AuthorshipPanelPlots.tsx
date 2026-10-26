@@ -3,6 +3,7 @@ import {
     useMemo,
     useRef,
     useState,
+    type DragEvent as ReactDragEvent,
     type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
@@ -202,19 +203,41 @@ function AuthorshipPanelPlotTrajectory({
 }: AuthorshipPanelPlotTrajectoryProps) {
     const lanesDrawn = useRef<SVGSVGElement>(null);
     const [rowConnectedFrom, connectFromRow] = useState<number | null>(null);
+    const [nodeIdDragged, dragTheNode] = useState<string | null>(null);
+    const [rowDraggedOver, dragOverTheRow] = useState<number | null>(null);
     const [pointerAt, movePointerTo] = useState<[number, number] | null>(
         null,
     );
+    const plotCellShown = useMemo(
+        () =>
+            nodeIdDragged === null || rowDraggedOver === null
+                ? plotCell
+                : plotCell.withNodeMovedInPlaceOf(
+                      nodeIdDragged,
+                      plotCell.nodes[rowDraggedOver].nodeId,
+                  ),
+        [plotCell, nodeIdDragged, rowDraggedOver],
+    );
     const nodeIds = useMemo(
-        () => plotCell.nodes.map((node) => node.nodeId),
-        [plotCell],
+        () => plotCellShown.nodes.map((node) => node.nodeId),
+        [plotCellShown],
+    );
+    const passagesShown = useMemo(
+        () =>
+            plotCellShown.nodes.map(
+                (node) =>
+                    passages.find(
+                        (passage) => passage.passageId === node.nodeId,
+                    )!,
+            ),
+        [plotCellShown, passages],
     );
     const lanes = useMemo(
-        () => new PlotTrajectoryLanes(nodeIds, plotCell.edges),
-        [nodeIds, plotCell],
+        () => new PlotTrajectoryLanes(nodeIds, plotCellShown.edges),
+        [nodeIds, plotCellShown],
     );
     const lanesWidth = lanes.lanesTaken * TRAJECTORY_LANE_WIDTH;
-    const rowsHeight = passages.length * TRAJECTORY_ROW_HEIGHT;
+    const rowsHeight = passagesShown.length * TRAJECTORY_ROW_HEIGHT;
     const xConnectedFrom =
         rowConnectedFrom === null
             ? null
@@ -249,6 +272,41 @@ function AuthorshipPanelPlotTrajectory({
         });
     }
 
+    function startDragging(row: number): void {
+        dragTheNode(nodeIds[row]);
+        dragOverTheRow(row);
+    }
+
+    function stopDragging(): void {
+        dragTheNode(null);
+        dragOverTheRow(null);
+    }
+
+    function letTheNodeDraggedBeDropped(event: ReactDragEvent): void {
+        if (nodeIdDragged !== null) {
+            event.preventDefault();
+        }
+    }
+
+    function moveTheNodeDragged(): void {
+        if (nodeIdDragged === null || rowDraggedOver === null) {
+            return;
+        }
+        const inPlaceOfNodeId = plotCell.nodes[rowDraggedOver].nodeId;
+        if (inPlaceOfNodeId === nodeIdDragged) {
+            return;
+        }
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "moveNodeInPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                nodeId: nodeIdDragged,
+                inPlaceOfNodeId,
+            },
+        });
+    }
+
     function disconnect(edgeId: string): void {
         sendMessagesToVscode({
             type: "invoke",
@@ -273,23 +331,37 @@ function AuthorshipPanelPlotTrajectory({
 
     return (
         <div
-            className="authorship-panel-plot-trajectory"
+            className={
+                nodeIdDragged === null
+                    ? "authorship-panel-plot-trajectory"
+                    : "authorship-panel-plot-trajectory authorship-panel-plot-trajectory-dragging"
+            }
             onMouseMove={followThePointer}
         >
             <ul
                 className="authorship-panel-story-annotation-passages"
                 style={{ paddingLeft: lanesWidth }}
+                onDragOver={letTheNodeDraggedBeDropped}
+                onDrop={moveTheNodeDragged}
             >
-                {passages.map((storyWordRange, node) => (
+                {passagesShown.map((storyWordRange, node) => (
                     <li
                         key={storyWordRange.passageId}
-                        className={
+                        className={`authorship-panel-story-annotation-passage${
                             storyWordRange.passageId === nodeIdSelected
-                                ? "authorship-panel-story-annotation-passage authorship-panel-story-annotation-passage-selected"
-                                : "authorship-panel-story-annotation-passage"
-                        }
+                                ? " authorship-panel-story-annotation-passage-selected"
+                                : ""
+                        }${
+                            storyWordRange.passageId === nodeIdDragged
+                                ? " authorship-panel-plot-trajectory-row-dragged"
+                                : ""
+                        }`}
                         style={{ height: TRAJECTORY_ROW_HEIGHT }}
                         onMouseUp={() => connectTo(node)}
+                        draggable
+                        onDragStart={() => startDragging(node)}
+                        onDragEnter={() => dragOverTheRow(node)}
+                        onDragEnd={stopDragging}
                     >
                         <button
                             type="button"
@@ -373,11 +445,15 @@ function AuthorshipPanelPlotTrajectory({
                     return (
                         <circle
                             key={nodeIds[node]}
-                            className={
+                            className={`authorship-panel-plot-trajectory-node${
                                 nodeIds[node] === nodeIdSelected
-                                    ? `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-node-selected authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
-                                    : `authorship-panel-plot-trajectory-node authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`
-                            }
+                                    ? " authorship-panel-plot-trajectory-node-selected"
+                                    : ""
+                            }${
+                                nodeIds[node] === nodeIdDragged
+                                    ? " authorship-panel-plot-trajectory-node-dragged"
+                                    : ""
+                            } authorship-panel-plot-trajectory-lane-${lane % TRAJECTORY_LANE_COLORS}`}
                             cx={xOfTheNode}
                             cy={yOfTheNode}
                             r={TRAJECTORY_NODE_RADIUS}

@@ -109,6 +109,34 @@ describe("the plots tab", () => {
         });
     }
 
+    async function startDragging(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(
+                new MouseEvent("dragstart", { bubbles: true }),
+            );
+        });
+    }
+
+    async function dragOver(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(
+                new MouseEvent("dragenter", { bubbles: true }),
+            );
+        });
+    }
+
+    async function dropOn(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(new MouseEvent("drop", { bubbles: true }));
+        });
+    }
+
+    async function stopDragging(element: Element): Promise<void> {
+        await act(async () => {
+            element.dispatchEvent(new MouseEvent("dragend", { bubbles: true }));
+        });
+    }
+
     it("says so when no manuscript is open", async () => {
         await mountPlots({ story: null });
 
@@ -389,6 +417,203 @@ describe("the plots tab", () => {
         await letGo(secondRow);
 
         expect(posted).toEqual([]);
+    });
+
+    it.each([
+        { dragged: 1, droppedOn: 0, nodeId: "n2", inPlaceOfNodeId: "n1" },
+        { dragged: 0, droppedOn: 1, nodeId: "n1", inPlaceOfNodeId: "n2" },
+    ])(
+        "asks for the node on row $dragged to take the place of the node on row $droppedOn",
+        async ({ dragged, droppedOn, nodeId, inPlaceOfNodeId }) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "p1",
+                    passageId: null,
+                },
+            });
+            const rows = document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage",
+            );
+
+            await startDragging(rows[dragged]);
+            await dragOver(rows[droppedOn]);
+            await dropOn(rows[droppedOn]);
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "moveNodeInPlot",
+                    commandArguments: {
+                        annotationCellId: "p1",
+                        nodeId,
+                        inPlaceOfNodeId,
+                    },
+                },
+            ]);
+        },
+    );
+
+    it("moves nothing when a row is dropped on itself", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const firstRow = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        )[0];
+
+        await startDragging(firstRow);
+        await dragOver(firstRow);
+        await dropOn(firstRow);
+
+        expect(posted).toEqual([]);
+    });
+
+    it("moves nothing once a row was dropped outside the trajectory", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const rows = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        );
+
+        await startDragging(rows[0]);
+        await dragOver(rows[1]);
+        await stopDragging(rows[0]);
+        await dropOn(rows[1]);
+
+        expect(posted).toEqual([]);
+    });
+
+    it.each([
+        {
+            dragging: "the first row over the second",
+            dragged: 0,
+            draggedOver: 1,
+            nodesShown: ["the bell.", "the door."],
+        },
+        {
+            dragging: "the second row over the first",
+            dragged: 1,
+            draggedOver: 0,
+            nodesShown: ["the bell.", "the door."],
+        },
+        {
+            dragging: "a row over itself",
+            dragged: 0,
+            draggedOver: 0,
+            nodesShown: ["the door.", "the bell."],
+        },
+    ])(
+        "shows where the node lands while dragging $dragging",
+        async ({ dragged, draggedOver, nodesShown }) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+                storyAnnotationSelected: {
+                    annotationCellId: "p1",
+                    passageId: null,
+                },
+            });
+            const rows = document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage",
+            );
+
+            await startDragging(rows[dragged]);
+            await dragOver(rows[draggedOver]);
+
+            const nodesShownWhileDragging = [
+                ...document.querySelectorAll(
+                    ".authorship-panel-story-annotation-passage-shown",
+                ),
+            ].map((node) => node.textContent);
+            expect(nodesShownWhileDragging).toEqual(nodesShown);
+        },
+    );
+
+    it("marks only the row dragged, where it lands, while dragging", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const rows = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        );
+
+        await startDragging(rows[0]);
+        await dragOver(rows[1]);
+
+        const rowsMarked = [
+            ...document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage",
+            ),
+        ].map((row) =>
+            row.classList.contains("authorship-panel-plot-trajectory-row-dragged"),
+        );
+        expect(rowsMarked).toEqual([false, true]);
+    });
+
+    it("marks no row once the drag ends", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const rows = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        );
+
+        await startDragging(rows[0]);
+        await dragOver(rows[1]);
+        await stopDragging(rows[0]);
+
+        const rowsMarked = [
+            ...document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage",
+            ),
+        ].map((row) =>
+            row.classList.contains("authorship-panel-plot-trajectory-row-dragged"),
+        );
+        expect(rowsMarked).toEqual([false, false]);
+    });
+
+    it("redraws the lines for where the node lands while dragging", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const rows = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        );
+
+        await startDragging(rows[0]);
+        await dragOver(rows[1]);
+
+        const arrowheadDrawn = document
+            .querySelector(".authorship-panel-plot-trajectory-edge-arrowhead")
+            ?.getAttribute("d");
+        expect(arrowheadDrawn).toBe("M 3.5 24.5 L 10.5 24.5 L 7 19.5 Z");
+    });
+
+    it("puts the node back once the drag is let go outside the trajectory", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const rows = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage",
+        );
+
+        await startDragging(rows[0]);
+        await dragOver(rows[1]);
+        await stopDragging(rows[0]);
+
+        const nodesShown = [
+            ...document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage-shown",
+            ),
+        ].map((node) => node.textContent);
+        expect(nodesShown).toEqual(["the door.", "the bell."]);
     });
 
     it("asks for the nodes whose line is clicked to be disconnected", async () => {

@@ -2,6 +2,18 @@
     position: relative;
 }
 
+.authorship-panel-plot-trajectory-dragging
+    .authorship-panel-story-annotation-passage-shown:hover,
+.authorship-panel-plot-trajectory-dragging
+    .authorship-panel-story-annotation-passage-removed:hover {
+    background: none;
+}
+
+.authorship-panel-plot-trajectory-row-dragged {
+    outline: 1px dashed var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
 .authorship-panel-plot-trajectory-lanes {
     position: absolute;
     top: 0;
@@ -85,6 +97,11 @@
 
 .authorship-panel-plot-trajectory-node-selected {
     fill: var(--authorship-panel-plot-trajectory-lane-color);
+}
+
+.authorship-panel-plot-trajectory-node-dragged {
+    stroke: var(--vscode-focusBorder);
+    stroke-dasharray: 2 2;
 }
 
 .authorship-panel-plot-trajectory-connection {

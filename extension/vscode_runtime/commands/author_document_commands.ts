@@ -22,6 +22,7 @@ import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
 import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
+import { MoveNodeInPlotCommand } from "./move_node_in_plot";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
 import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
@@ -71,6 +72,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new AssignStoryTextToPlotCommand(),
     new RemoveReferenceFromSalientConceptCommand(),
     new RemoveNodeFromPlotCommand(),
+    new MoveNodeInPlotCommand(),
     new AddEdgeToPlotCommand(),
     new RemoveEdgeFromPlotCommand(),
     new ImportMarkdownCommand(),
