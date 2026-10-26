@@ -58,6 +58,31 @@ export class PlotCell extends Cell {
         );
     }
 
+    withNodeMovedInPlaceOf(nodeId: string, inPlaceOfNodeId: string): PlotCell {
+        const nodeMoved = this.nodes.find((node) => node.nodeId === nodeId);
+        const placeTaken = this.nodes.findIndex(
+            (node) => node.nodeId === inPlaceOfNodeId,
+        );
+        if (nodeMoved === undefined || placeTaken < 0) {
+            return this;
+        }
+        const nodesLeft = this.nodes.filter((node) => node.nodeId !== nodeId);
+        const nodes = [
+            ...nodesLeft.slice(0, placeTaken),
+            nodeMoved,
+            ...nodesLeft.slice(placeTaken),
+        ];
+        return new PlotCell(
+            this.title,
+            nodes,
+            this.edges,
+            this.source,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
     accept<Result>(visitor: CellVisitor<Result>): Result {
         return visitor.visitPlot(this);
     }
