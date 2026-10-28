@@ -59,7 +59,7 @@ export class StoryAnnotationsIterator implements Iterable<StoryAnnotationInTheSt
             yield new StoryAnnotationInTheStory(
                 cell.uniqueId,
                 annotated.title,
-                cell.source,
+                annotated.description,
                 passages,
             );
         }

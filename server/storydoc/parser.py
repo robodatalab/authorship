@@ -50,13 +50,13 @@ from server.storydoc.visitors.marker_attributes import (
     WEBSITE,
     MarkerAttributes,
 )
+from server.storydoc.written_attributes import attributes_in, written_attribute_value
 
 _UNIQUE_ID = "id"
 FOLDED = "folded"
 _TRUE = "true"
 
 _MARKER = re.compile(r"^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$")
-_ATTR = re.compile(r'([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"')
 
 _SALIENT_CONCEPT_REFERENCE = re.compile(r"^\s*(?:([^:\s]+):)?(\d+)-(\d+)\s*$")
 
@@ -94,7 +94,7 @@ def parse(text: str) -> list[Cell]:
         close()
         opened = True
         kind = marker.group(1)
-        attrs = _read_attrs(marker.group(2))
+        attrs = attributes_in(marker.group(2))
         unique_id = attrs.pop(_UNIQUE_ID, "") or str(uuid4())
         folded = attrs.pop(FOLDED, "") == _TRUE
         body = []
@@ -106,16 +106,6 @@ def parse(text: str) -> list[Cell]:
 def cell_of_kind(kind: str) -> Cell:
     unique_id = str(uuid4())
     return _cell_from_marker(kind, {}, "", False, None, unique_id)
-
-
-def _read_attrs(text: str) -> dict[str, str]:
-    return {
-        name: _unescape(value) for name, value in _ATTR.findall(text)
-    }
-
-
-def _unescape(value: str) -> str:
-    return re.sub(r"\\(.)", r"\1", value)
 
 
 def _salient_concept_references_in(written: str) -> list[SalientConceptReference]:
@@ -228,10 +218,16 @@ def _cell_from_marker(
             attrs.get(TITLE, ""), references, source, folded, at, unique_id
         )
     if kind == PLOT:
-        nodes = _plot_nodes_in(attrs.get(PLOT_NODES, ""))
         edges = _plot_edges_in(attrs.get(PLOT_EDGES, ""))
-        return PlotCell(
-            attrs.get(TITLE, ""), nodes, edges, source, folded, at, unique_id
+        # A plot written before plots had events keeps its nodes in its marker
+        # and its overview in its body; it is written back with events.
+        if PLOT_NODES in attrs:
+            nodes = _plot_nodes_in(attrs[PLOT_NODES])
+            return PlotCell(
+                attrs.get(TITLE, ""), nodes, edges, source, folded, at, unique_id
+            )
+        return PlotCell.from_body(
+            attrs.get(TITLE, ""), edges, source, folded, at, unique_id
         )
     return UnknownCell(kind, attrs, source, folded, at, unique_id)
 
@@ -285,10 +281,8 @@ def marker_for(cell: Cell, marker_attributes: MarkerAttributes) -> str:
     folded = {FOLDED: _TRUE} if cell.folded else {}
     written_attrs = {_UNIQUE_ID: cell.unique_id, **attributes_of_the_kind, **folded}
     said = "".join(
-        f' {name}="{_escape(value)}"' for name, value in written_attrs.items()
+        f' {name}="{written_attribute_value(value)}"'
+        for name, value in written_attrs.items()
     )
     return f"<!-- cell: {cell.kind}{said} -->"
 
-
-def _escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')

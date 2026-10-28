@@ -15,6 +15,9 @@ interface AuthorshipPanelStoryAnnotationTitleAndDescriptionProps {
     title: string;
     description: string;
     onRetitled: (title: string) => void;
+    // Where the description is not the annotation cell's whole text — a plot's
+    // is its overview — what to do with the description the author typed.
+    onRedescribed?: (description: string) => void;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -23,6 +26,7 @@ export function AuthorshipPanelStoryAnnotationTitleAndDescription({
     title,
     description,
     onRetitled,
+    onRedescribed,
     sendMessagesToVscode,
 }: AuthorshipPanelStoryAnnotationTitleAndDescriptionProps) {
     const descriptionRewrites = useTimesTheHostRewroteIt(description);
@@ -43,6 +47,10 @@ export function AuthorshipPanelStoryAnnotationTitleAndDescription({
                         }
                         onMarkdownCommitted={(markdown) => {
                             descriptionRewrites.theAuthorTyped(markdown);
+                            if (onRedescribed !== undefined) {
+                                onRedescribed(markdown);
+                                return;
+                            }
                             sendMessagesToVscode({
                                 type: "typed",
                                 cellId: annotationCellId,

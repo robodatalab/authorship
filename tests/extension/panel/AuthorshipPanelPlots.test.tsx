@@ -22,6 +22,9 @@ vi.mock("monaco-editor/editor/editor.api", async () => {
 const { AuthorshipPanelPlots } = await import(
     "../../../extension/webview/panel/AuthorshipPanelPlots"
 );
+const { monacoEditorsOnThePage } = await import(
+    "../markdown/monaco_editor_double"
+);
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -52,6 +55,14 @@ She finds the door.
 const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3" -->
 
 She finds the door.
+`;
+
+const THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT = `<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->
+
+<ol title="She finds the door.">
+<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>
+<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>
+</ol>
 `;
 
 describe("the plots tab", () => {
@@ -186,7 +197,78 @@ describe("the plots tab", () => {
                 type: "invoke",
                 commandName: "replaceCell",
                 commandArguments: {
-                    cell: '<!-- cell: plot id="p1" title="The doors" -->\n\nShe finds the door.\n',
+                    cell: '<!-- cell: plot id="p1" title="The doors" -->\n\n<ol title="She finds the door.">\n</ol>\n',
+                },
+            },
+        ]);
+    });
+
+    it("lists every event by its summary, the story telling it or not", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+
+        const eventsShown = [
+            ...document.querySelectorAll(
+                ".authorship-panel-story-annotation-passage-shown",
+            ),
+        ].map((event) => [event.textContent, event.getAttribute("title")]);
+        expect(eventsShown).toEqual([
+            ["She finds the door.", "1.1 · the hall · the door."],
+            ["She opens the door.", "1.2 · the hall · Not told in the story yet"],
+        ]);
+    });
+
+    it("asks only for an event the story does not tell yet to be selected", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const eventUntold = document.querySelectorAll(
+            ".authorship-panel-story-annotation-passage-shown",
+        )[1];
+
+        await click(eventUntold);
+
+        expect(posted).toEqual([
+            { type: "selectPassage", cellKind: "plot", passageId: "e2" },
+        ]);
+    });
+
+    it("asks for the plot's overview to be replaced, its events kept, as the author types it", async () => {
+        monacoEditorsOnThePage.length = 0;
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const descriptionRendered =
+            document.querySelector(".markdown-rendered")!;
+
+        await act(async () => {
+            descriptionRendered.dispatchEvent(
+                new MouseEvent("dblclick", { bubbles: true }),
+            );
+        });
+        await act(async () => {
+            monacoEditorsOnThePage[0].putTheCursorAt(19);
+            monacoEditorsOnThePage[0].typeCharacter("!");
+        });
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "replaceCell",
+                commandArguments: {
+                    cell: [
+                        '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->',
+                        "",
+                        '<ol title="She finds the door.!">',
+                        '<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>',
+                        '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>',
+                        "</ol>",
+                        "",
+                    ].join("\n"),
                 },
             },
         ]);

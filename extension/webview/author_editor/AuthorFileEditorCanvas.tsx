@@ -239,11 +239,14 @@ export function AuthorFileEditorCanvas({
             if (plotCell === undefined || passageSelected === null) {
                 continue;
             }
-            const nodeIds = plotCell.nodes.map((node) => node.nodeId);
-            const nodeSelected = nodeIds[passageSelected];
+            // The marks are the plot's passages, and only an event the story
+            // tells has one, so an edge is drawn between the events' passages.
+            const nodeSelected = annotation.passageIds[passageSelected];
             for (const edge of plotCell.edges) {
-                const fromPassage = nodeIds.indexOf(edge.fromNodeId);
-                const toPassage = nodeIds.indexOf(edge.toNodeId);
+                const fromPassage = annotation.passageIds.indexOf(
+                    edge.fromNodeId,
+                );
+                const toPassage = annotation.passageIds.indexOf(edge.toNodeId);
                 const touchesTheNodeSelected =
                     edge.fromNodeId === nodeSelected ||
                     edge.toNodeId === nodeSelected;

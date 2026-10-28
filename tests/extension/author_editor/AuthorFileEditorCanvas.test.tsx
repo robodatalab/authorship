@@ -1364,6 +1364,20 @@ describe("the plots the story weaves", () => {
                         null,
                         "p3",
                     ),
+                    new PlotCell(
+                        "Knocked first",
+                        [
+                            new PlotNode("n0", null, "1.1", "the porch", "Someone knocks."),
+                            new PlotNode("n1", new StoryWordRange(0, 1)),
+                            new PlotNode("n2", new StoryWordRange(2, 2)),
+                            new PlotNode("n3", new StoryWordRange(3, 4)),
+                        ],
+                        [new PlotEdge("e1", "n1", "n3")],
+                        "Someone knocks before the door opens.",
+                        false,
+                        null,
+                        "p4",
+                    ),
                 ],
                 cellDrawings: {
                     markdown: (cell) => (
@@ -1559,6 +1573,30 @@ describe("the plots the story weaves", () => {
                     ],
                 ],
                 arrows: [],
+            },
+            {
+                selected: "a passage of a plot with an event the story does not tell",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p4", passageId: "n1" },
+                },
+                marks: [
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-3",
+                        "0",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-3",
+                        "10",
+                        "9",
+                    ],
+                    [
+                        "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-3",
+                        "150",
+                        "9",
+                    ],
+                ],
+                arrows: ["M 16 6.75 H 22 V 152.25 H 16"],
             },
             {
                 selected: "a concept and a passage of a plot",

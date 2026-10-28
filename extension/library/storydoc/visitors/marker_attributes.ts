@@ -4,7 +4,7 @@ import type { ChapterCell } from "../cells/chapter_cell";
 import type { DisclaimerCell } from "../cells/disclaimer_cell";
 import type { ImageCell } from "../cells/image_cell";
 import type { PartCell } from "../cells/part_cell";
-import type { PlotCell, PlotEdge, PlotNode } from "../cells/plot_cell";
+import type { PlotCell, PlotEdge } from "../cells/plot_cell";
 import type { RecapCell } from "../cells/recap_cell";
 import type {
     SalientConceptCell,
@@ -57,15 +57,6 @@ function writtenSalientConceptReferences(
         .map(
             (reference) =>
                 `${reference.referenceId}:${reference.storyWordRange.firstWord}-${reference.storyWordRange.lastWord}`,
-        )
-        .join(", ");
-}
-
-function writtenPlotNodes(nodes: readonly PlotNode[]): string {
-    return nodes
-        .map(
-            (node) =>
-                `${node.nodeId}:${node.storyWordRange.firstWord}-${node.storyWordRange.lastWord}`,
         )
         .join(", ");
 }
@@ -153,12 +144,11 @@ export class MarkerAttributes implements CellVisitor<Record<string, string>> {
         });
     }
 
+    // A plot's events are its body; its marker says only its title and edges.
     visitPlot(cell: PlotCell): Record<string, string> {
-        const nodes = writtenPlotNodes(cell.nodes);
         const edges = writtenPlotEdges(cell.edges);
         return withoutTheOnesNothingIsSaidAbout({
             [TITLE]: cell.title,
-            [PLOT_NODES]: nodes,
             [PLOT_EDGES]: edges,
         });
     }

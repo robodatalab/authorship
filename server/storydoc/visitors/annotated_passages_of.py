@@ -34,8 +34,13 @@ class AnnotatedPassagesOf(CellVisitor["AnnotatedPassages | None"]):
         ]
         return AnnotatedPassages(cell.title, story_word_ranges)
 
+    # Only an event that story text tells has a passage.
     def visit_plot(self, cell: PlotCell) -> AnnotatedPassages:
-        story_word_ranges = [node.story_word_range for node in cell.nodes]
+        story_word_ranges = [
+            node.story_word_range
+            for node in cell.nodes
+            if node.story_word_range is not None
+        ]
         return AnnotatedPassages(cell.title, story_word_ranges)
 
     def visit_markdown(self, cell: MarkdownCell) -> None:

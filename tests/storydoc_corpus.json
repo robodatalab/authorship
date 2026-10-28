@@ -237,6 +237,42 @@
                 }
             ],
             "dumped": "<!-- cell: markdown id=\"c1\" -->\n\nOne.\n"
+        },
+        {
+            "name": "a plot's body is its overview and its events, one to a line",
+            "text": "<!-- cell: plot id=\"p2\" title=\"Captain Varn and her daughter\" edges=\"x1:e1>e2, x2:e2>e3\" -->\n\n<ol title=\"How Captain Varn gave her life to buy her daughter time.\">\n<li id=\"e1\" timestamp=\"1.1\" location=\"earth, Varn's house\" words=\"412-468\">Captain Varn watches the news with her daughter. </li>\n<li id=\"e2\" timestamp=\"1.2\" location=\"earth, command center\" words=\"501-545\">Varn is given command of the corvette.</li>\n<li id=\"e3\" timestamp=\"1.4\" location=\"earth, Varn's house\">Varn says goodbye and promises to talk every day.</li>\n</ol>\n",
+            "cells": [
+                {
+                    "kind": "plot",
+                    "source": "<ol title=\"How Captain Varn gave her life to buy her daughter time.\">\n<li id=\"e1\" timestamp=\"1.1\" location=\"earth, Varn's house\" words=\"412-468\">Captain Varn watches the news with her daughter.</li>\n<li id=\"e2\" timestamp=\"1.2\" location=\"earth, command center\" words=\"501-545\">Varn is given command of the corvette.</li>\n<li id=\"e3\" timestamp=\"1.4\" location=\"earth, Varn's house\">Varn says goodbye and promises to talk every day.</li>\n</ol>",
+                    "id": "p2"
+                }
+            ],
+            "dumped": "<!-- cell: plot id=\"p2\" title=\"Captain Varn and her daughter\" edges=\"x1:e1>e2, x2:e2>e3\" -->\n\n<ol title=\"How Captain Varn gave her life to buy her daughter time.\">\n<li id=\"e1\" timestamp=\"1.1\" location=\"earth, Varn's house\" words=\"412-468\">Captain Varn watches the news with her daughter.</li>\n<li id=\"e2\" timestamp=\"1.2\" location=\"earth, command center\" words=\"501-545\">Varn is given command of the corvette.</li>\n<li id=\"e3\" timestamp=\"1.4\" location=\"earth, Varn's house\">Varn says goodbye and promises to talk every day.</li>\n</ol>\n"
+        },
+        {
+            "name": "a plot written before plots had events is written back with them",
+            "text": "<!-- cell: plot id=\"p1\" title=\"The door\" nodes=\"n1:2-3, n2:0-1\" edges=\"e1:n1>n2\" -->\n\nShe finds the door.\n",
+            "cells": [
+                {
+                    "kind": "plot",
+                    "source": "<ol title=\"She finds the door.\">\n<li id=\"n1\" words=\"2-3\"></li>\n<li id=\"n2\" words=\"0-1\"></li>\n</ol>",
+                    "id": "p1"
+                }
+            ],
+            "dumped": "<!-- cell: plot id=\"p1\" title=\"The door\" edges=\"e1:n1>n2\" -->\n\n<ol title=\"She finds the door.\">\n<li id=\"n1\" words=\"2-3\"></li>\n<li id=\"n2\" words=\"0-1\"></li>\n</ol>\n"
+        },
+        {
+            "name": "a plot's overview keeps its line breaks and quotes in one attribute",
+            "text": "<!-- cell: plot id=\"p3\" -->\n\n<ol title=\"She finds \\\"the\\\" door.\\nThen she opens it.\">\n<li id=\"e1\" location=\"the hall, by the door\">She opens the door.</li>\n</ol>\n",
+            "cells": [
+                {
+                    "kind": "plot",
+                    "source": "<ol title=\"She finds \\\"the\\\" door.\\nThen she opens it.\">\n<li id=\"e1\" location=\"the hall, by the door\">She opens the door.</li>\n</ol>",
+                    "id": "p3"
+                }
+            ],
+            "dumped": "<!-- cell: plot id=\"p3\" -->\n\n<ol title=\"She finds \\\"the\\\" door.\\nThen she opens it.\">\n<li id=\"e1\" location=\"the hall, by the door\">She opens the door.</li>\n</ol>\n"
         }
     ]
 }

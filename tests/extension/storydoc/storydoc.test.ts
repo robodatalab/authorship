@@ -7,6 +7,11 @@ import {
     SalientConceptCell,
     SalientConceptReference,
 } from "../../../extension/library/storydoc/cells/salient_concept_cell";
+import {
+    PlotCell,
+    PlotEdge,
+    PlotNode,
+} from "../../../extension/library/storydoc/cells/plot_cell";
 import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
 import {
     StoryTextSpan,
@@ -113,6 +118,107 @@ describe("a salient concept's references", () => {
         expect(written).toBe(
             '<!-- cell: salient-concept id="k1" title="Door" words="r1:2-3, r2:0-1" -->\n',
         );
+    });
+});
+
+describe("a plot's events", () => {
+    const THE_PLOT = [
+        '<!-- cell: plot id="p2" title="Captain Varn and her daughter" edges="x1:e1>e2" -->',
+        "",
+        '<ol title="How Captain Varn gave her life to buy her daughter time.">',
+        '<li id="e1" timestamp="1.1" location="earth, Varn\'s house" words="412-468">Captain Varn watches the news with her daughter.</li>',
+        '<li id="e2" timestamp="1.4" location="earth, command center">Varn is given command of the corvette.</li>',
+        "</ol>",
+        "",
+    ].join("\n");
+
+    it("are read with their timestamp, location, words and summary", () => {
+        const [plot] = new Document(THE_PLOT).cells;
+
+        expect(plot).toMatchObject({
+            title: "Captain Varn and her daughter",
+            overview: "How Captain Varn gave her life to buy her daughter time.",
+            nodes: [
+                new PlotNode(
+                    "e1",
+                    new StoryWordRange(412, 468),
+                    "1.1",
+                    "earth, Varn's house",
+                    "Captain Varn watches the news with her daughter.",
+                ),
+                new PlotNode(
+                    "e2",
+                    null,
+                    "1.4",
+                    "earth, command center",
+                    "Varn is given command of the corvette.",
+                ),
+            ],
+            edges: [new PlotEdge("x1", "e1", "e2")],
+        });
+    });
+
+    it("are written in the order the plot gives them, the words only of an event the story tells", () => {
+        const plot = new PlotCell(
+            "The door",
+            [
+                new PlotNode("e2", null, "1.2", "the hall", "She opens the door."),
+                new PlotNode("e1", new StoryWordRange(2, 3), "1.1", "the hall", "She finds the door."),
+            ],
+            [new PlotEdge("x1", "e1", "e2")],
+            "She finds a door, and opens it.",
+            false,
+            null,
+            "p1",
+        );
+
+        const written = Document.fromCells([plot]).text;
+
+        expect(written).toBe(
+            [
+                '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->',
+                "",
+                '<ol title="She finds a door, and opens it.">',
+                '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>',
+                '<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>',
+                "</ol>",
+                "",
+            ].join("\n"),
+        );
+    });
+
+    it("are none in a body that is not a list of them, which is all overview", () => {
+        const [plot] = new Document(
+            '<!-- cell: plot id="p1" title="The door" -->\n\nShe finds the door.\n',
+        ).cells;
+
+        expect(plot).toMatchObject({
+            overview: "She finds the door.",
+            nodes: [],
+        });
+    });
+
+    it("are kept when the overview is rewritten", () => {
+        const [plot] = new Document(THE_PLOT).cells as PlotCell[];
+
+        const redescribed = plot.withOverview("How a mother bought her daughter time.");
+
+        expect(redescribed.overview).toBe("How a mother bought her daughter time.");
+        expect(redescribed.nodes).toEqual(plot.nodes);
+    });
+
+    it("are read again from the body when the body is rewritten", () => {
+        const [plot] = new Document(THE_PLOT).cells as PlotCell[];
+
+        const rewritten = plot.withSource(
+            '<ol title="A mother.">\n<li id="e1" timestamp="2.1" location="orbit">Varn calls her daughter.</li>\n</ol>',
+        );
+
+        expect(rewritten).toMatchObject({
+            overview: "A mother.",
+            nodes: [new PlotNode("e1", null, "2.1", "orbit", "Varn calls her daughter.")],
+            edges: plot.edges,
+        });
     });
 });
 
