@@ -28,7 +28,7 @@ export class RemoveEdgeFromPlotCommand implements AuthorDocumentCommand {
                 plot.title,
                 plot.nodes,
                 edgesKept,
-                plot.source,
+                plot.overview,
                 plot.folded,
                 plot.at,
                 plot.uniqueId,

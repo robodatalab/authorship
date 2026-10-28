@@ -32,7 +32,7 @@ export class RemoveNodeFromPlotCommand implements AuthorDocumentCommand {
                 plot.title,
                 nodesKept,
                 edgesKept,
-                plot.source,
+                plot.overview,
                 plot.folded,
                 plot.at,
                 plot.uniqueId,

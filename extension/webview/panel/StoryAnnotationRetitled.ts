@@ -35,7 +35,7 @@ export class StoryAnnotationRetitled implements CellVisitor<Cell> {
             this.title,
             cell.nodes,
             cell.edges,
-            cell.source,
+            cell.overview,
             cell.folded,
             cell.at,
             cell.uniqueId,

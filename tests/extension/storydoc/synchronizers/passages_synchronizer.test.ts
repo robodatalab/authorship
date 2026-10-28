@@ -209,7 +209,7 @@ describe("a plot's nodes", () => {
         });
     });
 
-    it("are taken out with their edges when all their words are deleted", () => {
+    it("stay in the plot with their edges, told by no words, when all their words are deleted", () => {
         const story = withThePassagesInStep(
             [sheSaw("She saw the door."), HE_HEARD, thePlot("n-she:0-0, n-door:2-3, n-bell:6-7", "e-1:n-she>n-door, e-2:n-she>n-bell")].join("\n"),
             [sheSaw("She saw"), HE_HEARD, thePlot("n-she:0-0, n-door:2-3, n-bell:6-7", "e-1:n-she>n-door, e-2:n-she>n-bell")].join("\n"),
@@ -218,9 +218,13 @@ describe("a plot's nodes", () => {
         expect(story.cellWithId("p1")).toMatchObject({
             nodes: [
                 new PlotNode("n-she", new StoryWordRange(0, 0)),
+                new PlotNode("n-door", null),
                 new PlotNode("n-bell", new StoryWordRange(4, 5)),
             ],
-            edges: [new PlotEdge("e-2", "n-she", "n-bell")],
+            edges: [
+                new PlotEdge("e-1", "n-she", "n-door"),
+                new PlotEdge("e-2", "n-she", "n-bell"),
+            ],
         });
     });
 });

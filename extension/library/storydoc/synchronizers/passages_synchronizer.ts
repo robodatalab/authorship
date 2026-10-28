@@ -13,7 +13,7 @@ import type { ImageCell } from "../cells/image_cell";
 import type { MarkdownCell } from "../cells/markdown_cell";
 import type { NoteCell } from "../cells/note_cell";
 import type { PartCell } from "../cells/part_cell";
-import { PlotCell, PlotNode } from "../cells/plot_cell";
+import { PlotCell } from "../cells/plot_cell";
 import type { RecapCell } from "../cells/recap_cell";
 import {
     SalientConceptCell,
@@ -218,31 +218,23 @@ class PassagesKeptInStep implements CellVisitor<Cell> {
         );
     }
 
+    // An event outlives the words that told it: when they are gone, it is
+    // simply told by none.
     visitPlot(cell: PlotCell): PlotCell {
-        const nodesKeptInStep: PlotNode[] = [];
-        for (const node of cell.nodes) {
+        const nodesKeptInStep = cell.nodes.map((node) => {
+            if (node.storyWordRange === null) {
+                return node;
+            }
             const rangeKeptInStep = this.whereTheWordsWent.rangeKeptInStep(
                 node.storyWordRange,
             );
-            if (rangeKeptInStep !== null) {
-                const nodeKeptInStep = new PlotNode(
-                    node.nodeId,
-                    rangeKeptInStep,
-                );
-                nodesKeptInStep.push(nodeKeptInStep);
-            }
-        }
-        const nodeIdsKept = nodesKeptInStep.map((node) => node.nodeId);
-        const edgesKept = cell.edges.filter(
-            (edge) =>
-                nodeIdsKept.includes(edge.fromNodeId) &&
-                nodeIdsKept.includes(edge.toNodeId),
-        );
+            return node.withStoryWordRange(rangeKeptInStep);
+        });
         return new PlotCell(
             cell.title,
             nodesKeptInStep,
-            edgesKept,
-            cell.source,
+            cell.edges,
+            cell.overview,
             cell.folded,
             cell.at,
             cell.uniqueId,

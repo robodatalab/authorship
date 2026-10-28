@@ -3,6 +3,11 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
+import { AssignStoryTextToPlotEventCommand } from "./assign_story_text_to_plot_event";
+import { AddEventToPlotCommand } from "./add_event_to_plot";
+import { ChangePlotEventCommand } from "./change_plot_event";
+import { RemoveStoryTextFromPlotEventCommand } from "./remove_story_text_from_plot_event";
+import { RedescribePlotCommand } from "./redescribe_plot";
 import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
@@ -70,6 +75,11 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DeleteStoryAnnotationCommand(),
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
+    new AssignStoryTextToPlotEventCommand(),
+    new AddEventToPlotCommand(),
+    new ChangePlotEventCommand(),
+    new RemoveStoryTextFromPlotEventCommand(),
+    new RedescribePlotCommand(),
     new RemoveReferenceFromSalientConceptCommand(),
     new RemoveNodeFromPlotCommand(),
     new MoveNodeInPlotCommand(),

@@ -14,16 +14,28 @@ import {
 import { AuthorshipPanelStoryAnnotationTitleAndDescription } from "./AuthorshipPanelStoryAnnotationTitleAndDescription";
 import { StoryAnnotationRetitled } from "./StoryAnnotationRetitled";
 import {
+    AuthorshipPanelSections,
+    type AuthorshipPanelSection,
+} from "./AuthorshipPanelSections";
+import {
     PlotTrajectoryLanes,
     type PlotEdgeInALane,
 } from "./PlotTrajectoryLanes";
 import { replaceTheCell } from "../author_editor/AuthorFileEditorCanvas";
 import {
+    AuthorFileEditorCellFields,
+    type AuthorFileEditorCellField,
+} from "../author_editor/AuthorFileEditorCellFields";
+import {
     StoryAnnotationsIterator,
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
 } from "../../library/storydoc/iterators/story_annotations_iterator";
-import { PLOT, PlotCell } from "../../library/storydoc/cells/plot_cell";
+import {
+    PLOT,
+    PlotCell,
+    type PlotNode,
+} from "../../library/storydoc/cells/plot_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import type { Cell } from "../../library/storydoc/cells/cell";
@@ -37,8 +49,15 @@ const PLOTS_LIST_WORDING: AuthorshipPanelStoryAnnotationsListWording = {
     deleteTheAnnotation: "Delete this plot",
     passagesCounted: "Spans",
 };
-const ADD_THE_WORDS_SELECTED = "Add the selected words to the trajectory";
-const TAKE_THE_NODE_OUT = "Take these words out of the trajectory";
+const ADD_AN_EVENT =
+    "Add an event to the trajectory, told by the selected words if any are selected";
+const TAKE_THE_NODE_OUT = "Take this event out of the trajectory";
+const TOLD_BY_NO_WORDS = "Not told in the story yet";
+const UNTITLED_EVENT = "Untitled event";
+const ASSIGN_THE_WORDS_SELECTED = "Assign the selected words to this event";
+const DELETE_THE_STORY_TEXT = "Delete the story text of this event";
+// How many of the words that tell an untitled event its row shows.
+const FIRST_WORDS_SHOWN = 6;
 const DISCONNECT_THE_NODES = "Disconnect these nodes";
 const TRAJECTORY_ROW_HEIGHT = 22;
 const TRAJECTORY_LANE_WIDTH = 14;
@@ -80,6 +99,13 @@ export function AuthorshipPanelPlots({
             (plotCell) =>
                 plotCell.uniqueId === storyAnnotationSelected.annotationCellId,
         );
+    const eventShown = plotCellShown?.nodes.find(
+        (node) => node.nodeId === storyAnnotationSelected.passageId,
+    );
+    const passageOfTheEventShown =
+        plotShown?.passages.find(
+            (passage) => passage.passageId === eventShown?.nodeId,
+        ) ?? null;
 
     function retitleThePlot(plotCellId: string, title: string): void {
         const plotCell = story?.cellWithId(plotCellId);
@@ -91,17 +117,25 @@ export function AuthorshipPanelPlots({
         replaceTheCell(sendMessagesToVscode, retitled);
     }
 
-    return (
-        <div className="authorship-panel-story-annotations">
-            <AuthorshipPanelStoryAnnotationsList
-                cellKind={PLOT}
-                storyAnnotations={plots}
-                annotationShown={plotShown}
-                wording={PLOTS_LIST_WORDING}
-                sendMessagesToVscode={sendMessagesToVscode}
-            />
-            {plots.length > 0 &&
-                (plotShown === undefined || plotCellShown === undefined ? (
+    const sections: AuthorshipPanelSection[] = [
+        {
+            name: "plots",
+            content: (
+                <AuthorshipPanelStoryAnnotationsList
+                    cellKind={PLOT}
+                    storyAnnotations={plots}
+                    annotationShown={plotShown}
+                    wording={PLOTS_LIST_WORDING}
+                    sendMessagesToVscode={sendMessagesToVscode}
+                />
+            ),
+        },
+    ];
+    if (plots.length > 0) {
+        sections.push({
+            name: "plot",
+            content:
+                plotShown === undefined || plotCellShown === undefined ? (
                     <section className="authorship-panel-story-annotation-details">
                         <div className="authorship-panel-idle">
                             Select a plot to see its abstract and trajectory
@@ -119,8 +153,156 @@ export function AuthorshipPanelPlots({
                         }
                         sendMessagesToVscode={sendMessagesToVscode}
                     />
-                ))}
+                ),
+        });
+    }
+    if (plotCellShown !== undefined && eventShown !== undefined) {
+        sections.push({
+            name: "event",
+            content: (
+                <AuthorshipPanelPlotEvent
+                    key={eventShown.nodeId}
+                    plotCell={plotCellShown}
+                    plotNode={eventShown}
+                    passage={passageOfTheEventShown}
+                    storyTextSelected={storyTextSelected}
+                    sendMessagesToVscode={sendMessagesToVscode}
+                />
+            ),
+        });
+    }
+
+    return (
+        <div className="authorship-panel-story-annotations">
+            <AuthorshipPanelSections sections={sections} />
         </div>
+    );
+}
+
+interface AuthorshipPanelPlotEventProps {
+    plotCell: PlotCell;
+    plotNode: PlotNode;
+    passage: StoryWordRangeInTheStory | null;
+    storyTextSelected: StoryTextSpan | null;
+    sendMessagesToVscode: SendMessagesToVscode;
+}
+
+// The event selected in a plot's trajectory: what it is, when and where it
+// happens, and the story text that tells it.
+function AuthorshipPanelPlotEvent({
+    plotCell,
+    plotNode,
+    passage,
+    storyTextSelected,
+    sendMessagesToVscode,
+}: AuthorshipPanelPlotEventProps) {
+    // Only what changed is sent, for the host to say of the event as the plot
+    // stands there: the plot this page drew may be behind it.
+    function sayOfTheEvent(field: string, said: string): void {
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "changePlotEvent",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                nodeId: plotNode.nodeId,
+                field,
+                said,
+            },
+        });
+    }
+
+    const fields: AuthorFileEditorCellField[] = [
+        {
+            label: "Title",
+            said: plotNode.summary,
+            onSaid: (summary) => sayOfTheEvent("summary", summary),
+        },
+        {
+            label: "Timestamp",
+            said: plotNode.timestamp,
+            placeholder: "Story time",
+            onSaid: (timestamp) => sayOfTheEvent("timestamp", timestamp),
+        },
+        {
+            label: "Location",
+            said: plotNode.location,
+            placeholder: "Location in the story, comma separated",
+            onSaid: (location) => sayOfTheEvent("location", location),
+        },
+    ];
+
+    return (
+        <section className="authorship-panel-story-annotation-details authorship-panel-plot-event">
+            <h4>Event</h4>
+            <AuthorFileEditorCellFields fields={fields} />
+            <div className="authorship-panel-story-annotation-passages-heading">
+                <h4>Story text</h4>
+            </div>
+            <ul className="authorship-panel-story-annotation-passages">
+                <li className="authorship-panel-story-annotation-passage">
+                    {passage === null ? (
+                        <span className="authorship-panel-plot-event-untold">
+                            {TOLD_BY_NO_WORDS}
+                        </span>
+                    ) : (
+                        <button
+                            type="button"
+                            className="authorship-panel-story-annotation-passage-shown"
+                            title={passage.wordsItCovers}
+                            onClick={() =>
+                                sendMessagesToVscode({
+                                    type: "showStoryWordRange",
+                                    firstWord: passage.firstWord,
+                                    lastWord: passage.lastWord,
+                                })
+                            }
+                        >
+                            {passage.wordsItCovers}
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        className="authorship-panel-story-annotation-assign"
+                        title={ASSIGN_THE_WORDS_SELECTED}
+                        aria-label={ASSIGN_THE_WORDS_SELECTED}
+                        disabled={storyTextSelected === null}
+                        onClick={() =>
+                            sendMessagesToVscode({
+                                type: "invoke",
+                                commandName: "assignStoryTextToPlotEvent",
+                                commandArguments: {
+                                    annotationCellId: plotCell.uniqueId,
+                                    nodeId: plotNode.nodeId,
+                                    ...storyTextSelected,
+                                },
+                            })
+                        }
+                    >
+                        <i className="codicon codicon-link" />
+                    </button>
+                    {passage !== null && (
+                        <button
+                            type="button"
+                            className="authorship-panel-story-annotation-passage-removed"
+                            title={DELETE_THE_STORY_TEXT}
+                            aria-label={DELETE_THE_STORY_TEXT}
+                            onClick={() =>
+                                sendMessagesToVscode({
+                                    type: "invoke",
+                                    commandName: "removeStoryTextFromPlotEvent",
+                                    commandArguments: {
+                                        annotationCellId: plotCell.uniqueId,
+                                        nodeId: plotNode.nodeId,
+                                    },
+                                })
+                            }
+                        >
+                            <i className="codicon codicon-close" />
+                        </button>
+                    )}
+                </li>
+            </ul>
+        </section>
     );
 }
 
@@ -141,6 +323,33 @@ function AuthorshipPanelPlot({
     onRetitled,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotProps) {
+    // Selected words tell the event added; with none selected, the event is
+    // added untold, and selected for the author to say what it is.
+    function addAnEvent(): void {
+        if (storyTextSelected !== null) {
+            sendMessagesToVscode({
+                type: "invoke",
+                commandName: "assignStoryTextToPlot",
+                commandArguments: {
+                    annotationCellId: plot.annotationCellId,
+                    ...storyTextSelected,
+                },
+            });
+            return;
+        }
+        const nodeId = crypto.randomUUID();
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "addEventToPlot",
+            commandArguments: { annotationCellId: plot.annotationCellId, nodeId },
+        });
+        sendMessagesToVscode({
+            type: "selectPassage",
+            cellKind: PLOT,
+            passageId: nodeId,
+        });
+    }
+
     return (
         <section className="authorship-panel-story-annotation-details">
             <AuthorshipPanelStoryAnnotationTitleAndDescription
@@ -148,6 +357,16 @@ function AuthorshipPanelPlot({
                 title={plot.title}
                 description={plot.description}
                 onRetitled={onRetitled}
+                onRedescribed={(overview) =>
+                    sendMessagesToVscode({
+                        type: "invoke",
+                        commandName: "redescribePlot",
+                        commandArguments: {
+                            annotationCellId: plot.annotationCellId,
+                            overview,
+                        },
+                    })
+                }
                 sendMessagesToVscode={sendMessagesToVscode}
             />
             <div className="authorship-panel-story-annotation-passages-heading">
@@ -155,26 +374,16 @@ function AuthorshipPanelPlot({
                 <button
                     type="button"
                     className="authorship-panel-story-annotation-assign"
-                    title={ADD_THE_WORDS_SELECTED}
-                    aria-label={ADD_THE_WORDS_SELECTED}
-                    disabled={storyTextSelected === null}
-                    onClick={() =>
-                        sendMessagesToVscode({
-                            type: "invoke",
-                            commandName: "assignStoryTextToPlot",
-                            commandArguments: {
-                                annotationCellId: plot.annotationCellId,
-                                ...storyTextSelected,
-                            },
-                        })
-                    }
+                    title={ADD_AN_EVENT}
+                    aria-label={ADD_AN_EVENT}
+                    onClick={addAnEvent}
                 >
                     <i className="codicon codicon-add" />
                 </button>
             </div>
-            {plot.passages.length === 0 ? (
+            {plotCell.nodes.length === 0 ? (
                 <div className="authorship-panel-idle">
-                    No words in the trajectory yet
+                    No events in the trajectory yet
                 </div>
             ) : (
                 <AuthorshipPanelPlotTrajectory
@@ -222,13 +431,14 @@ function AuthorshipPanelPlotTrajectory({
         () => plotCellShown.nodes.map((node) => node.nodeId),
         [plotCellShown],
     );
+    // An event the story does not tell yet has no passage.
     const passagesShown = useMemo(
         () =>
             plotCellShown.nodes.map(
                 (node) =>
                     passages.find(
                         (passage) => passage.passageId === node.nodeId,
-                    )!,
+                    ) ?? null,
             ),
         [plotCellShown, passages],
     );
@@ -344,67 +554,83 @@ function AuthorshipPanelPlotTrajectory({
                 onDragOver={letTheNodeDraggedBeDropped}
                 onDrop={moveTheNodeDragged}
             >
-                {passagesShown.map((storyWordRange, node) => (
-                    <li
-                        key={storyWordRange.passageId}
-                        className={`authorship-panel-story-annotation-passage${
-                            storyWordRange.passageId === nodeIdSelected
-                                ? " authorship-panel-story-annotation-passage-selected"
-                                : ""
-                        }${
-                            storyWordRange.passageId === nodeIdDragged
-                                ? " authorship-panel-plot-trajectory-row-dragged"
-                                : ""
-                        }`}
-                        style={{ height: TRAJECTORY_ROW_HEIGHT }}
-                        onMouseUp={() => connectTo(node)}
-                        draggable
-                        onDragStart={() => startDragging(node)}
-                        onDragEnter={() => dragOverTheRow(node)}
-                        onDragEnd={stopDragging}
-                    >
-                        <button
-                            type="button"
-                            className="authorship-panel-story-annotation-passage-shown"
-                            title={storyWordRange.wordsItCovers}
-                            aria-pressed={
-                                storyWordRange.passageId === nodeIdSelected
-                            }
-                            onClick={() => {
-                                sendMessagesToVscode({
-                                    type: "selectPassage",
-                                    cellKind: PLOT,
-                                    passageId: storyWordRange.passageId,
-                                });
-                                sendMessagesToVscode({
-                                    type: "showStoryWordRange",
-                                    firstWord: storyWordRange.firstWord,
-                                    lastWord: storyWordRange.lastWord,
-                                });
-                            }}
+                {plotCellShown.nodes.map((plotNode, node) => {
+                    const passage = passagesShown[node];
+                    const told =
+                        passage === null
+                            ? TOLD_BY_NO_WORDS
+                            : passage.wordsItCovers;
+                    const said = [plotNode.timestamp, plotNode.location, told]
+                        .filter((part) => part !== "")
+                        .join(" · ");
+                    const named =
+                        plotNode.summary ||
+                        (passage === null
+                            ? UNTITLED_EVENT
+                            : firstWordsOf(passage.wordsItCovers));
+                    return (
+                        <li
+                            key={plotNode.nodeId}
+                            className={`authorship-panel-story-annotation-passage${
+                                plotNode.nodeId === nodeIdSelected
+                                    ? " authorship-panel-story-annotation-passage-selected"
+                                    : ""
+                            }${
+                                plotNode.nodeId === nodeIdDragged
+                                    ? " authorship-panel-plot-trajectory-row-dragged"
+                                    : ""
+                            }`}
+                            style={{ height: TRAJECTORY_ROW_HEIGHT }}
+                            onMouseUp={() => connectTo(node)}
+                            draggable
+                            onDragStart={() => startDragging(node)}
+                            onDragEnter={() => dragOverTheRow(node)}
+                            onDragEnd={stopDragging}
                         >
-                            {storyWordRange.wordsItCovers}
-                        </button>
-                        <button
-                            type="button"
-                            className="authorship-panel-story-annotation-passage-removed"
-                            title={TAKE_THE_NODE_OUT}
-                            aria-label={TAKE_THE_NODE_OUT}
-                            onClick={() =>
-                                sendMessagesToVscode({
-                                    type: "invoke",
-                                    commandName: "removeNodeFromPlot",
-                                    commandArguments: {
-                                        annotationCellId: plotCell.uniqueId,
-                                        nodeId: storyWordRange.passageId,
-                                    },
-                                })
-                            }
-                        >
-                            <i className="codicon codicon-close" />
-                        </button>
-                    </li>
-                ))}
+                            <button
+                                type="button"
+                                className="authorship-panel-story-annotation-passage-shown"
+                                title={said}
+                                aria-pressed={plotNode.nodeId === nodeIdSelected}
+                                onClick={() => {
+                                    sendMessagesToVscode({
+                                        type: "selectPassage",
+                                        cellKind: PLOT,
+                                        passageId: plotNode.nodeId,
+                                    });
+                                    if (passage === null) {
+                                        return;
+                                    }
+                                    sendMessagesToVscode({
+                                        type: "showStoryWordRange",
+                                        firstWord: passage.firstWord,
+                                        lastWord: passage.lastWord,
+                                    });
+                                }}
+                            >
+                                {named}
+                            </button>
+                            <button
+                                type="button"
+                                className="authorship-panel-story-annotation-passage-removed"
+                                title={TAKE_THE_NODE_OUT}
+                                aria-label={TAKE_THE_NODE_OUT}
+                                onClick={() =>
+                                    sendMessagesToVscode({
+                                        type: "invoke",
+                                        commandName: "removeNodeFromPlot",
+                                        commandArguments: {
+                                            annotationCellId: plotCell.uniqueId,
+                                            nodeId: plotNode.nodeId,
+                                        },
+                                    })
+                                }
+                            >
+                                <i className="codicon codicon-close" />
+                            </button>
+                        </li>
+                    );
+                })}
             </ul>
             <svg
                 ref={lanesDrawn}
@@ -525,4 +751,10 @@ function arrowheadOfTheEdge(edge: PlotEdgeInALane): string {
         "Z",
     ].join(" ");
     return arrowheadDrawn;
+}
+
+function firstWordsOf(words: string): string {
+    const each = words.split(" ");
+    const first = each.slice(0, FIRST_WORDS_SHOWN).join(" ");
+    return each.length > FIRST_WORDS_SHOWN ? `${first}…` : first;
 }

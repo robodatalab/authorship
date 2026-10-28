@@ -539,6 +539,99 @@ class Plots(unittest.TestCase):
         self.assertEqual(plots, expected)
 
 
+class PlotEvents(unittest.TestCase):
+    THE_PLOT = (
+        '<!-- cell: plot id="p2" title="Captain Varn and her daughter" edges="x1:e1>e2" -->\n'
+        '\n'
+        '<ol title="How Captain Varn gave her life to buy her daughter time.">\n'
+        '<li id="e1" timestamp="1.1" location="earth, Varn\'s house" words="412-468">'
+        'Captain Varn watches the news with her daughter.</li>\n'
+        '<li id="e2" timestamp="1.4" location="earth, command center">'
+        'Varn is given command of the corvette.</li>\n'
+        '</ol>\n'
+    )
+
+    def test_are_read_with_their_timestamp_location_words_and_summary(self) -> None:
+        (plot,) = Document(self.THE_PLOT).plots()
+
+        self.assertEqual(
+            plot,
+            PlotCell(
+                "Captain Varn and her daughter",
+                [
+                    PlotNode(
+                        "e1",
+                        StoryWordRange(412, 468),
+                        "1.1",
+                        "earth, Varn's house",
+                        "Captain Varn watches the news with her daughter.",
+                    ),
+                    PlotNode(
+                        "e2",
+                        None,
+                        "1.4",
+                        "earth, command center",
+                        "Varn is given command of the corvette.",
+                    ),
+                ],
+                [PlotEdge("x1", "e1", "e2")],
+                "How Captain Varn gave her life to buy her daughter time.",
+                False,
+                None,
+                "p2",
+            ),
+        )
+
+    def test_are_written_in_the_order_the_plot_gives_them(self) -> None:
+        plot = PlotCell(
+            "The door",
+            [
+                PlotNode("e2", None, "1.2", "the hall", "She opens the door."),
+                PlotNode("e1", StoryWordRange(2, 3), "1.1", "the hall", "She finds the door."),
+            ],
+            [PlotEdge("x1", "e1", "e2")],
+            "She finds a door, and opens it.",
+            False,
+            None,
+            "p1",
+        )
+
+        written = Document.from_cells([plot]).text
+
+        self.assertEqual(
+            written,
+            '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->\n'
+            '\n'
+            '<ol title="She finds a door, and opens it.">\n'
+            '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>\n'
+            '<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>\n'
+            '</ol>\n',
+        )
+
+    def test_are_kept_when_the_overview_is_rewritten(self) -> None:
+        (plot,) = Document(self.THE_PLOT).plots()
+
+        redescribed = plot.with_overview("How a mother bought her daughter time.")
+
+        self.assertEqual(redescribed.overview, "How a mother bought her daughter time.")
+        self.assertEqual(redescribed.nodes, plot.nodes)
+
+    def test_are_read_again_from_the_body_when_the_body_is_rewritten(self) -> None:
+        (plot,) = Document(self.THE_PLOT).plots()
+
+        rewritten = plot.with_source(
+            '<ol title="A mother.">\n'
+            '<li id="e1" timestamp="2.1" location="orbit">Varn calls her daughter.</li>\n'
+            '</ol>'
+        )
+
+        self.assertEqual(rewritten.overview, "A mother.")
+        self.assertEqual(
+            rewritten.nodes, [PlotNode("e1", None, "2.1", "orbit", "Varn calls her daughter.")]
+        )
+        self.assertEqual(rewritten.edges, plot.edges)
+
+
 class StoryText(unittest.TestCase):
     @parameterized.expand([
         (

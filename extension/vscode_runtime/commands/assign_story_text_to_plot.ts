@@ -31,9 +31,9 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
             if (
                 plot.nodes.some(
                     (node) =>
-                        node.storyWordRange.firstWord ===
+                        node.storyWordRange?.firstWord ===
                             wordsAssigned.firstWord &&
-                        node.storyWordRange.lastWord === wordsAssigned.lastWord,
+                        node.storyWordRange?.lastWord === wordsAssigned.lastWord,
                 )
             ) {
                 return;
@@ -45,7 +45,7 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
                 plot.title,
                 nodes,
                 plot.edges,
-                plot.source,
+                plot.overview,
                 plot.folded,
                 plot.at,
                 plot.uniqueId,

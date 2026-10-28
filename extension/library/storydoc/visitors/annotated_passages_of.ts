@@ -26,6 +26,7 @@ export class AnnotatedPassage {
 export class AnnotatedPassages {
     constructor(
         readonly title: string,
+        readonly description: string,
         readonly passages: readonly AnnotatedPassage[],
     ) {}
 }
@@ -39,14 +40,17 @@ export class AnnotatedPassagesOf implements CellVisitor<AnnotatedPassages | null
                     reference.storyWordRange,
                 ),
         );
-        return new AnnotatedPassages(cell.title, passages);
+        return new AnnotatedPassages(cell.title, cell.source, passages);
     }
 
+    // Only an event that story text tells has a passage.
     visitPlot(cell: PlotCell): AnnotatedPassages {
-        const passages = cell.nodes.map(
-            (node) => new AnnotatedPassage(node.nodeId, node.storyWordRange),
+        const passages = cell.nodes.flatMap((node) =>
+            node.storyWordRange === null
+                ? []
+                : [new AnnotatedPassage(node.nodeId, node.storyWordRange)],
         );
-        return new AnnotatedPassages(cell.title, passages);
+        return new AnnotatedPassages(cell.title, cell.overview, passages);
     }
 
     visitMarkdown(_cell: MarkdownCell): null {

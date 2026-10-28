@@ -47,7 +47,7 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
                 plot.title,
                 plot.nodes,
                 edges,
-                plot.source,
+                plot.overview,
                 plot.folded,
                 plot.at,
                 plot.uniqueId,

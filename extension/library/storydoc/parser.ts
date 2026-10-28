@@ -48,9 +48,9 @@ import {
     WEBSITE,
     MarkerAttributes,
 } from "./visitors/marker_attributes";
+import { attributesIn, writtenAttributeValue } from "./written_attributes";
 
 const MARKER = /^<!--\s*cell:\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*?)\s*-->\s*$/;
-const ATTR = /([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
 
 const SALIENT_CONCEPT_REFERENCE = /^\s*(?:([^:\s]+):)?(\d+)-(\d+)\s*$/;
 
@@ -107,7 +107,7 @@ export function parse(text: string): Cell[] {
         close();
         opened = true;
         kind = marker[1];
-        attrs = readAttrs(marker[2]);
+        attrs = attributesIn(marker[2]);
         uniqueId = attrs[UNIQUE_ID] || crypto.randomUUID();
         folded = attrs[FOLDED] === TRUE;
         delete attrs[UNIQUE_ID];
@@ -122,19 +122,6 @@ export function parse(text: string): Cell[] {
 export function cellOfKind(kind: string): Cell {
     const uniqueId = crypto.randomUUID();
     return cellFromMarker(kind, {}, "", false, null, uniqueId);
-}
-
-function readAttrs(text: string): Record<string, string> {
-    return Object.fromEntries(
-        Array.from(text.matchAll(ATTR), ([, name, value]) => [
-            name,
-            unescape(value),
-        ]),
-    );
-}
-
-function unescape(value: string): string {
-    return value.replace(/\\(.)/g, "$1");
 }
 
 function salientConceptReferencesIn(
@@ -289,11 +276,23 @@ function cellFromMarker(
             );
         }
         case PLOT: {
-            const nodes = plotNodesIn(attrs[PLOT_NODES] ?? "");
             const edges = plotEdgesIn(attrs[PLOT_EDGES] ?? "");
-            return new PlotCell(
+            // A plot written before plots had events keeps its nodes in its
+            // marker and its overview in its body; it is written back with events.
+            if (attrs[PLOT_NODES] !== undefined) {
+                const nodes = plotNodesIn(attrs[PLOT_NODES]);
+                return new PlotCell(
+                    attrs[TITLE] ?? "",
+                    nodes,
+                    edges,
+                    source,
+                    folded,
+                    at,
+                    uniqueId,
+                );
+            }
+            return PlotCell.fromBody(
                 attrs[TITLE] ?? "",
-                nodes,
                 edges,
                 source,
                 folded,
@@ -381,11 +380,7 @@ export function markerFor(
         ...(cell.folded ? { [FOLDED]: TRUE } : {}),
     };
     const said = Object.entries(writtenAttrs)
-        .map(([name, value]) => ` ${name}="${escape(value)}"`)
+        .map(([name, value]) => ` ${name}="${writtenAttributeValue(value)}"`)
         .join("");
     return `<!-- cell: ${cell.kind}${said} -->`;
-}
-
-function escape(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
