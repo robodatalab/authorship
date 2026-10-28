@@ -15,14 +15,14 @@ from unittest import mock
 
 from cortexgrid_infer import CompletionChunk
 
-from server.storydoc import storydoc
-from server.storydoc.storydoc import Document
-from server.storydoc.cells.blurb_cell import BlurbCell
-from server.storydoc.cells.chapter_cell import ChapterCell
-from server.storydoc.cells.markdown_cell import MarkdownCell
-from server.storydoc.cells.part_cell import PartCell
-from server.storydoc.cells.table_of_contents_cell import TableOfContentsCell
-from server.storydoc.cells.title_page_cell import TitlePageCell
+from authordoc import storydoc
+from authordoc.storydoc import Document
+from authordoc.cells.blurb_cell import BlurbCell
+from authordoc.cells.chapter_cell import ChapterCell
+from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.part_cell import PartCell
+from authordoc.cells.table_of_contents_cell import TableOfContentsCell
+from authordoc.cells.title_page_cell import TitlePageCell
 from server.writing_tools.blurb import BLURB_INSTRUCTION, write_blurb
 
 

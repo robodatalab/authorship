@@ -16,7 +16,7 @@ import {
 import {
     CHAPTER,
     ChapterCell,
-} from "../../library/storydoc/cells/chapter_cell";
+} from "authordoc/cells/chapter_cell";
 
 interface AuthorFileEditorChapterCellProps {
     cell: ChapterCell;

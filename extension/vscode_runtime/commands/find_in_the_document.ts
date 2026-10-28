@@ -6,8 +6,8 @@
 // DOM, so it can be unit tested without a page.
 
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { Document } from "../../library/storydoc/storydoc";
-import type { SynchronizedRepresentation } from "../../library/storydoc/synchronizers/character_range_synchronizer";
+import type { Document } from "authordoc/storydoc";
+import type { SynchronizedRepresentation } from "authordoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export interface AuthorFileEditorFindQuery {

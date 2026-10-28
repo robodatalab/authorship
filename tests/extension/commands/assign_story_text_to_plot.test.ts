@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AssignStoryTextToPlotCommand } from "../../../extension/vscode_runtime/commands/assign_story_text_to_plot";
-import { PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+import { PlotNode } from "authordoc/cells/plot_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 describe("AssignStoryTextToPlotCommand — adds the selected words to a plot's trajectory", () => {

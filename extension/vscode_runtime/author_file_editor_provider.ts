@@ -23,7 +23,7 @@ import {
 } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
 import type { AuthorshipPanelProvider } from "./authorship_panel_provider";
-import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { loadTemplates, watchSettings } from "./settings/file";
 import { watchTheAuthorFileForChanges } from "./author_file_watcher";
 import { useTemplates } from "./settings/model";

@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { parse } from "../../library/storydoc/parser";
+import { parse } from "authordoc/parser";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class ReplaceCellCommand implements AuthorDocumentCommand {

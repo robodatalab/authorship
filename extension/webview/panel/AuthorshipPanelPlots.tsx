@@ -30,16 +30,16 @@ import {
     StoryAnnotationsIterator,
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
-} from "../../library/storydoc/iterators/story_annotations_iterator";
+} from "authordoc/iterators/story_annotations_iterator";
 import {
     PLOT,
     PlotCell,
     type PlotNode,
-} from "../../library/storydoc/cells/plot_cell";
+} from "authordoc/cells/plot_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
-import type { Cell } from "../../library/storydoc/cells/cell";
-import type { Document } from "../../library/storydoc/storydoc";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import type { Cell } from "authordoc/cells/cell";
+import type { Document } from "authordoc/storydoc";
 import "./AuthorshipPanelStoryAnnotations.css";
 import "./AuthorshipPanelPlots.css";
 

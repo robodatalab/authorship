@@ -9,9 +9,9 @@ import { authorDocumentCellTypes } from "../vscode_runtime/commands/author_docum
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
-import type { Cell } from "../library/storydoc/cells/cell";
-import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
-import { parse } from "../library/storydoc/parser";
+import type { Cell } from "authordoc/cells/cell";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import { parse } from "authordoc/parser";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 

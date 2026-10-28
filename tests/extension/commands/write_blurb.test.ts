@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WriteBlurbCommand } from "../../../extension/vscode_runtime/commands/write_blurb";
-import { parse } from "../../../extension/library/storydoc/parser";
+import { parse } from "authordoc/parser";
 import { files } from "../vscode";
 import {
     forgetWhatTheEditorDid,

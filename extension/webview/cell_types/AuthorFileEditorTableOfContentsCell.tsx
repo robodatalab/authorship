@@ -16,7 +16,7 @@ import {
 import {
     TABLE_OF_CONTENTS,
     type TableOfContentsCell,
-} from "../../library/storydoc/cells/table_of_contents_cell";
+} from "authordoc/cells/table_of_contents_cell";
 
 interface AuthorFileEditorTableOfContentsCellProps {
     cell: TableOfContentsCell;

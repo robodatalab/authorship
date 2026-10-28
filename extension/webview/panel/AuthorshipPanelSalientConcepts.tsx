@@ -10,12 +10,12 @@ import { replaceTheCell } from "../author_editor/AuthorFileEditorCanvas";
 import {
     StoryAnnotationsIterator,
     type StoryAnnotationInTheStory,
-} from "../../library/storydoc/iterators/story_annotations_iterator";
-import { SALIENT_CONCEPT } from "../../library/storydoc/cells/salient_concept_cell";
+} from "authordoc/iterators/story_annotations_iterator";
+import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
-import type { Cell } from "../../library/storydoc/cells/cell";
-import type { Document } from "../../library/storydoc/storydoc";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import type { Cell } from "authordoc/cells/cell";
+import type { Document } from "authordoc/storydoc";
 import "./AuthorshipPanelStoryAnnotations.css";
 
 const SALIENT_CONCEPTS_LIST_WORDING: AuthorshipPanelStoryAnnotationsListWording =

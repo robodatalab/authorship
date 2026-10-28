@@ -16,7 +16,7 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { BLURB, type BlurbCell } from "../../library/storydoc/cells/blurb_cell";
+import { BLURB, type BlurbCell } from "authordoc/cells/blurb_cell";
 
 interface AuthorFileEditorBlurbCellProps {
     cell: BlurbCell;

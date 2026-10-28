@@ -3,8 +3,8 @@ import * as vscode from "vscode";
 
 import { openAuthorFileEditorSession } from "../../../extension/vscode_runtime/author_file_editor_session";
 import { RemoveNodeFromPlotCommand } from "../../../extension/vscode_runtime/commands/remove_node_from_plot";
-import { PlotEdge, PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+import { PlotEdge, PlotNode } from "authordoc/cells/plot_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { STORY_FILE, openStory } from "./open_story";
 
 describe("RemoveNodeFromPlotCommand — takes a node out of a plot's trajectory", () => {

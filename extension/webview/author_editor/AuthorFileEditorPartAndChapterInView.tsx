@@ -1,10 +1,10 @@
-import type { Cell } from "../../library/storydoc/cells/cell";
-import { ChapterCell } from "../../library/storydoc/cells/chapter_cell";
-import { PartCell } from "../../library/storydoc/cells/part_cell";
+import type { Cell } from "authordoc/cells/cell";
+import { ChapterCell } from "authordoc/cells/chapter_cell";
+import { PartCell } from "authordoc/cells/part_cell";
 import {
     cellsBySection,
     whereACellStands,
-} from "../../library/storydoc/story_sections";
+} from "authordoc/story_sections";
 import "./AuthorFileEditorPartAndChapterInView.css";
 
 interface AuthorFileEditorPartAndChapterInViewProps {

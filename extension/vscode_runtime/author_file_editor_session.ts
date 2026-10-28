@@ -6,17 +6,17 @@ import type {
     AuthorFileEditorMessage,
     MessageQueueListener,
 } from "./message_queue_between_vscode_and_webview";
-import { CharacterRangeSynchronizer } from "../library/storydoc/synchronizers/character_range_synchronizer";
-import type { AuthorDocSynchronizer } from "../library/storydoc/author_doc_synchronizer";
-import type { AuthorDocChangeVisitor } from "../library/storydoc/author_doc_change_visitor";
-import type { CellAdded } from "../library/storydoc/changes/cell_added";
-import type { CellHeaderChanged } from "../library/storydoc/changes/cell_header_changed";
-import type { CellRemoved } from "../library/storydoc/changes/cell_removed";
-import type { CellTextChanged } from "../library/storydoc/changes/cell_text_changed";
-import type { CellsMoved } from "../library/storydoc/changes/cells_moved";
-import { AuthorDocDiff } from "../library/storydoc/diff";
-import { Document } from "../library/storydoc/storydoc";
-import type { Cell } from "../library/storydoc/cells/cell";
+import { CharacterRangeSynchronizer } from "authordoc/synchronizers/character_range_synchronizer";
+import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
+import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";
+import type { CellAdded } from "authordoc/changes/cell_added";
+import type { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
+import type { CellRemoved } from "authordoc/changes/cell_removed";
+import type { CellTextChanged } from "authordoc/changes/cell_text_changed";
+import type { CellsMoved } from "authordoc/changes/cells_moved";
+import { AuthorDocDiff } from "authordoc/diff";
+import { Document } from "authordoc/storydoc";
+import type { Cell } from "authordoc/cells/cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,
@@ -25,10 +25,10 @@ import {
 import {
     StoryWordsIterator,
     type StoryTextSpan,
-} from "../library/storydoc/iterators/story_words_iterator";
-import type { StoryWordRange } from "../library/storydoc/cells/story_word_range";
-import { PassagesSynchronizer } from "../library/storydoc/synchronizers/passages_synchronizer";
-import { WordCounter } from "../library/storydoc/synchronizers/word_counter";
+} from "authordoc/iterators/story_words_iterator";
+import type { StoryWordRange } from "authordoc/cells/story_word_range";
+import { PassagesSynchronizer } from "authordoc/synchronizers/passages_synchronizer";
+import { WordCounter } from "authordoc/synchronizers/word_counter";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener

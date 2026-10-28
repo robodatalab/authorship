@@ -5,10 +5,10 @@ from dataclasses import dataclass
 
 from torch.utils.data import Dataset
 
-from server.storydoc.cells.salient_concept_cell import SalientConceptCell
-from server.storydoc.cells.story_word_range import StoryWordRange
-from server.storydoc.iterators.story_words_iterator import StoryWordsIterator
-from server.storydoc.storydoc import Document
+from authordoc.cells.salient_concept_cell import SalientConceptCell
+from authordoc.cells.story_word_range import StoryWordRange
+from authordoc.iterators.story_words_iterator import StoryWordsIterator
+from authordoc.storydoc import Document
 
 UNRELATED_TEXTS_PER_CONCEPT = 8
 FEWEST_EXAMPLES = 1

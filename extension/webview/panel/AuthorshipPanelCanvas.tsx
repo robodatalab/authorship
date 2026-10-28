@@ -9,14 +9,14 @@ import {
 } from "./AuthorshipPanelAsyncJobs";
 import { AuthorshipPanelSalientConcepts } from "./AuthorshipPanelSalientConcepts";
 import { AuthorshipPanelPlots } from "./AuthorshipPanelPlots";
-import { PLOT } from "../../library/storydoc/cells/plot_cell";
-import { SALIENT_CONCEPT } from "../../library/storydoc/cells/salient_concept_cell";
+import { PLOT } from "authordoc/cells/plot_cell";
+import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
-import type { Document } from "../../library/storydoc/storydoc";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import type { Document } from "authordoc/storydoc";
 import "./AuthorshipPanelCanvas.css";
 
 export type SendMessagesToVscode = (message: unknown) => void;

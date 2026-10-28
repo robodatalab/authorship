@@ -18,8 +18,8 @@ from collections.abc import Callable
 
 from cortexgrid_infer import CompletingModel
 
-from server.storydoc.iterators.chapters_iterator import ChaptersIterator
-from server.storydoc.storydoc import Document
+from authordoc.iterators.chapters_iterator import ChaptersIterator
+from authordoc.storydoc import Document
 
 # A blurb that runs longer than this has stopped being a blurb.
 BLURB_TOKENS = 320

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
 import { AuthorshipPanelProvider } from "../../../extension/vscode_runtime/authorship_panel_provider";
-import type { Cell } from "../../../extension/library/storydoc/cells/cell";
-import { parse } from "../../../extension/library/storydoc/parser";
+import type { Cell } from "authordoc/cells/cell";
+import { parse } from "authordoc/parser";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";

@@ -4,8 +4,8 @@ import { MoveNodeInPlotCommand } from "../../../extension/vscode_runtime/command
 import {
     PlotEdge,
     PlotNode,
-} from "../../../extension/library/storydoc/cells/plot_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+} from "authordoc/cells/plot_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 describe("MoveNodeInPlotCommand — moves a node to another place on a plot's trajectory list", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PlotEdge } from "../../../extension/library/storydoc/cells/plot_cell";
+import { PlotEdge } from "authordoc/cells/plot_cell";
 import {
     PlotEdgeInALane,
     PlotTrajectoryLanes,

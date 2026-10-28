@@ -22,7 +22,7 @@ import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose"
 import {
     TextWordsIterator,
     type TextWord,
-} from "../../library/storydoc/iterators/text_words_iterator";
+} from "authordoc/iterators/text_words_iterator";
 import "./MarkdownEditor.css";
 
 monaco.languages.register({ id: "markdown" });

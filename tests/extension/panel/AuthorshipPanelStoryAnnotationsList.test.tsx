@@ -6,7 +6,7 @@ import { AuthorshipPanelStoryAnnotationsList } from "../../../extension/webview/
 import {
     StoryAnnotationInTheStory,
     StoryWordRangeInTheStory,
-} from "../../../extension/library/storydoc/iterators/story_annotations_iterator";
+} from "authordoc/iterators/story_annotations_iterator";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -15,6 +15,7 @@ dependencies = [
     "uvicorn>=0.32",
     "proselint>=0.16.0",
     "cortexgrid-train>=0.1.8",
+    "authordoc>=0.1.1",
 ]
 
 [tool.uv]

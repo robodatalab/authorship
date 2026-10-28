@@ -13,19 +13,19 @@ from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
-from server.storydoc.storydoc import Document
-from server.storydoc import storydoc
-from server.storydoc.cells.about_cell import ABOUT, AboutCell
-from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
-from server.storydoc.cells.chapter_cell import ChapterCell
-from server.storydoc.cells.image_cell import ImageCell
-from server.storydoc.cells.markdown_cell import MarkdownCell
-from server.storydoc.cells.recap_cell import RECAP, RecapCell
-from server.storydoc.cells.table_of_contents_cell import (
+from authordoc.storydoc import Document
+from authordoc import storydoc
+from authordoc.cells.about_cell import ABOUT, AboutCell
+from authordoc.cells.blurb_cell import BLURB, BlurbCell
+from authordoc.cells.chapter_cell import ChapterCell
+from authordoc.cells.image_cell import ImageCell
+from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.recap_cell import RECAP, RecapCell
+from authordoc.cells.table_of_contents_cell import (
     TABLE_OF_CONTENTS,
     TableOfContentsCell,
 )
-from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from authordoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 DEFAULT_REPLY = (

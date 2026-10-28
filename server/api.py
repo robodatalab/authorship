@@ -18,9 +18,9 @@ from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
-from server.storydoc.storydoc import Document
-from server.storydoc.cells.blurb_cell import BLURB
-from server.storydoc.cells.recap_cell import RECAP
+from authordoc.storydoc import Document
+from authordoc.cells.blurb_cell import BLURB
+from authordoc.cells.recap_cell import RECAP
 
 _log = log.logger(__name__)
 

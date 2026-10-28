@@ -20,7 +20,7 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { RECAP, RecapCell } from "../../library/storydoc/cells/recap_cell";
+import { RECAP, RecapCell } from "authordoc/cells/recap_cell";
 
 interface AuthorFileEditorRecapCellProps {
     cell: RecapCell;

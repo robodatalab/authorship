@@ -1,6 +1,6 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
-import { cellOfKind } from "../../library/storydoc/parser";
+import { cellOfKind } from "authordoc/parser";
 
 export class InsertCellCommand implements AuthorDocumentCommand {
     readonly commandName = "insertCell";

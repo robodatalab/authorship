@@ -18,20 +18,20 @@ import {
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
-import type { Cell } from "../../library/storydoc/cells/cell";
-import type { CellVisitor } from "../../library/storydoc/cells/cell_visitor";
-import { PART } from "../../library/storydoc/cells/part_cell";
-import { StoryAnnotationsIterator } from "../../library/storydoc/iterators/story_annotations_iterator";
+import type { Cell } from "authordoc/cells/cell";
+import type { CellVisitor } from "authordoc/cells/cell_visitor";
+import { PART } from "authordoc/cells/part_cell";
+import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
 import {
     StoryWordsIterator,
     type StoryTextSpan,
-} from "../../library/storydoc/iterators/story_words_iterator";
+} from "authordoc/iterators/story_words_iterator";
 import {
     cellsBySection,
     opensASection,
     type CellsInASection,
-} from "../../library/storydoc/story_sections";
-import { Document } from "../../library/storydoc/storydoc";
+} from "authordoc/story_sections";
+import { Document } from "authordoc/storydoc";
 import {
     NO_STORY_ANNOTATION_SELECTED,
     STORY_ANNOTATION_KINDS,

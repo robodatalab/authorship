@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { SalientConceptCell } from "../../library/storydoc/cells/salient_concept_cell";
+import { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class RemoveReferenceFromSalientConceptCommand implements AuthorDocumentCommand {

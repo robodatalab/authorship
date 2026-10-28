@@ -1,5 +1,5 @@
 import type { SendMessagesToVscode } from "./AuthorshipPanelCanvas";
-import type { StoryAnnotationInTheStory } from "../../library/storydoc/iterators/story_annotations_iterator";
+import type { StoryAnnotationInTheStory } from "authordoc/iterators/story_annotations_iterator";
 import "./AuthorshipPanelStoryAnnotations.css";
 
 const UNTITLED = "Untitled";

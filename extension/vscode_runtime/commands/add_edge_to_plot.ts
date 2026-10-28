@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { PlotCell, PlotEdge } from "../../library/storydoc/cells/plot_cell";
+import { PlotCell, PlotEdge } from "authordoc/cells/plot_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class AddEdgeToPlotCommand implements AuthorDocumentCommand {

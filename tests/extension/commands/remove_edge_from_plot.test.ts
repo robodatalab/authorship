@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveEdgeFromPlotCommand } from "../../../extension/vscode_runtime/commands/remove_edge_from_plot";
-import { PlotEdge } from "../../../extension/library/storydoc/cells/plot_cell";
+import { PlotEdge } from "authordoc/cells/plot_cell";
 import { openStory } from "./open_story";
 
 describe("RemoveEdgeFromPlotCommand — disconnects two nodes of a plot's trajectory", () => {

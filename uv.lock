@@ -187,10 +187,20 @@ wheels = [
 ]
 
 [[package]]
+name = "authordoc"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/13/76/466c4864d92e9522489ab00880fe5ff62281c6b723cb2c0b2b3b4443655c/authordoc-0.1.1.tar.gz", hash = "sha256:4df8036605277d7e74215b30d61d07b47909230d0adbe9836a96615419777e96", size = 65363, upload-time = "2026-10-28T17:34:57.336Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/3b/39f756bfddc0a11deaabb479ad34b2052df206f9226deb9e6744bef75b89/authordoc-0.1.1-py3-none-any.whl", hash = "sha256:3f9f6ed95e4a8c0c6c4799207b7bf55bd79684a430fe651fa5b6980d90d70f26", size = 32659, upload-time = "2026-10-28T17:34:56.015Z" },
+]
+
+[[package]]
 name = "authorship-model"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "authordoc" },
     { name = "cortexgrid" },
     { name = "cortexgrid-infer" },
     { name = "cortexgrid-train" },
@@ -216,6 +226,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "authordoc", specifier = ">=0.1.1" },
     { name = "cortexgrid", specifier = ">=0.3.20" },
     { name = "cortexgrid-infer", specifier = ">=0.3.12" },
     { name = "cortexgrid-train", specifier = ">=0.1.8" },

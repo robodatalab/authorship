@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { AssignStoryTextToPlotEventCommand } from "../../../extension/vscode_runtime/commands/assign_story_text_to_plot_event";
-import { PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+import { PlotNode } from "authordoc/cells/plot_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 const THE_STORY = `
