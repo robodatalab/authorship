@@ -236,7 +236,7 @@ describe("the plots tab", () => {
         ]);
     });
 
-    it("asks for the plot's overview to be replaced, its events kept, as the author types it", async () => {
+    it("asks for the plot's overview, and only that, to be changed as the author types it", async () => {
         monacoEditorsOnThePage.length = 0;
         await mountPlots({
             story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
@@ -258,17 +258,10 @@ describe("the plots tab", () => {
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "replaceCell",
+                commandName: "redescribePlot",
                 commandArguments: {
-                    cell: [
-                        '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->',
-                        "",
-                        '<ol title="She finds the door.!">',
-                        '<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>',
-                        '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>',
-                        "</ol>",
-                        "",
-                    ].join("\n"),
+                    annotationCellId: "p1",
+                    overview: "She finds the door.!",
                 },
             },
         ]);
@@ -323,64 +316,69 @@ describe("the plots tab", () => {
             });
 
             const said = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-idle",
+                ".authorship-panel-plot-event .authorship-panel-plot-event-untold",
             )?.textContent;
+            const deleteTheStoryText = document.querySelector(
+                ".authorship-panel-plot-event .authorship-panel-story-annotation-passage-removed",
+            );
             expect(said).toBe("Not told in the story yet");
+            expect(deleteTheStoryText).toBeNull();
+        });
+
+        it("says what goes in each field before anything is written in it", async () => {
+            await mountPlots({
+                story: [
+                    THE_STORY,
+                    '<!-- cell: plot id="p1" title="The door" -->\n\n<ol>\n<li id="e1"></li>\n</ol>\n',
+                ].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+
+            const placeholders = [
+                ...document.querySelectorAll<HTMLInputElement>(
+                    ".authorship-panel-plot-event .author-file-editor-cell-field-input",
+                ),
+            ].map((field) => field.placeholder);
+            expect(placeholders).toEqual([
+                "",
+                "Story time",
+                "Location in the story, comma separated",
+            ]);
         });
 
         it.each([
-            [
-                "title",
-                0,
-                "She finds the red door.",
-                '<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the red door.</li>',
-            ],
-            [
-                "timestamp",
-                1,
-                "2.1",
-                '<li id="e1" timestamp="2.1" location="the hall" words="2-3">She finds the door.</li>',
-            ],
-            [
-                "location",
-                2,
-                "the hall, by the stairs",
-                '<li id="e1" timestamp="1.1" location="the hall, by the stairs" words="2-3">She finds the door.</li>',
-            ],
+            ["title", 0, "summary", "She finds the red door."],
+            ["timestamp", 1, "timestamp", "2.1"],
+            ["location", 2, "location", "the hall, by the stairs"],
         ])(
-            "asks for the plot to be replaced with the event's %s as the author types it",
-            async (_, field, said, eventWritten) => {
+            "asks for the event's %s, and only that, to be changed as the author types it",
+            async (_, index, field, said) => {
                 await mountPlots({
                     story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
                     storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
                 });
                 const fieldTyped = document.querySelectorAll<HTMLInputElement>(
                     ".authorship-panel-plot-event .author-file-editor-cell-field-input",
-                )[field];
+                )[index];
 
                 await type(fieldTyped, said);
 
                 expect(posted).toEqual([
                     {
                         type: "invoke",
-                        commandName: "replaceCell",
+                        commandName: "changePlotEvent",
                         commandArguments: {
-                            cell: [
-                                '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->',
-                                "",
-                                '<ol title="She finds the door.">',
-                                eventWritten,
-                                '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>',
-                                "</ol>",
-                                "",
-                            ].join("\n"),
+                            annotationCellId: "p1",
+                            nodeId: "e1",
+                            field,
+                            said,
                         },
                     },
                 ]);
             },
         );
 
-        it("asks for the plot to be replaced with the event's words taken away", async () => {
+        it("asks for the event's words to be taken away from it", async () => {
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
@@ -394,18 +392,8 @@ describe("the plots tab", () => {
             expect(posted).toEqual([
                 {
                     type: "invoke",
-                    commandName: "replaceCell",
-                    commandArguments: {
-                        cell: [
-                            '<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->',
-                            "",
-                            '<ol title="She finds the door.">',
-                            '<li id="e1" timestamp="1.1" location="the hall">She finds the door.</li>',
-                            '<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>',
-                            "</ol>",
-                            "",
-                        ].join("\n"),
-                    },
+                    commandName: "removeStoryTextFromPlotEvent",
+                    commandArguments: { annotationCellId: "p1", nodeId: "e1" },
                 },
             ]);
         });
@@ -452,6 +440,30 @@ describe("the plots tab", () => {
             )!;
             expect(tellTheEvent.disabled).toBe(true);
         });
+    });
+
+    it.each([
+        ["its title", '<li id="e1" words="0-3">She finds the door.</li>', "She finds the door."],
+        ["the words that tell it, without a title", '<li id="e1" words="0-3"></li>', "She saw the door."],
+        [
+            "the first few words that tell it, without a title",
+            '<li id="e1" words="0-7"></li>',
+            "She saw the door. He heard…",
+        ],
+        ["that it has no title, told by no words", '<li id="e1"></li>', "Untitled event"],
+    ])("names an event in the trajectory by %s", async (_, eventWritten, named) => {
+        await mountPlots({
+            story: [
+                THE_STORY,
+                `<!-- cell: plot id="p1" title="The door" -->\n\n<ol>\n${eventWritten}\n</ol>\n`,
+            ].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+
+        const eventNamed = document.querySelector(
+            ".authorship-panel-plot-trajectory .authorship-panel-story-annotation-passage-shown",
+        )?.textContent;
+        expect(eventNamed).toBe(named);
     });
 
     it("lists the trajectory in the order it is written", async () => {
@@ -570,16 +582,35 @@ describe("the plots tab", () => {
         ]);
     });
 
-    it("cannot add anything to the trajectory until words are selected", async () => {
+    it("asks for an untold event to be added, and selected, when no words are selected", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR].join("\n"),
             storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
         });
-
-        const assignButton = document.querySelector<HTMLButtonElement>(
+        vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
+            "3f1c0e2a-0000-4000-8000-000000000001",
+        );
+        const addButton = document.querySelector(
             ".authorship-panel-story-annotation-assign",
         )!;
-        expect(assignButton.disabled).toBe(true);
+
+        await click(addButton);
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "addEventToPlot",
+                commandArguments: {
+                    annotationCellId: "p1",
+                    nodeId: "3f1c0e2a-0000-4000-8000-000000000001",
+                },
+            },
+            {
+                type: "selectPassage",
+                cellKind: "plot",
+                passageId: "3f1c0e2a-0000-4000-8000-000000000001",
+            },
+        ]);
     });
 
     it("asks for the selected words to be added to the selected plot", async () => {

@@ -1,0 +1,22 @@
+.authorship-panel-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.authorship-panel-section > .authorship-panel-story-annotations-list,
+.authorship-panel-section > .authorship-panel-story-annotation-details {
+    flex: 1 1 auto;
+}
+
+.authorship-panel-sash {
+    flex: 0 0 4px;
+    margin: -2px 0;
+    cursor: row-resize;
+    z-index: 1;
+}
+
+.authorship-panel-sash:hover,
+.authorship-panel-sash:active {
+    background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+}

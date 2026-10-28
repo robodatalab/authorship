@@ -109,3 +109,11 @@
     stroke-width: 2;
     stroke-dasharray: 3 2;
 }
+
+.authorship-panel-plot-event-untold {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+}
