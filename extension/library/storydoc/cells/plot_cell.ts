@@ -51,6 +51,36 @@ export class PlotNode {
             this.summary,
         );
     }
+
+    withTimestamp(timestamp: string): PlotNode {
+        return new PlotNode(
+            this.nodeId,
+            this.storyWordRange,
+            timestamp,
+            this.location,
+            this.summary,
+        );
+    }
+
+    withLocation(location: string): PlotNode {
+        return new PlotNode(
+            this.nodeId,
+            this.storyWordRange,
+            this.timestamp,
+            location,
+            this.summary,
+        );
+    }
+
+    withSummary(summary: string): PlotNode {
+        return new PlotNode(
+            this.nodeId,
+            this.storyWordRange,
+            this.timestamp,
+            this.location,
+            summary,
+        );
+    }
 }
 
 export class PlotEdge {
@@ -118,6 +148,22 @@ export class PlotCell extends Cell {
             this.nodes,
             this.edges,
             overview,
+            this.folded,
+            this.at,
+            this.uniqueId,
+        );
+    }
+
+    /** The plot with `node` in place of its event of the same id. */
+    withNode(node: PlotNode): PlotCell {
+        const nodes = this.nodes.map((nodeInThePlot) =>
+            nodeInThePlot.nodeId === node.nodeId ? node : nodeInThePlot,
+        );
+        return new PlotCell(
+            this.title,
+            nodes,
+            this.edges,
+            this.overview,
             this.folded,
             this.at,
             this.uniqueId,

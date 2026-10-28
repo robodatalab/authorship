@@ -3,6 +3,7 @@ import type { AuthorDocumentCommand } from "./author_document_command";
 import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
+import { AssignStoryTextToPlotEventCommand } from "./assign_story_text_to_plot_event";
 import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
@@ -70,6 +71,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new DeleteStoryAnnotationCommand(),
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
+    new AssignStoryTextToPlotEventCommand(),
     new RemoveReferenceFromSalientConceptCommand(),
     new RemoveNodeFromPlotCommand(),
     new MoveNodeInPlotCommand(),

@@ -19,11 +19,19 @@ import {
 } from "./PlotTrajectoryLanes";
 import { replaceTheCell } from "../author_editor/AuthorFileEditorCanvas";
 import {
+    AuthorFileEditorCellFields,
+    type AuthorFileEditorCellField,
+} from "../author_editor/AuthorFileEditorCellFields";
+import {
     StoryAnnotationsIterator,
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
 } from "../../library/storydoc/iterators/story_annotations_iterator";
-import { PLOT, PlotCell } from "../../library/storydoc/cells/plot_cell";
+import {
+    PLOT,
+    PlotCell,
+    type PlotNode,
+} from "../../library/storydoc/cells/plot_cell";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import type { StoryTextSpan } from "../../library/storydoc/iterators/story_words_iterator";
 import type { Cell } from "../../library/storydoc/cells/cell";
@@ -40,6 +48,9 @@ const PLOTS_LIST_WORDING: AuthorshipPanelStoryAnnotationsListWording = {
 const ADD_THE_WORDS_SELECTED = "Add the selected words to the trajectory";
 const TAKE_THE_NODE_OUT = "Take this event out of the trajectory";
 const TOLD_BY_NO_WORDS = "Not told in the story yet";
+const TELL_THE_EVENT_WITH_THE_WORDS_SELECTED =
+    "Tell this event with the selected words";
+const TAKE_THE_WORDS_FROM_THE_EVENT = "Take these words away from the event";
 const DISCONNECT_THE_NODES = "Disconnect these nodes";
 const TRAJECTORY_ROW_HEIGHT = 22;
 const TRAJECTORY_LANE_WIDTH = 14;
@@ -81,6 +92,13 @@ export function AuthorshipPanelPlots({
             (plotCell) =>
                 plotCell.uniqueId === storyAnnotationSelected.annotationCellId,
         );
+    const eventShown = plotCellShown?.nodes.find(
+        (node) => node.nodeId === storyAnnotationSelected.passageId,
+    );
+    const passageOfTheEventShown =
+        plotShown?.passages.find(
+            (passage) => passage.passageId === eventShown?.nodeId,
+        ) ?? null;
 
     function retitleThePlot(plotCellId: string, title: string): void {
         const plotCell = story?.cellWithId(plotCellId);
@@ -121,7 +139,125 @@ export function AuthorshipPanelPlots({
                         sendMessagesToVscode={sendMessagesToVscode}
                     />
                 ))}
+            {plotCellShown !== undefined && eventShown !== undefined && (
+                <AuthorshipPanelPlotEvent
+                    key={eventShown.nodeId}
+                    plotCell={plotCellShown}
+                    plotNode={eventShown}
+                    passage={passageOfTheEventShown}
+                    storyTextSelected={storyTextSelected}
+                    sendMessagesToVscode={sendMessagesToVscode}
+                />
+            )}
         </div>
+    );
+}
+
+interface AuthorshipPanelPlotEventProps {
+    plotCell: PlotCell;
+    plotNode: PlotNode;
+    passage: StoryWordRangeInTheStory | null;
+    storyTextSelected: StoryTextSpan | null;
+    sendMessagesToVscode: SendMessagesToVscode;
+}
+
+// The event selected in a plot's trajectory: what it is, when and where it
+// happens, and the story text that tells it.
+function AuthorshipPanelPlotEvent({
+    plotCell,
+    plotNode,
+    passage,
+    storyTextSelected,
+    sendMessagesToVscode,
+}: AuthorshipPanelPlotEventProps) {
+    function changeTheEvent(eventChanged: PlotNode): void {
+        const plotChanged = plotCell.withNode(eventChanged);
+        replaceTheCell(sendMessagesToVscode, plotChanged);
+    }
+
+    const fields: AuthorFileEditorCellField[] = [
+        {
+            label: "Title",
+            said: plotNode.summary,
+            onSaid: (summary) => changeTheEvent(plotNode.withSummary(summary)),
+        },
+        {
+            label: "Timestamp",
+            said: plotNode.timestamp,
+            placeholder: "1.1",
+            onSaid: (timestamp) =>
+                changeTheEvent(plotNode.withTimestamp(timestamp)),
+        },
+        {
+            label: "Location",
+            said: plotNode.location,
+            placeholder: "earth, Varn's house",
+            onSaid: (location) =>
+                changeTheEvent(plotNode.withLocation(location)),
+        },
+    ];
+
+    return (
+        <section className="authorship-panel-story-annotation-details authorship-panel-plot-event">
+            <h4>Event</h4>
+            <AuthorFileEditorCellFields fields={fields} />
+            <div className="authorship-panel-story-annotation-passages-heading">
+                <h4>Story text</h4>
+                <button
+                    type="button"
+                    className="authorship-panel-story-annotation-assign"
+                    title={TELL_THE_EVENT_WITH_THE_WORDS_SELECTED}
+                    aria-label={TELL_THE_EVENT_WITH_THE_WORDS_SELECTED}
+                    disabled={storyTextSelected === null}
+                    onClick={() =>
+                        sendMessagesToVscode({
+                            type: "invoke",
+                            commandName: "assignStoryTextToPlotEvent",
+                            commandArguments: {
+                                annotationCellId: plotCell.uniqueId,
+                                nodeId: plotNode.nodeId,
+                                ...storyTextSelected,
+                            },
+                        })
+                    }
+                >
+                    <i className="codicon codicon-add" />
+                </button>
+            </div>
+            {passage === null ? (
+                <div className="authorship-panel-idle">{TOLD_BY_NO_WORDS}</div>
+            ) : (
+                <ul className="authorship-panel-story-annotation-passages">
+                    <li className="authorship-panel-story-annotation-passage">
+                        <button
+                            type="button"
+                            className="authorship-panel-story-annotation-passage-shown"
+                            title={passage.wordsItCovers}
+                            onClick={() =>
+                                sendMessagesToVscode({
+                                    type: "showStoryWordRange",
+                                    firstWord: passage.firstWord,
+                                    lastWord: passage.lastWord,
+                                })
+                            }
+                        >
+                            {passage.wordsItCovers}
+                        </button>
+                        <button
+                            type="button"
+                            className="authorship-panel-story-annotation-passage-removed"
+                            title={TAKE_THE_WORDS_FROM_THE_EVENT}
+                            aria-label={TAKE_THE_WORDS_FROM_THE_EVENT}
+                            onClick={() =>
+                                changeTheEvent(plotNode.withStoryWordRange(null))
+                            }
+                        >
+                            <i className="codicon codicon-close" />
+                        </button>
+                    </li>
+                </ul>
+            )}
+        </section>
     );
 }
 
