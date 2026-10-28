@@ -22,7 +22,7 @@ import {
 import {
     MARKDOWN,
     type MarkdownCell,
-} from "../../library/storydoc/cells/markdown_cell";
+} from "authordoc/cells/markdown_cell";
 
 interface AuthorFileEditorMarkdownCellProps {
     cell: MarkdownCell;

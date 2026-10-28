@@ -11,13 +11,13 @@ import {
 import {
     CHAPTER,
     ChapterCell,
-} from "../../../extension/library/storydoc/cells/chapter_cell";
+} from "authordoc/cells/chapter_cell";
 import {
     IMAGE,
     ImageCell,
-} from "../../../extension/library/storydoc/cells/image_cell";
-import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
-import { UnknownCell } from "../../../extension/library/storydoc/cells/unknown_cell";
+} from "authordoc/cells/image_cell";
+import { MarkdownCell } from "authordoc/cells/markdown_cell";
+import { UnknownCell } from "authordoc/cells/unknown_cell";
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {

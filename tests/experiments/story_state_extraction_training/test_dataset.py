@@ -7,7 +7,7 @@ from experiments.story_state_extraction_training.dataset import (
     SalientConceptExamples,
     SalientConceptsDataset,
 )
-from server.storydoc.storydoc import Document
+from authordoc.storydoc import Document
 
 
 class SalientConceptsDatasetTests(unittest.TestCase):

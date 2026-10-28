@@ -3,8 +3,8 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorPartAndChapterInView } from "../../../extension/webview/author_editor/AuthorFileEditorPartAndChapterInView";
-import type { Cell } from "../../../extension/library/storydoc/cells/cell";
-import { parse } from "../../../extension/library/storydoc/parser";
+import type { Cell } from "authordoc/cells/cell";
+import { parse } from "authordoc/parser";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 

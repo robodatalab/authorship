@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveReferenceFromSalientConceptCommand } from "../../../extension/vscode_runtime/commands/remove_reference_from_salient_concept";
-import { SalientConceptReference } from "../../../extension/library/storydoc/cells/salient_concept_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
+import { SalientConceptReference } from "authordoc/cells/salient_concept_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
 function storyWithTheDoor(words: string) {

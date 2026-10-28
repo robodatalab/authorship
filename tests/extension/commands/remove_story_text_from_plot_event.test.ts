@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { RemoveStoryTextFromPlotEventCommand } from "../../../extension/vscode_runtime/commands/remove_story_text_from_plot_event";
 import { ChangePlotEventCommand } from "../../../extension/vscode_runtime/commands/change_plot_event";
-import { PlotNode } from "../../../extension/library/storydoc/cells/plot_cell";
+import { PlotNode } from "authordoc/cells/plot_cell";
 import { openStory } from "./open_story";
 
 const THE_STORY = `

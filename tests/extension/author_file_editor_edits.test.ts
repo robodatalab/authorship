@@ -4,7 +4,7 @@ import {
     openAuthorFileEditorSession,
     type AuthorFileEditorSession,
 } from "../../extension/vscode_runtime/author_file_editor_session";
-import { NoteCell } from "../../extension/library/storydoc/cells/note_cell";
+import { NoteCell } from "authordoc/cells/note_cell";
 import { EventEmitter, Uri } from "./vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";

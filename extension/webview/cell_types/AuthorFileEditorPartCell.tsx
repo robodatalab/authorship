@@ -13,7 +13,7 @@ import {
     replaceTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { PART, PartCell } from "../../library/storydoc/cells/part_cell";
+import { PART, PartCell } from "authordoc/cells/part_cell";
 
 interface AuthorFileEditorPartCellProps {
     cell: PartCell;

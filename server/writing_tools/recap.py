@@ -9,8 +9,8 @@ from typing import Any
 
 from cortexgrid_infer import CompletingModel
 
-from server.storydoc.iterators.chapters_iterator import ChaptersIterator
-from server.storydoc.storydoc import Document
+from authordoc.iterators.chapters_iterator import ChaptersIterator
+from authordoc.storydoc import Document
 
 
 SUMMARY_TOKENS = 300

@@ -10,8 +10,8 @@ from typing import Any
 from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
-from server.storydoc.iterators.story_lines_iterator import StoryLinesIterator
-from server.storydoc.storydoc import Document
+from authordoc.iterators.story_lines_iterator import StoryLinesIterator
+from authordoc.storydoc import Document
 from server.writing_tools import grammar_check, prose_check
 
 

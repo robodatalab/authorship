@@ -18,7 +18,7 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { ABOUT, AboutCell } from "../../library/storydoc/cells/about_cell";
+import { ABOUT, AboutCell } from "authordoc/cells/about_cell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 
 interface AuthorFileEditorAboutCellProps {

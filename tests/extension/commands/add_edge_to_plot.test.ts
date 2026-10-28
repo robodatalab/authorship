@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AddEdgeToPlotCommand } from "../../../extension/vscode_runtime/commands/add_edge_to_plot";
-import { PlotEdge } from "../../../extension/library/storydoc/cells/plot_cell";
+import { PlotEdge } from "authordoc/cells/plot_cell";
 import { openStory } from "./open_story";
 
 describe("AddEdgeToPlotCommand — connects two nodes of a plot's trajectory", () => {

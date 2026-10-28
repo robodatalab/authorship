@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WriteStorySoFarCommand } from "../../../extension/vscode_runtime/commands/write_story_so_far";
-import { parse } from "../../../extension/library/storydoc/parser";
+import { parse } from "authordoc/parser";
 import { shownMessages } from "../vscode";
 import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
 

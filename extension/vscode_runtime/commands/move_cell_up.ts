@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { moveTheSectionUp } from "../../library/storydoc/story_sections";
+import { moveTheSectionUp } from "authordoc/story_sections";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 export class MoveCellUpCommand implements AuthorDocumentCommand {

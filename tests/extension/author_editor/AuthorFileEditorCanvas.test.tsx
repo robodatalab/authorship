@@ -12,35 +12,35 @@ import {
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../../../extension/library/storydoc/iterators/story_words_iterator";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 import { MarkdownEditor } from "../../../extension/webview/markdown/MarkdownEditor";
-import { AboutCell } from "../../../extension/library/storydoc/cells/about_cell";
-import { BlurbCell } from "../../../extension/library/storydoc/cells/blurb_cell";
-import type { Cell } from "../../../extension/library/storydoc/cells/cell";
-import type { CellVisitor } from "../../../extension/library/storydoc/cells/cell_visitor";
-import { ChapterCell } from "../../../extension/library/storydoc/cells/chapter_cell";
-import type { DisclaimerCell } from "../../../extension/library/storydoc/cells/disclaimer_cell";
-import type { DividerCell } from "../../../extension/library/storydoc/cells/divider_cell";
-import type { ImageCell } from "../../../extension/library/storydoc/cells/image_cell";
-import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
-import type { NoteCell } from "../../../extension/library/storydoc/cells/note_cell";
-import { PartCell } from "../../../extension/library/storydoc/cells/part_cell";
+import { AboutCell } from "authordoc/cells/about_cell";
+import { BlurbCell } from "authordoc/cells/blurb_cell";
+import type { Cell } from "authordoc/cells/cell";
+import type { CellVisitor } from "authordoc/cells/cell_visitor";
+import { ChapterCell } from "authordoc/cells/chapter_cell";
+import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
+import type { DividerCell } from "authordoc/cells/divider_cell";
+import type { ImageCell } from "authordoc/cells/image_cell";
+import { MarkdownCell } from "authordoc/cells/markdown_cell";
+import type { NoteCell } from "authordoc/cells/note_cell";
+import { PartCell } from "authordoc/cells/part_cell";
 import {
     PlotCell,
     PlotEdge,
     PlotNode,
-} from "../../../extension/library/storydoc/cells/plot_cell";
-import type { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
+} from "authordoc/cells/plot_cell";
+import type { RecapCell } from "authordoc/cells/recap_cell";
 import {
     SalientConceptCell,
     SalientConceptReference,
-} from "../../../extension/library/storydoc/cells/salient_concept_cell";
-import { StoryWordRange } from "../../../extension/library/storydoc/cells/story_word_range";
-import type { TableOfContentsCell } from "../../../extension/library/storydoc/cells/table_of_contents_cell";
-import type { TitlePageCell } from "../../../extension/library/storydoc/cells/title_page_cell";
-import type { UnknownCell } from "../../../extension/library/storydoc/cells/unknown_cell";
+} from "authordoc/cells/salient_concept_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
+import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell";
+import type { TitlePageCell } from "authordoc/cells/title_page_cell";
+import type { UnknownCell } from "authordoc/cells/unknown_cell";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 

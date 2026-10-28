@@ -1,4 +1,4 @@
-import type { PlotEdge } from "../../library/storydoc/cells/plot_cell";
+import type { PlotEdge } from "authordoc/cells/plot_cell";
 
 export class PlotEdgeInALane {
     constructor(

@@ -14,7 +14,7 @@ import {
 import {
     TITLE_PAGE,
     TitlePageCell,
-} from "../../library/storydoc/cells/title_page_cell";
+} from "authordoc/cells/title_page_cell";
 
 interface AuthorFileEditorTitlePageCellProps {
     cell: TitlePageCell;

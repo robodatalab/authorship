@@ -6,8 +6,8 @@ import {
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
-import type { StoryTextSpan } from "../library/storydoc/iterators/story_words_iterator";
-import { Document } from "../library/storydoc/storydoc";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 

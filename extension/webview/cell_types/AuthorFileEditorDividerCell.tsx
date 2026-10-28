@@ -1,6 +1,6 @@
 import { AuthorFileEditorCellActions } from "../author_editor/AuthorFileEditorCell";
 import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import { DIVIDER } from "../../library/storydoc/cells/divider_cell";
+import { DIVIDER } from "authordoc/cells/divider_cell";
 import "./DividerCell.css";
 
 export function AuthorFileEditorDividerCell() {

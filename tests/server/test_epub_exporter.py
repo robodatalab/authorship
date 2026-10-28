@@ -23,25 +23,25 @@ from server.publishing.epub_exporter import (
     read_book,
     report_of,
 )
-from server.storydoc import storydoc
-from server.storydoc.storydoc import Document
-from server.storydoc.cells.about_cell import ABOUT, AboutCell
-from server.storydoc.cells.blurb_cell import BLURB, BlurbCell
-from server.storydoc.cells.cell import Cell
-from server.storydoc.cells.chapter_cell import CHAPTER, ChapterCell
-from server.storydoc.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
-from server.storydoc.cells.divider_cell import DividerCell
-from server.storydoc.cells.image_cell import ImageCell
-from server.storydoc.cells.markdown_cell import MarkdownCell
-from server.storydoc.cells.note_cell import NoteCell
-from server.storydoc.cells.part_cell import PartCell
-from server.storydoc.cells.recap_cell import RecapCell
-from server.storydoc.cells.salient_concept_cell import SalientConceptCell
-from server.storydoc.cells.table_of_contents_cell import (
+from authordoc import storydoc
+from authordoc.storydoc import Document
+from authordoc.cells.about_cell import ABOUT, AboutCell
+from authordoc.cells.blurb_cell import BLURB, BlurbCell
+from authordoc.cells.cell import Cell
+from authordoc.cells.chapter_cell import CHAPTER, ChapterCell
+from authordoc.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
+from authordoc.cells.divider_cell import DividerCell
+from authordoc.cells.image_cell import ImageCell
+from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.note_cell import NoteCell
+from authordoc.cells.part_cell import PartCell
+from authordoc.cells.recap_cell import RecapCell
+from authordoc.cells.salient_concept_cell import SalientConceptCell
+from authordoc.cells.table_of_contents_cell import (
     TABLE_OF_CONTENTS,
     TableOfContentsCell,
 )
-from server.storydoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
+from authordoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 
 
 def document(*cells: Cell) -> Document:

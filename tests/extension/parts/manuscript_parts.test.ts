@@ -8,16 +8,16 @@ import {
     partNumber,
     partTitle,
 } from "../../../extension/vscode_runtime/parts/manuscript_parts";
-import { AboutCell } from "../../../extension/library/storydoc/cells/about_cell";
-import { BlurbCell } from "../../../extension/library/storydoc/cells/blurb_cell";
-import { ChapterCell } from "../../../extension/library/storydoc/cells/chapter_cell";
-import { DividerCell } from "../../../extension/library/storydoc/cells/divider_cell";
-import { ImageCell } from "../../../extension/library/storydoc/cells/image_cell";
-import { MarkdownCell } from "../../../extension/library/storydoc/cells/markdown_cell";
-import { NoteCell } from "../../../extension/library/storydoc/cells/note_cell";
-import { PartCell } from "../../../extension/library/storydoc/cells/part_cell";
-import { RecapCell } from "../../../extension/library/storydoc/cells/recap_cell";
-import { TitlePageCell } from "../../../extension/library/storydoc/cells/title_page_cell";
+import { AboutCell } from "authordoc/cells/about_cell";
+import { BlurbCell } from "authordoc/cells/blurb_cell";
+import { ChapterCell } from "authordoc/cells/chapter_cell";
+import { DividerCell } from "authordoc/cells/divider_cell";
+import { ImageCell } from "authordoc/cells/image_cell";
+import { MarkdownCell } from "authordoc/cells/markdown_cell";
+import { NoteCell } from "authordoc/cells/note_cell";
+import { PartCell } from "authordoc/cells/part_cell";
+import { RecapCell } from "authordoc/cells/recap_cell";
+import { TitlePageCell } from "authordoc/cells/title_page_cell";
 
 /** Prose of a given length, for a story that has to look like one. */
 function prose(words: number): MarkdownCell {

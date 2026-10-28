@@ -18,7 +18,7 @@ import {
 import {
     DISCLAIMER,
     type DisclaimerCell,
-} from "../../library/storydoc/cells/disclaimer_cell";
+} from "authordoc/cells/disclaimer_cell";
 
 interface AuthorFileEditorDisclaimerCellProps {
     cell: DisclaimerCell;

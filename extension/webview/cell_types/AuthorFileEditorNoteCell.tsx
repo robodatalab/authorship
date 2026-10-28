@@ -13,7 +13,7 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { NOTE, type NoteCell } from "../../library/storydoc/cells/note_cell";
+import { NOTE, type NoteCell } from "authordoc/cells/note_cell";
 import "./NotesCell.css";
 
 interface AuthorFileEditorNoteCellProps {

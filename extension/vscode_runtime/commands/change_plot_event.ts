@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { PlotCell, type PlotNode } from "../../library/storydoc/cells/plot_cell";
+import { PlotCell, type PlotNode } from "authordoc/cells/plot_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 // What of an event the author can say, and how each is said of it.

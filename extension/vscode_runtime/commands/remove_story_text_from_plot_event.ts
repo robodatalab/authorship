@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { PlotCell } from "../../library/storydoc/cells/plot_cell";
+import { PlotCell } from "authordoc/cells/plot_cell";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 /** Leaves one event of a plot told by no story text, the event itself kept. */

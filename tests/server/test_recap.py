@@ -14,11 +14,11 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 from parameterized import parameterized  # type: ignore
 
-from server.storydoc import storydoc
-from server.storydoc.storydoc import Document
-from server.storydoc.cells.chapter_cell import ChapterCell
-from server.storydoc.cells.markdown_cell import MarkdownCell
-from server.storydoc.cells.title_page_cell import TitlePageCell
+from authordoc import storydoc
+from authordoc.storydoc import Document
+from authordoc.cells.chapter_cell import ChapterCell
+from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.title_page_cell import TitlePageCell
 from server.writing_tools.recap import write_recap
 
 

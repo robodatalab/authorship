@@ -15,7 +15,7 @@ import {
     replaceTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import { IMAGE, ImageCell } from "../../library/storydoc/cells/image_cell";
+import { IMAGE, ImageCell } from "authordoc/cells/image_cell";
 import "./ImageCell.css";
 
 interface AuthorFileEditorImageCellProps {
