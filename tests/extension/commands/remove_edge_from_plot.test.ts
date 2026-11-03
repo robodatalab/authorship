@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RemoveEdgeFromPlotCommand } from "../../../extension/vscode_runtime/commands/remove_edge_from_plot";
-import { PlotEdge } from "authordoc/cells/plot_cell";
+import { PlotEdge, type PlotCell } from "authordoc/cells/plot_cell";
 import { openStory } from "./open_story";
 
 describe("RemoveEdgeFromPlotCommand — disconnects two nodes of a plot's trajectory", () => {
@@ -24,5 +24,31 @@ She finds the door.
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [new PlotEdge("e2", "n3", "n1")],
         });
+    });
+
+    it("keeps the concepts the plot references", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother puts her child first.
+
+<!-- cell: plot title="The door" nodes="n1:2-3, n2:6-7" edges="e1:n1>n2" concepts="k1" id="p1" -->
+
+She finds the door.
+`);
+
+        new RemoveEdgeFromPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            edgeId: "e1",
+        });
+
+        const plot = session.document.cellWithId("p1") as PlotCell;
+        const concepts = plot.concepts(session.document);
+        const motherhood = session.document.cellWithId("k1");
+        expect(concepts).toEqual([motherhood]);
     });
 });

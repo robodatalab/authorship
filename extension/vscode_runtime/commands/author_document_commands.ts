@@ -1,5 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddConceptToPlotCommand } from "./add_concept_to_plot";
 import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
 import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
@@ -29,6 +30,7 @@ import { MoveCellDownCommand } from "./move_cell_down";
 import { MoveCellUpCommand } from "./move_cell_up";
 import { MoveNodeInPlotCommand } from "./move_node_in_plot";
 import { OpenAsTextCommand } from "./open_as_text";
+import { RemoveConceptFromPlotCommand } from "./remove_concept_from_plot";
 import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
 import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
 import { RemoveReferenceFromSalientConceptCommand } from "./remove_reference_from_salient_concept";
@@ -85,6 +87,8 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new MoveNodeInPlotCommand(),
     new AddEdgeToPlotCommand(),
     new RemoveEdgeFromPlotCommand(),
+    new AddConceptToPlotCommand(),
+    new RemoveConceptFromPlotCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

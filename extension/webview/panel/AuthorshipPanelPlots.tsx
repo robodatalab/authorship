@@ -59,6 +59,9 @@ const DELETE_THE_STORY_TEXT = "Delete the story text of this event";
 // How many of the words that tell an untitled event its row shows.
 const FIRST_WORDS_SHOWN = 6;
 const DISCONNECT_THE_NODES = "Disconnect these nodes";
+const REFERENCE_A_CONCEPT = "Reference a salient concept from this plot";
+const STOP_REFERENCING_THE_CONCEPT = "Stop referencing this concept";
+const UNTITLED_CONCEPT = "Untitled concept";
 const TRAJECTORY_ROW_HEIGHT = 22;
 const TRAJECTORY_LANE_WIDTH = 14;
 const TRAJECTORY_NODE_RADIUS = 4;
@@ -109,10 +112,10 @@ export function AuthorshipPanelPlots({
 
     function retitleThePlot(plotCellId: string, title: string): void {
         const plotCell = story?.cellWithId(plotCellId);
-        if (plotCell === undefined) {
+        if (story === null || plotCell === undefined) {
             return;
         }
-        const retitling = new StoryAnnotationRetitled(title);
+        const retitling = new StoryAnnotationRetitled(title, story);
         const retitled = plotCell.accept<Cell>(retitling);
         replaceTheCell(sendMessagesToVscode, retitled);
     }
@@ -144,6 +147,7 @@ export function AuthorshipPanelPlots({
                 ) : (
                     <AuthorshipPanelPlot
                         key={plotShown.annotationCellId}
+                        story={story}
                         plot={plotShown}
                         plotCell={plotCellShown}
                         nodeIdSelected={storyAnnotationSelected.passageId}
@@ -307,6 +311,7 @@ function AuthorshipPanelPlotEvent({
 }
 
 interface AuthorshipPanelPlotProps {
+    story: Document;
     plot: StoryAnnotationInTheStory;
     plotCell: PlotCell;
     nodeIdSelected: string | null;
@@ -316,6 +321,7 @@ interface AuthorshipPanelPlotProps {
 }
 
 function AuthorshipPanelPlot({
+    story,
     plot,
     plotCell,
     nodeIdSelected,
@@ -369,6 +375,11 @@ function AuthorshipPanelPlot({
                 }
                 sendMessagesToVscode={sendMessagesToVscode}
             />
+            <AuthorshipPanelPlotConcepts
+                story={story}
+                plotCell={plotCell}
+                sendMessagesToVscode={sendMessagesToVscode}
+            />
             <div className="authorship-panel-story-annotation-passages-heading">
                 <h4>Trajectory</h4>
                 <button
@@ -394,6 +405,115 @@ function AuthorshipPanelPlot({
                 />
             )}
         </section>
+    );
+}
+
+interface AuthorshipPanelPlotConceptsProps {
+    story: Document;
+    plotCell: PlotCell;
+    sendMessagesToVscode: SendMessagesToVscode;
+}
+
+// The salient concepts the plot references: each can be stopped being
+// referenced, and the story's other concepts can be chosen to be referenced.
+function AuthorshipPanelPlotConcepts({
+    story,
+    plotCell,
+    sendMessagesToVscode,
+}: AuthorshipPanelPlotConceptsProps) {
+    const [choosing, setChoosing] = useState(false);
+    const referenced = plotCell.concepts(story);
+    const referencedIds = referenced.map((concept) => concept.uniqueId);
+    const conceptsInTheStory = story.salientConcepts();
+    const unreferenced = conceptsInTheStory.filter(
+        (concept) => !referencedIds.includes(concept.uniqueId),
+    );
+
+    function reference(conceptCellId: string): void {
+        setChoosing(false);
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "addConceptToPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                conceptCellId,
+            },
+        });
+    }
+
+    function stopReferencing(conceptCellId: string): void {
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "removeConceptFromPlot",
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                conceptCellId,
+            },
+        });
+    }
+
+    return (
+        <>
+            <div className="authorship-panel-story-annotation-passages-heading">
+                <h4>Concepts</h4>
+                <button
+                    type="button"
+                    className="authorship-panel-plot-concept-chosen"
+                    title={REFERENCE_A_CONCEPT}
+                    aria-label={REFERENCE_A_CONCEPT}
+                    aria-expanded={choosing}
+                    disabled={unreferenced.length === 0}
+                    onClick={() => setChoosing(!choosing)}
+                >
+                    <i className="codicon codicon-add" />
+                </button>
+            </div>
+            {choosing && unreferenced.length > 0 ? (
+                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-concepts-to-choose">
+                    {unreferenced.map((concept) => (
+                        <li
+                            key={concept.uniqueId}
+                            className="authorship-panel-story-annotation-passage"
+                        >
+                            <button
+                                type="button"
+                                className="authorship-panel-story-annotation-passage-shown"
+                                onClick={() => reference(concept.uniqueId)}
+                            >
+                                {concept.title || UNTITLED_CONCEPT}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+            {referenced.length === 0 ? (
+                <div className="authorship-panel-idle">
+                    No concepts referenced yet
+                </div>
+            ) : (
+                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-concepts">
+                    {referenced.map((concept) => (
+                        <li
+                            key={concept.uniqueId}
+                            className="authorship-panel-story-annotation-passage"
+                        >
+                            <span className="authorship-panel-story-annotation-passage-shown">
+                                {concept.title || UNTITLED_CONCEPT}
+                            </span>
+                            <button
+                                type="button"
+                                className="authorship-panel-story-annotation-passage-removed"
+                                title={STOP_REFERENCING_THE_CONCEPT}
+                                aria-label={STOP_REFERENCING_THE_CONCEPT}
+                                onClick={() => stopReferencing(concept.uniqueId)}
+                            >
+                                <i className="codicon codicon-close" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </>
     );
 }
 

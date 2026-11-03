@@ -46,6 +46,7 @@
 }
 
 .authorship-panel-story-annotation-assign,
+.authorship-panel-plot-concept-chosen,
 .authorship-panel-story-annotation-deleted,
 .authorship-panel-story-annotation-passage-removed {
     display: inline-flex;
@@ -59,6 +60,7 @@
 }
 
 .authorship-panel-story-annotation-assign:hover:enabled,
+.authorship-panel-plot-concept-chosen:hover:enabled,
 .authorship-panel-story-annotation-deleted:hover,
 .authorship-panel-story-annotation-passage-shown:hover,
 .authorship-panel-story-annotation-passage-removed:hover {
@@ -87,7 +89,8 @@
     visibility: visible;
 }
 
-.authorship-panel-story-annotation-assign:disabled {
+.authorship-panel-story-annotation-assign:disabled,
+.authorship-panel-plot-concept-chosen:disabled {
     opacity: 0.4;
     cursor: default;
 }

@@ -65,10 +65,10 @@ export function AuthorshipPanelSalientConcepts({
         title: string,
     ): void {
         const salientConceptCell = story?.cellWithId(salientConceptCellId);
-        if (salientConceptCell === undefined) {
+        if (story === null || salientConceptCell === undefined) {
             return;
         }
-        const retitling = new StoryAnnotationRetitled(title);
+        const retitling = new StoryAnnotationRetitled(title, story);
         const retitled = salientConceptCell.accept<Cell>(retitling);
         replaceTheCell(sendMessagesToVscode, retitled);
     }

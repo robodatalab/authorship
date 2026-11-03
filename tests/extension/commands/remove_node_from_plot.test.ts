@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import { openAuthorFileEditorSession } from "../../../extension/vscode_runtime/author_file_editor_session";
 import { RemoveNodeFromPlotCommand } from "../../../extension/vscode_runtime/commands/remove_node_from_plot";
-import { PlotEdge, PlotNode } from "authordoc/cells/plot_cell";
+import { PlotEdge, PlotNode, type PlotCell } from "authordoc/cells/plot_cell";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { STORY_FILE, openStory } from "./open_story";
 
@@ -89,5 +89,31 @@ She finds the door.
             "salient-concept": { annotationCellId: null, passageId: null },
             plot: { annotationCellId: "p1", passageId: "n2" },
         });
+    });
+
+    it("keeps the concepts the plot references", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother puts her child first.
+
+<!-- cell: plot title="The door" nodes="n1:2-3, n2:6-7" concepts="k1" id="p1" -->
+
+She finds the door.
+`);
+
+        new RemoveNodeFromPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            nodeId: "n2",
+        });
+
+        const plot = session.document.cellWithId("p1") as PlotCell;
+        const concepts = plot.concepts(session.document);
+        const motherhood = session.document.cellWithId("k1");
+        expect(concepts).toEqual([motherhood]);
     });
 });

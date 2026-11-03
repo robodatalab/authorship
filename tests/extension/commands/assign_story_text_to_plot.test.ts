@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AssignStoryTextToPlotCommand } from "../../../extension/vscode_runtime/commands/assign_story_text_to_plot";
-import { PlotNode } from "authordoc/cells/plot_cell";
+import { PlotNode, type PlotCell } from "authordoc/cells/plot_cell";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { openStory } from "./open_story";
 
@@ -81,5 +81,33 @@ She finds the door.
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [],
         });
+    });
+
+    it("keeps the concepts the plot references", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother puts her child first.
+
+<!-- cell: plot title="The door" concepts="k1" id="p1" -->
+
+She finds the door.
+`);
+
+        new AssignStoryTextToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            cellId: "c1",
+            startCharacterOffsetInCell: 5,
+            endCharacterOffsetInCell: 13,
+        });
+
+        const plot = session.document.cellWithId("p1") as PlotCell;
+        const concepts = plot.concepts(session.document);
+        const motherhood = session.document.cellWithId("k1");
+        expect(concepts).toEqual([motherhood]);
     });
 });

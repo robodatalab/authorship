@@ -43,7 +43,7 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
             const edgeId = crypto.randomUUID();
             const edgeAdded = new PlotEdge(edgeId, fromNodeId, toNodeId);
             const edges = [...plot.edges, edgeAdded];
-            story.cells[plotIndex] = new PlotCell(
+            const withTheEdge = new PlotCell(
                 plot.title,
                 plot.nodes,
                 edges,
@@ -52,6 +52,9 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
                 plot.at,
                 plot.uniqueId,
             );
+            const concepts = plot.concepts(story);
+            const plotConnected = withTheEdge.withConcepts(concepts);
+            story.cells[plotIndex] = plotConnected;
         });
     }
 }

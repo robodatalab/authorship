@@ -41,7 +41,7 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
             const nodeId = crypto.randomUUID();
             const nodeAdded = new PlotNode(nodeId, wordsAssigned);
             const nodes = [...plot.nodes, nodeAdded];
-            story.cells[plotIndex] = new PlotCell(
+            const withTheEvent = new PlotCell(
                 plot.title,
                 nodes,
                 plot.edges,
@@ -50,6 +50,9 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
                 plot.at,
                 plot.uniqueId,
             );
+            const concepts = plot.concepts(story);
+            const plotTold = withTheEvent.withConcepts(concepts);
+            story.cells[plotIndex] = plotTold;
         });
     }
 }

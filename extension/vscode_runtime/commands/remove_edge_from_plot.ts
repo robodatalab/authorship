@@ -24,7 +24,7 @@ export class RemoveEdgeFromPlotCommand implements AuthorDocumentCommand {
             const edgesKept = plot.edges.filter(
                 (edge) => edge.edgeId !== commandArguments.edgeId,
             );
-            story.cells[plotIndex] = new PlotCell(
+            const withoutTheEdge = new PlotCell(
                 plot.title,
                 plot.nodes,
                 edgesKept,
@@ -33,6 +33,9 @@ export class RemoveEdgeFromPlotCommand implements AuthorDocumentCommand {
                 plot.at,
                 plot.uniqueId,
             );
+            const concepts = plot.concepts(story);
+            const plotKept = withoutTheEdge.withConcepts(concepts);
+            story.cells[plotIndex] = plotKept;
         });
     }
 }

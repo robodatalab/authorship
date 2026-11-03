@@ -32,7 +32,7 @@ export class AddEventToPlotCommand implements AuthorDocumentCommand {
             }
             const eventAdded = new PlotNode(nodeId, null);
             const nodes = [...plot.nodes, eventAdded];
-            story.cells[plotIndex] = new PlotCell(
+            const withTheEvent = new PlotCell(
                 plot.title,
                 nodes,
                 plot.edges,
@@ -41,6 +41,9 @@ export class AddEventToPlotCommand implements AuthorDocumentCommand {
                 plot.at,
                 plot.uniqueId,
             );
+            const concepts = plot.concepts(story);
+            const plotGrown = withTheEvent.withConcepts(concepts);
+            story.cells[plotIndex] = plotGrown;
         });
     }
 }
