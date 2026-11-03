@@ -15,9 +15,13 @@ import { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
 import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell";
 import type { TitlePageCell } from "authordoc/cells/title_page_cell";
 import type { UnknownCell } from "authordoc/cells/unknown_cell";
+import type { Document } from "authordoc/storydoc";
 
 export class StoryAnnotationRetitled implements CellVisitor<Cell> {
-    constructor(private readonly title: string) {}
+    constructor(
+        private readonly title: string,
+        private readonly story: Document,
+    ) {}
 
     visitSalientConcept(cell: SalientConceptCell): SalientConceptCell {
         return new SalientConceptCell(
@@ -31,7 +35,7 @@ export class StoryAnnotationRetitled implements CellVisitor<Cell> {
     }
 
     visitPlot(cell: PlotCell): PlotCell {
-        return new PlotCell(
+        const retitled = new PlotCell(
             this.title,
             cell.nodes,
             cell.edges,
@@ -40,6 +44,9 @@ export class StoryAnnotationRetitled implements CellVisitor<Cell> {
             cell.at,
             cell.uniqueId,
         );
+        const concepts = cell.concepts(this.story);
+        const retitledReferencing = retitled.withConcepts(concepts);
+        return retitledReferencing;
     }
 
     visitMarkdown(cell: MarkdownCell): MarkdownCell {

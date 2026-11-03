@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import { authorDocumentCommand } from "./commands/author_document_commands";
 import { fetchFromServer } from "./server/fetch";
@@ -50,10 +51,11 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
                     message.markdown as string,
                 );
             } else if (message?.type === "showStoryWordRange") {
-                this.sessionFollowed?.showTheStoryWordRange({
-                    firstWord: message.firstWord as number,
-                    lastWord: message.lastWord as number,
-                });
+                const storyWordRange = new StoryWordRange(
+                    message.firstWord as number,
+                    message.lastWord as number,
+                );
+                this.sessionFollowed?.showTheStoryWordRange(storyWordRange);
             } else if (message?.type === "invoke" && this.sessionFollowed) {
                 void authorDocumentCommand(
                     message.commandName as string,

@@ -65,6 +65,26 @@ const THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT = `<!-- cell: plot id="p1" title
 </ol>
 `;
 
+const MOTHERHOOD = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother puts her child first.
+`;
+
+const THE_PROMISE = `<!-- cell: salient-concept id="k2" title="The promise" -->
+
+A promise is kept whatever it costs.
+`;
+
+const THE_DOOR_REFERENCING_MOTHERHOOD = `<!-- cell: plot id="p1" title="The door" concepts="k1" -->
+
+She finds the door.
+`;
+
+const THE_DOOR_REFERENCING_BOTH_CONCEPTS = `<!-- cell: plot id="p1" title="The door" concepts="k1, k2" -->
+
+She finds the door.
+`;
+
 describe("the plots tab", () => {
     let posted: unknown[] = [];
     let root: Root;
@@ -265,6 +285,138 @@ describe("the plots tab", () => {
                 },
             },
         ]);
+    });
+
+    it("keeps the concepts the plot references when it is retitled", async () => {
+        await mountPlots({
+            story: [THE_STORY, MOTHERHOOD, THE_DOOR_REFERENCING_MOTHERHOOD].join("\n"),
+            storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+        });
+        const titleBox = document.querySelector<HTMLInputElement>(
+            ".author-file-editor-cell-field-input",
+        )!;
+        const setTheValue = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        )!.set!;
+
+        await act(async () => {
+            setTheValue.call(titleBox, "The doors");
+            titleBox.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "replaceCell",
+                commandArguments: {
+                    cell: '<!-- cell: plot id="p1" title="The doors" concepts="k1" -->\n\n<ol title="She finds the door.">\n</ol>\n',
+                },
+            },
+        ]);
+    });
+
+    describe("the plot's concepts", () => {
+        it("lists the concepts the plot references by their titles", async () => {
+            await mountPlots({
+                story: [THE_STORY, MOTHERHOOD, THE_PROMISE, THE_DOOR_REFERENCING_MOTHERHOOD].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+            });
+
+            const conceptsShown = Array.from(
+                document.querySelectorAll(
+                    ".authorship-panel-plot-concepts .authorship-panel-story-annotation-passage-shown",
+                ),
+                (concept) => concept.textContent,
+            );
+            expect(conceptsShown).toEqual(["Motherhood"]);
+        });
+
+        it("asks for a concept to stop being referenced", async () => {
+            await mountPlots({
+                story: [THE_STORY, MOTHERHOOD, THE_PROMISE, THE_DOOR_REFERENCING_MOTHERHOOD].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+            });
+            const removeButton = document.querySelector(
+                ".authorship-panel-plot-concepts .authorship-panel-story-annotation-passage-removed",
+            )!;
+
+            await click(removeButton);
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "removeConceptFromPlot",
+                    commandArguments: {
+                        annotationCellId: "p1",
+                        conceptCellId: "k1",
+                    },
+                },
+            ]);
+        });
+
+        it("offers only the concepts the plot does not reference yet", async () => {
+            await mountPlots({
+                story: [THE_STORY, MOTHERHOOD, THE_PROMISE, THE_DOOR_REFERENCING_MOTHERHOOD].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+            });
+            const chooseButton = document.querySelector(
+                ".authorship-panel-plot-concept-chosen",
+            )!;
+
+            await click(chooseButton);
+
+            const conceptsOffered = Array.from(
+                document.querySelectorAll(
+                    ".authorship-panel-plot-concepts-to-choose .authorship-panel-story-annotation-passage-shown",
+                ),
+                (concept) => concept.textContent,
+            );
+            expect(conceptsOffered).toEqual(["The promise"]);
+        });
+
+        it("asks for the concept chosen to be referenced, and stops offering", async () => {
+            await mountPlots({
+                story: [THE_STORY, MOTHERHOOD, THE_PROMISE, THE_DOOR_REFERENCING_MOTHERHOOD].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+            });
+            const chooseButton = document.querySelector(
+                ".authorship-panel-plot-concept-chosen",
+            )!;
+            await click(chooseButton);
+            const thePromise = document.querySelector(
+                ".authorship-panel-plot-concepts-to-choose .authorship-panel-story-annotation-passage-shown",
+            )!;
+
+            await click(thePromise);
+
+            const offering = document.querySelector(
+                ".authorship-panel-plot-concepts-to-choose",
+            );
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "addConceptToPlot",
+                    commandArguments: {
+                        annotationCellId: "p1",
+                        conceptCellId: "k2",
+                    },
+                },
+            ]);
+            expect(offering).toBeNull();
+        });
+
+        it("offers nothing to reference once the plot references every concept", async () => {
+            await mountPlots({
+                story: [THE_STORY, MOTHERHOOD, THE_PROMISE, THE_DOOR_REFERENCING_BOTH_CONCEPTS].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
+            });
+
+            const chooseButton = document.querySelector<HTMLButtonElement>(
+                ".authorship-panel-plot-concept-chosen",
+            )!;
+            expect(chooseButton.disabled).toBe(true);
+        });
     });
 
     describe("the event selected", () => {
