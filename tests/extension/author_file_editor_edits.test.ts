@@ -82,7 +82,7 @@ describe("what a change to the document records", () => {
     it("records nothing when the change touches no cell at all", () => {
         const { session, editsRecorded } = openSession(THE_STORY);
 
-        session.changeTheDocument(() => undefined);
+        session.changeTheDocument((story) => story);
 
         expect(editsRecorded).toEqual([]);
     });
@@ -127,7 +127,10 @@ describe("what a change to the document records", () => {
 
         typing(session, "c1", "She saw the door.", "!!");
         session.changeTheDocument((story) => {
-            story.cells[0] = story.cells[0].withFolded(true);
+            const [chapter] = story.cells;
+            const chapterFolded = chapter.withFolded(true);
+            const storyFolded = story.withCell(chapterFolded);
+            return storyFolded;
         });
         typing(session, "c1", "She saw the door.!!", "!!");
 
@@ -222,7 +225,10 @@ describe("undoing and redoing what the author did", () => {
         const asItStood = session.document.text;
 
         session.changeTheDocument((story) => {
-            story.cells.splice(1, 0, new NoteCell());
+            const [chapter, sheSaw, heHeard] = story.cells;
+            const note = new NoteCell();
+            const storyWithTheNote = story.withCells([chapter, note, sheSaw, heHeard]);
+            return storyWithTheNote;
         });
         const withTheNote = cellsOf(session);
 
@@ -241,7 +247,9 @@ describe("undoing and redoing what the author did", () => {
         const asItStood = session.document.text;
 
         session.changeTheDocument((story) => {
-            story.cells.splice(1, 1);
+            const [chapter, , heHeard] = story.cells;
+            const storyWithoutTheCell = story.withCells([chapter, heHeard]);
+            return storyWithoutTheCell;
         });
 
         expect(cellsOf(session)).toEqual([
@@ -264,8 +272,9 @@ describe("undoing and redoing what the author did", () => {
         const asItStood = session.document.text;
 
         session.changeTheDocument((story) => {
-            const cellsMoved = story.cells.splice(2, 1);
-            story.cells.splice(0, 0, ...cellsMoved);
+            const [chapter, sheSaw, heHeard] = story.cells;
+            const storyReordered = story.withCells([heHeard, chapter, sheSaw]);
+            return storyReordered;
         });
 
         expect(session.document.cells.map((cell) => cell.uniqueId)).toEqual([
@@ -290,7 +299,10 @@ describe("undoing and redoing what the author did", () => {
         const asItStood = session.document.text;
 
         session.changeTheDocument((story) => {
-            story.cells[0] = story.cells[0].withFolded(true);
+            const [chapter] = story.cells;
+            const chapterFolded = chapter.withFolded(true);
+            const storyFolded = story.withCell(chapterFolded);
+            return storyFolded;
         });
 
         expect(session.document.cellWithId("c0")?.folded).toBe(true);
@@ -309,14 +321,20 @@ describe("undoing and redoing what the author did", () => {
 
         session.theAuthorTypedInTheCell("c1", "She saw the gate.");
         session.changeTheDocument((story) => {
-            story.cells.splice(2, 0, new NoteCell());
+            const [chapter, sheSaw, heHeard] = story.cells;
+            const note = new NoteCell();
+            const storyWithTheNote = story.withCells([chapter, sheSaw, note, heHeard]);
+            return storyWithTheNote;
         });
         session.changeTheDocument((story) => {
-            story.cells.splice(0, 1);
+            const [, sheSaw, note, heHeard] = story.cells;
+            const storyWithoutTheChapter = story.withCells([sheSaw, note, heHeard]);
+            return storyWithoutTheChapter;
         });
         session.changeTheDocument((story) => {
-            const cellsMoved = story.cells.splice(0, 1);
-            story.cells.splice(1, 0, ...cellsMoved);
+            const [sheSaw, note, heHeard] = story.cells;
+            const storyReordered = story.withCells([note, sheSaw, heHeard]);
+            return storyReordered;
         });
         const asTheAuthorLeftIt = cellsOf(session);
 

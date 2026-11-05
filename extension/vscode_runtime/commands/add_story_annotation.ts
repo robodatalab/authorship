@@ -14,7 +14,11 @@ export class AddStoryAnnotationCommand implements AuthorDocumentCommand {
     ): void {
         const cellKind = commandArguments.cellKind as string;
         const annotation = cellOfKind(cellKind);
-        session.changeTheDocument((story) => story.cells.push(annotation));
+        session.changeTheDocument((story) => {
+            const cellsAnnotated = [...story.cells, annotation];
+            const storyAnnotated = story.withCells(cellsAnnotated);
+            return storyAnnotated;
+        });
         session.selectTheStoryAnnotation(cellKind, annotation.uniqueId);
     }
 }

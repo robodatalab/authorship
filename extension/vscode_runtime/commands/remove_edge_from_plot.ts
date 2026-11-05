@@ -14,12 +14,9 @@ export class RemoveEdgeFromPlotCommand implements AuthorDocumentCommand {
     ): void {
         const annotationCellId = commandArguments.annotationCellId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const edgesKept = plot.edges.filter(
                 (edge) => edge.edgeId !== commandArguments.edgeId,
@@ -35,7 +32,8 @@ export class RemoveEdgeFromPlotCommand implements AuthorDocumentCommand {
             );
             const concepts = plot.concepts(story);
             const plotKept = withoutTheEdge.withConcepts(concepts);
-            story.cells[plotIndex] = plotKept;
+            const storyChanged = story.withCell(plotKept);
+            return storyChanged;
         });
     }
 }

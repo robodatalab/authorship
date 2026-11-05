@@ -20,14 +20,13 @@ export class FoldCellCommand implements AuthorDocumentCommand {
     ): void {
         const cellId = commandArguments.cellId as string;
         session.changeTheDocument((story) => {
-            const cellIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === cellId,
-            );
-            if (cellIndex === -1) {
-                return;
+            const cell = story.cellWithId(cellId);
+            if (!cell) {
+                return story;
             }
-            const cell = story.cells[cellIndex];
-            story.cells[cellIndex] = cell.withFolded(this.folded);
+            const cellRewritten = cell.withFolded(this.folded);
+            const storyChanged = story.withCell(cellRewritten);
+            return storyChanged;
         });
     }
 }

@@ -28,19 +28,22 @@ function putCorrectedSectionsIn(
 ): void {
     let anySectionChanged = false;
     session.changeTheDocument((story) => {
+        const cells = [...story.cells];
         for (const { cellId, source } of corrected) {
-            const cellIndex = story.cells.findIndex(
+            const cellIndex = cells.findIndex(
                 (cell) => cell.uniqueId === cellId,
             );
             if (cellIndex === -1) {
                 continue;
             }
-            const cell = story.cells[cellIndex];
+            const cell = cells[cellIndex];
             if (cell.kind === MARKDOWN && cell.source !== source) {
-                story.cells[cellIndex] = cell.withSource(source);
+                cells[cellIndex] = cell.withSource(source);
                 anySectionChanged = true;
             }
         }
+        const storyCorrected = story.withCells(cells);
+        return storyCorrected;
     });
     if (anySectionChanged) {
         session.sendDocument();

@@ -15,13 +15,8 @@ export class ReplaceCellCommand implements AuthorDocumentCommand {
         const written = commandArguments.cell as string;
         const [cellReplacing] = parse(written);
         session.changeTheDocument((story) => {
-            const cellIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === cellReplacing.uniqueId,
-            );
-            if (cellIndex === -1) {
-                return;
-            }
-            story.cells[cellIndex] = cellReplacing;
+            const storyChanged = story.withCell(cellReplacing);
+            return storyChanged;
         });
     }
 }

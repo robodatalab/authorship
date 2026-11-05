@@ -14,18 +14,22 @@ export class FixProseCommand implements AuthorDocumentCommand {
     ): void {
         const error = commandArguments as unknown as ProseCheckError;
         session.changeTheDocument((story) => {
-            const cellIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === error.cellId,
-            );
-            if (cellIndex === -1 || error.correctVersion === "") {
-                return;
+            const cell = story.cellWithId(error.cellId);
+            if (!cell || error.correctVersion === "") {
+                return story;
             }
-            const cell = story.cells[cellIndex];
-            story.cells[cellIndex] = cell.withSource(
-                cell.source.slice(0, error.startCharacterOffsetInCell) +
-                    error.correctVersion +
-                    cell.source.slice(error.endCharacterOffsetInCell),
+            const proseBefore = cell.source.slice(
+                0,
+                error.startCharacterOffsetInCell,
             );
+            const proseAfter = cell.source.slice(
+                error.endCharacterOffsetInCell,
+            );
+            const proseFixed =
+                proseBefore + error.correctVersion + proseAfter;
+            const cellFixed = cell.withSource(proseFixed);
+            const storyFixed = story.withCell(cellFixed);
+            return storyFixed;
         });
     }
 }

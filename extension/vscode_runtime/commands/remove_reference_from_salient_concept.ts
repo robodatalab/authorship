@@ -15,17 +15,14 @@ export class RemoveReferenceFromSalientConceptCommand implements AuthorDocumentC
         const annotationCellId = commandArguments.annotationCellId as string;
         const referenceId = commandArguments.referenceId as string;
         session.changeTheDocument((story) => {
-            const annotationIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const annotation = story.cells[annotationIndex];
+            const annotation = story.cellWithId(annotationCellId);
             if (!(annotation instanceof SalientConceptCell)) {
-                return;
+                return story;
             }
             const referencesKept = annotation.references.filter(
                 (reference) => reference.referenceId !== referenceId,
             );
-            story.cells[annotationIndex] = new SalientConceptCell(
+            const annotationKept = new SalientConceptCell(
                 annotation.title,
                 referencesKept,
                 annotation.source,
@@ -33,6 +30,8 @@ export class RemoveReferenceFromSalientConceptCommand implements AuthorDocumentC
                 annotation.at,
                 annotation.uniqueId,
             );
+            const storyChanged = story.withCell(annotationKept);
+            return storyChanged;
         });
     }
 }

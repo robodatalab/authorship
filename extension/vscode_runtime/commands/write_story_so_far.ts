@@ -56,14 +56,13 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );
             session?.changeTheDocument((story) => {
-                const cellIndex = story.cells.findIndex(
-                    (cell) => cell.uniqueId === cellId,
-                );
-                if (cellIndex === -1) {
-                    return;
+                const cell = story.cellWithId(cellId);
+                if (!cell) {
+                    return story;
                 }
-                const cell = story.cells[cellIndex];
-                story.cells[cellIndex] = cell.withSource(storySoFar.text);
+                const cellRewritten = cell.withSource(storySoFar.text);
+                const storyChanged = story.withCell(cellRewritten);
+                return storyChanged;
             });
         } catch (failure) {
             void vscode.window.showErrorMessage(

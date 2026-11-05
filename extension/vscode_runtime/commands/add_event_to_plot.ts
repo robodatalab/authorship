@@ -20,15 +20,12 @@ export class AddEventToPlotCommand implements AuthorDocumentCommand {
         const annotationCellId = commandArguments.annotationCellId as string;
         const nodeId = commandArguments.nodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (
                 !(plot instanceof PlotCell) ||
                 plot.nodes.some((node) => node.nodeId === nodeId)
             ) {
-                return;
+                return story;
             }
             const eventAdded = new PlotNode(nodeId, null);
             const nodes = [...plot.nodes, eventAdded];
@@ -43,7 +40,8 @@ export class AddEventToPlotCommand implements AuthorDocumentCommand {
             );
             const concepts = plot.concepts(story);
             const plotGrown = withTheEvent.withConcepts(concepts);
-            story.cells[plotIndex] = plotGrown;
+            const storyChanged = story.withCell(plotGrown);
+            return storyChanged;
         });
     }
 }

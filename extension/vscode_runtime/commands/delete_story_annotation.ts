@@ -42,9 +42,11 @@ export class DeleteStoryAnnotationCommand implements AuthorDocumentCommand {
             return;
         }
         session.changeTheDocument((story) => {
-            story.cells = story.cells.filter(
+            const cellsKept = story.cells.filter(
                 (cell) => cell.uniqueId !== annotationCellId,
             );
+            const storyKept = story.withCells(cellsKept);
+            return storyKept;
         });
     }
 }

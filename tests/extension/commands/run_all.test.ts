@@ -104,7 +104,10 @@ describe("RunAllCommand — while it runs", () => {
                     (cell) => cell.uniqueId === "toc",
                 );
                 const blurbAdded = new BlurbCell("", false, null, "b3");
-                story.cells.splice(tableOfContentsAt, 0, blurbAdded);
+                const cells = [...story.cells];
+                cells.splice(tableOfContentsAt, 0, blurbAdded);
+                const storyWithTheBlurb = story.withCells(cells);
+                return storyWithTheBlurb;
             }),
         );
 
@@ -122,9 +125,11 @@ describe("RunAllCommand — while it runs", () => {
         );
         const asked = serverThatWritesEveryBlurb(() =>
             session.changeTheDocument((story) => {
-                story.cells = story.cells.filter(
+                const cellsKept = story.cells.filter(
                     (cell) => cell.uniqueId !== "b2",
                 );
+                const storyKept = story.withCells(cellsKept);
+                return storyKept;
             }),
         );
 

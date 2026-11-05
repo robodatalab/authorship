@@ -51,14 +51,13 @@ export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
         const cellId = commandArguments.cellId as string;
         const tableOfContents = tableOfContentsOf(session.document);
         session.changeTheDocument((story) => {
-            const cellIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === cellId,
-            );
-            if (cellIndex === -1) {
-                return;
+            const cell = story.cellWithId(cellId);
+            if (!cell) {
+                return story;
             }
-            const cell = story.cells[cellIndex];
-            story.cells[cellIndex] = cell.withSource(tableOfContents);
+            const cellRewritten = cell.withSource(tableOfContents);
+            const storyChanged = story.withCell(cellRewritten);
+            return storyChanged;
         });
     }
 }

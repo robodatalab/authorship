@@ -18,21 +18,18 @@ export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCom
     ): void {
         const annotationCellId = commandArguments.annotationCellId as string;
         session.changeTheDocument((story) => {
-            const annotationIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
             const storyWords = new StoryWordsIterator(story);
             const wordsAssigned = storyWords.rangeBetween(
                 commandArguments.cellId as string,
                 commandArguments.startCharacterOffsetInCell as number,
                 commandArguments.endCharacterOffsetInCell as number,
             );
-            const annotation = story.cells[annotationIndex];
+            const annotation = story.cellWithId(annotationCellId);
             if (
                 !(annotation instanceof SalientConceptCell) ||
                 wordsAssigned === null
             ) {
-                return;
+                return story;
             }
             if (
                 annotation.references.some(
@@ -43,7 +40,7 @@ export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCom
                             wordsAssigned.lastWord,
                 )
             ) {
-                return;
+                return story;
             }
             const referenceId = crypto.randomUUID();
             const referenceAdded = new SalientConceptReference(
@@ -51,7 +48,7 @@ export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCom
                 wordsAssigned,
             );
             const references = [...annotation.references, referenceAdded];
-            story.cells[annotationIndex] = new SalientConceptCell(
+            const annotationReferencing = new SalientConceptCell(
                 annotation.title,
                 references,
                 annotation.source,
@@ -59,6 +56,8 @@ export class AssignStoryTextToSalientConceptCommand implements AuthorDocumentCom
                 annotation.at,
                 annotation.uniqueId,
             );
+            const storyChanged = story.withCell(annotationReferencing);
+            return storyChanged;
         });
     }
 }

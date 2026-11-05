@@ -16,12 +16,9 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
         const fromNodeId = commandArguments.fromNodeId as string;
         const toNodeId = commandArguments.toNodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const nodeIds = plot.nodes.map((node) => node.nodeId);
             if (
@@ -29,7 +26,7 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
                 !nodeIds.includes(toNodeId) ||
                 fromNodeId === toNodeId
             ) {
-                return;
+                return story;
             }
             if (
                 plot.edges.some(
@@ -38,7 +35,7 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
                         edge.toNodeId === toNodeId,
                 )
             ) {
-                return;
+                return story;
             }
             const edgeId = crypto.randomUUID();
             const edgeAdded = new PlotEdge(edgeId, fromNodeId, toNodeId);
@@ -54,7 +51,8 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
             );
             const concepts = plot.concepts(story);
             const plotConnected = withTheEdge.withConcepts(concepts);
-            story.cells[plotIndex] = plotConnected;
+            const storyChanged = story.withCell(plotConnected);
+            return storyChanged;
         });
     }
 }

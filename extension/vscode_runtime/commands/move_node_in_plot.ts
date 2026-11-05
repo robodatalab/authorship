@@ -16,17 +16,16 @@ export class MoveNodeInPlotCommand implements AuthorDocumentCommand {
         const nodeId = commandArguments.nodeId as string;
         const inPlaceOfNodeId = commandArguments.inPlaceOfNodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
-            story.cells[plotIndex] = plot.withNodeMovedInPlaceOf(
+            const plotRearranged = plot.withNodeMovedInPlaceOf(
                 nodeId,
                 inPlaceOfNodeId,
             );
+            const storyChanged = story.withCell(plotRearranged);
+            return storyChanged;
         });
     }
 }

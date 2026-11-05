@@ -7,7 +7,7 @@ import {
 import { Document } from "authordoc/storydoc";
 import { Cell } from "authordoc/cells/cell";
 
-function cellsOf(text: string): Cell[] {
+function cellsOf(text: string): readonly Cell[] {
     return new Document(text).cells;
 }
 
