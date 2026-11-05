@@ -60,15 +60,16 @@ export class ReplaceFindMatchesCommand implements AuthorDocumentCommand {
             commandArguments.findMatches as AuthorFileEditorFindMatch[];
         const findMatchesFromTheLast = [...findMatches].reverse();
         session.changeTheDocument((story) => {
+            const cells = [...story.cells];
             // Backwards, so that writing over one match does not move the next.
             for (const findMatch of findMatchesFromTheLast) {
-                const cellIndex = story.cells.findIndex(
+                const cellIndex = cells.findIndex(
                     (cell) => cell.uniqueId === findMatch.cellId,
                 );
                 if (cellIndex === -1) {
                     continue;
                 }
-                const cell = story.cells[cellIndex];
+                const cell = cells[cellIndex];
                 const proseReplaced = replacedIn(
                     cell.source,
                     findMatch.startCharacterOffsetInCell,
@@ -77,8 +78,10 @@ export class ReplaceFindMatchesCommand implements AuthorDocumentCommand {
                     query,
                     replacement,
                 );
-                story.cells[cellIndex] = cell.withSource(proseReplaced);
+                cells[cellIndex] = cell.withSource(proseReplaced);
             }
+            const storyReplaced = story.withCells(cells);
+            return storyReplaced;
         });
     }
 }

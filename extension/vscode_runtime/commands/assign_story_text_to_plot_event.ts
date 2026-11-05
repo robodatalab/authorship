@@ -17,25 +17,24 @@ export class AssignStoryTextToPlotEventCommand implements AuthorDocumentCommand 
         const annotationCellId = commandArguments.annotationCellId as string;
         const nodeId = commandArguments.nodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
             const storyWords = new StoryWordsIterator(story);
             const wordsAssigned = storyWords.rangeBetween(
                 commandArguments.cellId as string,
                 commandArguments.startCharacterOffsetInCell as number,
                 commandArguments.endCharacterOffsetInCell as number,
             );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell) || wordsAssigned === null) {
-                return;
+                return story;
             }
             const event = plot.nodes.find((node) => node.nodeId === nodeId);
             if (event === undefined) {
-                return;
+                return story;
             }
             const eventTold = event.withStoryWordRange(wordsAssigned);
-            story.cells[plotIndex] = plot.withNode(eventTold);
+            const plotTold = plot.withNode(eventTold);
+            const storyChanged = story.withCell(plotTold);
+            return storyChanged;
         });
     }
 }

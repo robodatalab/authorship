@@ -16,9 +16,11 @@ export class FoldAllCommand implements AuthorDocumentCommand {
 
     invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            story.cells = story.cells.map((cell) =>
+            const cellsFolded = story.cells.map((cell) =>
                 cell.withFolded(this.folded),
             );
+            const storyFolded = story.withCells(cellsFolded);
+            return storyFolded;
         });
     }
 }

@@ -20,14 +20,13 @@ export class RedescribePlotCommand implements AuthorDocumentCommand {
         const annotationCellId = commandArguments.annotationCellId as string;
         const overview = commandArguments.overview as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
-            story.cells[plotIndex] = plot.withOverview(overview);
+            const plotRedescribed = plot.withOverview(overview);
+            const storyChanged = story.withCell(plotRedescribed);
+            return storyChanged;
         });
     }
 }

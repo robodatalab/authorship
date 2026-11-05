@@ -15,19 +15,17 @@ export class RemoveConceptFromPlotCommand implements AuthorDocumentCommand {
         const annotationCellId = commandArguments.annotationCellId as string;
         const conceptCellId = commandArguments.conceptCellId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const referenced = plot.concepts(story);
             const conceptsKept = referenced.filter(
                 (concept) => concept.uniqueId !== conceptCellId,
             );
             const plotKept = plot.withConcepts(conceptsKept);
-            story.cells[plotIndex] = plotKept;
+            const storyChanged = story.withCell(plotKept);
+            return storyChanged;
         });
     }
 }

@@ -32,19 +32,18 @@ export class ChangePlotEventCommand implements AuthorDocumentCommand {
             return;
         }
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const event = plot.nodes.find((node) => node.nodeId === nodeId);
             if (event === undefined) {
-                return;
+                return story;
             }
             const eventChanged = sayIt(event, said);
-            story.cells[plotIndex] = plot.withNode(eventChanged);
+            const plotChanged = plot.withNode(eventChanged);
+            const storyChanged = story.withCell(plotChanged);
+            return storyChanged;
         });
     }
 }

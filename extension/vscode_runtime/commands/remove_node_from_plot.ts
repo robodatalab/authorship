@@ -15,12 +15,9 @@ export class RemoveNodeFromPlotCommand implements AuthorDocumentCommand {
         const annotationCellId = commandArguments.annotationCellId as string;
         const nodeId = commandArguments.nodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const nodesKept = plot.nodes.filter(
                 (node) => node.nodeId !== nodeId,
@@ -39,7 +36,8 @@ export class RemoveNodeFromPlotCommand implements AuthorDocumentCommand {
             );
             const concepts = plot.concepts(story);
             const plotKept = withoutTheNode.withConcepts(concepts);
-            story.cells[plotIndex] = plotKept;
+            const storyChanged = story.withCell(plotKept);
+            return storyChanged;
         });
     }
 }

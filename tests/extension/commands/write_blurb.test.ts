@@ -82,7 +82,9 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
             const stillRunning = url.includes("status") && statusAskedFor++ < 1;
             if (stillRunning) {
                 session.changeTheDocument((story) => {
-                    story.cells = parse(session.document.text);
+                    const cellsReadAgain = parse(session.document.text);
+                    const storyReadAgain = story.withCells(cellsReadAgain);
+                    return storyReadAgain;
                 });
             }
             return Promise.resolve({

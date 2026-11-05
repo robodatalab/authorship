@@ -58,9 +58,11 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
 
         if (standing.section.within.length === 0) {
             session?.changeTheDocument((story) => {
-                story.cells = story.cells.filter(
+                const cellsKept = story.cells.filter(
                     (cell) => cell.uniqueId !== cellId,
                 );
+                const storyKept = story.withCells(cellsKept);
+                return storyKept;
             });
             return;
         }
@@ -77,9 +79,11 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
             return;
         }
         session?.changeTheDocument((story) => {
-            story.cells = story.cells.filter(
+            const cellsKept = story.cells.filter(
                 (cell) => cell.uniqueId !== cellId,
             );
+            const storyKept = story.withCells(cellsKept);
+            return storyKept;
         });
     }
 }

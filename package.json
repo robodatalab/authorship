@@ -2,7 +2,7 @@
     "name": "authorship",
     "displayName": "Authorship",
     "description": "Tools for creative writing",
-    "version": "0.1.20",
+    "version": "0.1.21",
     "publisher": "RoboDataLab",
     "repository": {
         "type": "git",
@@ -108,7 +108,7 @@
         "serialize-javascript": "^7.0.6"
     },
     "dependencies": {
-        "authordoc": "^0.1.2",
+        "authordoc": "^0.1.9",
         "marked": "^18.0.11",
         "monaco-editor": "^0.56.0",
         "react": "^19.2.8",

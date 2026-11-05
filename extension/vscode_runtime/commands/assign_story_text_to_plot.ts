@@ -15,18 +15,15 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
     ): void {
         const annotationCellId = commandArguments.annotationCellId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
             const storyWords = new StoryWordsIterator(story);
             const wordsAssigned = storyWords.rangeBetween(
                 commandArguments.cellId as string,
                 commandArguments.startCharacterOffsetInCell as number,
                 commandArguments.endCharacterOffsetInCell as number,
             );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell) || wordsAssigned === null) {
-                return;
+                return story;
             }
             if (
                 plot.nodes.some(
@@ -36,7 +33,7 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
                         node.storyWordRange?.lastWord === wordsAssigned.lastWord,
                 )
             ) {
-                return;
+                return story;
             }
             const nodeId = crypto.randomUUID();
             const nodeAdded = new PlotNode(nodeId, wordsAssigned);
@@ -52,7 +49,8 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
             );
             const concepts = plot.concepts(story);
             const plotTold = withTheEvent.withConcepts(concepts);
-            story.cells[plotIndex] = plotTold;
+            const storyChanged = story.withCell(plotTold);
+            return storyChanged;
         });
     }
 }

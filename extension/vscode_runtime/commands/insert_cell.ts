@@ -15,12 +15,15 @@ export class InsertCellCommand implements AuthorDocumentCommand {
         const blankCell = cellOfKind(commandArguments.cellKind as string);
         const beforeCellId = commandArguments.beforeCellId as string | null;
         session.changeTheDocument((story) => {
-            const beforeCellIndex = story.cells.findIndex(
+            const cells = [...story.cells];
+            const beforeCellIndex = cells.findIndex(
                 (cell) => cell.uniqueId === beforeCellId,
             );
             const insertedAt =
-                beforeCellIndex === -1 ? story.cells.length : beforeCellIndex;
-            story.cells.splice(insertedAt, 0, blankCell);
+                beforeCellIndex === -1 ? cells.length : beforeCellIndex;
+            cells.splice(insertedAt, 0, blankCell);
+            const storyWithTheCell = story.withCells(cells);
+            return storyWithTheCell;
         });
     }
 }

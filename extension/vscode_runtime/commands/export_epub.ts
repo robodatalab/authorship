@@ -77,7 +77,8 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         }
         const laidOut = cellsLaidOutByPlan(session.document.cells, report.plan);
         session.changeTheDocument((story) => {
-            story.cells = laidOut;
+            const storyLaidOut = story.withCells(laidOut);
+            return storyLaidOut;
         });
         void vscode.window.showInformationMessage(
             saidAfterLayingOut(fileName, report),

@@ -16,19 +16,18 @@ export class RemoveStoryTextFromPlotEventCommand implements AuthorDocumentComman
         const annotationCellId = commandArguments.annotationCellId as string;
         const nodeId = commandArguments.nodeId as string;
         session.changeTheDocument((story) => {
-            const plotIndex = story.cells.findIndex(
-                (cell) => cell.uniqueId === annotationCellId,
-            );
-            const plot = story.cells[plotIndex];
+            const plot = story.cellWithId(annotationCellId);
             if (!(plot instanceof PlotCell)) {
-                return;
+                return story;
             }
             const event = plot.nodes.find((node) => node.nodeId === nodeId);
             if (event === undefined) {
-                return;
+                return story;
             }
             const eventUntold = event.withStoryWordRange(null);
-            story.cells[plotIndex] = plot.withNode(eventUntold);
+            const plotUntold = plot.withNode(eventUntold);
+            const storyChanged = story.withCell(plotUntold);
+            return storyChanged;
         });
     }
 }
