@@ -73,6 +73,7 @@ interface AuthorshipPanelPlotsProps {
     story: Document | null;
     storyAnnotationSelected: StoryAnnotationSelected;
     storyTextSelected: StoryTextSpan | null;
+    commandHighlighted?: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -80,6 +81,7 @@ export function AuthorshipPanelPlots({
     story,
     storyAnnotationSelected,
     storyTextSelected,
+    commandHighlighted = null,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotsProps) {
     const plots = useMemo(() => {
@@ -129,6 +131,7 @@ export function AuthorshipPanelPlots({
                     storyAnnotations={plots}
                     annotationShown={plotShown}
                     wording={PLOTS_LIST_WORDING}
+                    commandHighlighted={commandHighlighted}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             ),

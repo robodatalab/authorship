@@ -32,6 +32,7 @@ interface AuthorshipPanelSalientConceptsProps {
     story: Document | null;
     storyAnnotationSelected: StoryAnnotationSelected;
     storyTextSelected: StoryTextSpan | null;
+    commandHighlighted?: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -39,6 +40,7 @@ export function AuthorshipPanelSalientConcepts({
     story,
     storyAnnotationSelected,
     storyTextSelected,
+    commandHighlighted = null,
     sendMessagesToVscode,
 }: AuthorshipPanelSalientConceptsProps) {
     const salientConcepts = useMemo(() => {
@@ -80,6 +82,7 @@ export function AuthorshipPanelSalientConcepts({
                 storyAnnotations={salientConcepts}
                 annotationShown={salientConceptShown}
                 wording={SALIENT_CONCEPTS_LIST_WORDING}
+                commandHighlighted={commandHighlighted}
                 sendMessagesToVscode={sendMessagesToVscode}
             />
             {salientConcepts.length > 0 &&

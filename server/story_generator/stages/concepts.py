@@ -1,17 +1,17 @@
 """The story's salient concepts: what the story is about, kept as its salient
-concept cells, first in the story. The author is asked for the concepts of
-their choosing; then the model describes every one of them, in the light of the
-others, as what it is really about and in what light the story shows it. The
-model adds no concept: the story is about what the author chose. The author
-reviews the descriptions together.
+concept cells, first in the story. The author adds the concepts of their
+choosing in the Salient Concepts tab; then the model describes every one of them,
+in the light of the others, as what it is really about and in what light the
+story shows it. The model adds no concept: the story is about what the author
+chose. The author reviews the descriptions one by one.
 
 A concept is an idea, not a thing that appears in the story: a general theme the
 story is built on, such as motherhood or war, or a story-specific hook, such as
 a stranger stranded under the surface of Mars. Every concept gets a plot of its
 own, and every plot respects every concept.
 
-The model writes, and the author reviews, every concept as its title on a line
-of its own, opened with "### ", followed by its description:
+The model writes every concept as its title on a line of its own, opened with
+"### ", followed by its description:
 
     ### Motherhood
     A mother's care for her child, shown in the light of what it costs her.
@@ -20,16 +20,16 @@ of its own, opened with "### ", followed by its description:
 from __future__ import annotations
 
 import re
-from uuid import uuid4
 
-from authordoc.cells.salient_concept_cell import SalientConceptCell
+from authordoc.cells.salient_concept_cell import SALIENT_CONCEPT, SalientConceptCell
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import AnnotationShown, CommandShown, ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
-QUESTION = "Which concepts should the story be about? One a line, an empty line to finish."
+# Where the author adds the concepts: the Salient Concepts tab's add button.
+ADD_THE_CONCEPTS = CommandShown(SALIENT_CONCEPT, "addStoryAnnotation")
 
 DESCRIPTION_INSTRUCTIONS = """You help an author describe what an interactive story is about: its salient concepts, the ideas a reader should come away understanding, though the story never states them.
 
@@ -45,17 +45,6 @@ Write every concept as its title on a line of its own, opened with "### ", follo
 MAX_CONCEPTS_TOKENS = 1500
 
 
-def _read_titles(typed: str) -> list[str]:
-    """The titles the author typed, in order, each once."""
-    titles: list[str] = []
-    for line in typed.splitlines():
-        unmarked = line.strip().lstrip("-*• ")
-        title = unmarked.strip()
-        if title and title not in titles:
-            titles.append(title)
-    return titles
-
-
 def _read_concepts(written: str) -> list[tuple[str, str]]:
     """The concepts the model wrote, in order: each one's title and description."""
     _, *blocks = re.split(r"^### ", written, flags=re.MULTILINE)
@@ -68,26 +57,18 @@ def _read_concepts(written: str) -> list[tuple[str, str]]:
 
 
 class AskForConceptsStep(StageStep):
-    """The concepts of the author's choosing, asked for first and added to the
-    story's concepts, with no description yet."""
+    """The concepts of the author's choosing, added by the author in the Salient
+    Concepts tab, and put first in the story."""
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
-        typed = reviews.ask(QUESTION)
-        titles = _read_titles(typed)
-        held = document.salient_concepts()
-        held_titles = [concept.title for concept in held]
-
-        chosen = []
-        for title in titles:
-            if title in held_titles:
-                continue
-            concept = SalientConceptCell(title=title, references=[], source="", _unique_id=str(uuid4()))
-            chosen.append(concept)
-
-        others = [cell for cell in document.cells if not isinstance(cell, SalientConceptCell)]
-        document = document.with_cells([*held, *chosen, *others])
-        review_result = ReviewResult.success()
-        return review_result, document
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+        answer = await reviews.ask(ADD_THE_CONCEPTS)
+        if not answer.review_result.is_passed():
+            return answer.review_result, document
+        told = Document(answer.story, document.path)
+        concepts = told.salient_concepts()
+        others = [cell for cell in told.cells if not isinstance(cell, SalientConceptCell)]
+        with_the_concepts = told.with_cells([*concepts, *others])
+        return answer.review_result, with_the_concepts
 
 
 class DescribeConceptsStep(StageStep):
@@ -97,7 +78,7 @@ class DescribeConceptsStep(StageStep):
     def __init__(self, model: CompletingModel) -> None:
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         story = InteractiveAuthorStory(document)
         chosen = story.written_concepts()
         asked = f"\n\nThe author asks you to do it again: {reviewer_instruction}" if reviewer_instruction else ""
@@ -108,19 +89,26 @@ class DescribeConceptsStep(StageStep):
         written = "".join(chunks)
         concepts_written = written.strip()
 
-        review_result = reviews(concepts_written)
-        if not review_result.is_passed():
-            return review_result, document
-
         # A concept the model wrote no description for keeps the one it has; a
         # concept the author did not choose is not added.
         read = _read_concepts(concepts_written)
         description_of_title = dict(read)
+        described = document
         for concept in document.salient_concepts():
             description = description_of_title.get(concept.title, concept.source)
-            described = concept.with_source(description)
-            document = document.with_cell(described)
-        return review_result, document
+            concept_described = concept.with_source(description)
+            described = described.with_cell(concept_described)
+
+        # The author reviews the descriptions one by one. One done again has them
+        # all written again, told which concept the author's comment is about.
+        for concept in described.salient_concepts():
+            shown = AnnotationShown(SALIENT_CONCEPT, concept.unique_id, None)
+            review_result = await reviews(described, shown)
+            if not review_result.is_passed():
+                about_the_concept = ReviewResult(review_result.verdict, f"{concept.title}: {review_result.comment}")
+                return about_the_concept, document
+        accepted = ReviewResult.success()
+        return accepted, described
 
 
 class Concepts(Stage):

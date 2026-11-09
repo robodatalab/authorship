@@ -7,14 +7,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from authordoc.storydoc import Document
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import ReviewResult, Review
 
 
 class StageStep(ABC):
     """One step of a stage's work."""
 
     @abstractmethod
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         """Does the step's work on the story, following the reviewer's instruction
         when there is one, and has its result reviewed. Returns the review's result
         and the story: changed when the result passed, as it was otherwise."""

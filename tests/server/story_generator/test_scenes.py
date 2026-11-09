@@ -1,7 +1,7 @@
 import random
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
@@ -11,7 +11,7 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import TerminalReview
+from server.story_generator.review import Answer, CellShown, Review, ReviewResult
 from server.story_generator.stages.scenes import SCENE_INSTRUCTIONS, Scenes, SceneStep
 
 
@@ -46,8 +46,10 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
             "p2",
         )
         self.document = Document.from_cells([varn, dax])
-        chance = random.Random(0)
-        self.reviews = TerminalReview(0.0, chance)
+        # The author accepts every scene shown.
+        self.author = Mock()
+        self.author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
+        self.reviews = Review(0.0, random.Random(0), self.author)
         self.model = Mock()
         self.model.complete.side_effect = [
             streamed("Dax took the water while Varn held her son close."),
@@ -55,9 +57,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
             streamed("Dax drank in front of them."),
         ]
 
-    # The author accepts every scene shown.
-    @patch("builtins.input", return_value="a")
-    async def test_every_event_points_at_the_whole_of_its_scene(self, _) -> None:
+    async def test_every_event_points_at_the_whole_of_its_scene(self) -> None:
         where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
         _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
         _, with_varns_room = await in_varns_room(with_the_meeting, self.reviews, "")
@@ -72,9 +72,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(varns_room.story_word_range), "Varn gave her son the last cup.\n\nHe drank it slowly.")
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
-    # The author accepts every scene shown.
-    @patch("builtins.input", return_value="a")
-    async def test_every_event_keeps_pointing_at_its_scene_when_a_scene_before_it_grows(self, _) -> None:
+    async def test_every_event_keeps_pointing_at_its_scene_when_a_scene_before_it_grows(self) -> None:
         where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
         _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
         _, with_varns_room = await in_varns_room(with_the_meeting, self.reviews, "")
@@ -95,28 +93,16 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(varns_room.story_word_range), "Varn gave her son the last cup.\n\nHe drank it slowly.")
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
-    # The author accepts the scene shown.
-    @patch("builtins.input", return_value="a")
-    @patch("builtins.print")
-    async def test_shows_the_author_where_and_when_the_scene_happens_and_its_events_apart_from_the_scene(self, shown: Mock, _) -> None:
+    async def test_shows_the_author_the_cell_of_the_scene(self) -> None:
         where_they_meet, _, _ = Scenes(self.model).run(self.document)
 
-        await where_they_meet(self.document, self.reviews, "")
+        _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
 
-        shown.assert_called_once_with(
-            "\nWHERE: mars, the base\n"
-            "WHEN: 1\n\n"
-            "EVENTS:\n"
-            '- the event of the plot "Motherhood":\n'
-            "  Dax takes the water from Varn and her son.\n"
-            '- the event of the plot "Brutal father":\n'
-            "  Dax takes the water from Varn and her son.\n\n"
-            "SCENE:\n"
-            "Dax took the water while Varn held her son close.\n"
-        )
+        *_, the_meeting = with_the_meeting.cells
+        _, shown = self.author.review.await_args.args
+        self.assertEqual(shown, CellShown(the_meeting.unique_id))
 
-    @patch("builtins.input", return_value="a")
-    async def test_asks_for_the_scene_once_where_events_intersect(self, _) -> None:
+    async def test_asks_for_the_scene_once_where_events_intersect(self) -> None:
         where_they_meet, _, _ = Scenes(self.model).run(self.document)
         await where_they_meet(self.document, self.reviews, "")
 
@@ -130,9 +116,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
 
 
 class SceneStepCall(unittest.IsolatedAsyncioTestCase):
-    # The author accepts the scene shown.
-    @patch("builtins.input", return_value="a")
-    async def test_a_scene_added_to_a_story_that_has_scenes_leaves_every_reference_on_its_words(self, _) -> None:
+    async def test_a_scene_added_to_a_story_that_has_scenes_leaves_every_reference_on_its_words(self) -> None:
         # The story's words so far: "The(0) ship(1) landed(2) on(3) Mars(4) at(5)
         # dawn.(6)", the scene of the landing, which the concept points into.
         arrival = SalientConceptCell("Arrival", [SalientConceptReference("r1", StoryWordRange(1, 4))], "", False, None, "k1")
@@ -165,8 +149,10 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         )
         the_landing = MarkdownCell("The ship landed on Mars at dawn.", False, None, "s0")
         document = Document.from_cells([arrival, landing, varn, dax, the_landing])
-        chance = random.Random(0)
-        reviews = TerminalReview(0.0, chance)
+        # The author accepts the scene shown.
+        author = Mock()
+        author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
+        reviews = Review(0.0, random.Random(0), author)
         model = Mock()
         model.complete.return_value = streamed("Dax took the water while Varn held her son close.")
         where_they_meet = SceneStep(

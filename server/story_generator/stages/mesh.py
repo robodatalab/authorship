@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document, SalientConceptCell
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import AnnotationShown, ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
 INSTRUCTIONS = """You help an author mesh the plots of an interactive story into one world. The story is built from its salient concepts: every concept has a plot that illustrates it, and every plot respects every concept, so that a character who is a mother acts as a mother in whichever plot she appears.
@@ -94,7 +95,7 @@ class MeshStep(StageStep):
         self._step_index = step_index
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         plots = document.plots()
         first_plot = plots[self._first_plot_idx]
         second_plot = plots[self._second_plot_idx]
@@ -138,10 +139,6 @@ nothing else.
 
         merged_event_desc, merged_event_location = _parse_event_str(merged_event_str)
 
-        review_result = reviews(merged_event_desc, merged_event_location)
-        if not review_result.is_passed():
-            return review_result, document
-
         first_meshed = first_event.with_summary(merged_event_desc)
         first_meshed = first_meshed.with_location(merged_event_location)
         second_meshed = second_event.with_summary(merged_event_desc)
@@ -153,10 +150,14 @@ nothing else.
 
         first_plot_meshed = first_plot.with_node(first_meshed)
         second_plot_meshed = second_plot.with_node(second_meshed)
-        document = document.with_cell(first_plot_meshed)
-        document = document.with_cell(second_plot_meshed)
+        meshed = document.with_cell(first_plot_meshed)
+        meshed = meshed.with_cell(second_plot_meshed)
 
-        return review_result, document
+        shown = AnnotationShown(PLOT, first_plot.unique_id, first_event.node_id)
+        review_result = await reviews(meshed, shown)
+        if not review_result.is_passed():
+            return review_result, document
+        return review_result, meshed
 
 
 class Mesh(Stage):

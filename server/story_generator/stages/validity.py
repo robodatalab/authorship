@@ -38,7 +38,7 @@ from server.story_generator.interactive_author_story import InteractiveAuthorSto
 from server.story_generator.plot_following import get_trajectories
 from server.story_generator.exposure_tracker import ExposureTracker
 from server.story_generator.story_player import StoryPlayer
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
 # How many times every plot is played from its start, taking each option every
@@ -169,7 +169,7 @@ class PlotValidityStep(StageStep):
     def __init__(self, plot_index: int) -> None:
         self._plot_index = plot_index
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         logger = logging.getLogger(__name__)
         plots = document.plots()
         plot = plots[self._plot_index]
@@ -216,7 +216,7 @@ class SceneCountsStep(StageStep):
     """Counts the story's scenes, those where plots meet and those that offer a
     single choice, and logs them."""
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         logger = logging.getLogger(__name__)
         story = InteractiveAuthorStory(document)
         scenes = story.scenes

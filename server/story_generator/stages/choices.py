@@ -16,7 +16,7 @@ from authordoc.cells.plot_cell import PlotEdge
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory, InteractiveScene
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import CellShown, ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
 CHOICES_INSTRUCTIONS = """You write the choices that end one scene of an interactive story. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself.
@@ -49,7 +49,7 @@ class ChoicesStep(StageStep):
         self._edges = edges
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         story = InteractiveAuthorStory(document)
         could_happen = []
         for number, edge in enumerate(self._edges, start=1):
@@ -63,14 +63,15 @@ class ChoicesStep(StageStep):
         streamed = self._model.complete(messages, max_new_tokens=MAX_CHOICES_TOKENS)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
-        review_result = reviews(self._scene.text, written_could_happen, written)
-        if not review_result.is_passed():
-            return review_result, document
 
         choices = _parse_choices_returned_by_llm(written)
         options = {edge.edge_id: choice for edge, choice in zip(self._edges, choices, strict=True)}
         scene = self._scene.with_options(options)
         story_with_the_choices = story.with_scenes([scene])
+        shown = CellShown(scene.markdown_cell_id)
+        review_result = await reviews(story_with_the_choices.document, shown)
+        if not review_result.is_passed():
+            return review_result, document
         return review_result, story_with_the_choices.document
 
 

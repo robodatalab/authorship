@@ -1,0 +1,44 @@
+.author-file-editor-story-generation {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    margin-left: 6px;
+}
+
+.author-file-editor-story-generation-stage {
+    margin-right: 4px;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.author-file-editor-story-generation-answer {
+    padding: 2px 8px;
+    color: var(--vscode-button-secondaryForeground);
+    background: var(--vscode-button-secondaryBackground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.author-file-editor-story-generation-answer:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.author-file-editor-story-generation-answer-default {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+}
+
+.author-file-editor-story-generation-answer-default:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.author-file-editor-story-generation-comment {
+    min-width: 16em;
+    padding: 2px 6px;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, transparent);
+    border-radius: 2px;
+}

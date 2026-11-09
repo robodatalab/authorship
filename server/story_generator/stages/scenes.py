@@ -3,7 +3,7 @@ same event, at the same moment and in the same place. The model writes the scene
 from the event, and every one of the events points at the whole of the markdown
 cell that tells it. Nothing else of the events or the concepts changes: a scene
 shows the concepts of the plots its events belong to. The author reviews every
-scene."""
+scene in the editor."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from authordoc.cells.plot_cell import PlotNode
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import CellShown, ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
 SCENE_INSTRUCTIONS = """You write one scene of an interactive story, the way a text adventure such as Zork shows a location: whoever reads it may have come to it from anywhere in the story, so it stands on its own. It says nothing of what happened before it, and nothing of what may happen after it. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself. Write in the third person and the past tense.
@@ -37,7 +37,7 @@ class SceneStep(StageStep):
         self._events = events
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         event, *_ = self._events
         request = f"Where: {event.location}\n\nWhat happens:\n{event.summary}\n\n{reviewer_instruction}"
         messages = [{"role": "system", "content": SCENE_INSTRUCTIONS}, {"role": "user", "content": request}]
@@ -46,28 +46,21 @@ class SceneStep(StageStep):
         written = "".join(chunks)
         scene = written.strip()
 
-        # The author sees what the scene is written from apart from the scene: where
-        # and when it happens, and every event that meets there, each under its plot.
-        listed = []
-        for meeting in self._events:
-            plot = document.get_plot_of_node(meeting)
-            listed.append(f'- the event of the plot "{plot.title}":\n  {meeting.summary}')
-        written_events = "\n".join(listed)
-        shown = f"WHERE: {event.location}\nWHEN: {event.timestamp}\n\nEVENTS:\n{written_events}\n\nSCENE:\n{scene}"
-        review_result = reviews(shown)
-        if not review_result.is_passed():
-            return review_result, document
-
         cell = MarkdownCell(scene, False, None, str(uuid4()))
-        document = document.with_cells([*document.cells, cell])
-        story_words = StoryWordsIterator(document)
+        told = document.with_cells([*document.cells, cell])
+        story_words = StoryWordsIterator(told)
         scene_words = story_words.range_between(cell.unique_id, 0, len(scene))
         for event in self._events:
-            plot = document.get_plot_of_node(event)
+            plot = told.get_plot_of_node(event)
             event_told = event.with_story_word_range(scene_words)
             plot_told = plot.with_node(event_told)
-            document = document.with_cell(plot_told)
-        return review_result, document
+            told = told.with_cell(plot_told)
+
+        shown = CellShown(cell.unique_id)
+        review_result = await reviews(told, shown)
+        if not review_result.is_passed():
+            return review_result, document
+        return review_result, told
 
 
 class Scenes(Stage):

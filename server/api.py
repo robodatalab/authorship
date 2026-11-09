@@ -14,6 +14,8 @@ from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
+from server.story_generator.job import StoryGenerationJob
+from server.story_generator.review import Answer, ReviewResult, Verdict
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
@@ -238,6 +240,60 @@ def generate_status(id: str) -> dict[str, Any]:
         "text": job.text,
         "progress": {"written": job.written, "chapters": job.chapters},
     }
+
+
+class StoryGenerationRequest(BaseModel):
+    # Path of the .author file to generate the story into.
+    path: str
+
+
+@app.post("/generate/story", status_code=202)
+def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
+    """Start generating the story with its author; poll /generate/story/status for
+    what it asks them, and answer at /generate/story/answer."""
+    job = StoryGenerationJob(_deployed("writing_model"), Path(request.path))
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+def _story_generation(path: str) -> StoryGenerationJob:
+    job = app.state.jobs.get(path)
+    if not isinstance(job, StoryGenerationJob):
+        raise HTTPException(status_code=404, detail=f"No story generation for {path}")
+    return job
+
+
+@app.get("/generate/story/status")
+def generate_story_status(id: str) -> dict[str, Any]:
+    job = _story_generation(id)
+    asked = job.author.asked
+    return {
+        "running": not job.done,
+        "cancelled": job.cancelled,
+        "error": job.error,
+        "progress": job.progress.reported(),
+        "asked": None if asked is None else asked.written(),
+    }
+
+
+class StoryGenerationAnswer(BaseModel):
+    path: str
+    # "accept", "revise" or "stop".
+    verdict: str
+    comment: str
+    # The story as the editor has it when the author answers.
+    story: str
+
+
+@app.post("/generate/story/answer")
+def answer_story_generation(request: StoryGenerationAnswer) -> dict[str, Any]:
+    job = _story_generation(request.path)
+    verdict = Verdict(request.verdict)
+    review_result = ReviewResult(verdict, request.comment)
+    answer = Answer(review_result, request.story)
+    job.author.answer(answer)
+    return {}
+
 
 class StyleFixRequest(BaseModel):
     path: str

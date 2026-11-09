@@ -1,13 +1,14 @@
 import random
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock
 
+from authordoc.cells.plot_cell import PLOT
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import AnnotationShown, Answer, Review, ReviewResult
 from server.story_generator.stages.plots import ENDS_INSTRUCTIONS, IN_BETWEEN_INSTRUCTIONS, Plots
 
 
@@ -16,13 +17,13 @@ async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
 
 
 class PlotsRun(unittest.IsolatedAsyncioTestCase):
-    # The author accepts every event shown.
-    @patch("builtins.input", return_value="a")
-    async def test_the_events_between_the_ends_are_written_halfway_between_written_events(self, _) -> None:
+    async def test_the_events_between_the_ends_are_written_halfway_between_written_events(self) -> None:
         concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")
         document = Document.from_cells([concept])
-        chance = random.Random(0)
-        reviews = TerminalReview(0.0, chance)
+        # The author accepts every event shown.
+        author = Mock()
+        author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
+        reviews = Review(0.0, random.Random(0), author)
         model = Mock()
         model.complete.side_effect = [
             streamed(
@@ -65,13 +66,18 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
 
 
 class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
-    # The author has the first ends done again, then accepts the second.
-    @patch("builtins.input", side_effect=["r", "make it end in loss", "a"])
-    async def test_writes_the_ends_again_with_the_authors_feedback_until_the_author_accepts(self, _) -> None:
+    async def test_writes_the_ends_again_with_the_authors_feedback_until_the_author_accepts(self) -> None:
         concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")
         document = Document.from_cells([concept])
-        chance = random.Random(0)
-        reviews = TerminalReview(0.0, chance)
+        # The author has the first ends done again, then accepts the second.
+        author = Mock()
+        author.review = AsyncMock(
+            side_effect=[
+                Answer(ReviewResult.failed("make it end in loss"), ""),
+                Answer(ReviewResult.success(), ""),
+            ]
+        )
+        reviews = Review(0.0, random.Random(0), author)
         model = Mock()
         model.complete.side_effect = [
             streamed(
@@ -106,3 +112,8 @@ class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
             " |  | \n"
             "4 | mars, the base | Varn buries her son on Mars.",
         )
+        # The author is shown the plot, at its first event.
+        (plot,) = with_the_ends.plots()
+        first_event, *_ = plot.nodes
+        _, shown = author.review.await_args.args
+        self.assertEqual(shown, AnnotationShown(PLOT, plot.unique_id, first_event.node_id))

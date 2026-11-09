@@ -28,6 +28,7 @@ import {
 } from "authordoc/iterators/story_words_iterator";
 import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import { WordCounter } from "authordoc/synchronizers/word_counter";
+import type { StoryGeneration } from "./story_generation";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
@@ -54,6 +55,8 @@ export class AuthorFileEditorSession
     >();
 
     private storyTextSelected: StoryTextSpan | null = null;
+
+    private storyGeneration: StoryGeneration | null = null;
 
     private readonly documentOrSelectionChanged =
         new vscode.EventEmitter<void>();
@@ -112,6 +115,19 @@ export class AuthorFileEditorSession
 
     get theStoryTextSelected(): StoryTextSpan | null {
         return this.storyTextSelected;
+    }
+
+    get theStoryGeneration(): StoryGeneration | null {
+        return this.storyGeneration;
+    }
+
+    showTheStoryGeneration(storyGeneration: StoryGeneration | null): void {
+        this.storyGeneration = storyGeneration;
+        void this.panel?.webview.postMessage({
+            type: "storyGeneration",
+            storyGeneration,
+        });
+        this.documentOrSelectionChanged.fire();
     }
 
     selectTheStoryAnnotation(

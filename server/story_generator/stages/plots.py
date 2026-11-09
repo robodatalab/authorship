@@ -9,8 +9,8 @@ The causality runs from the concept to the plot: every event is written to
 show the plot's concept, so how the concept shows at an event is what the event
 says.
 
-The author reviews, and the model writes, an event as its moment on the world's
-clock, its place and what happens, separated by bars:
+The model writes an event as its moment on the world's clock, its place and what
+happens, separated by bars, and the author reviews it in the Plots tab:
 
     1 | earth, Varn's house | Varn is given command of a ship bound for Mars.
 """
@@ -19,12 +19,12 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
+from authordoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import ReviewResult, TerminalReview
+from server.story_generator.review import AnnotationShown, ReviewResult, Review
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | what happens.
@@ -80,7 +80,7 @@ class LayOutPlotsStep(StageStep):
     def __init__(self, plots: list[PlotCell]) -> None:
         self._plots = plots
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         document_with_plots = document.with_cells([*document.cells, *self._plots])
         review_result = ReviewResult.success()
         return review_result, document_with_plots
@@ -97,20 +97,21 @@ class PlotEndsStep(StageStep):
         self._last = last
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         request = f"{self._concept.title}: {self._concept.source}\n\n{reviewer_instruction}"
         messages = [{"role": "system", "content": ENDS_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages, max_new_tokens=MAX_ENDS_TOKENS)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
-        review_result = reviews(self._concept.title, written)
-        if not review_result.is_passed():
-            return review_result, document
         plot = document.get_plot_of_node(self._first)
         plot_with_the_start = plot.with_node(PlotNode(self._first.node_id, None, *start))
         plot_with_the_ends = plot_with_the_start.with_node(PlotNode(self._last.node_id, None, *end))
         document_with_the_ends = document.with_cell(plot_with_the_ends)
+        shown = AnnotationShown(PLOT, plot.unique_id, self._first.node_id)
+        review_result = await reviews(document_with_the_ends, shown)
+        if not review_result.is_passed():
+            return review_result, document
         return review_result, document_with_the_ends
 
 
@@ -125,7 +126,7 @@ class InBetweenStep(StageStep):
         self._after = after
         self._model = model
 
-    async def __call__(self, document: Document, reviews: TerminalReview, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
         story = InteractiveAuthorStory(document)
         plot = document.get_plot_of_node(self._at)
         event_before = plot.get_node_by_id(self._before.node_id)
@@ -143,11 +144,12 @@ class InBetweenStep(StageStep):
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         (event,) = _parse_events_table_returned_by_llm(written)
-        review_result = reviews(self._concept.title, written_before, written, written_after)
-        if not review_result.is_passed():
-            return review_result, document
         plot_with_the_event = plot.with_node(PlotNode(self._at.node_id, None, *event))
         document_with_the_event = document.with_cell(plot_with_the_event)
+        shown = AnnotationShown(PLOT, plot.unique_id, self._at.node_id)
+        review_result = await reviews(document_with_the_event, shown)
+        if not review_result.is_passed():
+            return review_result, document
         return review_result, document_with_the_event
 
 
