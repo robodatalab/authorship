@@ -103,6 +103,20 @@ describe("the story generation under the main menu's tools", () => {
         expect(mesh.textContent).toBe("mesh");
     });
 
+    it("spins the icon of the stage it is at, while it works", async () => {
+        await mountTheStoryGeneration(WRITES);
+
+        const icon = document.querySelector('[aria-current="step"] i')!;
+        expect(icon.className).toBe("codicon codicon-loading codicon-modifier-spin");
+    });
+
+    it("stills the icon of the stage it is at, while it waits for the author", async () => {
+        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
+
+        const icon = document.querySelector('[aria-current="step"] i')!;
+        expect(icon.className).toBe("codicon codicon-circle-filled");
+    });
+
     it("shows how far along the stage it is at is, while it works", async () => {
         await mountTheStoryGeneration(WRITES);
 

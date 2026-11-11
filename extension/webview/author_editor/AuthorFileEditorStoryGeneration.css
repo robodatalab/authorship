@@ -56,7 +56,8 @@
     color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
 }
 
-.author-file-editor-story-generation-stage-current {
+.author-file-editor-story-generation-stage-working,
+.author-file-editor-story-generation-stage-asking {
     color: var(--vscode-button-foreground);
     background: var(--vscode-button-background);
 }

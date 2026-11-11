@@ -220,8 +220,9 @@ function AuthorshipPanelPlotEvent({
 
     const fields: AuthorFileEditorCellField[] = [
         {
-            label: "Title",
+            label: "Summary",
             said: plotNode.summary,
+            multiline: true,
             onSaid: (summary) => sayOfTheEvent("summary", summary),
         },
         {

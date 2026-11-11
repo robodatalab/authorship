@@ -10,7 +10,8 @@ const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
 // How every stage is drawn: finished, the one the generation is at, or to come.
 const ICON_OF_EACH_STATE: Record<string, string> = {
     done: "codicon codicon-pass-filled",
-    current: "codicon codicon-circle-filled",
+    working: "codicon codicon-loading codicon-modifier-spin",
+    asking: "codicon codicon-circle-filled",
     "to-come": "codicon codicon-circle-outline",
 };
 
@@ -64,6 +65,7 @@ export function AuthorFileEditorStoryGeneration({
     }
 
     const stageDoes = whatTheStageDoes();
+    const stateOfTheStageAt = asked === null ? "working" : "asking";
 
     return (
         <div className="author-file-editor-story-generation">
@@ -72,14 +74,14 @@ export function AuthorFileEditorStoryGeneration({
                     const state = stage.done
                         ? "done"
                         : index === currentStage
-                          ? "current"
+                          ? stateOfTheStageAt
                           : "to-come";
                     return (
                         <li
                             key={stage.name}
                             className={`author-file-editor-story-generation-stage author-file-editor-story-generation-stage-${state}`}
                             aria-current={
-                                state === "current" ? "step" : undefined
+                                index === currentStage ? "step" : undefined
                             }
                         >
                             <i className={ICON_OF_EACH_STATE[state]} />
