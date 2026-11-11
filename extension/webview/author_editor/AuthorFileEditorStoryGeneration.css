@@ -1,15 +1,80 @@
+/* While a story is generated, the main menu wraps: its tools stay on the top
+   row, and the generation takes the whole row under them. */
+.author-file-editor-main-menu:has(.author-file-editor-story-generation) {
+    flex-wrap: wrap;
+}
+
 .author-file-editor-story-generation {
-    display: inline-flex;
+    display: flex;
+    flex-basis: 100%;
+    flex-direction: column;
     gap: 4px;
+    margin: 5px -12px -5px;
+    padding: 6px 12px;
+    border-top: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+}
+
+.author-file-editor-story-generation-stages {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    margin-left: 6px;
+    gap: 4px 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 .author-file-editor-story-generation-stage {
-    margin-right: 4px;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    white-space: nowrap;
+    border-radius: 10px;
+}
+
+.author-file-editor-story-generation-stage + .author-file-editor-story-generation-stage {
+    margin-left: 18px;
+}
+
+/* The line that leads from every stage to the next, in the space between them. */
+.author-file-editor-story-generation-stage + .author-file-editor-story-generation-stage::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -16px;
+    width: 14px;
+    height: 1px;
+    background: var(--vscode-descriptionForeground);
+    opacity: 0.6;
+}
+
+.author-file-editor-story-generation-stage-done {
+    color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
+}
+
+.author-file-editor-story-generation-stage-current {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+}
+
+.author-file-editor-story-generation-stage-to-come {
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-generation-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.author-file-editor-story-generation-doing {
+    margin-right: auto;
     font-size: calc(var(--vscode-font-size) - 1px);
     color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
 }
 
 .author-file-editor-story-generation-answer {
@@ -32,13 +97,4 @@
 
 .author-file-editor-story-generation-answer-default:hover {
     background: var(--vscode-button-hoverBackground);
-}
-
-.author-file-editor-story-generation-comment {
-    min-width: 16em;
-    padding: 2px 6px;
-    color: var(--vscode-input-foreground);
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, transparent);
-    border-radius: 2px;
 }

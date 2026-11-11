@@ -15,7 +15,7 @@ from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
 from server.story_generator.job import StoryGenerationJob
-from server.story_generator.review import Answer, ReviewResult, Verdict
+from server.story_generator.review import Answer, Verdict
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
@@ -267,20 +267,22 @@ def _story_generation(path: str) -> StoryGenerationJob:
 def generate_story_status(id: str) -> dict[str, Any]:
     job = _story_generation(id)
     asked = job.author.asked
+    stages_done = job.workflow.stages_done()
+    stages = [{"name": name, "done": done} for name, done in stages_done.items()]
     return {
         "running": not job.done,
         "cancelled": job.cancelled,
         "error": job.error,
         "progress": job.progress.reported(),
+        "stages": stages,
         "asked": None if asked is None else asked.written(),
     }
 
 
 class StoryGenerationAnswer(BaseModel):
     path: str
-    # "accept", "revise" or "stop".
+    # "accept" or "stop".
     verdict: str
-    comment: str
     # The story as the editor has it when the author answers.
     story: str
 
@@ -289,8 +291,7 @@ class StoryGenerationAnswer(BaseModel):
 def answer_story_generation(request: StoryGenerationAnswer) -> dict[str, Any]:
     job = _story_generation(request.path)
     verdict = Verdict(request.verdict)
-    review_result = ReviewResult(verdict, request.comment)
-    answer = Answer(review_result, request.story)
+    answer = Answer(verdict, request.story)
     job.author.answer(answer)
     return {}
 

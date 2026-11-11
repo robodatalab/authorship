@@ -1,7 +1,6 @@
-import random
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
@@ -10,7 +9,6 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import Answer, CellShown, Review, ReviewResult
 from server.story_generator.stages.choices import CHOICES_INSTRUCTIONS, Choices
 
 
@@ -56,17 +54,13 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
                 MarkdownCell("Dax drank in front of them.", False, None, "s3"),
             ]
         )
-        # The author accepts the choices shown.
-        self.author = Mock()
-        self.author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
-        self.reviews = Review(0.0, random.Random(0), self.author)
         self.model = Mock()
         self.model.complete.return_value = streamed("1. Varn followed the water to her room.\n2. Dax raised his cup to the crowd.")
 
     async def test_ends_the_scene_with_a_choice_for_every_edge_leaving_it(self) -> None:
         (where_they_meet,) = Choices(self.model).run(self.document)
 
-        _, with_the_choices = await where_they_meet(self.document, self.reviews, "")
+        with_the_choices = await where_they_meet(self.document)
 
         story = InteractiveAuthorStory(with_the_choices)
         meeting, _, _ = story.scenes
@@ -75,7 +69,7 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
     async def test_every_event_keeps_pointing_at_its_scene_once_the_choices_are_written(self) -> None:
         (where_they_meet,) = Choices(self.model).run(self.document)
 
-        _, with_the_choices = await where_they_meet(self.document, self.reviews, "")
+        with_the_choices = await where_they_meet(self.document)
 
         story_words = StoryWordsIterator(with_the_choices)
         varn, dax = with_the_choices.plots()
@@ -86,18 +80,10 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(varns_room.story_word_range), "Varn gave her son the last cup.")
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
-    async def test_shows_the_author_the_scene_the_choices_end(self) -> None:
-        (where_they_meet,) = Choices(self.model).run(self.document)
-
-        await where_they_meet(self.document, self.reviews, "")
-
-        _, shown = self.author.review.await_args.args
-        self.assertEqual(shown, CellShown("s1"))
-
     async def test_asks_for_the_choices_of_a_scene_at_once(self) -> None:
         (where_they_meet,) = Choices(self.model).run(self.document)
 
-        await where_they_meet(self.document, self.reviews, "")
+        await where_they_meet(self.document)
 
         self.model.complete.assert_called_once_with(
             [
@@ -109,7 +95,7 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
                     "1. mars, Varn's room: Varn shares her water with her son.\n"
                     "Varn gave her son the last cup.\n\n"
                     "2. mars, the base: Dax drinks in front of the thirsty.\n"
-                    "Dax drank in front of them.\n\n",
+                    "Dax drank in front of them.",
                 },
             ],
             max_new_tokens=500,

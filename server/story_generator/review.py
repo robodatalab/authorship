@@ -1,64 +1,22 @@
-"""The author's review of what the stages' steps produce, at the editor: the story
-as a step would leave it is shown to the author, with the part it changed brought
-into view, by chance, the less often the more the author trusts the stage; the
-author answers from the editor's main menu with a pass, a fail that says how to do
-it again, or a stop. The author is also asked to work on the story themselves, with
-the part of authorship to do it in brought into view, and answers once done."""
+"""The author's review of every stage, at the editor: once a stage has done its
+work, the story as it leaves it is shown to the author, with the part of
+authorship the stage worked in brought into view. The author looks round it,
+edits what they like, and answers from the editor's main menu: they accept the
+story as they leave it, or stop."""
 
 from __future__ import annotations
 
 import asyncio
-import logging
-import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Protocol
 
 from authordoc.storydoc import Document
 
-# How far every result the author approves moves the confidence in the stage
-# towards certainty.
-RISE = 0.2
-
-# The most confidence there can be in a stage: at least one result in ten is
-# still reviewed, so that a drift in the results is caught.
-CAP = 0.9
-
 
 class Verdict(Enum):
     ACCEPT = "accept"
-    REVISE = "revise"
     STOP = "stop"
-
-
-@dataclass(frozen=True)
-class ReviewResult:
-    """The author's answer to a result; when it is to be done again, the comment
-    says how."""
-
-    verdict: Verdict
-    comment: str = ""
-
-    @classmethod
-    def success(cls) -> ReviewResult:
-        return cls(Verdict.ACCEPT, "")
-
-    @classmethod
-    def failed(cls, reviewer_instruction: str = "") -> ReviewResult:
-        return cls(Verdict.REVISE, reviewer_instruction)
-
-    @classmethod
-    def abort(cls) -> ReviewResult:
-        return cls(Verdict.STOP, "")
-
-    def is_passed(self) -> bool:
-        return self.verdict == Verdict.ACCEPT
-
-    def is_failed(self) -> bool:
-        return self.verdict == Verdict.REVISE
-
-    def is_aborted(self) -> bool:
-        return self.verdict == Verdict.STOP
 
 
 class Shown(Protocol):
@@ -69,31 +27,13 @@ class Shown(Protocol):
 
 
 @dataclass(frozen=True)
-class AnnotationShown:
-    """A salient concept or a plot, selected in its sidebar tab, and, when there is
-    one, a passage of it: a plot's event, a concept's reference."""
+class TabShown:
+    """The sidebar tab of a kind of cell."""
 
     cell_kind: str
-    annotation_cell_id: str
-    passage_id: str | None
 
     def written(self) -> dict[str, Any]:
-        return {
-            "kind": "annotation",
-            "cellKind": self.cell_kind,
-            "annotationCellId": self.annotation_cell_id,
-            "passageId": self.passage_id,
-        }
-
-
-@dataclass(frozen=True)
-class CellShown:
-    """A cell of the story, brought into view in the editor."""
-
-    cell_id: str
-
-    def written(self) -> dict[str, Any]:
-        return {"kind": "cell", "cellId": self.cell_id}
+        return {"kind": "tab", "cellKind": self.cell_kind}
 
 
 @dataclass(frozen=True)
@@ -109,24 +49,33 @@ class CommandShown:
 
 
 @dataclass(frozen=True)
-class Answer:
-    """The author's answer, and the story as the editor had it when they gave it."""
+class EditorShown:
+    """The story, in the editor."""
 
-    review_result: ReviewResult
+    def written(self) -> dict[str, Any]:
+        return {"kind": "editor"}
+
+
+@dataclass(frozen=True)
+class Answer:
+    """The author's verdict, and the story as the editor had it when they gave it,
+    with the author's own edits."""
+
+    verdict: Verdict
     story: str
 
 
-STOPPED = Answer(ReviewResult.abort(), "")
+STOPPED = Answer(Verdict.STOP, "")
 
 
 @dataclass(frozen=True)
 class Asked:
     """What the author is asked, numbered, so that the editor acts on every question
-    once: to review `story`, the story as a step would leave it, or, with no story,
-    to work on the story as it is; either way, with a part of authorship shown."""
+    once: to review `story`, the story as a stage leaves it, with a part of
+    authorship shown."""
 
     number: int
-    story: str | None
+    story: str
     shown: Shown
 
     def written(self) -> dict[str, Any]:
@@ -146,14 +95,16 @@ class Author:
         self._answer: asyncio.Future[Answer] | None = None
 
     async def review(self, story: Document, shown: Shown) -> Answer:
-        """The author's answer to the story, as a step would leave it."""
-        answer = await self._asked(story.text, shown)
-        return answer
-
-    async def work(self, shown: Shown) -> Answer:
-        """The author's answer once they have worked on the story: they leave it in
-        the answer."""
-        answer = await self._asked(None, shown)
+        """The author's answer to the story, as a stage leaves it."""
+        if self._stopped:
+            return STOPPED
+        self._times_asked += 1
+        loop = asyncio.get_running_loop()
+        self._answer = loop.create_future()
+        self.asked = Asked(self._times_asked, story.text, shown)
+        answer = await self._answer
+        self.asked = None
+        self._answer = None
         return answer
 
     def answer(self, answer: Answer) -> None:
@@ -169,60 +120,8 @@ class Author:
         self._stopped = True
         self.answer(STOPPED)
 
-    async def _asked(self, story: str | None, shown: Shown) -> Answer:
-        if self._stopped:
-            return STOPPED
-        self._times_asked += 1
-        loop = asyncio.get_running_loop()
-        self._answer = loop.create_future()
-        self.asked = Asked(self._times_asked, story, shown)
-        answer = await self._answer
-        self.asked = None
-        self._answer = None
-        return answer
-
 
 def _settle(awaited: asyncio.Future[Answer], answer: Answer) -> None:
     """The first answer to a question is the author's; one given twice is left unread."""
     if not awaited.done():
         awaited.set_result(answer)
-
-
-class Review:
-    """The review of one stage's results by the author, and the author's confidence
-    in the stage: rising a fifth of the way towards certainty with every result the
-    author approves, and halving with every result the author has done again;
-    never above `CAP`."""
-
-    def __init__(self, initial_confidence: float, chance: random.Random, author: Author) -> None:
-        self.confidence = initial_confidence
-        self._chance = chance
-        self._author = author
-
-    async def __call__(self, story: Document, shown: Shown) -> ReviewResult:
-        """Whether the story, as a step would leave it, passes. It is shown to the
-        author by chance, the more likely the less the confidence, and passes
-        unseen, and logged, otherwise."""
-        logger = logging.getLogger(__name__)
-        drawn = self._chance.random()
-        if drawn >= 1 - self.confidence:
-            logger.info("passed unreviewed, at confidence %.2f", self.confidence)
-            unreviewed = ReviewResult.success()
-            return unreviewed
-        answer = await self._author.review(story, shown)
-        review_result = answer.review_result
-        if review_result.is_failed():
-            self.confidence = self.confidence / 2
-            logger.info("confidence: %.2f", self.confidence)
-        elif review_result.is_passed():
-            risen = self.confidence + (1 - self.confidence) * RISE
-            self.confidence = min(risen, CAP)
-            logger.info("confidence: %.2f", self.confidence)
-        return review_result
-
-    async def ask(self, shown: Shown) -> Answer:
-        """The author's answer once they have worked on the story, with the part of
-        authorship to do it in shown. Always asked, however confident the author is
-        in the stage."""
-        answer = await self._author.work(shown)
-        return answer

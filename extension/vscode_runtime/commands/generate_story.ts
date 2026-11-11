@@ -7,40 +7,29 @@ import type {
     StoryGeneration,
     StoryGenerationAsked,
 } from "../story_generation";
-import { StoryWordsIterator } from "authordoc/iterators/story_words_iterator";
 
-// Brings what the generation asks into view: the story as a step would leave
-// it, to review, and the part of authorship the step changed, or the author is
-// to work in. The sidebar draws its own part of it.
+// Opens the Authorship panel in the sidebar: VS Code gives every view a command
+// that focuses it.
+const OPEN_THE_AUTHORSHIP_PANEL = "authorship.manuscript.focus";
+
+// Brings what the generation asks into view: the story as a stage leaves it,
+// to review, in the editor, and the part of authorship the stage worked in. A
+// tab, or a command in it, is shown in the Authorship panel, which is opened on
+// it and draws its own part of it.
 function showWhatTheStoryGenerationAsks(
     session: AuthorFileEditorSession,
     asked: StoryGenerationAsked,
 ): void {
-    if (asked.story !== null) {
-        session.importDocumentFromText(asked.story);
-    }
-    const shown = asked.shown;
-    if (shown.kind === "annotation") {
-        session.selectTheStoryAnnotation(shown.cellKind, shown.annotationCellId);
-        session.selectThePassage(shown.cellKind, shown.passageId);
-    } else if (shown.kind === "cell") {
-        const cell = session.document.cellWithId(shown.cellId)!;
-        const storyWords = new StoryWordsIterator(session.document);
-        const cellWords = storyWords.rangeBetween(
-            shown.cellId,
-            0,
-            cell.source.length,
-        );
-        if (cellWords) {
-            session.showTheStoryWordRange(cellWords);
-        }
+    session.importDocumentFromText(asked.story);
+    if (asked.shown.kind !== "editor") {
+        void vscode.commands.executeCommand(OPEN_THE_AUTHORSHIP_PANEL);
     }
 }
 
 export class GenerateStoryCommand implements AuthorDocumentCommand {
     readonly commandName = "generateStory";
     readonly buttonGroup = "generate";
-    readonly iconClassName = "codicon codicon-sparkle";
+    readonly iconClassName = "codicon codicon-wand";
     readonly tooltip = "Generate the story with you, stage by stage";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {

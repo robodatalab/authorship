@@ -1,7 +1,6 @@
-import random
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
@@ -11,7 +10,6 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import Answer, CellShown, Review, ReviewResult
 from server.story_generator.stages.scenes import SCENE_INSTRUCTIONS, Scenes, SceneStep
 
 
@@ -46,10 +44,6 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
             "p2",
         )
         self.document = Document.from_cells([varn, dax])
-        # The author accepts every scene shown.
-        self.author = Mock()
-        self.author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
-        self.reviews = Review(0.0, random.Random(0), self.author)
         self.model = Mock()
         self.model.complete.side_effect = [
             streamed("Dax took the water while Varn held her son close."),
@@ -59,9 +53,9 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
 
     async def test_every_event_points_at_the_whole_of_its_scene(self) -> None:
         where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
-        _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
-        _, with_varns_room = await in_varns_room(with_the_meeting, self.reviews, "")
-        _, with_every_scene = await where_dax_drinks(with_varns_room, self.reviews, "")
+        with_the_meeting = await where_they_meet(self.document)
+        with_varns_room = await in_varns_room(with_the_meeting)
+        with_every_scene = await where_dax_drinks(with_varns_room)
 
         story_words = StoryWordsIterator(with_every_scene)
         varn, dax = with_every_scene.plots()
@@ -74,9 +68,9 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
 
     async def test_every_event_keeps_pointing_at_its_scene_when_a_scene_before_it_grows(self) -> None:
         where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
-        _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
-        _, with_varns_room = await in_varns_room(with_the_meeting, self.reviews, "")
-        _, with_every_scene = await where_dax_drinks(with_varns_room, self.reviews, "")
+        with_the_meeting = await where_they_meet(self.document)
+        with_varns_room = await in_varns_room(with_the_meeting)
+        with_every_scene = await where_dax_drinks(with_varns_room)
         story = InteractiveAuthorStory(with_every_scene)
         meeting, _, _ = story.scenes
 
@@ -93,23 +87,14 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(varns_room.story_word_range), "Varn gave her son the last cup.\n\nHe drank it slowly.")
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
-    async def test_shows_the_author_the_cell_of_the_scene(self) -> None:
-        where_they_meet, _, _ = Scenes(self.model).run(self.document)
-
-        _, with_the_meeting = await where_they_meet(self.document, self.reviews, "")
-
-        *_, the_meeting = with_the_meeting.cells
-        _, shown = self.author.review.await_args.args
-        self.assertEqual(shown, CellShown(the_meeting.unique_id))
-
     async def test_asks_for_the_scene_once_where_events_intersect(self) -> None:
         where_they_meet, _, _ = Scenes(self.model).run(self.document)
-        await where_they_meet(self.document, self.reviews, "")
+        await where_they_meet(self.document)
 
         self.model.complete.assert_called_once_with(
             [
                 {"role": "system", "content": SCENE_INSTRUCTIONS},
-                {"role": "user", "content": "Where: mars, the base\n\nWhat happens:\nDax takes the water from Varn and her son.\n\n"},
+                {"role": "user", "content": "Where: mars, the base\n\nWhat happens:\nDax takes the water from Varn and her son."},
             ],
             max_new_tokens=3000,
         )
@@ -149,10 +134,6 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         )
         the_landing = MarkdownCell("The ship landed on Mars at dawn.", False, None, "s0")
         document = Document.from_cells([arrival, landing, varn, dax, the_landing])
-        # The author accepts the scene shown.
-        author = Mock()
-        author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
-        reviews = Review(0.0, random.Random(0), author)
         model = Mock()
         model.complete.return_value = streamed("Dax took the water while Varn held her son close.")
         where_they_meet = SceneStep(
@@ -163,7 +144,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
             model,
         )
 
-        _, with_the_meeting = await where_they_meet(document, reviews, "")
+        with_the_meeting = await where_they_meet(document)
 
         story_words = StoryWordsIterator(with_the_meeting)
         (concept,) = with_the_meeting.salient_concepts()

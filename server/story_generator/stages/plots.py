@@ -10,7 +10,7 @@ show the plot's concept, so how the concept shows at an event is what the event
 says.
 
 The model writes an event as its moment on the world's clock, its place and what
-happens, separated by bars, and the author reviews it in the Plots tab:
+happens, separated by bars, and the author reviews the plots in the Plots tab:
 
     1 | earth, Varn's house | Varn is given command of a ship bound for Mars.
 """
@@ -24,15 +24,13 @@ from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import AnnotationShown, ReviewResult, Review
+from server.story_generator.review import Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | what happens.
 - The moment is on the world's clock: numbers separated by dots, as in 2.3, where a greater moment is a later one.
 - The place runs from the broadest to the most specific, separated by commas, as in "earth, Varn's house".
-- What happens is a plain, simple statement of what happens and why.
-
-When the author's comment on what you wrote before follows, answer it."""
+- What happens is a plain, simple statement of what happens and why."""
 
 ENDS_INSTRUCTIONS = f"""You help an author write an interactive story built from its salient concepts: the ideas a reader should come away understanding.
 
@@ -80,10 +78,9 @@ class LayOutPlotsStep(StageStep):
     def __init__(self, plots: list[PlotCell]) -> None:
         self._plots = plots
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         document_with_plots = document.with_cells([*document.cells, *self._plots])
-        review_result = ReviewResult.success()
-        return review_result, document_with_plots
+        return document_with_plots
 
 
 class PlotEndsStep(StageStep):
@@ -97,8 +94,8 @@ class PlotEndsStep(StageStep):
         self._last = last
         self._model = model
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
-        request = f"{self._concept.title}: {self._concept.source}\n\n{reviewer_instruction}"
+    async def __call__(self, document: Document) -> Document:
+        request = f"{self._concept.title}: {self._concept.source}"
         messages = [{"role": "system", "content": ENDS_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages, max_new_tokens=MAX_ENDS_TOKENS)
         chunks = [chunk.content async for chunk in streamed]
@@ -108,11 +105,7 @@ class PlotEndsStep(StageStep):
         plot_with_the_start = plot.with_node(PlotNode(self._first.node_id, None, *start))
         plot_with_the_ends = plot_with_the_start.with_node(PlotNode(self._last.node_id, None, *end))
         document_with_the_ends = document.with_cell(plot_with_the_ends)
-        shown = AnnotationShown(PLOT, plot.unique_id, self._first.node_id)
-        review_result = await reviews(document_with_the_ends, shown)
-        if not review_result.is_passed():
-            return review_result, document
-        return review_result, document_with_the_ends
+        return document_with_the_ends
 
 
 class InBetweenStep(StageStep):
@@ -126,7 +119,7 @@ class InBetweenStep(StageStep):
         self._after = after
         self._model = model
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         story = InteractiveAuthorStory(document)
         plot = document.get_plot_of_node(self._at)
         event_before = plot.get_node_by_id(self._before.node_id)
@@ -136,8 +129,7 @@ class InBetweenStep(StageStep):
         request = (
             f"{self._concept.title}: {self._concept.source}\n\n"
             f"The event before:\n{written_before}\n\n"
-            f"The event after:\n{written_after}\n\n"
-            f"{reviewer_instruction}"
+            f"The event after:\n{written_after}"
         )
         messages = [{"role": "system", "content": IN_BETWEEN_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages, max_new_tokens=MAX_EVENT_TOKENS)
@@ -146,11 +138,7 @@ class InBetweenStep(StageStep):
         (event,) = _parse_events_table_returned_by_llm(written)
         plot_with_the_event = plot.with_node(PlotNode(self._at.node_id, None, *event))
         document_with_the_event = document.with_cell(plot_with_the_event)
-        shown = AnnotationShown(PLOT, plot.unique_id, self._at.node_id)
-        review_result = await reviews(document_with_the_event, shown)
-        if not review_result.is_passed():
-            return review_result, document
-        return review_result, document_with_the_event
+        return document_with_the_event
 
 
 class Plots(Stage):
@@ -192,3 +180,6 @@ class Plots(Stage):
                 halves.extend([(first, middle), (middle, last)])
             spans = halves
         return plot_steps
+
+    def shown(self) -> Shown:
+        return TabShown(PLOT)

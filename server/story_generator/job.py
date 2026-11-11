@@ -13,14 +13,15 @@ from server.story_generator.workflow import Workflow
 
 class StoryGenerationJob(Job):
     """The workflow, run on the story's file; what it asks the author is
-    `author.asked`, and the author answers through `author`."""
+    `author.asked`, and the author answers through `author`; how far along it is
+    is `workflow.stages_done()`."""
 
     kind = "story"
 
     def __init__(self, model: CompletingModel, path: Path) -> None:
         super().__init__(str(path))
         self.author = Author()
-        self._workflow = Workflow(path, model, self.author)
+        self.workflow = Workflow(path, model, self.author)
 
     def cancel(self) -> None:
         """A cancelled generation stops as the author stops it."""
@@ -28,4 +29,4 @@ class StoryGenerationJob(Job):
         self.author.stop()
 
     async def execute(self) -> None:
-        await self._workflow.run()
+        await self.workflow.run()

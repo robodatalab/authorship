@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenerateStoryCommand } from "../../../extension/vscode_runtime/commands/generate_story";
+import type { StoryGenerationShown } from "../../../extension/vscode_runtime/story_generation";
+import { executedCommands } from "../vscode";
 import {
     forgetWhatTheEditorDid,
     openStory,
@@ -31,10 +33,10 @@ describe("GenerateStoryCommand — runs the generation on the story's file", () 
         const asksForTheConcepts = {
             running: true,
             error: null,
-            progress: { steps: [{ doing: "concepts", done: 0, of: 2 }] },
+            progress: { steps: [{ doing: "concept titles", done: 0, of: 0 }] },
             asked: {
                 number: 1,
-                story: null,
+                story: THE_STORY_WITH_A_PLOT,
                 shown: {
                     kind: "command",
                     cellKind: "salient-concept",
@@ -86,97 +88,65 @@ describe("GenerateStoryCommand — runs the generation on the story's file", () 
     });
 });
 
-describe("GenerateStoryCommand — brings what the generation asks into view", () => {
-    it("selects the plot and the event a step changed, in the story the step would leave", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ id: STORY_FILE }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () =>
-                    Promise.resolve({
-                        running: true,
-                        error: null,
-                        progress: { steps: [{ doing: "plots", done: 1, of: 3 }] },
-                        asked: {
-                            number: 1,
-                            story: THE_STORY_WITH_A_PLOT,
-                            shown: {
-                                kind: "annotation",
-                                cellKind: "plot",
-                                annotationCellId: "p1",
-                                passageId: "e1",
-                            },
-                        },
-                    }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () =>
-                    Promise.resolve({
-                        running: false,
-                        error: null,
-                        progress: { steps: [] },
-                        asked: null,
-                    }),
-            });
-        vi.stubGlobal("fetch", fetched);
-        const session = openStory(THE_STORY);
-
-        await new GenerateStoryCommand().invoke(session);
-
-        expect(session.theStoryAnnotationsSelected.plot).toEqual({
-            annotationCellId: "p1",
-            passageId: "e1",
-        });
-    });
-
-    it("brings the scene a step wrote into view in the editor", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ id: STORY_FILE }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () =>
-                    Promise.resolve({
-                        running: true,
-                        error: null,
-                        progress: { steps: [{ doing: "scenes", done: 0, of: 1 }] },
-                        asked: {
-                            number: 1,
-                            story: THE_STORY_WITH_A_PLOT,
-                            shown: { kind: "cell", cellId: "c1" },
-                        },
-                    }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () =>
-                    Promise.resolve({
-                        running: false,
-                        error: null,
-                        progress: { steps: [] },
-                        asked: null,
-                    }),
-            });
-        vi.stubGlobal("fetch", fetched);
-        const session = openStory(THE_STORY);
-
-        await new GenerateStoryCommand().invoke(session);
-
-        expect(sentToThePage).toContainEqual({
-            type: "storyTextShown",
-            storyTextShown: {
-                cellId: "c1",
-                startCharacterOffsetInCell: 0,
-                endCharacterOffsetInCell: 17,
+describe("GenerateStoryCommand — brings the part of authorship a stage worked in into view", () => {
+    it.each<{ shown: StoryGenerationShown; commandsExecuted: string[] }>([
+        {
+            shown: {
+                kind: "command",
+                cellKind: "salient-concept",
+                commandName: "addStoryAnnotation",
             },
-        });
-    });
+            commandsExecuted: ["authorship.manuscript.focus"],
+        },
+        {
+            shown: { kind: "tab", cellKind: "plot" },
+            commandsExecuted: ["authorship.manuscript.focus"],
+        },
+        {
+            shown: { kind: "editor" },
+            commandsExecuted: [],
+        },
+    ])(
+        "opens the Authorship panel only on a part of its own: $shown.kind",
+        async ({ shown, commandsExecuted }) => {
+            const fetched = vi
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve({ id: STORY_FILE }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            running: true,
+                            error: null,
+                            progress: {
+                                steps: [{ doing: "plots", done: 3, of: 3 }],
+                            },
+                            asked: {
+                                number: 1,
+                                story: THE_STORY_WITH_A_PLOT,
+                                shown,
+                            },
+                        }),
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () =>
+                        Promise.resolve({
+                            running: false,
+                            error: null,
+                            progress: { steps: [] },
+                            asked: null,
+                        }),
+                });
+            vi.stubGlobal("fetch", fetched);
+            const session = openStory(THE_STORY);
+
+            await new GenerateStoryCommand().invoke(session);
+
+            expect(executedCommands).toEqual(commandsExecuted);
+        },
+    );
 });

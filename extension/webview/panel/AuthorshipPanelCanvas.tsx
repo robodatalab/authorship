@@ -82,7 +82,7 @@ export function AuthorshipPanelCanvas({
     // Every question the story generation asks opens, once, the tab of the kind
     // of cell it shows; the author is free to move on from there.
     useEffect(() => {
-        if (shown !== undefined && shown.kind !== "cell") {
+        if (shown !== undefined && shown.kind !== "editor") {
             showTab(TAB_OF_EACH_KIND[shown.cellKind]);
         }
     }, [asked?.number]);

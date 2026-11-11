@@ -1,8 +1,8 @@
 """Whether the story does what the benchmark needs of it, found by playing it
 with the benchmark's own player, with no model: scripted plays, and what they
 are shown, as the benchmark's exposure tracker records it. The stage only
-reports, in the log: it changes nothing in the story, and asks the author
-nothing. A step plays one plot; the last counts the story's scenes.
+reports, in the log: it changes nothing in the story, which the author reviews
+in the editor. A step plays one plot; the last counts the story's scenes.
 
 1. Following every plot from start to finish. A play starts at the plot's first
    event, and at every scene takes the choice that leads on to the plot's next
@@ -38,7 +38,7 @@ from server.story_generator.interactive_author_story import InteractiveAuthorSto
 from server.story_generator.plot_following import get_trajectories
 from server.story_generator.exposure_tracker import ExposureTracker
 from server.story_generator.story_player import StoryPlayer
-from server.story_generator.review import ReviewResult, Review
+from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 # How many times every plot is played from its start, taking each option every
@@ -169,7 +169,7 @@ class PlotValidityStep(StageStep):
     def __init__(self, plot_index: int) -> None:
         self._plot_index = plot_index
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         logger = logging.getLogger(__name__)
         plots = document.plots()
         plot = plots[self._plot_index]
@@ -208,15 +208,14 @@ class PlotValidityStep(StageStep):
                 written_runs,
             )
 
-        review_result = ReviewResult.success()
-        return review_result, document
+        return document
 
 
 class SceneCountsStep(StageStep):
     """Counts the story's scenes, those where plots meet and those that offer a
     single choice, and logs them."""
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         logger = logging.getLogger(__name__)
         story = InteractiveAuthorStory(document)
         scenes = story.scenes
@@ -233,8 +232,7 @@ class SceneCountsStep(StageStep):
                 single += 1
         count = len(scenes)
         logger.info("scenes: %d; intersections, where plots meet: %d; scenes with only 1 choice: %d", count, intersections, single)
-        review_result = ReviewResult.success()
-        return review_result, document
+        return document
 
 
 class Validity(Stage):
@@ -245,3 +243,6 @@ class Validity(Stage):
         scene_counts_step = SceneCountsStep()
         validity_steps = [*plot_steps, scene_counts_step]
         return validity_steps
+
+    def shown(self) -> Shown:
+        return EditorShown()

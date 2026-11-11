@@ -1,6 +1,4 @@
-import random
 import unittest
-from unittest.mock import Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
@@ -8,7 +6,6 @@ from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.cells.story_word_range import StoryWordRange
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import Review
 from server.story_generator.stages.validity import PlotValidityStep
 
 
@@ -38,8 +35,6 @@ class PlotValidityStepCall(unittest.IsolatedAsyncioTestCase):
                 MarkdownCell("Varn gave birth.", False, None, "s2"),
             ]
         )
-        # The stage asks the author nothing.
-        self.reviews = Review(0.0, random.Random(0), Mock())
 
     async def test_reports_a_plot_that_can_be_followed_from_start_to_finish(self) -> None:
         story = InteractiveAuthorStory(self.document)
@@ -47,7 +42,7 @@ class PlotValidityStepCall(unittest.IsolatedAsyncioTestCase):
         with_the_choice = story.with_scenes([waiting.with_options({"x1": "Varn went on."})])
 
         with self.assertLogs("server.story_generator.stages.validity", level="INFO") as logged:
-            await PlotValidityStep(0)(with_the_choice.document, self.reviews, "")
+            await PlotValidityStep(0)(with_the_choice.document)
 
         self.assertEqual(
             logged.output,
@@ -59,7 +54,7 @@ class PlotValidityStepCall(unittest.IsolatedAsyncioTestCase):
 
     async def test_reports_where_a_plot_breaks_and_the_events_of_its_concept_not_shown(self) -> None:
         with self.assertLogs("server.story_generator.stages.validity", level="INFO") as logged:
-            await PlotValidityStep(0)(self.document, self.reviews, "")
+            await PlotValidityStep(0)(self.document)
 
         self.assertEqual(
             logged.output,

@@ -2,8 +2,8 @@
 same event, at the same moment and in the same place. The model writes the scene
 from the event, and every one of the events points at the whole of the markdown
 cell that tells it. Nothing else of the events or the concepts changes: a scene
-shows the concepts of the plots its events belong to. The author reviews every
-scene in the editor."""
+shows the concepts of the plots its events belong to. The author reviews the
+scenes in the editor."""
 
 from __future__ import annotations
 
@@ -14,14 +14,12 @@ from authordoc.cells.plot_cell import PlotNode
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import CellShown, ReviewResult, Review
+from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 SCENE_INSTRUCTIONS = """You write one scene of an interactive story, the way a text adventure such as Zork shows a location: whoever reads it may have come to it from anywhere in the story, so it stands on its own. It says nothing of what happened before it, and nothing of what may happen after it. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself. Write in the third person and the past tense.
 
 You are given where the scene takes place and what happens there. Tell it.
-
-When the author's comment on the scene you wrote before follows, answer it.
 
 Write two to five paragraphs of prose and nothing else."""
 
@@ -37,9 +35,9 @@ class SceneStep(StageStep):
         self._events = events
         self._model = model
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         event, *_ = self._events
-        request = f"Where: {event.location}\n\nWhat happens:\n{event.summary}\n\n{reviewer_instruction}"
+        request = f"Where: {event.location}\n\nWhat happens:\n{event.summary}"
         messages = [{"role": "system", "content": SCENE_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages, max_new_tokens=MAX_SCENE_TOKENS)
         chunks = [chunk.content async for chunk in streamed]
@@ -55,12 +53,7 @@ class SceneStep(StageStep):
             event_told = event.with_story_word_range(scene_words)
             plot_told = plot.with_node(event_told)
             told = told.with_cell(plot_told)
-
-        shown = CellShown(cell.unique_id)
-        review_result = await reviews(told, shown)
-        if not review_result.is_passed():
-            return review_result, document
-        return review_result, told
+        return told
 
 
 class Scenes(Stage):
@@ -77,3 +70,6 @@ class Scenes(Stage):
                 events.append(event)
         scene_steps: list[StageStep] = [SceneStep(events, self._model) for events in events_of_scene.values()]
         return scene_steps
+
+    def shown(self) -> Shown:
+        return EditorShown()

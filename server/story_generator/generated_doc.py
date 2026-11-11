@@ -11,17 +11,15 @@ from authordoc.storydoc import Document
 # The kind of the cell the checkpoint is kept in.
 CHECKPOINT = "GeneratedDocumentCheckpoint"
 
-# Open the lines of the checkpoint, as in "stage: mesh: True" and
-# "confidence in mesh: 0.360".
+# Opens the lines of the checkpoint, as in "stage: mesh: True".
 STAGE = "stage: "
-CONFIDENCE = "confidence in "
 
 
 class GeneratedDocument:
     """A story being generated: the story, kept in its .author file, and where its
     generation stands, kept in the checkpoint, a cell of its own last in the
     story, of a kind the format does not know and keeps as it is: which stages
-    are finished, and the author's confidence in every stage."""
+    are finished."""
 
     def __init__(self, path: Path, stage_names: list[str]) -> None:
         self._path = path
@@ -29,7 +27,6 @@ class GeneratedDocument:
         self._stage_names = stage_names
         self.document = Document.load(self._path)
         self.stages: dict[str, bool] = {name: False for name in self._stage_names}
-        self.confidence: dict[str, float] = {name: 0.0 for name in self._stage_names}
 
     def load(self) -> None:
         """Reads the story from its file, and where its generation stands from its
@@ -39,18 +36,12 @@ class GeneratedDocument:
         lines = checkpoint.source.splitlines() if checkpoint is not None else []
 
         self.stages = {name: False for name in self._stage_names}
-        self.confidence = {name: 0.0 for name in self._stage_names}
 
         for line in lines:
             if line.startswith(STAGE):
                 value = line.removeprefix(STAGE)
                 stage, _, is_done = value.rpartition(": ")
                 self.stages[stage] = is_done == "True"
-
-            elif line.startswith(CONFIDENCE):
-                value = line.removeprefix(CONFIDENCE)
-                stage, _, level = value.rpartition(": ")
-                self.confidence[stage] = float(level)
 
     def save(self) -> None:
         """Writes the story into its file, with the checkpoint as its last cell: a
@@ -59,9 +50,6 @@ class GeneratedDocument:
 
         for stage, is_done in self.stages.items():
             lines.append(f"{STAGE}{stage}: {is_done}")
-
-        for stage, level in sorted(self.confidence.items()):
-            lines.append(f"{CONFIDENCE}{stage}: {level:.3f}")
 
         source = "\n".join(lines)
 

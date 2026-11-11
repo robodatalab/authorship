@@ -1,13 +1,11 @@
-import random
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
-from authordoc.cells.plot_cell import PLOT, PlotCell, PlotNode
+from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from parameterized import parameterized
-from server.story_generator.review import AnnotationShown, Answer, Review, ReviewResult
 from server.story_generator.stages.mesh import Mesh, build_round_robin_plot_matrix, matrix_to_connectivity_trajectory
 
 
@@ -131,18 +129,14 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
             streamed("intersection location | intersection"),
         ]
         self.mesh = Mesh(model)
-        # The author accepts every meeting shown.
-        self.author = Mock()
-        self.author.review = AsyncMock(return_value=Answer(ReviewResult.success(), ""))
-        self.reviews = Review(0.0, random.Random(0), self.author)
 
     async def test_meshing_rewrites_the_events_that_meet(self):
         first_step, second_step, third_step, fourth_step = self.mesh.run(self.document)
 
-        _, first_document = await first_step(self.document, self.reviews, "")
-        _, second_document = await second_step(first_document, self.reviews, "")
-        _, third_document = await third_step(second_document, self.reviews, "")
-        _, fourth_document = await fourth_step(third_document, self.reviews, "")
+        first_document = await first_step(self.document)
+        second_document = await second_step(first_document)
+        third_document = await third_step(second_document)
+        fourth_document = await fourth_step(third_document)
 
         meshed_first, meshed_second = fourth_document.plots()
         self.assertSequenceEqual(
@@ -163,6 +157,3 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
                 PlotNode("p2e4", None, "4", "intersection location", "intersection"),
             ],
         )
-        # The last meeting is shown at the first plot's last event.
-        _, shown = self.author.review.await_args.args
-        self.assertEqual(shown, AnnotationShown(PLOT, "plot-1", "p1e4"))

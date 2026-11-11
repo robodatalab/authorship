@@ -5,7 +5,7 @@ put and the others turn round it, a seat a step, and with an odd number of plots
 one sits out every step. Every plot's event at a step happens at the step's
 moment, and the two events of every pair are rewritten to happen in one place,
 where the people of both plots come together: the two plots share a scene. The
-author reviews every meeting."""
+author reviews the meetings in the Plots tab."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document, SalientConceptCell
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import AnnotationShown, ReviewResult, Review
+from server.story_generator.review import Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
 
 INSTRUCTIONS = """You help an author mesh the plots of an interactive story into one world. The story is built from its salient concepts: every concept has a plot that illustrates it, and every plot respects every concept, so that a character who is a mother acts as a mother in whichever plot she appears.
@@ -32,8 +32,6 @@ You are given the story's concepts, the events of every plot, the two plots to b
 - none of the people is in two places at one moment.
 
 Each event is a plain, simple statement of what happens and why: no clock times, nothing added for the mechanics of the story.
-
-When you are also given your draft and the author's comments on it, rewrite the draft to answer every comment, and change nothing the comments do not ask you to change.
 
 Write two lines, the first plot's event and then the second's, each as: moment | place | what happens. Write the lines and nothing else."""
 
@@ -95,7 +93,7 @@ class MeshStep(StageStep):
         self._step_index = step_index
         self._model = model
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         plots = document.plots()
         first_plot = plots[self._first_plot_idx]
         second_plot = plots[self._second_plot_idx]
@@ -107,10 +105,7 @@ class MeshStep(StageStep):
         second_concepts = second_plot.concepts(document)
         first_written = _concepts_str(first_concepts)
         second_written = _concepts_str(second_concepts)
-        # The model takes no empty message: the request is said even when the
-        # author has nothing to add.
-        asked = f"\n\nThe author asks you to do it again: {reviewer_instruction}" if reviewer_instruction else ""
-        user = f"Merge the two events.{asked}"
+        user = "Merge the two events."
         system = f"""
 Two story plot events meet, and we need to unify them.
 Event 1, at {first_event.location}:
@@ -152,12 +147,7 @@ nothing else.
         second_plot_meshed = second_plot.with_node(second_meshed)
         meshed = document.with_cell(first_plot_meshed)
         meshed = meshed.with_cell(second_plot_meshed)
-
-        shown = AnnotationShown(PLOT, first_plot.unique_id, first_event.node_id)
-        review_result = await reviews(meshed, shown)
-        if not review_result.is_passed():
-            return review_result, document
-        return review_result, meshed
+        return meshed
 
 
 class Mesh(Stage):
@@ -182,6 +172,9 @@ class Mesh(Stage):
                 mesh_steps.append(mesh_step)
 
         return mesh_steps
+
+    def shown(self) -> Shown:
+        return TabShown(PLOT)
 
 
 def _concepts_str(concepts: Sequence[SalientConceptCell]) -> str:

@@ -2,7 +2,7 @@
 the scene's events, a choice that follows from the scene's narrative and leads
 towards the event the edge reaches, without telling it. The model writes a
 scene's choices together, so that they read as one, and the author reviews them
-together:
+in the editor:
 
     1. Varn followed the water to her room.
     2. Dax raised his cup to the crowd.
@@ -16,14 +16,12 @@ from authordoc.cells.plot_cell import PlotEdge
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory, InteractiveScene
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import CellShown, ReviewResult, Review
+from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 CHOICES_INSTRUCTIONS = """You write the choices that end one scene of an interactive story. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself.
 
 You are given the scene, and the events that could follow it, numbered, each with where it happens and the scene that tells it. For every event, write one choice: a short line, in the third person and the past tense, that follows from the scene and leads towards the event: it shows whom to follow, what to watch or where to go to see the event, but does not tell what happens. The choices of one scene read alike, and none leans more than the others. Add no characters, places or events beyond those given.
-
-When the author's comment on the choices you wrote before follows, answer it.
 
 Write one line for every event, in their order, numbered as the events are, and nothing else."""
 
@@ -49,7 +47,7 @@ class ChoicesStep(StageStep):
         self._edges = edges
         self._model = model
 
-    async def __call__(self, document: Document, reviews: Review, reviewer_instruction: str) -> tuple[ReviewResult, Document]:
+    async def __call__(self, document: Document) -> Document:
         story = InteractiveAuthorStory(document)
         could_happen = []
         for number, edge in enumerate(self._edges, start=1):
@@ -58,7 +56,7 @@ class ChoicesStep(StageStep):
             next_scene = story.scene_of(next_event)
             could_happen.append(f"{number}. {next_event.location}: {next_event.summary}\n{next_scene.text}")
         written_could_happen = "\n\n".join(could_happen)
-        request = f"The scene:\n{self._scene.text}\n\nWhat could happen next:\n{written_could_happen}\n\n{reviewer_instruction}"
+        request = f"The scene:\n{self._scene.text}\n\nWhat could happen next:\n{written_could_happen}"
         messages = [{"role": "system", "content": CHOICES_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages, max_new_tokens=MAX_CHOICES_TOKENS)
         chunks = [chunk.content async for chunk in streamed]
@@ -68,11 +66,7 @@ class ChoicesStep(StageStep):
         options = {edge.edge_id: choice for edge, choice in zip(self._edges, choices, strict=True)}
         scene = self._scene.with_options(options)
         story_with_the_choices = story.with_scenes([scene])
-        shown = CellShown(scene.markdown_cell_id)
-        review_result = await reviews(story_with_the_choices.document, shown)
-        if not review_result.is_passed():
-            return review_result, document
-        return review_result, story_with_the_choices.document
+        return story_with_the_choices.document
 
 
 class Choices(Stage):
@@ -98,3 +92,6 @@ class Choices(Stage):
             choices_steps.append(choices_step)
 
         return choices_steps
+
+    def shown(self) -> Shown:
+        return EditorShown()

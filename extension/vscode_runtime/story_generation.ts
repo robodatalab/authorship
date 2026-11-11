@@ -1,18 +1,9 @@
 import type { ServerJob } from "./server/jobs";
 
-// A salient concept or a plot, selected in its sidebar tab, and, when there is
-// one, a passage of it: a plot's event, a concept's reference.
-export interface StoryGenerationAnnotationShown {
-    kind: "annotation";
+// The sidebar tab of a kind of cell.
+export interface StoryGenerationTabShown {
+    kind: "tab";
     cellKind: string;
-    annotationCellId: string;
-    passageId: string | null;
-}
-
-// A cell of the story, brought into view in the editor.
-export interface StoryGenerationCellShown {
-    kind: "cell";
-    cellId: string;
 }
 
 // The sidebar tab of a kind of cell, with the button of one of its commands
@@ -23,19 +14,23 @@ export interface StoryGenerationCommandShown {
     commandName: string;
 }
 
+// The story, in the editor.
+export interface StoryGenerationEditorShown {
+    kind: "editor";
+}
+
 // The part of authorship the story generation brings into view for the author.
 export type StoryGenerationShown =
-    | StoryGenerationAnnotationShown
-    | StoryGenerationCellShown
-    | StoryGenerationCommandShown;
+    | StoryGenerationTabShown
+    | StoryGenerationCommandShown
+    | StoryGenerationEditorShown;
 
 // What the story generation asks the author, numbered, so that every question
-// is acted on once: to review `story`, the story as a step would leave it, or,
-// with no story, to work on the story as it is; either way, with a part of
-// authorship shown.
+// is acted on once: to review `story`, the story as a stage leaves it, with a
+// part of authorship shown.
 export interface StoryGenerationAsked {
     number: number;
-    story: string | null;
+    story: string;
     shown: StoryGenerationShown;
 }
 
@@ -47,7 +42,15 @@ export interface StoryGenerationStage {
     of: number | null;
 }
 
+// A stage of the story generation's workflow, and whether it is finished.
+export interface StoryGenerationWorkflowStage {
+    name: string;
+    done: boolean;
+}
+
 export interface StoryGeneration extends ServerJob {
     progress: { steps: StoryGenerationStage[] };
+    // Every stage, in the order they run.
+    stages: StoryGenerationWorkflowStage[];
     asked: StoryGenerationAsked | null;
 }

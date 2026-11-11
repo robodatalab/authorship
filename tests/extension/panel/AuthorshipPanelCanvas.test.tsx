@@ -36,10 +36,11 @@ She finds the door.
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "concepts", done: 0, of: 2 }] },
+    progress: { steps: [{ doing: "concept titles", done: 0, of: 0 }] },
+    stages: [{ name: "concept titles", done: false }],
     asked: {
         number: 1,
-        story: null,
+        story: THE_STORY,
         shown: {
             kind: "command",
             cellKind: "salient-concept",
@@ -48,19 +49,15 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     },
 };
 
-const ASKS_FOR_A_REVIEW_OF_A_PLOT: StoryGeneration = {
+const ASKS_FOR_A_REVIEW_OF_THE_PLOTS: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "plots", done: 1, of: 3 }] },
+    progress: { steps: [{ doing: "plots", done: 3, of: 3 }] },
+    stages: [{ name: "plots", done: false }],
     asked: {
         number: 2,
         story: THE_STORY,
-        shown: {
-            kind: "annotation",
-            cellKind: "plot",
-            annotationCellId: "p1",
-            passageId: null,
-        },
+        shown: { kind: "tab", cellKind: "plot" },
     },
 };
 
@@ -85,8 +82,8 @@ describe("the panel while a story is generated", () => {
         });
     }
 
-    it("opens the tab of the plot it shows", async () => {
-        await mountThePanel(ASKS_FOR_A_REVIEW_OF_A_PLOT);
+    it("opens the tab it shows", async () => {
+        await mountThePanel(ASKS_FOR_A_REVIEW_OF_THE_PLOTS);
 
         const plotsTab = document.querySelector('[aria-label="Plots"]')!;
         expect(plotsTab.getAttribute("aria-selected")).toBe("true");

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
@@ -8,100 +7,114 @@ import "./AuthorFileEditorStoryGeneration.css";
 
 const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
 
+// How every stage is drawn: finished, the one the generation is at, or to come.
+const ICON_OF_EACH_STATE: Record<string, string> = {
+    done: "codicon codicon-pass-filled",
+    current: "codicon codicon-circle-filled",
+    "to-come": "codicon codicon-circle-outline",
+};
+
 interface AuthorFileEditorStoryGenerationProps {
     storyGeneration: StoryGeneration | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 /**
- * The story generation in the main menu, while it runs: the stage it is in and
- * how far along, and, when it waits for the author, the answers they can give.
- * To the story as a step would leave it: accept, revise, saying what should
- * change, or stop. Once they have worked on the story themselves: continue, or
- * stop.
+ * The story generation, in a row of its own under the main menu's tools, while
+ * it runs. Every stage of the workflow, in order: those finished, the one it is
+ * at, and those to come. Under them, what the stage it is at does: while it
+ * works, how far along it is; once it is done, what the author is to do, and the
+ * answers they can give: accept the story as they leave it, edits included, or
+ * stop. Asked to do something themselves, with a command highlighted, the
+ * author continues once done.
  */
 export function AuthorFileEditorStoryGeneration({
     storyGeneration,
     sendMessagesToVscode,
 }: AuthorFileEditorStoryGenerationProps) {
-    const [revising, startRevising] = useState(false);
-    const [comment, writeTheComment] = useState("");
     if (storyGeneration === null) {
         return null;
     }
-    const stages = storyGeneration.progress.steps;
-    const stage = stages[stages.length - 1];
+    const stages = storyGeneration.stages;
+    const currentStage = stages.findIndex((stage) => !stage.done);
+    const stageAt = stages[currentStage];
+    const progress = storyGeneration.progress.steps;
+    const stageProgress = progress[progress.length - 1];
     const asked = storyGeneration.asked;
 
-    function answer(verdict: string, said: string): void {
+    function answer(verdict: string): void {
         invokeAuthorDocumentCommand(
             sendMessagesToVscode,
             ANSWER_THE_STORY_GENERATION,
-            { verdict, comment: said },
+            { verdict },
         );
-        startRevising(false);
-        writeTheComment("");
     }
 
+    function whatTheStageDoes(): string {
+        if (asked !== null && asked.shown.kind === "command") {
+            return "use the highlighted button, then continue";
+        }
+        if (asked !== null) {
+            return "review it, edit what you like, then accept";
+        }
+        if (stageProgress?.doing === stageAt?.name) {
+            return `step ${stageProgress.done + 1} of ${stageProgress.of}`;
+        }
+        return "starting";
+    }
+
+    const stageDoes = whatTheStageDoes();
+
     return (
-        <span className="author-file-editor-story-generation">
-            {stage !== undefined && (
-                <span className="author-file-editor-story-generation-stage">
-                    {stage.doing}: step {stage.done + 1} of {stage.of}
-                </span>
+        <div className="author-file-editor-story-generation">
+            <ol className="author-file-editor-story-generation-stages">
+                {stages.map((stage, index) => {
+                    const state = stage.done
+                        ? "done"
+                        : index === currentStage
+                          ? "current"
+                          : "to-come";
+                    return (
+                        <li
+                            key={stage.name}
+                            className={`author-file-editor-story-generation-stage author-file-editor-story-generation-stage-${state}`}
+                            aria-current={
+                                state === "current" ? "step" : undefined
+                            }
+                        >
+                            <i className={ICON_OF_EACH_STATE[state]} />
+                            {stage.name}
+                        </li>
+                    );
+                })}
+            </ol>
+            {stageAt !== undefined && (
+                <div className="author-file-editor-story-generation-status">
+                    <span className="author-file-editor-story-generation-doing">
+                        {`${stageAt.name}: ${stageDoes}`}
+                    </span>
+                    {asked !== null && (
+                        <>
+                            <button
+                                type="button"
+                                className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
+                                onClick={() => answer("accept")}
+                            >
+                                {asked.shown.kind === "command"
+                                    ? "Continue"
+                                    : "Accept"}
+                            </button>
+                            <button
+                                type="button"
+                                className="author-file-editor-story-generation-answer"
+                                onClick={() => answer("stop")}
+                            >
+                                Stop
+                            </button>
+                        </>
+                    )}
+                </div>
             )}
-            {asked !== null && asked.story === null && (
-                <button
-                    type="button"
-                    className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
-                    onClick={() => answer("accept", "")}
-                >
-                    Continue
-                </button>
-            )}
-            {asked !== null && asked.story !== null && !revising && (
-                <>
-                    <button
-                        type="button"
-                        className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
-                        onClick={() => answer("accept", "")}
-                    >
-                        Accept
-                    </button>
-                    <button
-                        type="button"
-                        className="author-file-editor-story-generation-answer"
-                        onClick={() => startRevising(true)}
-                    >
-                        Revise
-                    </button>
-                </>
-            )}
-            {asked !== null && revising && (
-                <input
-                    type="text"
-                    className="author-file-editor-story-generation-comment"
-                    placeholder="What should change? Enter sends it"
-                    aria-label="What should change"
-                    value={comment}
-                    autoFocus
-                    onChange={(typed) => writeTheComment(typed.target.value)}
-                    onKeyDown={(pressed) => {
-                        if (pressed.key === "Enter") {
-                            answer("revise", comment);
-                        }
-                    }}
-                />
-            )}
-            {asked !== null && (
-                <button
-                    type="button"
-                    className="author-file-editor-story-generation-answer"
-                    onClick={() => answer("stop", "")}
-                >
-                    Stop
-                </button>
-            )}
-        </span>
+        </div>
     );
 }

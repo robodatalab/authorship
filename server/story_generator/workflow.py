@@ -2,22 +2,22 @@
 
 The stages run one after another, each on what the ones before it wrote:
 
-    concepts → plot ends → mesh → scenes → choices → validity
+    concept titles → concepts → plot ends → mesh → scenes → choices → validity
 
-The story is built from its concepts: every concept gets a plot, begun as its
-start and its goal; the mesh fills every plot in between, so that the plots meet; every
-scene is built from versions dedicated to the concepts of its events' plots,
-merged between the concepts' markers; and the choices that end the scenes come
-after them. Last, the story is played as the benchmark plays it, to check that
-it does what the benchmark needs of it.
+The story is built from its concepts: the author adds them; every concept gets a
+plot, begun as its start and its goal; the mesh fills every plot in between, so
+that the plots meet; every scene is built from versions dedicated to the
+concepts of its events' plots, merged between the concepts' markers; and the
+choices that end the scenes come after them. Last, the story is played as the
+benchmark plays it, to check that it does what the benchmark needs of it.
 
 A stage only plans its work as steps. Everything else happens here: the steps
-run one after another, each done again with the author's instruction until its
-result passes its review; after every step, the story is saved, with the
-checkpoint of where the generation stands; and the stage's progress is reported,
-as the server's jobs report theirs. Stopped in a stage, or killed in it, the
-workflow resumes at that stage, from its first step, as confident in the stage as
-it was.
+run one after another, with the stage's progress reported, as the server's jobs
+report theirs; then the author reviews the story the stage leaves, edits it as
+they like, and accepts it, or stops. The story the author accepts is saved, with
+the checkpoint of where the generation stands. Stopped in a stage, or killed in
+it, the workflow resumes at that stage, from its first step, on the story the
+stage before left.
 
 The workflow logs when a stage starts, and when it finishes or the author stops
 in it."""
@@ -25,16 +25,16 @@ in it."""
 from __future__ import annotations
 
 import logging
-import random
 from pathlib import Path
 
+from authordoc.storydoc import Document
 from cortexgrid_infer import CompletingModel
 from server.progress import with_progress
 from server.story_generator.generated_doc import GeneratedDocument
-from server.story_generator.review import Author, Review, ReviewResult
+from server.story_generator.review import Author, Verdict
 from server.story_generator.stage import Stage
 from server.story_generator.stages.choices import Choices
-from server.story_generator.stages.concepts import Concepts
+from server.story_generator.stages.concepts import Concepts, ConceptTitles
 from server.story_generator.stages.mesh import Mesh
 from server.story_generator.stages.plots import Plots
 from server.story_generator.stages.scenes import Scenes
@@ -42,17 +42,11 @@ from server.story_generator.stages.validity import Validity
 
 
 class Workflow:
-    def __init__(
-        self,
-        path: Path,
-        model: CompletingModel,
-        author: Author,
-        chance: random.Random | None = None,
-    ) -> None:
+    def __init__(self, path: Path, model: CompletingModel, author: Author) -> None:
+        self._path = path
         self._author = author
-        # What draws the results the author reviews.
-        self._chance = chance if chance is not None else random.Random()
         self.stages: dict[str, Stage] = {
+            "concept titles": ConceptTitles(),
             "concepts": Concepts(model),
             "plots": Plots(model),
             "mesh": Mesh(model),
@@ -63,6 +57,10 @@ class Workflow:
 
         self._document = GeneratedDocument(path, list(self.stages))
 
+    def stages_done(self) -> dict[str, bool]:
+        """Every stage, in the order they run, and whether it is finished."""
+        stages_done = dict(self._document.stages)
+        return stages_done
 
     async def run(self) -> None:
         """Runs every stage not finished yet, in order, until the last is finished
@@ -72,32 +70,23 @@ class Workflow:
         self._document.load()
 
         stage_name = self._document.next_stage()
-        stage_aborted = False
-        while stage_name and not stage_aborted:
+        while stage_name:
             stage = self.stages[stage_name]
-            initial_confidence = self._document.confidence.get(stage_name, 0.0)
-            reviews = Review(initial_confidence, self._chance, self._author)
-
             logger.info("%s started", stage_name)
-            steps = stage.run(self._document.document)
 
+            document = self._document.document
+            steps = stage.run(document)
             for step in with_progress(steps, stage_name):
-                review_result = ReviewResult.failed()
-                document = self._document.document
-                while review_result.is_failed():
-                    review_result, document = await step(self._document.document, reviews, review_result.comment)
+                document = await step(document)
 
-                if review_result.is_passed():
-                    self._document.document = document
-                    self._document.confidence[stage_name] = reviews.confidence
-                    self._document.save()
-                else:
-                    stage_aborted = True
-                    break
+            shown = stage.shown()
+            answer = await self._author.review(document, shown)
+            if answer.verdict == Verdict.STOP:
+                logger.info("%s stopped", stage_name)
+                return
 
+            self._document.document = Document(answer.story, self._path)
+            self._document.mark_stage_done(stage_name)
+            self._document.save()
             logger.info("%s finished", stage_name)
-
-            if not stage_aborted:
-                self._document.mark_stage_done(stage_name)
-                self._document.save()
-                stage_name =  self._document.next_stage()
+            stage_name = self._document.next_stage()

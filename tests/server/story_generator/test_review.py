@@ -1,90 +1,56 @@
 import asyncio
-import random
 import unittest
-from unittest.mock import AsyncMock, Mock
+from typing import Any
 
 from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.plot_cell import PLOT
 from authordoc.cells.salient_concept_cell import SALIENT_CONCEPT
 from authordoc.storydoc import Document
 from parameterized import parameterized
-from server.story_generator.review import STOPPED, Answer, Author, CellShown, CommandShown, Review, ReviewResult
+from server.story_generator.review import STOPPED, Answer, Author, CommandShown, EditorShown, Shown, TabShown, Verdict
 
 
-class ReviewCall(unittest.IsolatedAsyncioTestCase):
+class ShownWritten(unittest.TestCase):
     @parameterized.expand(
         [
-            ("accepted", Answer(ReviewResult.success(), ""), 0.6),
-            ("revised", Answer(ReviewResult.failed("make it shorter"), ""), 0.25),
-            ("stopped", STOPPED, 0.5),
+            ("tab", TabShown(PLOT), {"kind": "tab", "cellKind": "plot"}),
+            (
+                "command",
+                CommandShown(SALIENT_CONCEPT, "addStoryAnnotation"),
+                {"kind": "command", "cellKind": "salient-concept", "commandName": "addStoryAnnotation"},
+            ),
+            ("editor", EditorShown(), {"kind": "editor"}),
         ]
     )
-    async def test_the_confidence_moves_with_the_authors_answer(self, _, answer: Answer, expected_confidence: float) -> None:
-        # The first draw, 0.134, is below one less the confidence: the author is
-        # shown the story.
-        author = Mock()
-        author.review = AsyncMock(return_value=answer)
-        reviews = Review(0.5, random.Random(1), author)
-        story = Document.from_cells([MarkdownCell("Varn waited.", False, None, "s1")])
-
-        review_result = await reviews(story, CellShown("s1"))
-
-        self.assertEqual(review_result, answer.review_result)
-        self.assertAlmostEqual(reviews.confidence, expected_confidence)
-
-    async def test_passes_unseen_at_full_confidence(self) -> None:
-        author = Mock()
-        author.review = AsyncMock()
-        reviews = Review(1.0, random.Random(0), author)
-        story = Document.from_cells([MarkdownCell("Varn waited.", False, None, "s1")])
-
-        review_result = await reviews(story, CellShown("s1"))
-
-        self.assertEqual(review_result, ReviewResult.success())
-        author.review.assert_not_awaited()
+    def test_as_the_editor_reads_it(self, _, shown: Shown, expected: dict[str, Any]) -> None:
+        self.assertEqual(shown.written(), expected)
 
 
 class AuthorReview(unittest.IsolatedAsyncioTestCase):
-    async def test_the_author_is_asked_until_they_answer(self) -> None:
+    async def test_the_author_is_asked_until_they_answer_with_the_story_as_they_leave_it(self) -> None:
         author = Author()
         story = Document.from_cells([MarkdownCell("Varn waited.", False, None, "s1")])
 
-        asking = asyncio.create_task(author.review(story, CellShown("s1")))
+        asking = asyncio.create_task(author.review(story, EditorShown()))
         await asyncio.sleep(0)
         asked = author.asked.written()
-        author.answer(Answer(ReviewResult.failed("make it shorter"), ""))
-        answer = await asking
-
-        self.assertEqual(asked, {"number": 1, "story": story.text, "shown": {"kind": "cell", "cellId": "s1"}})
-        self.assertEqual(answer, Answer(ReviewResult.failed("make it shorter"), ""))
-        self.assertIsNone(author.asked)
-
-
-class AuthorWork(unittest.IsolatedAsyncioTestCase):
-    async def test_the_author_is_asked_with_no_story_to_review_and_answers_with_theirs(self) -> None:
-        author = Author()
-
-        asking = asyncio.create_task(author.work(CommandShown(SALIENT_CONCEPT, "addStoryAnnotation")))
-        await asyncio.sleep(0)
-        asked = author.asked.written()
-        author.answer(Answer(ReviewResult.success(), "The story as the author left it."))
+        author.answer(Answer(Verdict.ACCEPT, '<!-- cell: markdown id="s1" -->\n\nVarn waited at the door.\n'))
         answer = await asking
 
         self.assertEqual(
             asked,
-            {
-                "number": 1,
-                "story": None,
-                "shown": {"kind": "command", "cellKind": "salient-concept", "commandName": "addStoryAnnotation"},
-            },
+            {"number": 1, "story": '<!-- cell: markdown id="s1" -->\n\nVarn waited.\n', "shown": {"kind": "editor"}},
         )
-        self.assertEqual(answer, Answer(ReviewResult.success(), "The story as the author left it."))
+        self.assertEqual(answer, Answer(Verdict.ACCEPT, '<!-- cell: markdown id="s1" -->\n\nVarn waited at the door.\n'))
+        self.assertIsNone(author.asked)
 
 
 class AuthorStop(unittest.IsolatedAsyncioTestCase):
     async def test_the_question_asked_is_answered_with_a_stop(self) -> None:
         author = Author()
+        story = Document.from_cells([MarkdownCell("Varn waited.", False, None, "s1")])
 
-        asking = asyncio.create_task(author.work(CommandShown(SALIENT_CONCEPT, "addStoryAnnotation")))
+        asking = asyncio.create_task(author.review(story, CommandShown(SALIENT_CONCEPT, "addStoryAnnotation")))
         await asyncio.sleep(0)
         author.stop()
         answer = await asking
@@ -96,7 +62,7 @@ class AuthorStop(unittest.IsolatedAsyncioTestCase):
         story = Document.from_cells([MarkdownCell("Varn waited.", False, None, "s1")])
 
         author.stop()
-        answer = await author.review(story, CellShown("s1"))
+        answer = await author.review(story, EditorShown())
 
         self.assertEqual(answer, STOPPED)
         self.assertIsNone(author.asked)
