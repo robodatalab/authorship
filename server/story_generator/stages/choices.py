@@ -25,8 +25,6 @@ You are given the scene, and the events that could follow it, numbered, each wit
 
 Write one line for every event, in their order, numbered as the events are, and nothing else."""
 
-# Room for the choices of one scene.
-MAX_CHOICES_TOKENS = 500
 
 # The number a choice is written after, as in "2. ".
 NUMBERED = re.compile(r"^\s*\d+[.)]\s*")
@@ -58,7 +56,7 @@ class ChoicesStep(StageStep):
         written_could_happen = "\n\n".join(could_happen)
         request = f"The scene:\n{self._scene.text}\n\nWhat could happen next:\n{written_could_happen}"
         messages = [{"role": "system", "content": CHOICES_INSTRUCTIONS}, {"role": "user", "content": request}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_CHOICES_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
 

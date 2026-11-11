@@ -43,7 +43,6 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
                     "The event after:\n4 | mars, the base | Varn raises her son on Mars.",
                 },
             ],
-            max_new_tokens=300,
         )
         written = InteractiveAuthorStory(with_every_event).written_world_events("")
         self.assertEqual(
@@ -79,7 +78,6 @@ class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
                 {"role": "system", "content": ENDS_INSTRUCTIONS},
                 {"role": "user", "content": "Motherhood: A mother's care."},
             ],
-            max_new_tokens=500,
         )
         written = InteractiveAuthorStory(with_the_ends).written_world_events("")
         self.assertEqual(

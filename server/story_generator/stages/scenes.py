@@ -23,9 +23,6 @@ You are given where the scene takes place and what happens there. Tell it.
 
 Write two to five paragraphs of prose and nothing else."""
 
-# Room for a scene of a few paragraphs.
-MAX_SCENE_TOKENS = 3000
-
 
 class SceneStep(StageStep):
     """The scene that tells the events, written from the first of them into a
@@ -39,7 +36,7 @@ class SceneStep(StageStep):
         event, *_ = self._events
         request = f"Where: {event.location}\n\nWhat happens:\n{event.summary}"
         messages = [{"role": "system", "content": SCENE_INSTRUCTIONS}, {"role": "user", "content": request}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_SCENE_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         scene = written.strip()

@@ -39,9 +39,6 @@ You are given the concepts the author has chosen, each under its title. Describe
 
 Write every concept as its title on a line of its own, opened with "### ", followed by its description, and nothing else."""
 
-# Room for the titles and the descriptions of a story's concepts.
-MAX_CONCEPTS_TOKENS = 1500
-
 
 def _read_concepts(written: str) -> list[tuple[str, str]]:
     """The concepts the model wrote, in order: each one's title and description."""
@@ -67,7 +64,7 @@ class DescribeConceptsStep(StageStep):
         chosen = story.written_concepts()
         request = f"The author's concepts:\n{chosen}"
         messages = [{"role": "system", "content": DESCRIPTION_INSTRUCTIONS}, {"role": "user", "content": request}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_CONCEPTS_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         concepts_written = written.strip()

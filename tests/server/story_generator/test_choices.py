@@ -98,5 +98,4 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
                     "Dax drank in front of them.",
                 },
             ],
-            max_new_tokens=500,
         )

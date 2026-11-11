@@ -35,9 +35,6 @@ Each event is a plain, simple statement of what happens and why: no clock times,
 
 Write two lines, the first plot's event and then the second's, each as: moment | place | what happens. Write the lines and nothing else."""
 
-# Room for the merged event.
-MAX_MEETING_TOKENS = 4096
-
 
 PlotMatrix = list[list[int]]
 ConnectivityTrajectory = list[set[tuple[int, int]]]
@@ -128,7 +125,7 @@ specific, as in "earth, Varn's house", then " | ", then what happens. Write the 
 nothing else.
 """
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_MEETING_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         merged_event_str = "".join(chunks)
 

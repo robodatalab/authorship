@@ -96,7 +96,6 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
                 {"role": "system", "content": SCENE_INSTRUCTIONS},
                 {"role": "user", "content": "Where: mars, the base\n\nWhat happens:\nDax takes the water from Varn and her son."},
             ],
-            max_new_tokens=3000,
         )
 
 

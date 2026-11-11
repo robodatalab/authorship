@@ -29,7 +29,6 @@ class DescribeConceptsStepCall(unittest.IsolatedAsyncioTestCase):
                 {"role": "system", "content": DESCRIPTION_INSTRUCTIONS},
                 {"role": "user", "content": "The author's concepts:\n### Motherhood\n"},
             ],
-            max_new_tokens=1500,
         )
         written = InteractiveAuthorStory(described).written_concepts()
         self.assertEqual(written, "### Motherhood\nA mother's care.")

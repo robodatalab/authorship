@@ -51,12 +51,6 @@ Write one line and nothing else."""
 # The events every plot has, for every plot the story has.
 EVENTS_FOR_EVERY_PLOT = 4
 
-# Room for a plot's two ends.
-MAX_ENDS_TOKENS = 500
-
-# Room for one event.
-MAX_EVENT_TOKENS = 300
-
 
 def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, str]]:
     """The moment, place and what happens of every event the table lists, in
@@ -97,7 +91,7 @@ class PlotEndsStep(StageStep):
     async def __call__(self, document: Document) -> Document:
         request = f"{self._concept.title}: {self._concept.source}"
         messages = [{"role": "system", "content": ENDS_INSTRUCTIONS}, {"role": "user", "content": request}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_ENDS_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
@@ -132,7 +126,7 @@ class InBetweenStep(StageStep):
             f"The event after:\n{written_after}"
         )
         messages = [{"role": "system", "content": IN_BETWEEN_INSTRUCTIONS}, {"role": "user", "content": request}]
-        streamed = self._model.complete(messages, max_new_tokens=MAX_EVENT_TOKENS)
+        streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         (event,) = _parse_events_table_returned_by_llm(written)
