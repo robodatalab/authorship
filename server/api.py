@@ -14,12 +14,14 @@ from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
+from server.story_generator.generated_doc import stages_done_in_the_checkpoint
 from server.story_generator.job import StoryGenerationJob
 from server.story_generator.review import Answer, Verdict
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
+from server.progress import WorkProgress
 from authordoc.storydoc import Document
 from authordoc.cells.blurb_cell import BLURB
 from authordoc.cells.recap_cell import RECAP
@@ -265,7 +267,21 @@ def _story_generation(path: str) -> StoryGenerationJob:
 
 @app.get("/generate/story/status")
 def generate_story_status(id: str) -> dict[str, Any]:
-    job = _story_generation(id)
+    job = app.state.jobs.get(id)
+    if not isinstance(job, StoryGenerationJob):
+        document = Document.load(Path(id))
+        stages_checkpointed = stages_done_in_the_checkpoint(document)
+        stages_left_off = [{"name": name, "done": done} for name, done in stages_checkpointed.items()]
+        no_progress = WorkProgress(StoryGenerationJob.kind)
+        no_progress_reported = no_progress.reported()
+        return {
+            "running": False,
+            "cancelled": False,
+            "error": None,
+            "progress": no_progress_reported,
+            "stages": stages_left_off,
+            "asked": None,
+        }
     asked = job.author.asked
     stages_done = job.workflow.stages_done()
     stages = [{"name": name, "done": done} for name, done in stages_done.items()]

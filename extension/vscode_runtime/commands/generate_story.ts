@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { awaitServerJob, startServerJob } from "../server/jobs";
+import { fetchFromServer } from "../server/fetch";
 import type {
     StoryGeneration,
     StoryGenerationAsked,
@@ -26,6 +27,71 @@ function showWhatTheStoryGenerationAsks(
     }
 }
 
+function showTheFailureToGenerate(failure: unknown): void {
+    void vscode.window.showErrorMessage(
+        `Cannot generate the story — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
+    );
+}
+
+function leftOff(storyGeneration: StoryGeneration): StoryGeneration | null {
+    const stagesDone = storyGeneration.stages.filter((stage) => stage.done);
+    const someStagesDoneAndSomeNot =
+        stagesDone.length > 0 &&
+        stagesDone.length < storyGeneration.stages.length;
+    return someStagesDoneAndSomeNot ? storyGeneration : null;
+}
+
+async function followTheStoryGeneration(
+    session: AuthorFileEditorSession,
+    jobId: string,
+): Promise<void> {
+    // The question last brought into view: every one is acted on once,
+    // however many times the job is polled while it waits for the author.
+    let numberShown = 0;
+    try {
+        await awaitServerJob<StoryGeneration>(
+            "/generate/story/status",
+            jobId,
+            (storyGeneration) => {
+                const asked = storyGeneration.asked;
+                if (asked !== null && asked.number !== numberShown) {
+                    numberShown = asked.number;
+                    showWhatTheStoryGenerationAsks(session, asked);
+                }
+                session.showTheStoryGeneration(storyGeneration);
+            },
+        );
+    } catch (failure) {
+        showTheFailureToGenerate(failure);
+    } finally {
+        // A story shown for review and not accepted gives way to the story
+        // as the generation saved it.
+        await session.readTheDocumentBackFromItsFile();
+        await showWhereTheStoryGenerationStands(session);
+    }
+}
+
+export async function showWhereTheStoryGenerationStands(
+    session: AuthorFileEditorSession,
+): Promise<void> {
+    const path = session.uri.fsPath;
+    let storyGeneration: StoryGeneration;
+    try {
+        storyGeneration = await fetchFromServer<StoryGeneration>(
+            `/generate/story/status?id=${encodeURIComponent(path)}`,
+        );
+    } catch {
+        session.showTheStoryGeneration(null);
+        return;
+    }
+    if (storyGeneration.running) {
+        await followTheStoryGeneration(session, path);
+        return;
+    }
+    const storyGenerationLeftOff = leftOff(storyGeneration);
+    session.showTheStoryGeneration(storyGenerationLeftOff);
+}
+
 export class GenerateStoryCommand implements AuthorDocumentCommand {
     readonly commandName = "generateStory";
     readonly buttonGroup = "generate";
@@ -33,35 +99,16 @@ export class GenerateStoryCommand implements AuthorDocumentCommand {
     readonly tooltip = "Generate the story with you, stage by stage";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
-        // The question last brought into view: every one is acted on once,
-        // however many times the job is polled while it waits for the author.
-        let numberShown = 0;
+        let jobId: string;
         try {
             await session.writeTheDocumentToItsFile();
-            const jobId = await startServerJob("/generate/story", {
+            jobId = await startServerJob("/generate/story", {
                 path: session.document.path,
             });
-            await awaitServerJob<StoryGeneration>(
-                "/generate/story/status",
-                jobId,
-                (storyGeneration) => {
-                    const asked = storyGeneration.asked;
-                    if (asked !== null && asked.number !== numberShown) {
-                        numberShown = asked.number;
-                        showWhatTheStoryGenerationAsks(session, asked);
-                    }
-                    session.showTheStoryGeneration(storyGeneration);
-                },
-            );
         } catch (failure) {
-            void vscode.window.showErrorMessage(
-                `Cannot generate the story — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
-            );
-        } finally {
-            session.showTheStoryGeneration(null);
-            // A story shown for review and not accepted gives way to the story
-            // as the generation saved it.
-            await session.readTheDocumentBackFromItsFile();
+            showTheFailureToGenerate(failure);
+            return;
         }
+        await followTheStoryGeneration(session, jobId);
     }
 }

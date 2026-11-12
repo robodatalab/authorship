@@ -15,6 +15,20 @@ CHECKPOINT = "GeneratedDocumentCheckpoint"
 STAGE = "stage: "
 
 
+def stages_done_in_the_checkpoint(document: Document) -> dict[str, bool]:
+    checkpoint = document.get_cell(UnknownCell, CHECKPOINT)
+    lines = checkpoint.source.splitlines() if checkpoint is not None else []
+
+    stages: dict[str, bool] = {}
+
+    for line in lines:
+        if line.startswith(STAGE):
+            value = line.removeprefix(STAGE)
+            stage, _, is_done = value.rpartition(": ")
+            stages[stage] = is_done == "True"
+    return stages
+
+
 class GeneratedDocument:
     """A story being generated: the story, kept in its .author file, and where its
     generation stands, kept in the checkpoint, a cell of its own last in the
@@ -32,16 +46,8 @@ class GeneratedDocument:
         """Reads the story from its file, and where its generation stands from its
         checkpoint."""
         self.document = Document.load(self._path)
-        checkpoint = self.document.get_cell(UnknownCell, CHECKPOINT)
-        lines = checkpoint.source.splitlines() if checkpoint is not None else []
-
-        self.stages = {name: False for name in self._stage_names}
-
-        for line in lines:
-            if line.startswith(STAGE):
-                value = line.removeprefix(STAGE)
-                stage, _, is_done = value.rpartition(": ")
-                self.stages[stage] = is_done == "True"
+        stages_checkpointed = stages_done_in_the_checkpoint(self.document)
+        self.stages = {name: False for name in self._stage_names} | stages_checkpointed
 
     def save(self) -> None:
         """Writes the story into its file, with the checkpoint as its last cell: a

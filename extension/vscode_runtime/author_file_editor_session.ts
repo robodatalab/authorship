@@ -123,11 +123,15 @@ export class AuthorFileEditorSession
 
     showTheStoryGeneration(storyGeneration: StoryGeneration | null): void {
         this.storyGeneration = storyGeneration;
+        this.sendTheStoryGeneration();
+        this.documentOrSelectionChanged.fire();
+    }
+
+    private sendTheStoryGeneration(): void {
         void this.panel?.webview.postMessage({
             type: "storyGeneration",
-            storyGeneration,
+            storyGeneration: this.storyGeneration,
         });
-        this.documentOrSelectionChanged.fire();
     }
 
     selectTheStoryAnnotation(
@@ -371,6 +375,7 @@ export class AuthorFileEditorSession
         this.sendStoryAnnotationsSelected();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.sendTheStoryGeneration();
         this.documentOrSelectionChanged.fire();
     }
 

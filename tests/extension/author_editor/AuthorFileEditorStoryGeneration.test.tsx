@@ -56,6 +56,18 @@ const WRITES: StoryGeneration = {
     asked: null,
 };
 
+const LEFT_OFF: StoryGeneration = {
+    running: false,
+    error: null,
+    progress: { steps: [] },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+    ],
+    asked: null,
+};
+
 describe("the story generation under the main menu's tools", () => {
     let posted: unknown[];
     let container: HTMLElement;
@@ -115,6 +127,37 @@ describe("the story generation under the main menu's tools", () => {
 
         const icon = document.querySelector('[aria-current="step"] i')!;
         expect(icon.className).toBe("codicon codicon-circle-filled");
+    });
+
+    it("pauses the icon of the stage it left off at", async () => {
+        await mountTheStoryGeneration(LEFT_OFF);
+
+        const icon = document.querySelector('[aria-current="step"] i')!;
+        expect(icon.className).toBe("codicon codicon-debug-pause");
+    });
+
+    it("says where it left off, for the author to resume", async () => {
+        await mountTheStoryGeneration(LEFT_OFF);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots: left off hereResume");
+    });
+
+    it("resuming generates the story again, from where it left off", async () => {
+        await mountTheStoryGeneration(LEFT_OFF);
+        const [resumeButton] = document.querySelectorAll("button");
+
+        await act(async () => resumeButton.click());
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "generateStory",
+                commandArguments: {},
+            },
+        ]);
     });
 
     it("shows how far along the stage it is at is, while it works", async () => {

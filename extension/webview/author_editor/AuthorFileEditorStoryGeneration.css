@@ -57,7 +57,8 @@
 }
 
 .author-file-editor-story-generation-stage-working,
-.author-file-editor-story-generation-stage-asking {
+.author-file-editor-story-generation-stage-asking,
+.author-file-editor-story-generation-stage-left-off {
     color: var(--vscode-button-foreground);
     background: var(--vscode-button-background);
 }

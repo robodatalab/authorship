@@ -26,13 +26,7 @@
     border-radius: 3px;
 }
 
-.author-file-editor-cell-field:has(> textarea) {
-    align-items: flex-start;
-}
-
 textarea.author-file-editor-cell-field-input {
-    flex-basis: 0;
-    min-width: 0;
     min-height: 4lh;
     field-sizing: content;
     resize: vertical;

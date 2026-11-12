@@ -163,3 +163,14 @@
     .authorship-panel-story-annotation-passage-shown {
     color: var(--vscode-list-inactiveSelectionForeground, inherit);
 }
+
+.authorship-panel-story-annotations .author-file-editor-cell-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+}
+
+.authorship-panel-story-annotations .author-file-editor-cell-field-label,
+.authorship-panel-story-annotations .author-file-editor-cell-field-input {
+    flex: none;
+}

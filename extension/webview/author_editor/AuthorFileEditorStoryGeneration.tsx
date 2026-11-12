@@ -6,12 +6,14 @@ import type { StoryGeneration } from "../../vscode_runtime/story_generation";
 import "./AuthorFileEditorStoryGeneration.css";
 
 const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
+const GENERATE_STORY = "generateStory";
 
 // How every stage is drawn: finished, the one the generation is at, or to come.
 const ICON_OF_EACH_STATE: Record<string, string> = {
     done: "codicon codicon-pass-filled",
     working: "codicon codicon-loading codicon-modifier-spin",
     asking: "codicon codicon-circle-filled",
+    "left-off": "codicon codicon-debug-pause",
     "to-come": "codicon codicon-circle-outline",
 };
 
@@ -42,6 +44,7 @@ export function AuthorFileEditorStoryGeneration({
     const progress = storyGeneration.progress.steps;
     const stageProgress = progress[progress.length - 1];
     const asked = storyGeneration.asked;
+    const running = storyGeneration.running;
 
     function answer(verdict: string): void {
         invokeAuthorDocumentCommand(
@@ -52,6 +55,9 @@ export function AuthorFileEditorStoryGeneration({
     }
 
     function whatTheStageDoes(): string {
+        if (!running) {
+            return "left off here";
+        }
         if (asked !== null && asked.shown.kind === "command") {
             return "use the highlighted button, then continue";
         }
@@ -65,7 +71,11 @@ export function AuthorFileEditorStoryGeneration({
     }
 
     const stageDoes = whatTheStageDoes();
-    const stateOfTheStageAt = asked === null ? "working" : "asking";
+    const stateOfTheStageAt = !running
+        ? "left-off"
+        : asked === null
+          ? "working"
+          : "asking";
 
     return (
         <div className="author-file-editor-story-generation">
@@ -95,6 +105,21 @@ export function AuthorFileEditorStoryGeneration({
                     <span className="author-file-editor-story-generation-doing">
                         {`${stageAt.name}: ${stageDoes}`}
                     </span>
+                    {!running && (
+                        <button
+                            type="button"
+                            className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
+                            onClick={() =>
+                                invokeAuthorDocumentCommand(
+                                    sendMessagesToVscode,
+                                    GENERATE_STORY,
+                                    {},
+                                )
+                            }
+                        >
+                            Resume
+                        </button>
+                    )}
                     {asked !== null && (
                         <>
                             <button
