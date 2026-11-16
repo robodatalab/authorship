@@ -15,6 +15,7 @@ class StoryPlayer:
 
     def __init__(self, doc: Document, exposure_tracker: ExposureTracker, plot_index: int) -> None:
         self._doc = doc
+        self._story = InteractiveAuthorStory(doc)
         self._exposure_tracker = exposure_tracker
         self._plot_index = plot_index
         self.reset()
@@ -40,9 +41,8 @@ class StoryPlayer:
         continuations fill, and those continuations, one for each edge leaving
         it, in a random order; where the story ends, the scene and no
         continuations. The scene's nodes count as seen by the exposure tracker."""
-        story = InteractiveAuthorStory(self._doc)
-        scene = story.scene_of(self._current_node)
-        current_nodes = story.events_of(scene)
+        scene = self._story.scene_of(self._current_node)
+        current_nodes = self._story.events_of(scene)
         self._exposure_tracker.see(current_nodes)
         outgoing_edges: list[PlotEdge] = []
         for node in current_nodes:
