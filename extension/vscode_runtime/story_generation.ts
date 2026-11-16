@@ -40,6 +40,8 @@ export interface StoryGenerationStage {
     doing: string;
     done: number;
     of: number | null;
+    state: "waiting" | "running" | "done";
+    steps: StoryGenerationStage[];
 }
 
 // A stage of the story generation's workflow, and whether it is finished.

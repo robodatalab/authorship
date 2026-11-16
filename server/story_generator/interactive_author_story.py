@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from functools import cached_property
 
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
@@ -170,16 +171,21 @@ class InteractiveAuthorStory:
         first word; None for an event no scene tells."""
         if event.story_word_range is None:
             return None
-        story_words = StoryWordsIterator(self.document)
-        spans = story_words.spans(event.story_word_range)
-        if not spans:
+        first_word = event.story_word_range.first_word
+        cell_id = self._cell_id_of_story_word.get(first_word)
+        if cell_id is None:
             return None
-        first_span, *_ = spans
-        cell = self.document.cell_with_id(first_span.cell_id)
+        cell = self.document.cell_with_id(cell_id)
         if not isinstance(cell, MarkdownCell):
             return None
         scene = InteractiveScene(cell)
         return scene
+
+    @cached_property
+    def _cell_id_of_story_word(self) -> dict[int, str]:
+        story_words = StoryWordsIterator(self.document)
+        cell_ids = {word.number: word.cell_id for word in story_words}
+        return cell_ids
 
     def events_of(self, scene: InteractiveScene) -> list[PlotNode]:
         """The events the scene tells: every event whose scene it is, in the order of
