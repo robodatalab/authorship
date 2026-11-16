@@ -725,3 +725,52 @@ class FixStyle(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoryGenerationStatus(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        app.state.jobs = ParallelJobsManager()
+
+    def test_a_story_no_generation_runs_on_stands_where_its_checkpoint_left_it(self) -> None:
+        self.document.write_text(
+            '<!-- cell: GeneratedDocumentCheckpoint id="k1" -->\n\n'
+            "stage: concept titles: True\n"
+            "stage: concepts: False\n",
+            encoding="utf-8",
+        )
+
+        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
+
+        self.assertEqual(
+            response.json(),
+            {
+                "running": False,
+                "cancelled": False,
+                "error": None,
+                "progress": {
+                    "doing": "story",
+                    "done": 0,
+                    "of": None,
+                    "seconds": 0.0,
+                    "secondsPerItem": None,
+                    "state": "waiting",
+                    "steps": [],
+                },
+                "stages": [
+                    {"name": "concept titles", "done": True},
+                    {"name": "concepts", "done": False},
+                ],
+                "asked": None,
+            },
+        )
+
+    def test_a_story_never_generated_has_no_stages(self) -> None:
+        self.document.write_text('<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n', encoding="utf-8")
+
+        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
+
+        self.assertEqual(response.json()["stages"], [])

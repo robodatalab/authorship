@@ -9,6 +9,7 @@ import { authorDocumentCellTypes } from "../vscode_runtime/commands/author_docum
 import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
+import type { StoryGeneration } from "../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { parse } from "authordoc/parser";
@@ -26,6 +27,7 @@ interface WhatTheWebviewDraws {
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
     wordsInTheDocument: number;
+    storyGeneration: StoryGeneration | null;
 }
 
 function cellsAsTheHostWroteThem(written: string[]): Cell[] {
@@ -83,6 +85,9 @@ function processMessageFromVscode(
             number
         >;
         drawn.wordsInTheDocument = message.data.wordsInTheDocument as number;
+    } else if (message.data?.type === "storyGeneration") {
+        drawn.storyGeneration = message.data
+            .storyGeneration as StoryGeneration | null;
     } else {
         return false;
     }
@@ -106,6 +111,7 @@ function openTheAuthorFileEditor(): void {
         cellsBeingWritten: {},
         wordsInEverySection: {},
         wordsInTheDocument: 0,
+        storyGeneration: null,
     };
 
     const cellRenderer = new AuthorFileEditorCellRenderer(sendMessagesToVscode);
@@ -126,6 +132,7 @@ function openTheAuthorFileEditor(): void {
                 cellsBeingWritten={drawn.cellsBeingWritten}
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
+                storyGeneration={drawn.storyGeneration}
             />,
         );
     }

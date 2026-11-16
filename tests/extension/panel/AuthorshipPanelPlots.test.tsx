@@ -428,9 +428,12 @@ describe("the plots tab", () => {
             ].map((field) => field.value);
         }
 
-        async function type(field: HTMLInputElement, said: string): Promise<void> {
+        async function type(
+            field: HTMLInputElement | HTMLTextAreaElement,
+            said: string,
+        ): Promise<void> {
             const setTheValue = Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
+                Object.getPrototypeOf(field),
                 "value",
             )!.set!;
             await act(async () => {
@@ -439,7 +442,7 @@ describe("the plots tab", () => {
             });
         }
 
-        it("is shown with its title, timestamp, location and the words that tell it", async () => {
+        it("is shown with its summary, timestamp, location and the words that tell it", async () => {
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
@@ -450,6 +453,25 @@ describe("the plots tab", () => {
             )?.textContent;
             expect(eventFieldsShown()).toEqual(["She finds the door.", "1.1", "the hall"]);
             expect(wordsShown).toBe("the door.");
+        });
+
+        it("shows its summary, labelled so, in a box of many lines", async () => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+
+            const [summaryField] = document.querySelectorAll(
+                ".authorship-panel-plot-event .author-file-editor-cell-field",
+            );
+            const label = summaryField.querySelector(
+                ".author-file-editor-cell-field-label",
+            )?.textContent;
+            const box = summaryField.querySelector(
+                ".author-file-editor-cell-field-input",
+            )?.tagName;
+            expect(label).toBe("Summary");
+            expect(box).toBe("TEXTAREA");
         });
 
         it("is not shown when no event is selected", async () => {
@@ -499,7 +521,7 @@ describe("the plots tab", () => {
         });
 
         it.each([
-            ["title", 0, "summary", "She finds the red door."],
+            ["summary", 0, "summary", "She finds the red door."],
             ["timestamp", 1, "timestamp", "2.1"],
             ["location", 2, "location", "the hall, by the stairs"],
         ])(

@@ -196,9 +196,12 @@ async function typeCharacterWithoutWaitingForTheHost(
 let editor: OpenEditor;
 
 beforeEach(async () => {
+    vi.stubGlobal("fetch", () => new Promise(() => undefined));
     editor = await openEditor("<!-- cell: markdown -->\n\nThe lantern\n");
     await openTheCellForTyping();
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("the cursor while the author types in a cell", () => {
     it("stays where the author is typing when the host answers a keystroke late", async () => {
@@ -892,6 +895,11 @@ describe("the prose errors marked while the author types", () => {
             textAfter,
             marksAfter,
         }) => {
+            editor = await openEditor(
+                ['<!-- cell: markdown id="m1" -->', "", textBefore, ""].join(
+                    "\n",
+                ),
+            );
             vi.stubGlobal("fetch", (url: string) =>
                 Promise.resolve({
                     ok: true,
@@ -921,11 +929,6 @@ describe("the prose errors marked while the author types", () => {
                                 : { id: "job-1" },
                         ),
                 }),
-            );
-            editor = await openEditor(
-                ['<!-- cell: markdown id="m1" -->', "", textBefore, ""].join(
-                    "\n",
-                ),
             );
             vi.useFakeTimers();
             await act(async () => {

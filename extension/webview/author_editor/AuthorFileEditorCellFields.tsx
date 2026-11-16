@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import "./AuthorFileEditorCellFields.css";
 
 export interface AuthorFileEditorCellField {
     label: string;
     said: string;
     placeholder?: string;
+    multiline?: boolean;
     onSaid: (said: string) => void;
 }
 
@@ -34,6 +35,7 @@ export function AuthorFileEditorCellFields({
                         className="author-file-editor-cell-field-input"
                         said={field.said}
                         placeholder={field.placeholder ?? ""}
+                        multiline={field.multiline ?? false}
                         onSaid={field.onSaid}
                     />
                 </label>
@@ -63,6 +65,7 @@ interface AuthorFileEditorCellFieldBoxProps {
     className: string;
     said: string;
     placeholder: string;
+    multiline: boolean;
     onSaid: (said: string) => void;
 }
 
@@ -70,22 +73,28 @@ function AuthorFileEditorCellFieldBox({
     className,
     said,
     placeholder,
+    multiline,
     onSaid,
 }: AuthorFileEditorCellFieldBoxProps) {
     const [beingTyped, setBeingTyped] = useState<string | null>(null);
 
-    return (
-        <input
-            type="text"
-            className={className}
-            value={beingTyped ?? said}
-            placeholder={placeholder}
-            onFocus={() => setBeingTyped(said)}
-            onBlur={() => setBeingTyped(null)}
-            onChange={(event) => {
-                setBeingTyped(event.currentTarget.value);
-                onSaid(event.currentTarget.value);
-            }}
-        />
+    const boxProps = {
+        className,
+        value: beingTyped ?? said,
+        placeholder,
+        onFocus: () => setBeingTyped(said),
+        onBlur: () => setBeingTyped(null),
+        onChange: (
+            event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+        ) => {
+            setBeingTyped(event.currentTarget.value);
+            onSaid(event.currentTarget.value);
+        },
+    };
+
+    return multiline ? (
+        <textarea {...boxProps} />
+    ) : (
+        <input type="text" {...boxProps} />
     );
 }

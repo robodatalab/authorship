@@ -90,6 +90,17 @@ body {
     );
 }
 
+/* The button the story generation asks the author to press. */
+.authorship-panel-toolbar-button-highlighted {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.authorship-panel-toolbar-button-highlighted:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
 .authorship-panel-offline {
     color: var(--vscode-errorForeground);
 }

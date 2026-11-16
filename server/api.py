@@ -14,10 +14,14 @@ from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
+from server.story_generator.generated_doc import stages_done_in_the_checkpoint
+from server.story_generator.job import StoryGenerationJob
+from server.story_generator.review import Answer, Verdict
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
+from server.progress import WorkProgress
 from authordoc.storydoc import Document
 from authordoc.cells.blurb_cell import BLURB
 from authordoc.cells.recap_cell import RECAP
@@ -238,6 +242,75 @@ def generate_status(id: str) -> dict[str, Any]:
         "text": job.text,
         "progress": {"written": job.written, "chapters": job.chapters},
     }
+
+
+class StoryGenerationRequest(BaseModel):
+    # Path of the .author file to generate the story into.
+    path: str
+
+
+@app.post("/generate/story", status_code=202)
+def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
+    """Start generating the story with its author; poll /generate/story/status for
+    what it asks them, and answer at /generate/story/answer."""
+    job = StoryGenerationJob(_deployed("writing_model"), Path(request.path))
+    app.state.jobs.start(job)
+    return {"id": job.target}
+
+
+def _story_generation(path: str) -> StoryGenerationJob:
+    job = app.state.jobs.get(path)
+    if not isinstance(job, StoryGenerationJob):
+        raise HTTPException(status_code=404, detail=f"No story generation for {path}")
+    return job
+
+
+@app.get("/generate/story/status")
+def generate_story_status(id: str) -> dict[str, Any]:
+    job = app.state.jobs.get(id)
+    if not isinstance(job, StoryGenerationJob):
+        document = Document.load(Path(id))
+        stages_checkpointed = stages_done_in_the_checkpoint(document)
+        stages_left_off = [{"name": name, "done": done} for name, done in stages_checkpointed.items()]
+        no_progress = WorkProgress(StoryGenerationJob.kind)
+        no_progress_reported = no_progress.reported()
+        return {
+            "running": False,
+            "cancelled": False,
+            "error": None,
+            "progress": no_progress_reported,
+            "stages": stages_left_off,
+            "asked": None,
+        }
+    asked = job.author.asked
+    stages_done = job.workflow.stages_done()
+    stages = [{"name": name, "done": done} for name, done in stages_done.items()]
+    return {
+        "running": not job.done,
+        "cancelled": job.cancelled,
+        "error": job.error,
+        "progress": job.progress.reported(),
+        "stages": stages,
+        "asked": None if asked is None else asked.written(),
+    }
+
+
+class StoryGenerationAnswer(BaseModel):
+    path: str
+    # "accept" or "stop".
+    verdict: str
+    # The story as the editor has it when the author answers.
+    story: str
+
+
+@app.post("/generate/story/answer")
+def answer_story_generation(request: StoryGenerationAnswer) -> dict[str, Any]:
+    job = _story_generation(request.path)
+    verdict = Verdict(request.verdict)
+    answer = Answer(verdict, request.story)
+    job.author.answer(answer)
+    return {}
+
 
 class StyleFixRequest(BaseModel):
     path: str

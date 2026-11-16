@@ -22,6 +22,7 @@ import {
     authorDocumentCommandCards,
 } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
+import { showWhereTheStoryGenerationStands } from "./commands/generate_story";
 import type { AuthorshipPanelProvider } from "./authorship_panel_provider";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { loadTemplates, watchSettings } from "./settings/file";
@@ -78,6 +79,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             session.uri,
         );
         session.showOn(panel);
+        void showWhereTheStoryGenerationStands(session);
         const documentChangesMessageQueue =
             new MessageQueueBetweenVscodeAndWebview(this.log);
         documentChangesMessageQueue.addListener(session);

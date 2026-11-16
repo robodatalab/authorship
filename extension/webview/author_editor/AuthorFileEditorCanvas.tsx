@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
+import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -18,6 +19,7 @@ import {
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
+import type { StoryGeneration } from "../../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { PART } from "authordoc/cells/part_cell";
@@ -124,6 +126,7 @@ interface AuthorFileEditorCanvasProps {
     cellsBeingWritten?: Readonly<Record<string, number>>;
     wordsInEverySection?: Readonly<Record<string, number>>;
     wordsInTheDocument?: number;
+    storyGeneration?: StoryGeneration | null;
 }
 
 export function AuthorFileEditorCanvas({
@@ -140,6 +143,7 @@ export function AuthorFileEditorCanvas({
     cellsBeingWritten = {},
     wordsInEverySection = {},
     wordsInTheDocument = 0,
+    storyGeneration = null,
 }: AuthorFileEditorCanvasProps) {
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
@@ -524,6 +528,10 @@ export function AuthorFileEditorCanvas({
                     wordsInTheDocument={wordsInTheDocument}
                 />
                 <AuthorFileEditorFindBar find={find} />
+                <AuthorFileEditorStoryGeneration
+                    storyGeneration={storyGeneration}
+                    sendMessagesToVscode={sendMessagesToVscode}
+                />
             </AuthorFileEditorMainMenu>
             <MarkdownEditorMediator
                 onEditingTheCell={(cellId) =>

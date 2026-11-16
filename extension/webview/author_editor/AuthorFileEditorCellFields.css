@@ -26,6 +26,12 @@
     border-radius: 3px;
 }
 
+textarea.author-file-editor-cell-field-input {
+    min-height: 4lh;
+    field-sizing: content;
+    resize: vertical;
+}
+
 .author-file-editor-cell-image {
     display: block;
     max-width: 240px;

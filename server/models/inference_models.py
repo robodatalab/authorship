@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import cortexgrid
 from cortexgrid_infer import (
+    AnthropicText2Text,
     GeminiText2Text,
     Hosted,
     HuggingFaceImporter,
@@ -20,6 +21,8 @@ _log = log.logger(__name__)
 
 GEC_MODEL = "Unbabel/gec-t5_small"
 STYLE_MODEL = "gemini-3.1-pro-preview"
+# The model that generates a story with its author.
+WRITING_MODEL = "claude-opus-5-5"
 
 def deploy_inference_models(app: FastAPI) -> None:
     _log.info("Starting the completion models")
@@ -56,4 +59,20 @@ def deploy_inference_models(app: FastAPI) -> None:
         )
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
         app.state.style_model = style_deployment.client()
+        writing_model = Hosted(WRITING_MODEL, AnthropicText2Text)
+        cortexgrid.register_model(
+            writing_model.serve_app,
+            family=writing_model.family,
+            suffix=writing_model.suffix,
+            requirements=writing_model.requirements(),
+            config=writing_model.config(),
+        )
+        writing_deployment = cortexgrid.deploy_model(
+            family=writing_model.family,
+            suffix=writing_model.suffix,
+            run_name=cortexgrid.IMPORTED,
+            timeout=cluster.DEPLOY_TIMEOUT_S,
+        )
+        app.state.inference_models[WRITING_MODEL] = writing_deployment.key
+        app.state.writing_model = writing_deployment.client()
     _log.info("Completion models created")

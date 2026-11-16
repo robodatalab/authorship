@@ -112,6 +112,7 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
             text: session?.document.text ?? null,
             storyAnnotationsSelected: session?.theStoryAnnotationsSelected ?? {},
             storyTextSelected: session?.theStoryTextSelected ?? null,
+            storyGeneration: session?.theStoryGeneration ?? null,
         });
     }
 
