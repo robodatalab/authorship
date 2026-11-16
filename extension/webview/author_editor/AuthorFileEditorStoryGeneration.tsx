@@ -43,6 +43,19 @@ export function AuthorFileEditorStoryGeneration({
     const stageAt = stages[currentStage];
     const progress = storyGeneration.progress.steps;
     const stageProgress = progress[progress.length - 1];
+    const progressOfTheStageAt =
+        stageProgress?.doing === stageAt?.name ? stageProgress : undefined;
+    const stepsDone = progressOfTheStageAt?.done ?? 0;
+    const stepsOf = progressOfTheStageAt?.of ?? null;
+    const workInTheStep = progressOfTheStageAt?.steps.at(-1);
+    const shareOfTheStepDone =
+        workInTheStep?.state === "running" && workInTheStep.of
+            ? workInTheStep.done / workInTheStep.of
+            : 0;
+    const shareOfTheStageDone = stepsOf
+        ? (stepsDone + shareOfTheStepDone) / stepsOf
+        : 0;
+    const percentOfTheStageDone = shareOfTheStageDone * 100;
     const asked = storyGeneration.asked;
     const running = storyGeneration.running;
 
@@ -61,13 +74,7 @@ export function AuthorFileEditorStoryGeneration({
         if (asked !== null && asked.shown.kind === "command") {
             return "use the highlighted button, then continue";
         }
-        if (asked !== null) {
-            return "review it, edit what you like, then accept";
-        }
-        if (stageProgress?.doing === stageAt?.name) {
-            return `step ${stageProgress.done + 1} of ${stageProgress.of}`;
-        }
-        return "starting";
+        return "review it, edit what you like, then accept";
     }
 
     const stageDoes = whatTheStageDoes();
@@ -103,8 +110,22 @@ export function AuthorFileEditorStoryGeneration({
             {stageAt !== undefined && (
                 <div className="author-file-editor-story-generation-status">
                     <span className="author-file-editor-story-generation-doing">
-                        {`${stageAt.name}: ${stageDoes}`}
+                        {stateOfTheStageAt === "working"
+                            ? stageAt.name
+                            : `${stageAt.name}: ${stageDoes}`}
                     </span>
+                    {stateOfTheStageAt === "working" && (
+                        <div
+                            className="author-file-editor-story-generation-progress"
+                            role="progressbar"
+                            aria-valuenow={Math.round(percentOfTheStageDone)}
+                        >
+                            <div
+                                className="author-file-editor-story-generation-progress-done"
+                                style={{ width: `${percentOfTheStageDone}%` }}
+                            />
+                        </div>
+                    )}
                     {!running && (
                         <button
                             type="button"

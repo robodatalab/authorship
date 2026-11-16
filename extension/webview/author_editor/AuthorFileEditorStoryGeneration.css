@@ -63,6 +63,20 @@
     background: var(--vscode-button-background);
 }
 
+.author-file-editor-story-generation-progress {
+    flex: 1;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--vscode-panel-border);
+}
+
+.author-file-editor-story-generation-progress-done {
+    height: 100%;
+    background: var(--vscode-progressBar-background, #0078d4);
+    transition: width 0.2s linear;
+}
+
 .author-file-editor-story-generation-stage-to-come {
     color: var(--vscode-descriptionForeground);
 }

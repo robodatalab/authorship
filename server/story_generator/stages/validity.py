@@ -34,6 +34,7 @@ from dataclasses import dataclass
 
 from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.storydoc import Document
+from server.progress import with_progress
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.plot_following import get_trajectories
 from server.story_generator.exposure_tracker import ExposureTracker
@@ -191,12 +192,14 @@ class PlotValidityStep(StageStep):
         story = InteractiveAuthorStory(document)
         options_offered = [len(scene.options) for scene in story.scenes]
         most_offered = max(options_offered, default=0)
-        for option in range(1, most_offered + 1):
-            longest_runs: Counter[int] = Counter()
-            for _ in range(PLAYS):
-                events_seen = play_same_option(document, self._plot_index, option)
-                longest = get_longest_run(plot, events_seen)
-                longest_runs[longest] += 1
+        options = range(1, most_offered + 1)
+        longest_runs_of_option: dict[int, Counter[int]] = {option: Counter() for option in options}
+        option_of_each_play = [option for option in options for _ in range(PLAYS)]
+        for option in with_progress(option_of_each_play, plot.title):
+            events_seen = play_same_option(document, self._plot_index, option)
+            longest = get_longest_run(plot, events_seen)
+            longest_runs_of_option[option][longest] += 1
+        for option, longest_runs in longest_runs_of_option.items():
             end_achieved = longest_runs[length] / PLAYS
             by_length = sorted(longest_runs.items())
             runs = [f"{run} {'event' if run == 1 else 'events'} {plays / PLAYS:.0%}" for run, plays in by_length]

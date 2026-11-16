@@ -10,7 +10,7 @@ import type { StoryGeneration } from "../../../extension/vscode_runtime/story_ge
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "concept titles", done: 0, of: 0 }] },
+    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: false },
         { name: "concepts", done: false },
@@ -30,7 +30,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 const ASKS_FOR_A_REVIEW: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "concepts", done: 1, of: 1 }] },
+    progress: { steps: [{ doing: "concepts", done: 1, of: 1, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: false },
@@ -46,12 +46,36 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
 const WRITES: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "plots", done: 3, of: 15 }] },
+    progress: { steps: [{ doing: "plots", done: 3, of: 15, state: "running", steps: [] }] },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: true },
         { name: "plots", done: false },
         { name: "mesh", done: false },
+    ],
+    asked: null,
+};
+
+const PLAYS_THE_STORY: StoryGeneration = {
+    running: true,
+    error: null,
+    progress: {
+        steps: [
+            {
+                doing: "validity",
+                done: 1,
+                of: 4,
+                state: "running",
+                steps: [
+                    { doing: "Motherhood", done: 200, of: 200, state: "done", steps: [] },
+                    { doing: "War", done: 100, of: 200, state: "running", steps: [] },
+                ],
+            },
+        ],
+    },
+    stages: [
+        { name: "choices", done: true },
+        { name: "validity", done: false },
     ],
     asked: null,
 };
@@ -160,13 +184,26 @@ describe("the story generation under the main menu's tools", () => {
         ]);
     });
 
-    it("shows how far along the stage it is at is, while it works", async () => {
+    it("shows how far along the stage it is at is in a bar, while it works", async () => {
         await mountTheStoryGeneration(WRITES);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots: step 4 of 15");
+        const bar = status.querySelector('[role="progressbar"]')!;
+        const filled = bar.firstElementChild as HTMLElement;
+        expect(status.textContent).toBe("plots");
+        expect(bar.getAttribute("aria-valuenow")).toBe("20");
+        expect(filled.style.width).toBe("20%");
+    });
+
+    it("fills the bar with the work done in the step it is at, too", async () => {
+        await mountTheStoryGeneration(PLAYS_THE_STORY);
+
+        const bar = document.querySelector('[role="progressbar"]')!;
+        const filled = bar.firstElementChild as HTMLElement;
+        expect(bar.getAttribute("aria-valuenow")).toBe("38");
+        expect(filled.style.width).toBe("37.5%");
     });
 
     it("asks the author to use the command shown, then continue or stop", async () => {

@@ -36,7 +36,7 @@ She finds the door.
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "concept titles", done: 0, of: 0 }] },
+    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, state: "done", steps: [] }] },
     stages: [{ name: "concept titles", done: false }],
     asked: {
         number: 1,
@@ -52,7 +52,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 const ASKS_FOR_A_REVIEW_OF_THE_PLOTS: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "plots", done: 3, of: 3 }] },
+    progress: { steps: [{ doing: "plots", done: 3, of: 3, state: "done", steps: [] }] },
     stages: [{ name: "plots", done: false }],
     asked: {
         number: 2,
