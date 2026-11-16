@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
 import { AuthorshipPanelProvider } from "../../../extension/vscode_runtime/authorship_panel_provider";
@@ -132,8 +132,11 @@ function theFileNowReads(one: string, two: string): string {
 let editor: OpenEditor;
 
 beforeEach(async () => {
+    vi.stubGlobal("fetch", () => new Promise(() => undefined));
     editor = await openEditor(TWO_CELLS);
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("the watcher on the author file, when the editor saves it itself", () => {
     it("says nothing to the page, the file holding what the document holds", async () => {

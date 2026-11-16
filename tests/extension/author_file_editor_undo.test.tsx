@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../extension/vscode_runtime/author_file_editor_provider";
@@ -129,8 +129,11 @@ let editor: OpenEditor;
 
 beforeEach(async () => {
     executedCommands.length = 0;
+    vi.stubGlobal("fetch", () => new Promise(() => undefined));
     editor = await openEditor("<!-- cell: markdown -->\n\none\n");
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("undoing after two cells were added", () => {
     it("takes one of the two out of the file", async () => {
