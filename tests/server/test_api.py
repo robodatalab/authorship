@@ -774,3 +774,166 @@ class StoryGenerationStatus(unittest.TestCase):
         response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
 
         self.assertEqual(response.json()["stages"], [])
+
+
+class StoryGenerationStageByStage(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
+        app.state.jobs = ParallelJobsManager()
+
+        def _restore_model():
+            app.state.writing_model = None
+
+        self.addCleanup(_restore_model)
+
+    def wait_for_the_stage(self, client: TestClient) -> dict:
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            status = client.get("/generate/story/status", params={"id": str(self.document)}).json()
+            if not status["running"]:
+                return status
+            time.sleep(0.005)
+        raise AssertionError("the stage did not finish within 5s")
+
+    def test_runs_the_first_stage_not_finished_and_asks_the_author_to_review_it(self) -> None:
+        self.document.write_text("", encoding="utf-8")
+        app.state.writing_model = build_fake_completion_model()
+        client = TestClient(app)
+
+        client.post("/generate/story", json={"path": str(self.document)})
+        status = self.wait_for_the_stage(client)
+
+        self.assertEqual(
+            status,
+            {
+                "running": False,
+                "cancelled": False,
+                "error": None,
+                "progress": mock.ANY,
+                "stages": [
+                    {"name": "concept titles", "done": False},
+                    {"name": "concepts", "done": False},
+                    {"name": "plots", "done": False},
+                    {"name": "mesh", "done": False},
+                    {"name": "scenes", "done": False},
+                    {"name": "choices", "done": False},
+                    {"name": "validity", "done": False},
+                ],
+                "asked": {
+                    "number": 1,
+                    "story": "",
+                    "shown": {
+                        "kind": "command",
+                        "cellKind": "salient-concept",
+                        "commandName": "addStoryAnnotation",
+                    },
+                },
+            },
+        )
+
+    def test_accepting_saves_the_story_and_runs_the_next_stage_on_it(self) -> None:
+        self.document.write_text("", encoding="utf-8")
+        app.state.writing_model = build_fake_completion_model("### Motherhood\nA mother's care.")
+        client = TestClient(app)
+        client.post("/generate/story", json={"path": str(self.document)})
+        self.wait_for_the_stage(client)
+
+        client.post(
+            "/generate/story/answer",
+            json={
+                "path": str(self.document),
+                "verdict": "accept",
+                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+                '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
+                "stage: concept titles: False\n",
+            },
+        )
+        status = self.wait_for_the_stage(client)
+
+        self.assertEqual(
+            status,
+            {
+                "running": False,
+                "cancelled": False,
+                "error": None,
+                "progress": mock.ANY,
+                "stages": [
+                    {"name": "concept titles", "done": True},
+                    {"name": "concepts", "done": False},
+                    {"name": "plots", "done": False},
+                    {"name": "mesh", "done": False},
+                    {"name": "scenes", "done": False},
+                    {"name": "choices", "done": False},
+                    {"name": "validity", "done": False},
+                ],
+                "asked": {
+                    "number": 2,
+                    "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+                    "A mother's care.\n\n"
+                    '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
+                    "stage: concept titles: True\n"
+                    "stage: concepts: False\n"
+                    "stage: plots: False\n"
+                    "stage: mesh: False\n"
+                    "stage: scenes: False\n"
+                    "stage: choices: False\n"
+                    "stage: validity: False\n",
+                    "shown": {"kind": "tab", "cellKind": "salient-concept"},
+                },
+            },
+        )
+
+    def test_stopping_drops_the_question_and_leaves_the_story_where_it_was(self) -> None:
+        self.document.write_text(
+            '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+            '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
+            "stage: concept titles: True\n"
+            "stage: concepts: False\n",
+            encoding="utf-8",
+        )
+        app.state.writing_model = build_fake_completion_model("### Motherhood\nA mother's care.")
+        client = TestClient(app)
+        client.post("/generate/story", json={"path": str(self.document)})
+        self.wait_for_the_stage(client)
+
+        client.post(
+            "/generate/story/answer",
+            json={"path": str(self.document), "verdict": "stop", "story": ""},
+        )
+        status = client.get("/generate/story/status", params={"id": str(self.document)}).json()
+        saved = self.document.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            status,
+            {
+                "running": False,
+                "cancelled": False,
+                "error": None,
+                "progress": mock.ANY,
+                "stages": [
+                    {"name": "concept titles", "done": True},
+                    {"name": "concepts", "done": False},
+                ],
+                "asked": None,
+            },
+        )
+        self.assertEqual(
+            saved,
+            '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+            '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
+            "stage: concept titles: True\n"
+            "stage: concepts: False\n",
+        )
+
+    def test_answering_a_story_no_generation_asks_about_is_a_miss(self) -> None:
+        self.document.write_text("", encoding="utf-8")
+
+        response = TestClient(app).post(
+            "/generate/story/answer",
+            json={"path": str(self.document), "verdict": "accept", "story": ""},
+        )
+
+        self.assertEqual(response.status_code, 404)

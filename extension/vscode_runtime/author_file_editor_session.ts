@@ -94,6 +94,15 @@ export class AuthorFileEditorSession
 
     showOn(panel: vscode.WebviewPanel): void {
         this.panel = panel;
+        panel.onDidDispose(() => {
+            if (this.panel === panel) {
+                this.panel = undefined;
+            }
+        });
+    }
+
+    get isShownInItsEditor(): boolean {
+        return this.panel !== undefined;
     }
 
     async onMessage(message: AuthorFileEditorMessage): Promise<void> {

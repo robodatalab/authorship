@@ -19,8 +19,7 @@ the checkpoint of where the generation stands. Stopped in a stage, or killed in
 it, the workflow resumes at that stage, from its first step, on the story the
 stage before left.
 
-The workflow logs when a stage starts, and when it finishes or the author stops
-in it."""
+The workflow logs when a stage starts, and when it finishes."""
 
 from __future__ import annotations
 
@@ -31,7 +30,7 @@ from authordoc.storydoc import Document
 from cortexgrid_infer import CompletingModel
 from server.progress import with_progress
 from server.story_generator.generated_doc import GeneratedDocument
-from server.story_generator.review import Author, Verdict
+from server.story_generator.review import Asked
 from server.story_generator.stage import Stage
 from server.story_generator.stages.choices import Choices
 from server.story_generator.stages.concepts import Concepts, ConceptTitles
@@ -42,9 +41,8 @@ from server.story_generator.stages.validity import Validity
 
 
 class Workflow:
-    def __init__(self, path: Path, model: CompletingModel, author: Author) -> None:
-        self._path = path
-        self._author = author
+    def __init__(self, path: Path, model: CompletingModel) -> None:
+        self.path = path
         self.stages: dict[str, Stage] = {
             "concept titles": ConceptTitles(),
             "concepts": Concepts(model),
@@ -62,31 +60,33 @@ class Workflow:
         stages_done = dict(self._document.stages)
         return stages_done
 
-    async def run(self) -> None:
-        """Runs every stage not finished yet, in order, until the last is finished
-        or the author stops in one."""
+    def next_stage(self) -> str | None:
+        self._document.load()
+        stage_name = self._document.next_stage()
+        return stage_name
+
+    async def run(self, stage_name: str) -> Asked:
+        logger = logging.getLogger(__name__)
+        logger.info("%s started", stage_name)
+
+        self._document.load()
+        document = self._document.document
+        stage = self.stages[stage_name]
+        steps = stage.run(document)
+        for step in with_progress(steps, stage_name):
+            document = await step(document)
+
+        stage_names = list(self.stages)
+        number = stage_names.index(stage_name) + 1
+        shown = stage.shown()
+        asked = Asked(number, document.text, shown)
+        return asked
+
+    def accept(self, stage_name: str, story: str) -> None:
         logger = logging.getLogger(__name__)
 
         self._document.load()
-
-        stage_name = self._document.next_stage()
-        while stage_name:
-            stage = self.stages[stage_name]
-            logger.info("%s started", stage_name)
-
-            document = self._document.document
-            steps = stage.run(document)
-            for step in with_progress(steps, stage_name):
-                document = await step(document)
-
-            shown = stage.shown()
-            answer = await self._author.review(document, shown)
-            if answer.verdict == Verdict.STOP:
-                logger.info("%s stopped", stage_name)
-                return
-
-            self._document.document = Document(answer.story, self._path)
-            self._document.mark_stage_done(stage_name)
-            self._document.save()
-            logger.info("%s finished", stage_name)
-            stage_name = self._document.next_stage()
+        self._document.document = Document(story, self.path)
+        self._document.mark_stage_done(stage_name)
+        self._document.save()
+        logger.info("%s finished", stage_name)

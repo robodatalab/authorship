@@ -16,7 +16,8 @@ from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
 from server.story_generator.generated_doc import stages_done_in_the_checkpoint
 from server.story_generator.job import StoryGenerationJob
-from server.story_generator.review import Answer, Verdict
+from server.story_generator.review import Verdict
+from server.story_generator.workflow import Workflow
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
@@ -253,9 +254,20 @@ class StoryGenerationRequest(BaseModel):
 def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
     """Start generating the story with its author; poll /generate/story/status for
     what it asks them, and answer at /generate/story/answer."""
-    job = StoryGenerationJob(_deployed("writing_model"), Path(request.path))
+    path = Path(request.path)
+    model = _deployed("writing_model")
+    workflow = Workflow(path, model)
+    _run_the_next_stage(workflow)
+    story_generation_id = str(path)
+    return {"id": story_generation_id}
+
+
+def _run_the_next_stage(workflow: Workflow) -> None:
+    stage_name = workflow.next_stage()
+    if stage_name is None:
+        return
+    job = StoryGenerationJob(workflow, stage_name)
     app.state.jobs.start(job)
-    return {"id": job.target}
 
 
 def _story_generation(path: str) -> StoryGenerationJob:
@@ -282,7 +294,7 @@ def generate_story_status(id: str) -> dict[str, Any]:
             "stages": stages_left_off,
             "asked": None,
         }
-    asked = job.author.asked
+    asked = job.asked
     stages_done = job.workflow.stages_done()
     stages = [{"name": name, "done": done} for name, done in stages_done.items()]
     return {
@@ -306,9 +318,13 @@ class StoryGenerationAnswer(BaseModel):
 @app.post("/generate/story/answer")
 def answer_story_generation(request: StoryGenerationAnswer) -> dict[str, Any]:
     job = _story_generation(request.path)
+    if job.asked is None:
+        raise HTTPException(status_code=409, detail=f"The story generation of {request.path} asks nothing")
+    app.state.jobs.forget(job.target)
     verdict = Verdict(request.verdict)
-    answer = Answer(verdict, request.story)
-    job.author.answer(answer)
+    if verdict == Verdict.ACCEPT:
+        job.workflow.accept(job.stage_name, request.story)
+        _run_the_next_stage(job.workflow)
     return {}
 
 

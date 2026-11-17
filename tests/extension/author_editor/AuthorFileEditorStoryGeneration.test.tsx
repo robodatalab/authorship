@@ -8,7 +8,7 @@ import type { StoryGeneration } from "../../../extension/vscode_runtime/story_ge
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
-    running: true,
+    running: false,
     error: null,
     progress: { steps: [{ doing: "concept titles", done: 0, of: 0, state: "done", steps: [] }] },
     stages: [
@@ -28,7 +28,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 };
 
 const ASKS_FOR_A_REVIEW: StoryGeneration = {
-    running: true,
+    running: false,
     error: null,
     progress: { steps: [{ doing: "concepts", done: 1, of: 1, state: "done", steps: [] }] },
     stages: [

@@ -68,21 +68,21 @@ export function AuthorFileEditorStoryGeneration({
     }
 
     function whatTheStageDoes(): string {
-        if (!running) {
+        if (asked === null) {
             return "left off here";
         }
-        if (asked !== null && asked.shown.kind === "command") {
+        if (asked.shown.kind === "command") {
             return "use the highlighted button, then continue";
         }
         return "review it, edit what you like, then accept";
     }
 
     const stageDoes = whatTheStageDoes();
-    const stateOfTheStageAt = !running
-        ? "left-off"
-        : asked === null
-          ? "working"
-          : "asking";
+    const stateOfTheStageAt = running
+        ? "working"
+        : asked !== null
+          ? "asking"
+          : "left-off";
 
     return (
         <div className="author-file-editor-story-generation">
@@ -126,7 +126,7 @@ export function AuthorFileEditorStoryGeneration({
                             />
                         </div>
                     )}
-                    {!running && (
+                    {stateOfTheStageAt === "left-off" && (
                         <button
                             type="button"
                             className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"

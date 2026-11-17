@@ -43,31 +43,16 @@ function leftOff(storyGeneration: StoryGeneration): StoryGeneration | null {
 
 async function followTheStoryGeneration(
     session: AuthorFileEditorSession,
-    jobId: string,
+    path: string,
 ): Promise<void> {
-    // The question last brought into view: every one is acted on once,
-    // however many times the job is polled while it waits for the author.
-    let numberShown = 0;
     try {
         await awaitServerJob<StoryGeneration>(
             "/generate/story/status",
-            jobId,
-            (storyGeneration) => {
-                const asked = storyGeneration.asked;
-                if (asked !== null && asked.number !== numberShown) {
-                    numberShown = asked.number;
-                    showWhatTheStoryGenerationAsks(session, asked);
-                }
-                session.showTheStoryGeneration(storyGeneration);
-            },
+            path,
+            (storyGeneration) => session.showTheStoryGeneration(storyGeneration),
         );
     } catch (failure) {
         showTheFailureToGenerate(failure);
-    } finally {
-        // A story shown for review and not accepted gives way to the story
-        // as the generation saved it.
-        await session.readTheDocumentBackFromItsFile();
-        await showWhereTheStoryGenerationStands(session);
     }
 }
 
@@ -86,6 +71,15 @@ export async function showWhereTheStoryGenerationStands(
     }
     if (storyGeneration.running) {
         await followTheStoryGeneration(session, path);
+        if (session.isShownInItsEditor) {
+            await showWhereTheStoryGenerationStands(session);
+        }
+        return;
+    }
+    const asked = storyGeneration.asked;
+    if (asked !== null) {
+        showWhatTheStoryGenerationAsks(session, asked);
+        session.showTheStoryGeneration(storyGeneration);
         return;
     }
     const storyGenerationLeftOff = leftOff(storyGeneration);
@@ -99,16 +93,15 @@ export class GenerateStoryCommand implements AuthorDocumentCommand {
     readonly tooltip = "Generate the story with you, stage by stage";
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
-        let jobId: string;
         try {
             await session.writeTheDocumentToItsFile();
-            jobId = await startServerJob("/generate/story", {
+            await startServerJob("/generate/story", {
                 path: session.document.path,
             });
         } catch (failure) {
             showTheFailureToGenerate(failure);
             return;
         }
-        await followTheStoryGeneration(session, jobId);
+        await showWhereTheStoryGenerationStands(session);
     }
 }

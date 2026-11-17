@@ -1,32 +1,26 @@
-"""Generating a story with its author, as one of the server's jobs: the workflow,
-run on the story's file, for as long as the author works on it."""
+"""Generating a story with its author, as one of the server's jobs: a stage of the
+workflow, run on the story's file."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from cortexgrid_infer import CompletingModel
 from server.jobs import Job
-from server.story_generator.review import Author
+from server.story_generator.review import Asked
 from server.story_generator.workflow import Workflow
 
 
 class StoryGenerationJob(Job):
-    """The workflow, run on the story's file; what it asks the author is
-    `author.asked`, and the author answers through `author`; how far along it is
-    is `workflow.stages_done()`."""
+    """A stage of the workflow, run on the story's file; once it is done, what it
+    asks the author is `asked`; how far along the generation is is
+    `workflow.stages_done()`."""
 
     kind = "story"
 
-    def __init__(self, model: CompletingModel, path: Path) -> None:
-        super().__init__(str(path))
-        self.author = Author()
-        self.workflow = Workflow(path, model, self.author)
-
-    def cancel(self) -> None:
-        """A cancelled generation stops as the author stops it."""
-        super().cancel()
-        self.author.stop()
+    def __init__(self, workflow: Workflow, stage_name: str) -> None:
+        super().__init__(str(workflow.path))
+        self.workflow = workflow
+        self.stage_name = stage_name
+        self.asked: Asked | None = None
 
     async def execute(self) -> None:
-        await self.workflow.run()
+        asked = await self.workflow.run(self.stage_name)
+        self.asked = None if self.cancelled else asked

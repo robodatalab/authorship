@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { fetchFromServer } from "../server/fetch";
+import { showWhereTheStoryGenerationStands } from "./generate_story";
 
 // The author's answer to what the story generation asks, from the main menu: a
 // verdict, "accept" or "stop", and the story as the author leaves it.
@@ -26,6 +27,9 @@ export class AnswerTheStoryGenerationCommand implements AuthorDocumentCommand {
             void vscode.window.showErrorMessage(
                 `Cannot answer the story generation — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
             );
+            return;
         }
+        await session.readTheDocumentBackFromItsFile();
+        await showWhereTheStoryGenerationStands(session);
     }
 }

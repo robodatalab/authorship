@@ -74,6 +74,9 @@ class ParallelJobsManager:
     def get(self, target: str) -> Job | None:
         return self._by_target.get(target)
 
+    def forget(self, target: str) -> None:
+        self._by_target.pop(target, None)
+
     def is_running(self, target: str) -> bool:
         job = self.get(target)
         return job is not None and not job.done

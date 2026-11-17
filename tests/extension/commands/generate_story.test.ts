@@ -5,8 +5,9 @@ import {
     showWhereTheStoryGenerationStands,
 } from "../../../extension/vscode_runtime/commands/generate_story";
 import type { StoryGenerationShown } from "../../../extension/vscode_runtime/story_generation";
-import { executedCommands } from "../vscode";
+import { executedCommands, shownMessages } from "../vscode";
 import {
+    closeTheStoryEditor,
     forgetWhatTheEditorDid,
     openStory,
     sentToThePage,
@@ -19,14 +20,44 @@ const THE_STORY = `
 She saw the door.
 `;
 
-const THE_STORY_WITH_A_PLOT = `<!-- cell: markdown id="c1" -->
+const THE_STORY_REVIEWED = `<!-- cell: markdown id="c1" -->
 
-She saw the door.
-
-<!-- cell: plot title="The door" id="p1" -->
-
-She finds the door.
+She saw the door at last.
 `;
+
+const WRITES_THE_PLOTS = {
+    running: true,
+    cancelled: false,
+    error: null,
+    progress: {
+        steps: [{ doing: "plots", done: 3, of: 15, state: "running", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+    ],
+    asked: null,
+};
+
+const ASKS_FOR_A_REVIEW_OF_THE_PLOTS = {
+    running: false,
+    cancelled: false,
+    error: null,
+    progress: {
+        steps: [{ doing: "plots", done: 15, of: 15, state: "done", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+    ],
+    asked: {
+        number: 3,
+        story: THE_STORY_REVIEWED,
+        shown: { kind: "tab", cellKind: "plot" },
+    },
+};
 
 const LEFT_OFF_AT_THE_CONCEPTS = {
     running: false,
@@ -66,22 +97,8 @@ const NEVER_GENERATED = {
 beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
-describe("GenerateStoryCommand — runs the generation on the story's file", () => {
-    it("starts it on the file and shows what it asks in the main menu until it ends", async () => {
-        const asksForTheConcepts = {
-            running: true,
-            error: null,
-            progress: { steps: [{ doing: "concept titles", done: 0, of: 0 }] },
-            asked: {
-                number: 1,
-                story: THE_STORY_WITH_A_PLOT,
-                shown: {
-                    kind: "command",
-                    cellKind: "salient-concept",
-                    commandName: "addStoryAnnotation",
-                },
-            },
-        };
+describe("GenerateStoryCommand — runs the next stage of the generation on the story's file", () => {
+    it("starts it on the file, follows it, and shows what it asks once it is done", async () => {
         const fetched = vi
             .fn()
             .mockResolvedValueOnce({
@@ -90,15 +107,19 @@ describe("GenerateStoryCommand — runs the generation on the story's file", () 
             })
             .mockResolvedValueOnce({
                 ok: true,
-                json: () => Promise.resolve(asksForTheConcepts),
+                json: () => Promise.resolve(WRITES_THE_PLOTS),
             })
             .mockResolvedValueOnce({
                 ok: true,
-                json: () => Promise.resolve(GENERATED_TO_THE_END),
+                json: () => Promise.resolve(WRITES_THE_PLOTS),
             })
             .mockResolvedValueOnce({
                 ok: true,
-                json: () => Promise.resolve(GENERATED_TO_THE_END),
+                json: () => Promise.resolve(ASKS_FOR_A_REVIEW_OF_THE_PLOTS),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(ASKS_FOR_A_REVIEW_OF_THE_PLOTS),
             });
         vi.stubGlobal("fetch", fetched);
         const session = openStory(THE_STORY);
@@ -106,25 +127,51 @@ describe("GenerateStoryCommand — runs the generation on the story's file", () 
         await new GenerateStoryCommand().invoke(session);
 
         const [startedAt, started] = fetched.mock.calls[0];
-        const [polledAt] = fetched.mock.calls[1];
+        const [askedAt] = fetched.mock.calls[1];
         expect(startedAt).toContain("/generate/story");
         expect(JSON.parse(started.body)).toEqual({ path: STORY_FILE });
-        expect(polledAt).toContain(
+        expect(askedAt).toContain(
             "/generate/story/status?id=%2Fstories%2Fstory.author",
         );
         expect(sentToThePage).toContainEqual({
             type: "storyGeneration",
-            storyGeneration: asksForTheConcepts,
+            storyGeneration: WRITES_THE_PLOTS,
         });
-        expect(sentToThePage).toContainEqual({
-            type: "storyGeneration",
-            storyGeneration: null,
-        });
-        expect(session.theStoryGeneration).toBeNull();
+        expect(session.theStoryGeneration).toEqual(
+            ASKS_FOR_A_REVIEW_OF_THE_PLOTS,
+        );
+        expect(session.document.text).toBe(THE_STORY_REVIEWED);
+    });
+
+    it("shows the stage it left off at, if it stops before it is done", async () => {
+        const fetched = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ id: STORY_FILE }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(WRITES_THE_PLOTS),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
+            });
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(THE_STORY);
+
+        await new GenerateStoryCommand().invoke(session);
+
+        expect(session.theStoryGeneration).toEqual(LEFT_OFF_AT_THE_CONCEPTS);
     });
 });
 
-describe("GenerateStoryCommand — brings the part of authorship a stage worked in into view", () => {
+describe("showWhereTheStoryGenerationStands — brings the part of authorship a stage worked in into view", () => {
     it.each<{ shown: StoryGenerationShown; commandsExecuted: string[] }>([
         {
             shown: {
@@ -145,74 +192,28 @@ describe("GenerateStoryCommand — brings the part of authorship a stage worked 
     ])(
         "opens the Authorship panel only on a part of its own: $shown.kind",
         async ({ shown, commandsExecuted }) => {
-            const fetched = vi
-                .fn()
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve({ id: STORY_FILE }),
-                })
-                .mockResolvedValueOnce({
+            vi.stubGlobal(
+                "fetch",
+                vi.fn().mockResolvedValueOnce({
                     ok: true,
                     json: () =>
                         Promise.resolve({
-                            running: true,
-                            error: null,
-                            progress: {
-                                steps: [{ doing: "plots", done: 3, of: 3 }],
-                            },
+                            ...ASKS_FOR_A_REVIEW_OF_THE_PLOTS,
                             asked: {
-                                number: 1,
-                                story: THE_STORY_WITH_A_PLOT,
+                                number: 3,
+                                story: THE_STORY_REVIEWED,
                                 shown,
                             },
                         }),
-                })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve(GENERATED_TO_THE_END),
-                })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve(GENERATED_TO_THE_END),
-                });
-            vi.stubGlobal("fetch", fetched);
+                }),
+            );
             const session = openStory(THE_STORY);
 
-            await new GenerateStoryCommand().invoke(session);
+            await showWhereTheStoryGenerationStands(session);
 
             expect(executedCommands).toEqual(commandsExecuted);
         },
     );
-});
-
-
-describe("GenerateStoryCommand — leaves the generation where it stopped", () => {
-    it("shows the stage it left off at once it stops, for the author to resume", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ id: STORY_FILE }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
-            });
-        vi.stubGlobal("fetch", fetched);
-        const session = openStory(THE_STORY);
-
-        await new GenerateStoryCommand().invoke(session);
-
-        expect(session.theStoryGeneration).toEqual(LEFT_OFF_AT_THE_CONCEPTS);
-        expect(sentToThePage).toContainEqual({
-            type: "storyGeneration",
-            storyGeneration: LEFT_OFF_AT_THE_CONCEPTS,
-        });
-    });
 });
 
 describe("showWhereTheStoryGenerationStands — the generation of a story opened", () => {
@@ -247,6 +248,24 @@ describe("showWhereTheStoryGenerationStands — the generation of a story opened
         expect(session.theStoryGeneration).toEqual(LEFT_OFF_AT_THE_CONCEPTS);
     });
 
+    it("brings back the story a stage asks the author to review", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(ASKS_FOR_A_REVIEW_OF_THE_PLOTS),
+            }),
+        );
+        const session = openStory(THE_STORY);
+
+        await showWhereTheStoryGenerationStands(session);
+
+        expect(session.theStoryGeneration).toEqual(
+            ASKS_FOR_A_REVIEW_OF_THE_PLOTS,
+        );
+        expect(session.document.text).toBe(THE_STORY_REVIEWED);
+    });
+
     it.each([
         ["never generated", NEVER_GENERATED],
         ["generated to the end", GENERATED_TO_THE_END],
@@ -277,50 +296,26 @@ describe("showWhereTheStoryGenerationStands — the generation of a story opened
         expect(session.theStoryGeneration).toBeNull();
     });
 
-    it("follows a generation still running on the story's file until it stops", async () => {
-        const writesThePlots = {
-            running: true,
-            cancelled: false,
-            error: null,
-            progress: { steps: [{ doing: "plots", done: 3, of: 15 }] },
-            stages: [
-                { name: "concept titles", done: true },
-                { name: "concepts", done: true },
-                { name: "plots", done: false },
-            ],
-            asked: null,
-        };
-        const leftOffAtThePlots = {
-            running: false,
-            cancelled: false,
-            error: null,
-            progress: { steps: [] },
-            stages: [
-                { name: "concept titles", done: true },
-                { name: "concepts", done: true },
-                { name: "plots", done: false },
-            ],
-            asked: null,
-        };
+    it("follows a stage still running on the story's file until it stops", async () => {
         vi.stubGlobal(
             "fetch",
             vi
                 .fn()
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: () => Promise.resolve(writesThePlots),
+                    json: () => Promise.resolve(WRITES_THE_PLOTS),
                 })
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: () => Promise.resolve(writesThePlots),
+                    json: () => Promise.resolve(WRITES_THE_PLOTS),
                 })
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: () => Promise.resolve(leftOffAtThePlots),
+                    json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
                 })
                 .mockResolvedValueOnce({
                     ok: true,
-                    json: () => Promise.resolve(leftOffAtThePlots),
+                    json: () => Promise.resolve(LEFT_OFF_AT_THE_CONCEPTS),
                 }),
         );
         const session = openStory(THE_STORY);
@@ -329,8 +324,36 @@ describe("showWhereTheStoryGenerationStands — the generation of a story opened
 
         expect(sentToThePage).toContainEqual({
             type: "storyGeneration",
-            storyGeneration: writesThePlots,
+            storyGeneration: WRITES_THE_PLOTS,
         });
-        expect(session.theStoryGeneration).toEqual(leftOffAtThePlots);
+        expect(session.theStoryGeneration).toEqual(LEFT_OFF_AT_THE_CONCEPTS);
+    });
+
+    it("stops following once the story's editor is closed, without a word", async () => {
+        const fetched = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(WRITES_THE_PLOTS),
+            })
+            .mockImplementationOnce(() => {
+                closeTheStoryEditor();
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve(WRITES_THE_PLOTS),
+                });
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve(ASKS_FOR_A_REVIEW_OF_THE_PLOTS),
+            });
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(THE_STORY);
+
+        await showWhereTheStoryGenerationStands(session);
+
+        expect(fetched).toHaveBeenCalledTimes(3);
+        expect(shownMessages).toEqual([]);
+        expect(executedCommands).toEqual([]);
     });
 });
