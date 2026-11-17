@@ -23,6 +23,8 @@ import type { StoryGeneration } from "../../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { PART } from "authordoc/cells/part_cell";
+import { PLOT } from "authordoc/cells/plot_cell";
+import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
 import {
     StoryWordsIterator,
@@ -48,6 +50,15 @@ import "./AuthorFileEditorCanvas.css";
 const CELL_BUTTON_GROUP = "cell";
 const INSERT_BUTTON_GROUP = "insert";
 const PRIMARY_INSERT_MENU_GROUP = "primary";
+
+const MANUSCRIPT_TAB = "Manuscript";
+const METADATA_TAB = "Metadata";
+const AUTHOR_FILE_EDITOR_TABS = [MANUSCRIPT_TAB, METADATA_TAB];
+const KINDS_ON_THE_METADATA_TAB = new Set([PLOT, SALIENT_CONCEPT]);
+
+function tabHoldingTheKind(kind: string): string {
+    return KINDS_ON_THE_METADATA_TAB.has(kind) ? METADATA_TAB : MANUSCRIPT_TAB;
+}
 
 export interface WebviewAuthorDocumentCommandCard {
     readonly commandName: string;
@@ -288,6 +299,17 @@ export function AuthorFileEditorCanvas({
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [cellIdInView, setCellIdInView] = useState<string>();
+    const [tabShown, showTheTab] = useState(MANUSCRIPT_TAB);
+    const cellTypesOnTheTab = cellTypes.filter(
+        (cellType) => tabHoldingTheKind(cellType.cellKind) === tabShown,
+    );
+
+    useEffect(() => {
+        if (storyTextShown) {
+            showTheTab(MANUSCRIPT_TAB);
+        }
+    }, [storyTextShown]);
+
     const find = useAuthorFileEditorFind(
         findMatches,
         sendMessagesToVscode,
@@ -335,7 +357,7 @@ export function AuthorFileEditorCanvas({
             watching.observe(drawn);
         }
         return () => watching.disconnect();
-    }, [sections]);
+    }, [sections, tabShown]);
 
     function everyCellIsDrawnOn(
         command: WebviewAuthorDocumentCommandCard,
@@ -384,7 +406,7 @@ export function AuthorFileEditorCanvas({
         return (
             <AuthorFileEditorInsertCellMenu
                 insertCommand={insertCommand}
-                cellTypes={cellTypes}
+                cellTypes={cellTypesOnTheTab}
                 insertBeforeCellId={insertBeforeCellId}
                 sendMessagesToVscode={sendMessagesToVscode}
             />
@@ -396,6 +418,9 @@ export function AuthorFileEditorCanvas({
         whatFollowsTheScope: string | null,
         scopeClassName?: string,
     ): ReactNode {
+        const sectionsOnTheTab = sections.filter(
+            (section) => tabHoldingTheKind(section.cell.kind) === tabShown,
+        );
         return (
             <ul
                 className={scopeClassName}
@@ -403,7 +428,8 @@ export function AuthorFileEditorCanvas({
             >
                 <li>
                     {insertCellMenu(
-                        sections[0]?.cell.uniqueId ?? whatFollowsTheScope,
+                        sectionsOnTheTab[0]?.cell.uniqueId ??
+                            whatFollowsTheScope,
                     )}
                 </li>
                 {sections.map((section, sectionIndex) => {
@@ -411,6 +437,9 @@ export function AuthorFileEditorCanvas({
                     const whatFollowsTheSection =
                         sections[sectionIndex + 1]?.cell.uniqueId ??
                         whatFollowsTheScope;
+                    if (!sectionsOnTheTab.includes(section)) {
+                        return null;
+                    }
                     const cellDrawn = cell.accept<ReactNode>(cellRenderer);
                     if (cellDrawn === null) {
                         return null;
@@ -522,6 +551,20 @@ export function AuthorFileEditorCanvas({
                 commands={mainMenuCommands}
                 sendMessagesToVscode={sendMessagesToVscode}
             >
+                <div className="author-file-editor-tabs" role="tablist">
+                    {AUTHOR_FILE_EDITOR_TABS.map((tab) => (
+                        <button
+                            key={tab}
+                            type="button"
+                            role="tab"
+                            className="author-file-editor-tab"
+                            aria-selected={tab === tabShown}
+                            onClick={() => showTheTab(tab)}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
                 <AuthorFileEditorPartAndChapterInView
                     cells={cells}
                     cellIdInView={cellIdInView}
@@ -539,11 +582,13 @@ export function AuthorFileEditorCanvas({
                 }
             >
                 {cellsInScope(sections, null)}
-                <AuthorFileEditorOverviewRuler
-                    scrolledList={cellsOnThePage}
-                    marks={whatTheOverviewRulerShows.marks}
-                    arrows={whatTheOverviewRulerShows.arrows}
-                />
+                {tabShown === MANUSCRIPT_TAB && (
+                    <AuthorFileEditorOverviewRuler
+                        scrolledList={cellsOnThePage}
+                        marks={whatTheOverviewRulerShows.marks}
+                        arrows={whatTheOverviewRulerShows.arrows}
+                    />
+                )}
             </MarkdownEditorMediator>
         </div>
     );

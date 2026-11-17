@@ -1678,3 +1678,178 @@ describe("the plots the story weaves", () => {
         });
     });
 });
+
+describe("the manuscript and the metadata tabs", () => {
+    const DRAWN_BY_THEIR_IDS: CellDrawings = {
+        markdown: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        plot: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        "salient-concept": (cell) => (
+            <div className="test-cell">{cell.uniqueId}</div>
+        ),
+    };
+
+    function cellsDrawn(): (string | null)[] {
+        return [...document.querySelectorAll(".test-cell")].map(
+            (drawn) => drawn.textContent,
+        );
+    }
+
+    function tabs(): Element[] {
+        return [...document.querySelectorAll('[role="tab"]')];
+    }
+
+    it("draws the manuscript first", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                markdownCell("Twice", "m2"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        expect(cellsDrawn()).toEqual(["m1", "m2"]);
+    });
+
+    it.each([
+        ["Manuscript", ["m1", "m2"]],
+        ["Metadata", ["p1", "k1"]],
+    ])("draws the cells the %s tab holds once it is chosen", async (tabChosen, expected) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                markdownCell("Twice", "m2"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
+        await click(tab);
+
+        expect(cellsDrawn()).toEqual(expected);
+    });
+
+    it("marks the tab shown as selected", async () => {
+        await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+        await click(tabs()[1]);
+
+        expect(
+            tabs().map((tab) => [
+                tab.textContent,
+                tab.getAttribute("aria-selected"),
+            ]),
+        ).toEqual([
+            ["Manuscript", "false"],
+            ["Metadata", "true"],
+        ]);
+    });
+
+    it.each([
+        ["Manuscript", ["markdown", "chapter"]],
+        ["Metadata", ["plot", "salient-concept"]],
+    ])("offers the kinds the %s tab holds", async (tabChosen, expected) => {
+        await mountCanvas({
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("plot", "primary"),
+                cellType("chapter", "primary"),
+                cellType("salient-concept", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
+        await click(tab);
+
+        expect(
+            [...insertMenus()[0].querySelectorAll("button")].map(
+                (button) => button.textContent,
+            ),
+        ).toEqual(expected);
+    });
+
+    it.each([
+        [
+            "the manuscript",
+            "Manuscript",
+            ["m1", "m2", "p1"],
+        ],
+        [
+            "the metadata",
+            "Metadata",
+            ["p1", "k1", null],
+        ],
+    ])("inserts on %s tab before what follows each menu", async (_case, tabChosen, expected) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                markdownCell("Twice", "m2"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("plot", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
+        await click(tab);
+
+        for (const menu of insertMenus()) {
+            await click(menu.querySelector("button")!);
+        }
+
+        expect(
+            posted.map(
+                (invocation) => invocation.commandArguments.beforeCellId,
+            ),
+        ).toEqual(expected);
+    });
+
+    it("goes back to the manuscript when the host shows its words", async () => {
+        const cells = [
+            markdownCell("Once", "m1"),
+            new PlotCell("Bell", [], [], "", false, null, "p1"),
+        ];
+        document.body.innerHTML = "";
+        const container = document.createElement("div");
+        document.body.append(container);
+        const root = createRoot(container);
+        await act(async () => {
+            root.render(
+                <AuthorFileEditorCanvas
+                    cells={cells}
+                    commands={[INSERT_COMMAND]}
+                    cellTypes={[]}
+                    sendMessagesToVscode={() => undefined}
+                    cellRenderer={new CellsDrawnAs(DRAWN_BY_THEIR_IDS)}
+                />,
+            );
+        });
+        await click(tabs()[1]);
+
+        await act(async () => {
+            root.render(
+                <AuthorFileEditorCanvas
+                    cells={cells}
+                    commands={[INSERT_COMMAND]}
+                    cellTypes={[]}
+                    sendMessagesToVscode={() => undefined}
+                    cellRenderer={new CellsDrawnAs(DRAWN_BY_THEIR_IDS)}
+                    storyTextShown={{
+                        cellId: "m1",
+                        startCharacterOffsetInCell: 0,
+                        endCharacterOffsetInCell: 4,
+                    }}
+                />,
+            );
+        });
+
+        expect(cellsDrawn()).toEqual(["m1"]);
+    });
+});

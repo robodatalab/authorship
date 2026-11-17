@@ -174,3 +174,29 @@ body {
         var(--vscode-list-activeSelectionBackground)
     );
 }
+
+.author-file-editor-tabs {
+    display: flex;
+    gap: 2px;
+    margin-left: 6px;
+}
+
+.author-file-editor-tab {
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
+
+.author-file-editor-tab:hover {
+    color: var(--vscode-foreground);
+}
+
+.author-file-editor-tab[aria-selected="true"] {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder);
+}

@@ -25,7 +25,9 @@ import { AuthorFileEditorImageCell } from "../cell_types/AuthorFileEditorImageCe
 import { AuthorFileEditorMarkdownCell } from "../cell_types/AuthorFileEditorMarkdownCell";
 import { AuthorFileEditorNoteCell } from "../cell_types/AuthorFileEditorNoteCell";
 import { AuthorFileEditorPartCell } from "../cell_types/AuthorFileEditorPartCell";
+import { AuthorFileEditorPlotCell } from "../cell_types/AuthorFileEditorPlotCell";
 import { AuthorFileEditorRecapCell } from "../cell_types/AuthorFileEditorRecapCell";
+import { AuthorFileEditorSalientConceptCell } from "../cell_types/AuthorFileEditorSalientConceptCell";
 import { AuthorFileEditorTableOfContentsCell } from "../cell_types/AuthorFileEditorTableOfContentsCell";
 import { AuthorFileEditorTitlePageCell } from "../cell_types/AuthorFileEditorTitlePageCell";
 
@@ -135,12 +137,22 @@ export class AuthorFileEditorCellRenderer implements CellVisitor<ReactNode> {
         );
     }
 
-    visitSalientConcept(_cell: SalientConceptCell): ReactNode {
-        return null;
+    visitSalientConcept(cell: SalientConceptCell): ReactNode {
+        return (
+            <AuthorFileEditorSalientConceptCell
+                cell={cell}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
     }
 
-    visitPlot(_cell: PlotCell): ReactNode {
-        return null;
+    visitPlot(cell: PlotCell): ReactNode {
+        return (
+            <AuthorFileEditorPlotCell
+                cell={cell}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
     }
 
     visitUnknown(_cell: UnknownCell): ReactNode {
