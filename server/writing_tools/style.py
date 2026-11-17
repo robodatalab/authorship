@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 
 from server.jobs import Job
@@ -135,19 +137,22 @@ def _opening(source: str) -> str:
 class StyleFixJob(Job):
     kind = "style fix"
 
-    def __init__(self, model: CompletingModel, document: Document) -> None:
-        super().__init__(str(document.path))
-        self._model = model
-        self._document = document
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, story: str) -> None:
+        super().__init__(str(path))
+        self._deployment = deployment
+        self._path = path
+        self._story = story
         self.sections: list[dict[str, Any]] = []
         self.fixed = 0
         self.to_fix = 0
         self.left_alone: list[dict[str, str]] = []
 
     async def execute(self) -> None:
+        model = self._deployment.client_async()
+        document = Document(self._story, self._path)
         await fix_style(
-            self._model,
-            self._document,
+            model,
+            document,
             lambda: self.cancelled,
             self._reached,
             self._revised,

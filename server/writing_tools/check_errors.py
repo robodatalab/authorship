@@ -7,6 +7,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import cortexgrid
 from cortexgrid_infer import RewritingModel
 
 from server.jobs import Job
@@ -62,31 +63,34 @@ class CheckErrorsJob(Job):
 
     def __init__(
         self,
-        model: RewritingModel,
-        document: Document,
+        deployment: cortexgrid.Deployment[RewritingModel],
+        path: Path,
+        story: str,
         selection: tuple[int, int] | None,
     ) -> None:
-        assert document.path is not None
-        super().__init__(_check_target(document.path, selection))
-        self._model = model
-        self._document = document
+        super().__init__(_check_target(path, selection))
+        self._deployment = deployment
+        self._path = path
+        self._story = story
         self._selection = selection
         self.findings: list[dict[str, Any]] = []
 
     async def execute(self) -> None:
-        start, end = self._selection or (0, len(self._document.lines) - 1)
+        model = self._deployment.client_async()
+        document = Document(self._story, self._path)
+        start, end = self._selection or (0, len(document.lines) - 1)
         crutches = (
-            prose_check.crutch_lemmas(list(StoryLinesIterator(self._document)))
+            prose_check.crutch_lemmas(list(StoryLinesIterator(document)))
             if self._selection is None
             else frozenset()
         )
         if self.cancelled:
             return
-        passage = list(StoryLinesIterator(self._document, start, end))
+        passage = list(StoryLinesIterator(document, start, end))
         by_the_rules = [
             error
             for finding in await asyncio.to_thread(prose_check.check, passage, crutches)
-            for error in _errors_of(self._document, finding)
+            for error in _errors_of(document, finding)
         ]
         self.findings = by_the_rules
         if self.cancelled:
@@ -94,9 +98,9 @@ class CheckErrorsJob(Job):
         self.findings = by_the_rules + [
             error
             for finding in await grammar_check.check(
-                self._model, passage, grammar_check.names_in(self._document.text)
+                model, passage, grammar_check.names_in(document.text)
             )
-            for error in _errors_of(self._document, finding)
+            for error in _errors_of(document, finding)
         ]
 
     def snapshot(self) -> dict[str, Any]:
