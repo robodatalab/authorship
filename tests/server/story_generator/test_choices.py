@@ -55,10 +55,12 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
             ]
         )
         self.model = Mock()
+        self.deployment = Mock()
+        self.deployment.client_async.return_value = self.model
         self.model.complete.return_value = streamed("1. Varn followed the water to her room.\n2. Dax raised his cup to the crowd.")
 
     async def test_ends_the_scene_with_a_choice_for_every_edge_leaving_it(self) -> None:
-        (where_they_meet,) = Choices(self.model).run(self.document)
+        (where_they_meet,) = Choices(self.deployment).run(self.document)
 
         with_the_choices = await where_they_meet(self.document)
 
@@ -67,7 +69,7 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(meeting.options, {"x1": "Varn followed the water to her room.", "x2": "Dax raised his cup to the crowd."})
 
     async def test_every_event_keeps_pointing_at_its_scene_once_the_choices_are_written(self) -> None:
-        (where_they_meet,) = Choices(self.model).run(self.document)
+        (where_they_meet,) = Choices(self.deployment).run(self.document)
 
         with_the_choices = await where_they_meet(self.document)
 
@@ -81,7 +83,7 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
     async def test_asks_for_the_choices_of_a_scene_at_once(self) -> None:
-        (where_they_meet,) = Choices(self.model).run(self.document)
+        (where_they_meet,) = Choices(self.deployment).run(self.document)
 
         await where_they_meet(self.document)
 

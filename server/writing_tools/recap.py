@@ -27,7 +27,6 @@ Return the summary that combines the overall text, without adding any tokens.
 async def write_recap(
     model: CompletingModel,
     documents: list[Document],
-    cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda read, chapters: None,
 ) -> str:
     chapters = [
@@ -41,9 +40,6 @@ async def write_recap(
     running_summary = ""
     progress(0, len(chapters))
     for read, prose in enumerate(chapters, start=1):
-        if cancelled():
-            return ""
-
         to_summarize = f"<summary_so_far>\n{running_summary}\n</sumary_so_far><new_part>\n{prose}\n</new_part>"
 
         new_running_summary = "".join(
@@ -62,9 +58,6 @@ async def write_recap(
         running_summary = new_running_summary
         progress(read, len(chapters))
 
-    if cancelled():
-        return ""
-    
     return running_summary.strip()
 
 

@@ -3,7 +3,6 @@ from pathlib import Path
 import tempfile
 import asyncio
 import threading
-import time
 import unittest
 import zipfile
 from unittest import mock
@@ -13,6 +12,7 @@ from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
 from server.api import app, ParallelJobsManager
+from server.jobs import Job
 from authordoc.storydoc import Document
 from authordoc import storydoc
 from authordoc.cells.about_cell import ABOUT, AboutCell
@@ -41,6 +41,12 @@ def build_fake_completion_model(reply: str = DEFAULT_REPLY) -> mock.MagicMock:
     model = mock.MagicMock()
     model.complete.side_effect = lambda messages, **_: streamed(reply)
     return model
+
+
+def build_fake_deployment(model: mock.MagicMock) -> mock.MagicMock:
+    deployment = mock.MagicMock()
+    deployment.client_async.return_value = model
+    return deployment
 
 
 class Health(unittest.TestCase):
@@ -81,7 +87,7 @@ class Models(unittest.TestCase):
 
 class RequestBeforeTheModelsAreDeployed(unittest.TestCase):
     def test_is_told_the_models_are_still_being_deployed(self) -> None:
-        app.state.causal_model = None
+        app.state.causal_deployment = None
 
         response = TestClient(app).post(
             "/generate/blurb", json={"path": "manuscript.author", "text": ""}
@@ -93,131 +99,33 @@ class RequestBeforeTheModelsAreDeployed(unittest.TestCase):
         )
 
 
-def wait_for_writing(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
-    """The finished answer of whichever section is being written for a document."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = client.get("/generate/status", params={"id": job_id})
-        if response.status_code == 200 and not response.json()["running"]:
-            return response.json()
-        time.sleep(0.005)
-    raise AssertionError(f"writing job {job_id} did not finish within {timeout}s")
+def run_the_job_started() -> Job:
+    job = app.state.jobs.start.call_args.args[0]
+    executing = job.execute()
+    asyncio.run(executing)
+    return job
 
 
 class Jobs(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
-        self._dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._dir.cleanup)
-        self.manuscript = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        self.written = Document.from_cells(
-            [
-                ChapterCell("One"),
-                MarkdownCell("The lantern had gone out."),
-                BlurbCell(),
-            ]
-        ).text
-        self.manuscript.write_text(self.written, encoding="utf-8")
+        app.state.jobs = mock.create_autospec(ParallelJobsManager, instance=True)
 
-        def _restore_model():
-            app.state.causal_model = None
-
-        self.addCleanup(_restore_model)
-        app.state.jobs = ParallelJobsManager()
-
-    def test_lists_the_work_in_flight_and_drops_it_once_finished(self) -> None:
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
-            entered.release()
-            await asyncio.to_thread(release.wait, 5)
-            yield CompletionChunk(content="the cat.")
-
-        model = build_fake_completion_model()
-        model.complete.side_effect = complete
-        app.state.causal_model = model
-        client = TestClient(app)
-
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.manuscript), "text": self.written},
+    def test_stops_the_job_on_the_file_it_is_asked_to(self) -> None:
+        response = TestClient(app).post(
+            "/jobs/cancel", json={"path": "/stories/story.author"}
         )
-        self.assertTrue(entered.acquire(timeout=5))
 
-        response = client.get("/jobs")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "jobs": [
-                    {
-                        "kind": "blurb",
-                        "path": str(self.manuscript),
-                        "status": "running",
-                        "cancelled": False,
-                    }
-                ]
-            },
-        )
-
-        release.set()
-        wait_for_writing(client, started.json()["id"])
-        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
-
-    def test_any_job_can_be_stopped_and_says_so_while_it_finishes(self) -> None:
-        # Cancelling belongs to the jobs framework rather than to any one tool,
-        # so what is watched here is a job being stopped rather than a blurb.
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
-            entered.release()
-            await asyncio.to_thread(release.wait, 5)
-            yield CompletionChunk(content="the cat.")
-
-        model = build_fake_completion_model()
-        model.complete.side_effect = complete
-        app.state.causal_model = model
-        client = TestClient(app)
-
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.manuscript), "text": self.written},
-        )
-        self.assertTrue(entered.acquire(timeout=5))
-
-        cancelled = client.post(
-            "/jobs/cancel", json={"path": str(self.manuscript)}
-        )
-        self.assertEqual(cancelled.status_code, 200)
-
-        # Told and finished are not the same moment: it is still working on the
-        # paragraph it had in hand when the button was pressed.
-        self.assertEqual(
-            client.get("/jobs").json(),
-            {
-                "jobs": [
-                    {
-                        "kind": "blurb",
-                        "path": str(self.manuscript),
-                        "status": "running",
-                        "cancelled": True,
-                    }
-                ]
-            },
-        )
-
-        release.set()
-        status = wait_for_writing(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
+        app.state.jobs.cancel.assert_called_once_with("/stories/story.author")
 
     def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/jobs/cancel", json={"path": str(self.manuscript)}
+        app.state.jobs.get.return_value = None
+
+        response = TestClient(app).post(
+            "/jobs/cancel", json={"path": "/stories/story.author"}
         )
+
         self.assertEqual(response.status_code, 404)
 
 
@@ -240,50 +148,46 @@ class GenerateBlurb(unittest.TestCase):
         self.document.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
-            app.state.causal_model = None
+            app.state.causal_deployment = None
 
         self.addCleanup(_restore_model)
 
-        app.state.causal_model = build_fake_completion_model(
+        self.model = build_fake_completion_model(
             reply="A woman loses her name."
         )
-        app.state.jobs = ParallelJobsManager()
+        app.state.causal_deployment = build_fake_deployment(self.model)
+        app.state.jobs = mock.create_autospec(ParallelJobsManager, instance=True)
 
     def test_runs_as_a_job_and_hands_the_blurb_back(self) -> None:
-        client = TestClient(app)
-        started = client.post(
+        started = TestClient(app).post(
             "/generate/blurb",
             json={"path": str(self.document), "text": self.document.read_text()},
         )
-        self.assertEqual(started.status_code, 202)
+        job = run_the_job_started()
 
-        status = wait_for_writing(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(status["text"], "A woman loses her name.")
-        self.assertEqual(status["kind"], BLURB)
-        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+        self.assertEqual(started.status_code, 202)
+        self.assertEqual(
+            job.snapshot(),
+            {
+                "kind": BLURB,
+                "text": "A woman loses her name.",
+                "progress": {"written": 2, "chapters": 2},
+            },
+        )
 
     def test_leaves_the_document_alone(self) -> None:
         # The blurb comes back for the editor to place; a job that wrote it into
         # the file would be writing a cell the editor owns.
-        client = TestClient(app)
-        started = client.post(
+        TestClient(app).post(
             "/generate/blurb",
             json={"path": str(self.document), "text": self.document.read_text()},
         )
-        wait_for_writing(client, started.json()["id"])
+        run_the_job_started()
+
         self.assertEqual(self.document.read_text(), self.written)
 
-    def test_is_dropped_from_the_work_in_hand_once_it_has_finished(self) -> None:
-        client = TestClient(app)
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        wait_for_writing(client, started.json()["id"])
-        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
-
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
+        app.state.jobs.get.return_value = None
         client = TestClient(app)
         response = client.get("/generate/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
@@ -299,103 +203,22 @@ class GenerateBlurb(unittest.TestCase):
             await asyncio.to_thread(release.wait, 5)
             yield CompletionChunk(content="A woman loses her name.")
 
-        app.state.causal_model.complete.side_effect = complete
-        client = TestClient(app)
-
-        started = client.post(
+        self.model.complete.side_effect = complete
+        TestClient(app).post(
             "/generate/blurb",
             json={"path": str(self.document), "text": self.document.read_text()},
         )
+        job = app.state.jobs.start.call_args.args[0]
+        executing = job.execute()
+        running = threading.Thread(target=asyncio.run, args=(executing,))
+        running.start()
         self.assertTrue(entered.acquire(timeout=5))
 
-        status = client.get(
-            "/generate/status", params={"id": started.json()["id"]}
-        )
-        self.assertTrue(status.json()["running"])
-        self.assertEqual(status.json()["progress"], {"written": 0, "chapters": 2})
+        self.assertEqual(job.snapshot()["progress"], {"written": 0, "chapters": 2})
 
         release.set()
-        self.assertEqual(
-            wait_for_writing(client, started.json()["id"])["progress"],
-            {"written": 2, "chapters": 2},
-        )
-
-    def test_stopping_it_leaves_the_blurb_unwritten(self) -> None:
-        # Stopping has to reach the job itself: a client that merely stopped
-        # asking would leave the model reading the rest of the book.
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
-            entered.release()
-            await asyncio.to_thread(release.wait, 5)
-            yield CompletionChunk(content="A woman loses her name.")
-
-        app.state.causal_model.complete.side_effect = complete
-        client = TestClient(app)
-
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        self.assertTrue(entered.acquire(timeout=5))
-
-        cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
-        self.assertEqual(cancelled.status_code, 200)
-        release.set()
-
-        status = wait_for_writing(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(status["text"], "")
-        # The second chapter was never read: stopping is what it did, not merely
-        # what it was told.
-        self.assertEqual(app.state.causal_model.complete.call_count, 1)
-        self.assertEqual(status["progress"], {"written": 1, "chapters": 2})
-        self.assertEqual(client.get("/jobs").json(), {"jobs": []})
-
-    def test_stopping_it_leaves_the_document_as_the_author_left_it(self) -> None:
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
-            entered.release()
-            await asyncio.to_thread(release.wait, 5)
-            yield CompletionChunk(content="A woman loses her name.")
-
-        app.state.causal_model.complete.side_effect = complete
-        client = TestClient(app)
-
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        self.assertTrue(entered.acquire(timeout=5))
-        client.post("/jobs/cancel", json={"path": str(self.document)})
-        release.set()
-        wait_for_writing(client, started.json()["id"])
-
-        self.assertEqual(self.document.read_text(), self.written)
-
-    def test_stopping_a_job_nobody_started_is_a_miss(self) -> None:
-        client = TestClient(app)
-        response = client.post(
-            "/jobs/cancel",
-            json={"path": str(self.document.with_name("nope.author"))},
-        )
-        self.assertEqual(response.status_code, 404)
-
-    def test_stopping_one_that_has_already_finished_is_no_failure(self) -> None:
-        # The click and the last chapter can land in either order, and an author
-        # who pressed stop wanted a job that is not running.
-        client = TestClient(app)
-        started = client.post(
-            "/generate/blurb",
-            json={"path": str(self.document), "text": self.document.read_text()},
-        )
-        wait_for_writing(client, started.json()["id"])
-
-        cancelled = client.post("/jobs/cancel", json={"path": str(self.document)})
-        self.assertEqual(cancelled.status_code, 200)
+        running.join(5)
+        self.assertEqual(job.snapshot()["progress"], {"written": 2, "chapters": 2})
 
 
 class GenerateRecap(unittest.TestCase):
@@ -436,14 +259,15 @@ class GenerateRecap(unittest.TestCase):
             ).save()
 
         def _restore_model():
-            app.state.causal_model = None
+            app.state.causal_deployment = None
 
         self.addCleanup(_restore_model)
 
-        app.state.causal_model = build_fake_completion_model(
+        self.model = build_fake_completion_model(
             reply="She has lost her name."
         )
-        app.state.jobs = ParallelJobsManager()
+        app.state.causal_deployment = build_fake_deployment(self.model)
+        app.state.jobs = mock.create_autospec(ParallelJobsManager, instance=True)
 
     def start(self, *documents: str):
         return TestClient(app).post(
@@ -456,39 +280,38 @@ class GenerateRecap(unittest.TestCase):
         )
 
     def test_runs_as_a_job_and_hands_the_story_so_far_back(self) -> None:
-        client = TestClient(app)
         started = self.start("a.author", "b.author")
-        self.assertEqual(started.status_code, 202)
+        job = run_the_job_started()
 
-        status = wait_for_writing(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(status["text"], "She has lost her name.")
-        self.assertEqual(status["kind"], RECAP)
-        self.assertEqual(status["progress"], {"written": 2, "chapters": 2})
+        self.assertEqual(started.status_code, 202)
+        self.assertEqual(
+            job.snapshot(),
+            {
+                "kind": RECAP,
+                "text": "She has lost her name.",
+                "progress": {"written": 2, "chapters": 2},
+            },
+        )
 
     def test_says_which_section_is_being_written(self) -> None:
         # A document may hold a blurb and a story so far, and only one of them
         # asked — so the editor is told which cell the answer belongs in.
-        client = TestClient(app)
-        started = self.start("a.author")
-        self.assertEqual(
-            wait_for_writing(client, started.json()["id"])["kind"], RECAP
-        )
+        self.start("a.author")
+        job = run_the_job_started()
+        self.assertEqual(job.snapshot()["kind"], RECAP)
 
     def test_the_documents_are_named_beside_the_one_that_asks(self) -> None:
         # A relative path is what the section carries, so the story survives being
         # moved, checked out somewhere else, or written on another machine.
-        client = TestClient(app)
-        started = self.start("a.author")
-        wait_for_writing(client, started.json()["id"])
-        said = app.state.causal_model.complete.call_args_list[0].args[0][1]["content"]
+        self.start("a.author")
+        run_the_job_started()
+        said = self.model.complete.call_args_list[0].args[0][1]["content"]
         self.assertIn("The lantern had gone out.", said)
 
     def test_leaves_every_document_alone(self) -> None:
         # The recap comes back for the editor to place, exactly as a blurb does.
-        client = TestClient(app)
-        started = self.start("a.author", "b.author")
-        wait_for_writing(client, started.json()["id"])
+        self.start("a.author", "b.author")
+        run_the_job_started()
         self.assertEqual(self.document.read_text(), self.written)
 
     def test_a_section_naming_no_documents_is_a_bad_request(self) -> None:
@@ -498,31 +321,6 @@ class GenerateRecap(unittest.TestCase):
     def test_a_document_that_is_not_there_is_a_bad_request(self) -> None:
         # Said before the model is loaded rather than a minute into the reading.
         self.assertEqual(self.start("a.author", "gone.author").status_code, 400)
-
-    def test_stopping_it_leaves_the_story_so_far_unwritten(self) -> None:
-        entered = threading.Semaphore(0)
-        release = threading.Event()
-
-        async def complete(*_args, **_kwargs) -> AsyncIterator[CompletionChunk]:
-            entered.release()
-            await asyncio.to_thread(release.wait, 5)
-            yield CompletionChunk(content="She has lost her name.")
-
-        app.state.causal_model.complete.side_effect = complete
-        client = TestClient(app)
-
-        started = self.start("a.author", "b.author")
-        self.assertTrue(entered.acquire(timeout=5))
-        self.assertEqual(
-            client.post("/jobs/cancel", json={"path": str(self.document)}).status_code,
-            200,
-        )
-        release.set()
-
-        status = wait_for_writing(client, started.json()["id"])
-        self.assertIsNone(status["error"])
-        self.assertEqual(status["text"], "")
-        self.assertEqual(app.state.causal_model.complete.call_count, 1)
 
 
 class ExportEpub(unittest.TestCase):
@@ -627,16 +425,6 @@ class ExportEpub(unittest.TestCase):
 CORRECTED = "The door had swung open."
 
 
-def wait_for_style(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = client.get("/fix/style/status", params={"id": job_id})
-        if response.status_code == 200 and not response.json()["running"]:
-            return response.json()
-        time.sleep(0.005)
-    raise AssertionError(f"style job {job_id} did not finish within {timeout}s")
-
-
 class FixStyle(unittest.TestCase):
     """The pass over the manuscript, against a model stood in for here.
 
@@ -659,38 +447,36 @@ class FixStyle(unittest.TestCase):
             ]
         ).text
         self.document.write_text(self.written, encoding="utf-8")
-        app.state.jobs = ParallelJobsManager()
+        app.state.jobs = mock.create_autospec(ParallelJobsManager, instance=True)
 
         # About as long as the sections it replaces, and ending where a sentence
         # ends. A stub any shorter is refused by the checks that keep a chapter
         # cut off mid-answer out of the document, which is as it should be.
         self.model = build_fake_completion_model(CORRECTED)
-        app.state.style_model = self.model
+        app.state.style_deployment = build_fake_deployment(self.model)
 
-    def start(self, **asked: object) -> dict:
-        client = TestClient(app)
-        started = client.post(
+    def start(self) -> Job:
+        started = TestClient(app).post(
             "/fix/style",
-            json={
-                "path": str(self.document),
-                "text": self.document.read_text(),
-                **asked,
-            },
+            json={"path": str(self.document), "text": self.document.read_text()},
         )
         self.assertEqual(started.status_code, 202)
-        return wait_for_style(client, started.json()["id"])
+        job = run_the_job_started()
+        return job
 
     def test_hands_back_each_corrected_section_by_the_cell_it_belongs_to(self) -> None:
-        status = self.start()
-        self.assertIsNone(status["error"])
+        job = self.start()
         self.assertEqual(
-            status["sections"],
-            [
-                {"cellId": "lantern", "source": CORRECTED},
-                {"cellId": "door", "source": CORRECTED},
-            ],
+            job.snapshot(),
+            {
+                "leftAlone": [],
+                "sections": [
+                    {"cellId": "lantern", "source": CORRECTED},
+                    {"cellId": "door", "source": CORRECTED},
+                ],
+                "progress": {"fixed": 2, "sections": 2},
+            },
         )
-        self.assertEqual(status["progress"], {"fixed": 2, "sections": 2})
 
     def test_leaves_the_document_alone(self) -> None:
         self.start()
@@ -702,13 +488,14 @@ class FixStyle(unittest.TestCase):
         # had needed nothing. The editor is told so it can say so.
         answers = iter(['She reached for it and said, "Come closer', CORRECTED])
         self.model.complete.side_effect = lambda messages, **_: streamed(next(answers))
-        status = self.start()
-        self.assertEqual(status["sections"], [{"cellId": "door", "source": CORRECTED}])
-        self.assertEqual(len(status["leftAlone"]), 1)
-        self.assertEqual(status["leftAlone"][0]["opening"], "The lantern had gone out.")
-        self.assertIn("mid-sentence", status["leftAlone"][0]["why"])
+        snapshot = self.start().snapshot()
+        self.assertEqual(snapshot["sections"], [{"cellId": "door", "source": CORRECTED}])
+        self.assertEqual(len(snapshot["leftAlone"]), 1)
+        self.assertEqual(snapshot["leftAlone"][0]["opening"], "The lantern had gone out.")
+        self.assertIn("mid-sentence", snapshot["leftAlone"][0]["why"])
 
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
+        app.state.jobs.get.return_value = None
         client = TestClient(app)
         response = client.get("/fix/style/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
@@ -719,58 +506,87 @@ class FixStyle(unittest.TestCase):
         self.document.write_text(
             Document.from_cells([ChapterCell("One")]).text, encoding="utf-8"
         )
-        status = self.start()
-        self.assertIn("no prose", status["error"])
+        with self.assertRaisesRegex(ValueError, "no prose"):
+            self.start()
 
 
 if __name__ == "__main__":
     unittest.main()
 
 
-class StoryGenerationStatus(unittest.TestCase):
+class StoryGenerationStage(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
-        self._dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._dir.cleanup)
-        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        app.state.jobs = ParallelJobsManager()
+        self.document = Path("/stories/story.author")
+        app.state.jobs = mock.create_autospec(ParallelJobsManager, instance=True)
 
-    def test_a_story_no_generation_runs_on_stands_where_its_checkpoint_left_it(self) -> None:
-        self.document.write_text(
-            '<!-- cell: GeneratedDocumentCheckpoint id="k1" -->\n\n'
-            "stage: concept titles: True\n"
-            "stage: concepts: False\n",
-            encoding="utf-8",
+        def _restore_model():
+            app.state.writing_deployment = None
+
+        self.addCleanup(_restore_model)
+
+    def test_runs_the_stage_it_is_given_and_asks_the_author_to_review_it(self) -> None:
+        model = build_fake_completion_model()
+        app.state.writing_deployment = build_fake_deployment(model)
+
+        started = TestClient(app).post(
+            "/generate/story",
+            json={"path": str(self.document), "story": "", "stage": "concept titles"},
         )
+        job = run_the_job_started()
 
-        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
-
+        self.assertEqual(started.status_code, 202)
         self.assertEqual(
-            response.json(),
+            job.snapshot()["asked"],
             {
-                "running": False,
-                "cancelled": False,
-                "error": None,
-                "progress": {
-                    "doing": "story",
-                    "done": 0,
-                    "of": None,
-                    "seconds": 0.0,
-                    "secondsPerItem": None,
-                    "state": "waiting",
-                    "steps": [],
+                "stage": "concept titles",
+                "story": "",
+                "shown": {
+                    "kind": "command",
+                    "cellKind": "salient-concept",
+                    "commandName": "addStoryAnnotation",
                 },
-                "stages": [
-                    {"name": "concept titles", "done": True},
-                    {"name": "concepts", "done": False},
-                ],
-                "asked": None,
             },
         )
 
-    def test_a_story_never_generated_has_no_stages(self) -> None:
-        self.document.write_text('<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n', encoding="utf-8")
+    def test_runs_the_stage_on_the_story_the_editor_sends(self) -> None:
+        model = build_fake_completion_model("### Motherhood\nA mother's care.")
+        app.state.writing_deployment = build_fake_deployment(model)
+
+        TestClient(app).post(
+            "/generate/story",
+            json={
+                "path": str(self.document),
+                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n',
+                "stage": "concepts",
+            },
+        )
+        job = run_the_job_started()
+
+        self.assertEqual(
+            job.snapshot()["asked"],
+            {
+                "stage": "concepts",
+                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+                "A mother's care.\n",
+                "shown": {"kind": "tab", "cellKind": "salient-concept"},
+            },
+        )
+
+    def test_a_stage_it_does_not_know_is_refused(self) -> None:
+        model = build_fake_completion_model()
+        app.state.writing_deployment = build_fake_deployment(model)
+
+        response = TestClient(app).post(
+            "/generate/story",
+            json={"path": str(self.document), "story": "", "stage": "epilogue"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_story_no_stage_ran_on_has_no_story_generation(self) -> None:
+        app.state.jobs.get.return_value = None
 
         response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
 
-        self.assertEqual(response.json()["stages"], [])
+        self.assertEqual(response.status_code, 404)

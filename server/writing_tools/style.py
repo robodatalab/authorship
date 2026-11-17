@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 
 from server.jobs import Job
@@ -39,7 +41,6 @@ FIX_REQUEST = "Fix the writing style and the grammar in the following section."
 async def fix_style(
     model: CompletingModel,
     document: Document,
-    cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, sections: None,
     revised: Callable[[str, str], None] = lambda cell_id, source: None,
     left_alone: Callable[[str, str], None] = lambda opening, why: None,
@@ -51,11 +52,7 @@ async def fix_style(
     corrected: list[str] = []
     progress(0, len(sections))
     for fixed, section in enumerate(sections, start=1):
-        if cancelled():
-            return
         fix, why = await _corrected(model, corrected, section)
-        if cancelled():
-            return
         if why:
             left_alone(_opening(section.source), why)
         corrected.append(section.source if fix is None else fix)
@@ -135,24 +132,35 @@ def _opening(source: str) -> str:
 class StyleFixJob(Job):
     kind = "style fix"
 
-    def __init__(self, model: CompletingModel, document: Document) -> None:
-        super().__init__(str(document.path))
-        self._model = model
-        self._document = document
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, story: str) -> None:
+        super().__init__(str(path))
+        self._deployment = deployment
+        self._path = path
+        self._story = story
         self.sections: list[dict[str, Any]] = []
         self.fixed = 0
         self.to_fix = 0
         self.left_alone: list[dict[str, str]] = []
 
     async def execute(self) -> None:
+        model = self._deployment.client_async()
+        document = Document(self._story, self._path)
         await fix_style(
-            self._model,
-            self._document,
-            lambda: self.cancelled,
+            model,
+            document,
             self._reached,
             self._revised,
             self._left_alone,
         )
+
+    def snapshot(self) -> dict[str, Any]:
+        left_alone = list(self.left_alone)
+        sections = list(self.sections)
+        return {
+            "leftAlone": left_alone,
+            "sections": sections,
+            "progress": {"fixed": self.fixed, "sections": self.to_fix},
+        }
 
     def _reached(self, fixed: int, sections: int) -> None:
         self.fixed, self.to_fix = fixed, sections

@@ -13,6 +13,7 @@ from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.plot_cell import PlotNode
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
@@ -55,17 +56,18 @@ class SceneStep(StageStep):
 
 class Scenes(Stage):
 
-    def __init__(self, model: CompletingModel) -> None:
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel]) -> None:
+        self._deployment = deployment
 
     def run(self, document: Document) -> list[StageStep]:
+        model = self._deployment.client_async()
         # Events at the same moment and in the same place are one scene.
         events_of_scene: dict[tuple[str, str], list[PlotNode]] = {}
         for plot in document.plots():
             for event in plot.nodes:
                 events = events_of_scene.setdefault((event.timestamp, event.location), [])
                 events.append(event)
-        scene_steps: list[StageStep] = [SceneStep(events, self._model) for events in events_of_scene.values()]
+        scene_steps: list[StageStep] = [SceneStep(events, model) for events in events_of_scene.values()]
         return scene_steps
 
     def shown(self) -> Shown:

@@ -166,34 +166,6 @@ class WriteBlurb(unittest.TestCase):
         )
         self.assertEqual(seen, [(0, 2), (1, 2), (2, 2)])
 
-    def test_a_cancelled_job_stops_between_chapters_and_answers_with_nothing(
-        self,
-    ) -> None:
-        # Nothing rather than the blurb for half the book: what comes back goes
-        # into the author's document.
-        model = build_model("After the first.", "After the second.")
-        written = blurb_written(
-            model, Document(STORY), lambda: model.complete.call_count >= 1
-        )
-        self.assertEqual(written, "")
-        self.assertEqual(model.complete.call_count, 1)
-
-    def test_a_cancelled_job_stops_counting_where_it_stopped_reading(self) -> None:
-        model = build_model("After the first.", "After the second.")
-        seen: list[tuple[int, int]] = []
-        blurb_written(
-            model,
-            Document(STORY),
-            lambda: model.complete.call_count >= 1,
-            lambda *counts: seen.append(counts),
-        )
-        self.assertEqual(seen, [(0, 2), (1, 2)])
-
-    def test_a_job_cancelled_before_it_starts_never_reaches_the_model(self) -> None:
-        model = build_model()
-        self.assertEqual(blurb_written(model, Document(STORY), lambda: True), "")
-        model.complete.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

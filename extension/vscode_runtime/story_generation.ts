@@ -25,11 +25,10 @@ export type StoryGenerationShown =
     | StoryGenerationCommandShown
     | StoryGenerationEditorShown;
 
-// What the story generation asks the author, numbered, so that every question
-// is acted on once: to review `story`, the story as a stage leaves it, with a
-// part of authorship shown.
+// What the story generation asks the author about `stage`: to review `story`,
+// the story as the stage leaves it, with a part of authorship shown.
 export interface StoryGenerationAsked {
-    number: number;
+    stage: string;
     story: string;
     shown: StoryGenerationShown;
 }
@@ -50,9 +49,12 @@ export interface StoryGenerationWorkflowStage {
     done: boolean;
 }
 
-export interface StoryGeneration extends ServerJob {
+export interface StoryGenerationStageJob extends ServerJob {
     progress: { steps: StoryGenerationStage[] };
+    asked: StoryGenerationAsked | null;
+}
+
+export interface StoryGeneration extends StoryGenerationStageJob {
     // Every stage, in the order they run.
     stages: StoryGenerationWorkflowStage[];
-    asked: StoryGenerationAsked | null;
 }

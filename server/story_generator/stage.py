@@ -20,8 +20,8 @@ class StageStep(ABC):
 
 class Stage(ABC):
     """One stage of writing a story. It plans its work as steps, and does nothing
-    else: the workflow runs the steps, has the author review the story they
-    leave, saves it, and shows the stage's progress."""
+    else: its job runs the steps and shows the stage's progress; the editor has
+    the author review the story they leave, and saves it."""
 
     @abstractmethod
     def run(self, document: Document) -> list[StageStep]:

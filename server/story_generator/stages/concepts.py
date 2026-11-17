@@ -24,6 +24,7 @@ import re
 from authordoc.cells.salient_concept_cell import SALIENT_CONCEPT, SalientConceptCell
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import CommandShown, Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
@@ -96,11 +97,12 @@ class ConceptTitles(Stage):
 
 class Concepts(Stage):
 
-    def __init__(self, model: CompletingModel) -> None:
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel]) -> None:
+        self._deployment = deployment
 
     def run(self, document: Document) -> list[StageStep]:
-        describe_step = DescribeConceptsStep(self._model)
+        model = self._deployment.client_async()
+        describe_step = DescribeConceptsStep(model)
         concepts_steps: list[StageStep] = [describe_step]
         return concepts_steps
 

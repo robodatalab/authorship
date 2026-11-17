@@ -14,14 +14,12 @@ from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap
 from server.writing_tools import style
-from server.story_generator.generated_doc import stages_done_in_the_checkpoint
 from server.story_generator.job import StoryGenerationJob
-from server.story_generator.review import Answer, Verdict
+from server.story_generator.stages import STAGES_BY_NAME
 from server.models.inference_models import deploy_inference_models
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.jobs import Job, ParallelJobsManager
-from server.progress import WorkProgress
 from authordoc.storydoc import Document
 from authordoc.cells.blurb_cell import BLURB
 from authordoc.cells.recap_cell import RECAP
@@ -56,35 +54,19 @@ def models() -> dict[str, Any]:
     }
 
 
-def _document(path: str) -> Document:
-    target = Path(path)
-    if not target.is_file():
-        raise HTTPException(status_code=400, detail=f"No such document: {path}")
-    return Document.load(target)
-
-
-def _deployed(model_client_name: str) -> Any:
-    model_client = getattr(app.state, model_client_name, None)
-    if model_client is None:
+def _deployed(deployment_name: str) -> Any:
+    deployment = getattr(app.state, deployment_name, None)
+    if deployment is None:
         raise HTTPException(
             status_code=503, detail="The models are still being deployed"
         )
-    return model_client
+    return deployment
 
 
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
-    return {
-        "jobs": [
-            {
-                "kind": job.kind,
-                "path": job.target,
-                "status": job.status,
-                "cancelled": job.cancelled,
-            }
-            for job in app.state.jobs.queued()
-        ]
-    }
+    in_flight = app.state.jobs.in_flight()
+    return {"jobs": in_flight}
 
 
 class JobCancelRequest(BaseModel):
@@ -96,7 +78,7 @@ def cancel_job(request: JobCancelRequest) -> dict[str, Any]:
     job = app.state.jobs.get(request.path)
     if job is None:
         raise HTTPException(status_code=404, detail=f"No job for {request.path}")
-    job.cancel()
+    app.state.jobs.cancel(request.path)
     return {"cancelling": job.target}
 
 
@@ -161,6 +143,13 @@ class WritingJob(Job):
     def reached(self, written: int, chapters: int) -> None:
         self.written, self.chapters = written, chapters
 
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "kind": self.cell_kind,
+            "text": self.text,
+            "progress": {"written": self.written, "chapters": self.chapters},
+        }
+
 
 class BlurbRequest(BaseModel):
     # Path of the document to write a blurb for.
@@ -171,14 +160,17 @@ class BlurbRequest(BaseModel):
 class BlurbJob(WritingJob):
     kind = "blurb"
 
-    def __init__(self, model: CompletingModel, document: Document) -> None:
-        super().__init__(BLURB, str(document.path))
-        self._model = model
-        self._document = document
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, story: str) -> None:
+        super().__init__(BLURB, str(path))
+        self._deployment = deployment
+        self._path = path
+        self._story = story
 
     async def execute(self) -> None:
+        model = self._deployment.client_async()
+        document = Document(self._story, self._path)
         self.text = await write_blurb(
-            self._model, self._document, lambda: self.cancelled, self.reached
+            model, document, progress=self.reached
         )
 
 
@@ -191,41 +183,39 @@ class RecapRequest(BaseModel):
 class RecapJob(WritingJob):
     kind = "recap"
 
-    def __init__(self, model: CompletingModel, document: Document, earlier: list[Document]) -> None:
-        super().__init__(RECAP, str(document.path))
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, earlier: list[Path]) -> None:
+        super().__init__(RECAP, str(path))
+        self._deployment = deployment
         self._earlier = earlier
 
     async def execute(self) -> None:
+        model = self._deployment.client_async()
+        earlier = [Document.load(volume) for volume in self._earlier]
         self.text = await write_recap(
-            self._model, self._earlier, lambda: self.cancelled, self.reached
+            model, earlier, progress=self.reached
         )
 
 
 @app.post("/generate/blurb", status_code=202)
 def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
     """Start writing the story's blurb; poll /generate/status for it."""
-    document = Document(request.text, Path(request.path))
-    job = BlurbJob(_deployed("causal_model"), document)
+    job = BlurbJob(_deployed("causal_deployment"), Path(request.path), request.text)
     app.state.jobs.start(job)
     return {"id": job.target}
 
 
 @app.post("/generate/recap", status_code=202)
 def generate_recap(request: RecapRequest) -> dict[str, Any]:
-    document = Document(request.text, Path(request.path))
     if not request.documents:
         raise HTTPException(
             status_code=400,
             detail="That section names no documents to summarise.",
         )
-    earlier = [
-        _document(str(volume))
-        for volume in volumes_in_reading_order(
-            Path(request.path).parent, request.documents
-        )
-    ]
-    job = RecapJob(_deployed("causal_model"), document, earlier)
+    earlier = volumes_in_reading_order(Path(request.path).parent, request.documents)
+    for volume in earlier:
+        if not volume.is_file():
+            raise HTTPException(status_code=400, detail=f"No such document: {volume}")
+    job = RecapJob(_deployed("causal_deployment"), Path(request.path), earlier)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -235,81 +225,38 @@ def generate_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, WritingJob):
         raise HTTPException(status_code=404, detail=f"No writing job for {id}")
-    return {
-        "running": not job.done,
-        "error": job.error,
-        "kind": job.cell_kind,
-        "text": job.text,
-        "progress": {"written": job.written, "chapters": job.chapters},
-    }
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class StoryGenerationRequest(BaseModel):
     # Path of the .author file to generate the story into.
     path: str
+    story: str
+    stage: str
 
 
 @app.post("/generate/story", status_code=202)
 def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
-    """Start generating the story with its author; poll /generate/story/status for
-    what it asks them, and answer at /generate/story/answer."""
-    job = StoryGenerationJob(_deployed("writing_model"), Path(request.path))
+    """Run a stage of generating the story with its author; poll
+    /generate/story/status for what it asks them."""
+    make_the_stage = STAGES_BY_NAME.get(request.stage)
+    if make_the_stage is None:
+        raise HTTPException(status_code=400, detail=f"No stage {request.stage}")
+    deployment = _deployed("writing_deployment")
+    stage = make_the_stage(deployment)
+    job = StoryGenerationJob(request.stage, stage, Path(request.path), request.story)
     app.state.jobs.start(job)
     return {"id": job.target}
-
-
-def _story_generation(path: str) -> StoryGenerationJob:
-    job = app.state.jobs.get(path)
-    if not isinstance(job, StoryGenerationJob):
-        raise HTTPException(status_code=404, detail=f"No story generation for {path}")
-    return job
 
 
 @app.get("/generate/story/status")
 def generate_story_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, StoryGenerationJob):
-        document = Document.load(Path(id))
-        stages_checkpointed = stages_done_in_the_checkpoint(document)
-        stages_left_off = [{"name": name, "done": done} for name, done in stages_checkpointed.items()]
-        no_progress = WorkProgress(StoryGenerationJob.kind)
-        no_progress_reported = no_progress.reported()
-        return {
-            "running": False,
-            "cancelled": False,
-            "error": None,
-            "progress": no_progress_reported,
-            "stages": stages_left_off,
-            "asked": None,
-        }
-    asked = job.author.asked
-    stages_done = job.workflow.stages_done()
-    stages = [{"name": name, "done": done} for name, done in stages_done.items()]
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "progress": job.progress.reported(),
-        "stages": stages,
-        "asked": None if asked is None else asked.written(),
-    }
-
-
-class StoryGenerationAnswer(BaseModel):
-    path: str
-    # "accept" or "stop".
-    verdict: str
-    # The story as the editor has it when the author answers.
-    story: str
-
-
-@app.post("/generate/story/answer")
-def answer_story_generation(request: StoryGenerationAnswer) -> dict[str, Any]:
-    job = _story_generation(request.path)
-    verdict = Verdict(request.verdict)
-    answer = Answer(verdict, request.story)
-    job.author.answer(answer)
-    return {}
+        raise HTTPException(status_code=404, detail=f"No story generation for {id}")
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class StyleFixRequest(BaseModel):
@@ -319,8 +266,7 @@ class StyleFixRequest(BaseModel):
 
 @app.post("/fix/style", status_code=202)
 def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
-    document = Document(request.text, Path(request.path))
-    job = style.StyleFixJob(_deployed("style_model"), document)
+    job = style.StyleFixJob(_deployed("style_deployment"), Path(request.path), request.text)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -330,14 +276,8 @@ def fix_style_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, style.StyleFixJob):
         raise HTTPException(status_code=404, detail=f"No style pass for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "leftAlone": list(job.left_alone),
-        "sections": list(job.sections),
-        "progress": {"fixed": job.fixed, "sections": job.to_fix},
-    }
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class LineSelection(BaseModel):
@@ -360,11 +300,10 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
     the second is not a lesser kind of the first and returns findings of exactly
     the same shape.
     """
-    document = Document(request.text, Path(request.path))
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
-    job = CheckErrorsJob(_deployed("gec_model"), document, selection)
+    job = CheckErrorsJob(_deployed("gec_deployment"), Path(request.path), request.text, selection)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -374,9 +313,5 @@ def check_errors_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, CheckErrorsJob):
         raise HTTPException(status_code=404, detail=f"No check for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "findings": job.findings,
-    }
+    status = app.state.jobs.reported(id)
+    return status

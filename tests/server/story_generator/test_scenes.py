@@ -45,6 +45,8 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         )
         self.document = Document.from_cells([varn, dax])
         self.model = Mock()
+        self.deployment = Mock()
+        self.deployment.client_async.return_value = self.model
         self.model.complete.side_effect = [
             streamed("Dax took the water while Varn held her son close."),
             streamed("Varn gave her son the last cup.\n\nHe drank it slowly."),
@@ -52,7 +54,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         ]
 
     async def test_every_event_points_at_the_whole_of_its_scene(self) -> None:
-        where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
+        where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.deployment).run(self.document)
         with_the_meeting = await where_they_meet(self.document)
         with_varns_room = await in_varns_room(with_the_meeting)
         with_every_scene = await where_dax_drinks(with_varns_room)
@@ -67,7 +69,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
     async def test_every_event_keeps_pointing_at_its_scene_when_a_scene_before_it_grows(self) -> None:
-        where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.model).run(self.document)
+        where_they_meet, in_varns_room, where_dax_drinks = Scenes(self.deployment).run(self.document)
         with_the_meeting = await where_they_meet(self.document)
         with_varns_room = await in_varns_room(with_the_meeting)
         with_every_scene = await where_dax_drinks(with_varns_room)
@@ -88,7 +90,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(story_words.text(dax_drinks.story_word_range), "Dax drank in front of them.")
 
     async def test_asks_for_the_scene_once_where_events_intersect(self) -> None:
-        where_they_meet, _, _ = Scenes(self.model).run(self.document)
+        where_they_meet, _, _ = Scenes(self.deployment).run(self.document)
         await where_they_meet(self.document)
 
         self.model.complete.assert_called_once_with(

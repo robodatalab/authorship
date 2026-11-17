@@ -122,13 +122,15 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
         )
         self.document = Document.from_cells([first_plot, second_plot])
         model = Mock()
+        deployment = Mock()
+        deployment.client_async.return_value = model
         model.complete.side_effect = [
             streamed("intersection location | intersection"),
             streamed("intersection location | intersection"),
             streamed("intersection location | intersection"),
             streamed("intersection location | intersection"),
         ]
-        self.mesh = Mesh(model)
+        self.mesh = Mesh(deployment)
 
     async def test_meshing_rewrites_the_events_that_meet(self):
         first_step, second_step, third_step, fourth_step = self.mesh.run(self.document)

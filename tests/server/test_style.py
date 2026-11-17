@@ -208,20 +208,6 @@ class FixStyle(unittest.TestCase):
         )
         self.assertEqual(seen, [(0, 4), (1, 4), (2, 4), (3, 4), (4, 4)])
 
-    def test_a_job_told_to_stop_reads_no_further(self) -> None:
-        model = build_model()
-        stop = [False]
-        revised: dict[str, str] = {}
-        styled(
-            model,
-            Document(STORY),
-            cancelled=lambda: stop[0],
-            progress=lambda *_: stop.__setitem__(0, True),
-            revised=lambda cell_id, source: revised.update({cell_id: source}),
-        )
-        self.assertEqual(model.complete.call_count, 0)
-        self.assertEqual(revised, {})
-
     def test_a_failure_that_is_not_about_the_section_ends_the_pass(self) -> None:
         model = build_model()
         model.complete.side_effect = RuntimeError("the model is not serving")

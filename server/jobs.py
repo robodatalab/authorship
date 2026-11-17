@@ -1,11 +1,21 @@
 import abc
 import asyncio
+import multiprocessing
+import os
 import threading
+from dataclasses import dataclass
+from multiprocessing.connection import Connection
+from multiprocessing.process import BaseProcess
+from typing import Any
 
 from server import log
 from server.progress import WorkProgress, reporting_progress_to
 
 _log = log.logger(__name__)
+
+_SECONDS_BETWEEN_SNAPSHOTS = 0.2
+
+_PROCESSES = multiprocessing.get_context("spawn")
 
 
 class Job(abc.ABC):
@@ -15,39 +25,89 @@ class Job(abc.ABC):
 
     def __init__(self, target: str) -> None:
         self.target = target
-        self.error: str | None = None
-        self._cancelled = False
-        self._begun = False
-        self._done = False
         self.progress = WorkProgress(self.kind)
 
-    @property
-    def cancelled(self) -> bool:
-        return self._cancelled
+    @abc.abstractmethod
+    async def execute(self) -> None:
+        pass
 
-    @property
-    def done(self) -> bool:
-        return self._done
+    @abc.abstractmethod
+    def snapshot(self) -> dict[str, Any]:
+        pass
+
+
+@dataclass(frozen=True)
+class _JobSnapshotSent:
+    snapshot: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _JobFailed:
+    error: str
+
+
+@dataclass
+class _JobInItsProcess:
+    job: Job
+    process: BaseProcess
+    snapshot: dict[str, Any]
+    begun: bool = False
+    done: bool = False
+    stopped: bool = False
+    error: str | None = None
 
     @property
     def status(self) -> str:
         """Waiting for a worker, holding one, or finished with."""
         if self.done:
             return "done"
-        return "running" if self._begun else "pending"
+        return "running" if self.begun else "pending"
 
-    def cancel(self) -> None:
-        self._cancelled = True
 
-    def begin(self) -> None:
-        self._begun = True
+async def _execute(job: Job) -> None:
+    with reporting_progress_to(job.progress):
+        await job.execute()
 
-    def finish(self) -> None:
-        self._done = True
 
-    @abc.abstractmethod
-    async def execute(self) -> None:
+def _exit_once_the_server_is_gone(lifeline: Connection) -> None:
+    try:
+        lifeline.recv()
+    except EOFError:
         pass
+    os._exit(1)
+
+
+def _send_snapshots_until_finished(job: Job, reporting: Connection, finished: threading.Event) -> None:
+    while True:
+        snapshot = job.snapshot()
+        snapshot_sent = _JobSnapshotSent(snapshot)
+        reporting.send(snapshot_sent)
+        if finished.wait(_SECONDS_BETWEEN_SNAPSHOTS):
+            return
+
+
+def _run_in_its_process(job: Job, reporting: Connection, lifeline: Connection) -> None:
+    log.setup()
+    watching_the_server = threading.Thread(target=_exit_once_the_server_is_gone, args=(lifeline,), daemon=True)
+    watching_the_server.start()
+    finished = threading.Event()
+    sending = threading.Thread(target=_send_snapshots_until_finished, args=(job, reporting, finished), daemon=True)
+    sending.start()
+    failure: str | None = None
+    try:
+        asyncio.run(_execute(job))
+    except Exception as err:
+        failure = str(err)
+        _log.exception("%s failed for %s", job.kind, job.target)
+    finished.set()
+    sending.join()
+    last_snapshot = job.snapshot()
+    last_snapshot_sent = _JobSnapshotSent(last_snapshot)
+    reporting.send(last_snapshot_sent)
+    if failure is not None:
+        job_failed = _JobFailed(failure)
+        reporting.send(job_failed)
+    reporting.close()
 
 
 class ParallelJobsManager:
@@ -55,47 +115,87 @@ class ParallelJobsManager:
     job for a target that already has one supersedes it — the newer write wins.
     A finished job lingers so its result can be polled, until it is replaced.
 
-    Jobs run on an event loop of the manager's own, so that a job outlives the
-    request that started it and can await the models it talks to."""
+    Every job runs in a process of its own, so that a job outlives the request
+    that started it, stopping or superseding it kills it at once, and it ends
+    with the server."""
 
     def __init__(self) -> None:
-        self._by_target: dict[str, Job] = {}
-        self._loop = asyncio.new_event_loop()
-        threading.Thread(target=self._loop.run_forever, daemon=True).start()
+        self._by_target: dict[str, _JobInItsProcess] = {}
 
     def start(self, job: Job) -> Job:
         superseded = self._by_target.get(job.target)
-        self._by_target[job.target] = job
-        if superseded is not None:
-            superseded.cancel()
-        asyncio.run_coroutine_threadsafe(self._run(job), self._loop)
+        if superseded is not None and not superseded.done:
+            self._kill(superseded)
+        reporting_received, reporting_sent = _PROCESSES.Pipe(duplex=False)
+        lifeline_watched, lifeline_held = _PROCESSES.Pipe(duplex=False)
+        process = _PROCESSES.Process(
+            target=_run_in_its_process,
+            args=(job, reporting_sent, lifeline_watched),
+            daemon=True,
+        )
+        process.start()
+        reporting_sent.close()
+        lifeline_watched.close()
+        first_snapshot = job.snapshot()
+        running = _JobInItsProcess(job, process, first_snapshot)
+        self._by_target[job.target] = running
+        following = threading.Thread(target=self._follow, args=(running, reporting_received, lifeline_held), daemon=True)
+        following.start()
+        _log.info("%s started for %s", job.kind, job.target)
         return job
 
     def get(self, target: str) -> Job | None:
-        return self._by_target.get(target)
+        running = self._by_target.get(target)
+        return None if running is None else running.job
 
-    def is_running(self, target: str) -> bool:
-        job = self.get(target)
-        return job is not None and not job.done
+    def cancel(self, target: str) -> None:
+        running = self._by_target[target]
+        if running.done:
+            del self._by_target[target]
+            return
+        self._kill(running)
 
-    def queued(self) -> list[Job]:
+    def reported(self, target: str) -> dict[str, Any]:
+        running = self._by_target[target]
+        return {"running": not running.done, "error": running.error, **running.snapshot}
+
+    def in_flight(self) -> list[dict[str, Any]]:
         """Every job still waiting for a worker or running on one."""
-        return [job for job in self._by_target.values() if not job.done]
+        return [
+            {
+                "kind": running.job.kind,
+                "path": running.job.target,
+                "status": running.status,
+            }
+            for running in self._by_target.values()
+            if not running.done
+        ]
 
-    async def _run(self, job: Job) -> None:
-        job.begin()
-        _log.info("%s started for %s", job.kind, job.target)
-        try:
-            with reporting_progress_to(job.progress):
-                await job.execute()
-        except Exception as err:
-            job.error = str(err)
-            _log.exception("%s failed for %s", job.kind, job.target)
-        finally:
-            job.finish()
-            _log.info(
-                "%s %s for %s",
-                job.kind,
-                "cancelled" if job.cancelled else "finished",
-                job.target,
-            )
+    def _kill(self, running: _JobInItsProcess) -> None:
+        running.stopped = True
+        running.process.kill()
+
+    def _follow(self, running: _JobInItsProcess, reporting: Connection, lifeline: Connection) -> None:
+        while True:
+            try:
+                message = reporting.recv()
+            except EOFError:
+                break
+            if isinstance(message, _JobSnapshotSent):
+                running.snapshot = message.snapshot
+                running.begun = True
+            elif isinstance(message, _JobFailed):
+                running.error = message.error
+        running.process.join()
+        reporting.close()
+        lifeline.close()
+        exit_code = running.process.exitcode
+        if exit_code != 0 and running.error is None and not running.stopped:
+            running.error = f"The {running.job.kind} ended with exit code {exit_code}"
+        running.done = True
+        _log.info(
+            "%s %s for %s",
+            running.job.kind,
+            "stopped" if running.stopped else "finished",
+            running.job.target,
+        )

@@ -5,7 +5,6 @@ const MILLISECONDS_BETWEEN_POLLS = 400;
 export interface ServerJob {
     running: boolean;
     error: string | null;
-    cancelled?: boolean;
 }
 
 export async function startServerJob(

@@ -23,6 +23,7 @@ from authordoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
@@ -137,10 +138,11 @@ class InBetweenStep(StageStep):
 
 class Plots(Stage):
 
-    def __init__(self, model: CompletingModel) -> None:
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel]) -> None:
+        self._deployment = deployment
 
     def run(self, document: Document) -> list[StageStep]:
+        model = self._deployment.client_async()
         concepts = document.salient_concepts()
         plot_length = EVENTS_FOR_EVERY_PLOT * len(concepts)
 
@@ -156,7 +158,7 @@ class Plots(Stage):
             plots.append(plot)
             trajectories.append((concept, placeholders))
         lay_out_step = LayOutPlotsStep(plots)
-        ends_steps = [PlotEndsStep(concept, placeholders[0], placeholders[-1], self._model) for concept, placeholders in trajectories]
+        ends_steps = [PlotEndsStep(concept, placeholders[0], placeholders[-1], model) for concept, placeholders in trajectories]
         plot_steps: list[StageStep] = [lay_out_step, *ends_steps]
 
         # Level by level, the event halfway between every two written events, for
@@ -169,7 +171,7 @@ class Plots(Stage):
                     continue
                 middle = (first + last) // 2
                 for concept, placeholders in trajectories:
-                    in_between_step = InBetweenStep(concept, placeholders[first], placeholders[middle], placeholders[last], self._model)
+                    in_between_step = InBetweenStep(concept, placeholders[first], placeholders[middle], placeholders[last], model)
                     plot_steps.append(in_between_step)
                 halves.extend([(first, middle), (middle, last)])
             spans = halves
