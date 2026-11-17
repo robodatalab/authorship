@@ -91,14 +91,14 @@ class ParallelJobsManagerRunningJobs(unittest.TestCase):
 
         reported = self.wait_for_the_end("story.author")
 
-        self.assertEqual(reported, {"running": False, "cancelled": False, "error": None, "counted": 3})
+        self.assertEqual(reported, {"running": False, "error": None, "counted": 3})
 
     def test_reports_why_a_job_failed(self) -> None:
         self.jobs.start(FindsNothingToDo("story.author"))
 
         reported = self.wait_for_the_end("story.author")
 
-        self.assertEqual(reported, {"running": False, "cancelled": False, "error": "There is nothing to do."})
+        self.assertEqual(reported, {"running": False, "error": "There is nothing to do."})
 
     def test_reports_a_job_waiting_for_its_process_as_it_stands(self) -> None:
         self.jobs.start(RunsUntilStopped("story.author"))
@@ -107,8 +107,8 @@ class ParallelJobsManagerRunningJobs(unittest.TestCase):
         reported = self.jobs.reported("story.author")
         in_flight = self.jobs.in_flight()
 
-        self.assertEqual(reported, {"running": True, "cancelled": False, "error": None, "ticks": 0, "process": mock.ANY})
-        self.assertEqual(in_flight, [{"kind": "endless", "path": "story.author", "status": "pending", "cancelled": False}])
+        self.assertEqual(reported, {"running": True, "error": None, "ticks": 0, "process": mock.ANY})
+        self.assertEqual(in_flight, [{"kind": "endless", "path": "story.author", "status": "pending"}])
 
     def test_stopping_a_running_job_kills_its_process_at_once(self) -> None:
         self.jobs.start(RunsUntilStopped("story.author"))
@@ -121,7 +121,7 @@ class ParallelJobsManagerRunningJobs(unittest.TestCase):
         seconds_it_took = time.monotonic() - stopped_at
         job_process_ended = self.wait_for_the_process_to_end(job_process)
 
-        self.assertEqual(reported, {"running": False, "cancelled": True, "error": None, "ticks": mock.ANY, "process": job_process})
+        self.assertEqual(reported, {"running": False, "error": None, "ticks": mock.ANY, "process": job_process})
         self.assertTrue(job_process_ended)
         self.assertLess(seconds_it_took, 1.0)
 
@@ -135,7 +135,7 @@ class ParallelJobsManagerRunningJobs(unittest.TestCase):
         older_process_ended = self.wait_for_the_process_to_end(older_process)
 
         self.assertTrue(older_process_ended)
-        self.assertEqual(reported, {"running": False, "cancelled": False, "error": None, "counted": 3})
+        self.assertEqual(reported, {"running": False, "error": None, "counted": 3})
 
     def test_stopping_a_job_that_is_done_drops_it(self) -> None:
         self.jobs.start(CountsToThree("story.author"))
@@ -154,7 +154,7 @@ class ParallelJobsManagerRunningJobs(unittest.TestCase):
 
         in_flight = self.jobs.in_flight()
 
-        self.assertEqual(in_flight, [{"kind": "endless", "path": "endless.author", "status": "running", "cancelled": False}])
+        self.assertEqual(in_flight, [{"kind": "endless", "path": "endless.author", "status": "running"}])
 
 
 class ParallelJobsManagerEndingWithTheServer(unittest.TestCase):

@@ -25,15 +25,7 @@ class Job(abc.ABC):
 
     def __init__(self, target: str) -> None:
         self.target = target
-        self._cancelled = False
         self.progress = WorkProgress(self.kind)
-
-    @property
-    def cancelled(self) -> bool:
-        return self._cancelled
-
-    def cancel(self) -> None:
-        self._cancelled = True
 
     @abc.abstractmethod
     async def execute(self) -> None:
@@ -165,7 +157,7 @@ class ParallelJobsManager:
 
     def reported(self, target: str) -> dict[str, Any]:
         running = self._by_target[target]
-        return {"running": not running.done, "cancelled": running.stopped, "error": running.error, **running.snapshot}
+        return {"running": not running.done, "error": running.error, **running.snapshot}
 
     def in_flight(self) -> list[dict[str, Any]]:
         """Every job still waiting for a worker or running on one."""
@@ -174,7 +166,6 @@ class ParallelJobsManager:
                 "kind": running.job.kind,
                 "path": running.job.target,
                 "status": running.status,
-                "cancelled": running.stopped,
             }
             for running in self._by_target.values()
             if not running.done
@@ -205,6 +196,6 @@ class ParallelJobsManager:
         _log.info(
             "%s %s for %s",
             running.job.kind,
-            "cancelled" if running.stopped else "finished",
+            "stopped" if running.stopped else "finished",
             running.job.target,
         )

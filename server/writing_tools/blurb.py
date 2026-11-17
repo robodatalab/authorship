@@ -37,19 +37,14 @@ BLURB_INSTRUCTION = (
 async def write_blurb(
     model: CompletingModel,
     document: Document,
-    cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda written, chapters: None,
 ) -> str:
     """The story's blurb, written a chapter at a time.
 
-    `progress` is told how many chapters have been read of how many, and is the
-    counterpart of `cancelled`: the two are all this says while it runs, one
-    outward and one in. It is told the total before the first chapter is read, so
-    a caller drawing a bar has its length before it has anything to fill it with.
-
-    A cancelled job answers with nothing rather than with the blurb for the half
-    of the book it had read — the editor puts what comes back in the author's
-    document, and a blurb for the first three chapters is worse there than none.
+    `progress` is told how many chapters have been read of how many, and is all
+    this says while it runs. It is told the total before the first chapter is
+    read, so a caller drawing a bar has its length before it has anything to fill
+    it with.
 
     Raises `ValueError` if the document has no chapters with prose in them: a
     blurb for an empty book is one the model has to invent.
@@ -64,8 +59,6 @@ async def write_blurb(
     blurb = ""
     progress(0, len(chapters))
     for written, (title, prose) in enumerate(chapters, start=1):
-        if cancelled():
-            return ""
         blurb = "".join(
             [
                 chunk.content

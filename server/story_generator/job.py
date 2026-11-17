@@ -33,8 +33,7 @@ class StoryGenerationJob(Job):
         for step in with_progress(steps, self._stage_name):
             document = await step(document)
         shown = self._stage.shown()
-        asked = Asked(self._stage_name, document.text, shown)
-        self.asked = None if self.cancelled else asked
+        self.asked = Asked(self._stage_name, document.text, shown)
 
     def snapshot(self) -> dict[str, Any]:
         progress = self.progress.reported()

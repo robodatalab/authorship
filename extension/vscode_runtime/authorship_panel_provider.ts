@@ -172,7 +172,6 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
                     kind: string;
                     path: string;
                     status: string;
-                    cancelled: boolean;
                 }[];
             }>(
                 "/jobs",
@@ -186,7 +185,6 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
                     vscode.Uri.file(job.path),
                 ),
                 status: job.status,
-                cancelled: job.cancelled,
                 secondsRunning: this.secondsSinceTheJobFirstAppeared(job.path),
             }));
             this.forgetJobsThatAreOver(answered.jobs.map((job) => job.path));

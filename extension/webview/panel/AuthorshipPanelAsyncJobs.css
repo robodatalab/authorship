@@ -40,11 +40,6 @@
     color: var(--vscode-charts-green, #89d185);
 }
 
-/* Told to stop, and still finishing the piece of work it was on. */
-.authorship-panel-job-stopping {
-    color: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
-}
-
 .authorship-panel-job-stop {
     display: flex;
     align-items: center;
@@ -73,8 +68,4 @@
     height: 8px;
     border-radius: 1px;
     background: currentColor;
-}
-
-.authorship-panel-job-stop-taken {
-    width: 16px;
 }

@@ -170,7 +170,7 @@ class BlurbJob(WritingJob):
         model = self._deployment.client_async()
         document = Document(self._story, self._path)
         self.text = await write_blurb(
-            model, document, lambda: self.cancelled, self.reached
+            model, document, progress=self.reached
         )
 
 
@@ -192,7 +192,7 @@ class RecapJob(WritingJob):
         model = self._deployment.client_async()
         earlier = [Document.load(volume) for volume in self._earlier]
         self.text = await write_recap(
-            model, earlier, lambda: self.cancelled, self.reached
+            model, earlier, progress=self.reached
         )
 
 

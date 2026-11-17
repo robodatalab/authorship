@@ -41,7 +41,6 @@ FIX_REQUEST = "Fix the writing style and the grammar in the following section."
 async def fix_style(
     model: CompletingModel,
     document: Document,
-    cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda fixed, sections: None,
     revised: Callable[[str, str], None] = lambda cell_id, source: None,
     left_alone: Callable[[str, str], None] = lambda opening, why: None,
@@ -53,11 +52,7 @@ async def fix_style(
     corrected: list[str] = []
     progress(0, len(sections))
     for fixed, section in enumerate(sections, start=1):
-        if cancelled():
-            return
         fix, why = await _corrected(model, corrected, section)
-        if cancelled():
-            return
         if why:
             left_alone(_opening(section.source), why)
         corrected.append(section.source if fix is None else fix)
@@ -153,7 +148,6 @@ class StyleFixJob(Job):
         await fix_style(
             model,
             document,
-            lambda: self.cancelled,
             self._reached,
             self._revised,
             self._left_alone,

@@ -75,7 +75,6 @@ const STAGES_LEFT_OFF_AT_THE_CONCEPTS = [
 
 const DESCRIBES_THE_CONCEPTS: StoryGenerationStageJob = {
     running: true,
-    cancelled: false,
     error: null,
     progress: {
         steps: [{ doing: "concepts", done: 0, of: 1, state: "running", steps: [] }],
@@ -85,7 +84,6 @@ const DESCRIBES_THE_CONCEPTS: StoryGenerationStageJob = {
 
 const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
     running: false,
-    cancelled: false,
     error: null,
     progress: {
         steps: [{ doing: "concepts", done: 1, of: 1, state: "done", steps: [] }],
@@ -99,7 +97,6 @@ const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
 
 const STOPPED_IN_THE_CONCEPTS: StoryGenerationStageJob = {
     running: false,
-    cancelled: true,
     error: null,
     progress: {
         steps: [{ doing: "concepts", done: 0, of: 1, state: "done", steps: [] }],

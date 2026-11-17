@@ -10,7 +10,6 @@ export interface AsyncJobStatus {
     /** The same file, said short enough for the panel. */
     name: string;
     status: string;
-    cancelled: boolean;
     secondsRunning: number;
 }
 
@@ -53,41 +52,25 @@ export function AuthorshipPanelAsyncJobs({
                             {job.name}
                         </span>
                     </div>
-                    {/* A job stops between the pieces of work it is made of, so
-                        on a long one there is a stretch where it has been told
-                        and is still going. Saying so is the difference between a
-                        slow button and a broken one. */}
                     <span
-                        className={
-                            job.cancelled
-                                ? "authorship-panel-job-elapsed authorship-panel-job-stopping"
-                                : `authorship-panel-job-elapsed authorship-panel-job-${job.status}`
-                        }
-                        title={job.cancelled ? "stopping" : job.status}
+                        className={`authorship-panel-job-elapsed authorship-panel-job-${job.status}`}
+                        title={job.status}
                     >
                         {timeItHasTaken(job.secondsRunning)}
                     </span>
-                    {/* Only a job nobody has stopped yet: pressing it twice asks
-                        the server for something it is already doing. The one
-                        already told keeps the column, so the buttons under it do
-                        not step sideways. */}
-                    {job.cancelled ? (
-                        <span className="authorship-panel-job-stop-taken" />
-                    ) : (
-                        <button
-                            type="button"
-                            className="authorship-panel-job-stop"
-                            title={`Stop this ${job.kind}`}
-                            onClick={() =>
-                                sendMessagesToVscode({
-                                    type: "stopJob",
-                                    path: job.path,
-                                })
-                            }
-                        >
-                            <i />
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        className="authorship-panel-job-stop"
+                        title={`Stop this ${job.kind}`}
+                        onClick={() =>
+                            sendMessagesToVscode({
+                                type: "stopJob",
+                                path: job.path,
+                            })
+                        }
+                    >
+                        <i />
+                    </button>
                 </Fragment>
             ))}
         </div>

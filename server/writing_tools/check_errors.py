@@ -84,8 +84,6 @@ class CheckErrorsJob(Job):
             if self._selection is None
             else frozenset()
         )
-        if self.cancelled:
-            return
         passage = list(StoryLinesIterator(document, start, end))
         by_the_rules = [
             error
@@ -93,8 +91,6 @@ class CheckErrorsJob(Job):
             for error in _errors_of(document, finding)
         ]
         self.findings = by_the_rules
-        if self.cancelled:
-            return
         self.findings = by_the_rules + [
             error
             for finding in await grammar_check.check(
