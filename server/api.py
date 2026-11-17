@@ -65,17 +65,8 @@ def _deployed(deployment_name: str) -> Any:
 
 @app.get("/jobs")
 def jobs() -> dict[str, Any]:
-    return {
-        "jobs": [
-            {
-                "kind": job.kind,
-                "path": job.target,
-                "status": job.status,
-                "cancelled": job.cancelled,
-            }
-            for job in app.state.jobs.queued()
-        ]
-    }
+    in_flight = app.state.jobs.in_flight()
+    return {"jobs": in_flight}
 
 
 class JobCancelRequest(BaseModel):
