@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,6 +36,8 @@ function renderedCellText(): string[] {
         (cellBody) => cellBody.textContent?.trim() ?? "",
     );
 }
+
+beforeAll(openWebview);
 
 beforeEach(() => {
     posted = [];
