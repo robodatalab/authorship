@@ -98,3 +98,6 @@ class CheckErrorsJob(Job):
             )
             for error in _errors_of(self._document, finding)
         ]
+
+    def snapshot(self) -> dict[str, Any]:
+        return {"findings": self.findings}

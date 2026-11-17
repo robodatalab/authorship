@@ -3,6 +3,8 @@ workflow, run on the story's file."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from server.jobs import Job
 from server.story_generator.review import Asked
 from server.story_generator.workflow import Workflow
@@ -24,3 +26,10 @@ class StoryGenerationJob(Job):
     async def execute(self) -> None:
         asked = await self.workflow.run(self.stage_name)
         self.asked = None if self.cancelled else asked
+
+    def snapshot(self) -> dict[str, Any]:
+        progress = self.progress.reported()
+        stages_done = self.workflow.stages_done()
+        stages = [{"name": name, "done": done} for name, done in stages_done.items()]
+        asked = None if self.asked is None else self.asked.written()
+        return {"progress": progress, "stages": stages, "asked": asked}

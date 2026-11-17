@@ -162,6 +162,13 @@ class WritingJob(Job):
     def reached(self, written: int, chapters: int) -> None:
         self.written, self.chapters = written, chapters
 
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "kind": self.cell_kind,
+            "text": self.text,
+            "progress": {"written": self.written, "chapters": self.chapters},
+        }
+
 
 class BlurbRequest(BaseModel):
     # Path of the document to write a blurb for.
@@ -236,13 +243,8 @@ def generate_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, WritingJob):
         raise HTTPException(status_code=404, detail=f"No writing job for {id}")
-    return {
-        "running": not job.done,
-        "error": job.error,
-        "kind": job.cell_kind,
-        "text": job.text,
-        "progress": {"written": job.written, "chapters": job.chapters},
-    }
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class StoryGenerationRequest(BaseModel):
@@ -294,17 +296,8 @@ def generate_story_status(id: str) -> dict[str, Any]:
             "stages": stages_left_off,
             "asked": None,
         }
-    asked = job.asked
-    stages_done = job.workflow.stages_done()
-    stages = [{"name": name, "done": done} for name, done in stages_done.items()]
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "progress": job.progress.reported(),
-        "stages": stages,
-        "asked": None if asked is None else asked.written(),
-    }
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class StoryGenerationAnswer(BaseModel):
@@ -346,14 +339,8 @@ def fix_style_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, style.StyleFixJob):
         raise HTTPException(status_code=404, detail=f"No style pass for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "leftAlone": list(job.left_alone),
-        "sections": list(job.sections),
-        "progress": {"fixed": job.fixed, "sections": job.to_fix},
-    }
+    status = app.state.jobs.reported(id)
+    return status
 
 
 class LineSelection(BaseModel):
@@ -390,9 +377,5 @@ def check_errors_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
     if not isinstance(job, CheckErrorsJob):
         raise HTTPException(status_code=404, detail=f"No check for {id}")
-    return {
-        "running": not job.done,
-        "cancelled": job.cancelled,
-        "error": job.error,
-        "findings": job.findings,
-    }
+    status = app.state.jobs.reported(id)
+    return status

@@ -154,6 +154,15 @@ class StyleFixJob(Job):
             self._left_alone,
         )
 
+    def snapshot(self) -> dict[str, Any]:
+        left_alone = list(self.left_alone)
+        sections = list(self.sections)
+        return {
+            "leftAlone": left_alone,
+            "sections": sections,
+            "progress": {"fixed": self.fixed, "sections": self.to_fix},
+        }
+
     def _reached(self, fixed: int, sections: int) -> None:
         self.fixed, self.to_fix = fixed, sections
 

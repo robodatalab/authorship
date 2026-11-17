@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import threading
+from typing import Any
 
 from server import log
 from server.progress import WorkProgress, reporting_progress_to
@@ -49,6 +50,10 @@ class Job(abc.ABC):
     async def execute(self) -> None:
         pass
 
+    @abc.abstractmethod
+    def snapshot(self) -> dict[str, Any]:
+        pass
+
 
 class ParallelJobsManager:
     """The job in flight, or the last one finished, per target file. Starting a
@@ -76,6 +81,11 @@ class ParallelJobsManager:
 
     def forget(self, target: str) -> None:
         self._by_target.pop(target, None)
+
+    def reported(self, target: str) -> dict[str, Any]:
+        job = self._by_target[target]
+        snapshot = job.snapshot()
+        return {"running": not job.done, "cancelled": job.cancelled, "error": job.error, **snapshot}
 
     def is_running(self, target: str) -> bool:
         job = self.get(target)
