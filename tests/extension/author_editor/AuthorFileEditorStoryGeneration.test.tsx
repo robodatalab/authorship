@@ -17,7 +17,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
         { name: "plots", done: false },
     ],
     asked: {
-        number: 1,
+        stage: "concept titles",
         story: "",
         shown: {
             kind: "command",
@@ -37,7 +37,7 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
         { name: "plots", done: false },
     ],
     asked: {
-        number: 2,
+        stage: "concepts",
         story: '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
         shown: { kind: "tab", cellKind: "salient-concept" },
     },

@@ -38,11 +38,13 @@ def deploy_inference_models(app: FastAPI) -> None:
             LONG_CONTEXT_QWEN, **LONG_CONTEXT_QWEN_DEPLOYMENT.config
         )
         app.state.inference_models[LONG_CONTEXT_QWEN.model_id] = causal_deployment.key
-        app.state.causal_model = causal_deployment.client()
+        cortexgrid.wait_for_model_serving(causal_deployment.key)
+        app.state.causal_deployment = causal_deployment
         imported[GEC_MODEL].result()
         gec_deployment = cluster.deploy(gec_model)
         app.state.inference_models[GEC_MODEL] = gec_deployment.key
-        app.state.gec_model = gec_deployment.client()
+        cortexgrid.wait_for_model_serving(gec_deployment.key)
+        app.state.gec_deployment = gec_deployment
         style_model = Hosted(STYLE_MODEL, GeminiText2Text)
         cortexgrid.register_model(
             style_model.serve_app,
@@ -58,7 +60,8 @@ def deploy_inference_models(app: FastAPI) -> None:
             timeout=cluster.DEPLOY_TIMEOUT_S,
         )
         app.state.inference_models[STYLE_MODEL] = style_deployment.key
-        app.state.style_model = style_deployment.client()
+        cortexgrid.wait_for_model_serving(style_deployment.key)
+        app.state.style_deployment = style_deployment
         writing_model = Hosted(WRITING_MODEL, AnthropicText2Text)
         cortexgrid.register_model(
             writing_model.serve_app,
@@ -74,5 +77,6 @@ def deploy_inference_models(app: FastAPI) -> None:
             timeout=cluster.DEPLOY_TIMEOUT_S,
         )
         app.state.inference_models[WRITING_MODEL] = writing_deployment.key
-        app.state.writing_model = writing_deployment.client()
+        cortexgrid.wait_for_model_serving(writing_deployment.key)
+        app.state.writing_deployment = writing_deployment
     _log.info("Completion models created")

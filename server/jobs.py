@@ -79,8 +79,11 @@ class ParallelJobsManager:
     def get(self, target: str) -> Job | None:
         return self._by_target.get(target)
 
-    def forget(self, target: str) -> None:
-        self._by_target.pop(target, None)
+    def cancel(self, target: str) -> None:
+        job = self._by_target[target]
+        job.cancel()
+        if job.done:
+            del self._by_target[target]
 
     def reported(self, target: str) -> dict[str, Any]:
         job = self._by_target[target]

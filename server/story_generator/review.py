@@ -7,13 +7,7 @@ story as they leave it, or stop."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Protocol
-
-
-class Verdict(Enum):
-    ACCEPT = "accept"
-    STOP = "stop"
 
 
 class Shown(Protocol):
@@ -55,13 +49,12 @@ class EditorShown:
 
 @dataclass(frozen=True)
 class Asked:
-    """What the author is asked, numbered, so that the editor acts on every question
-    once: to review `story`, the story as a stage leaves it, with a part of
-    authorship shown."""
+    """What the author is asked about `stage`: to review `story`, the story as the
+    stage leaves it, with a part of authorship shown."""
 
-    number: int
+    stage: str
     story: str
     shown: Shown
 
     def written(self) -> dict[str, Any]:
-        return {"number": self.number, "story": self.story, "shown": self.shown.written()}
+        return {"stage": self.stage, "story": self.story, "shown": self.shown.written()}

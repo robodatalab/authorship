@@ -85,7 +85,7 @@ export function AuthorshipPanelCanvas({
         if (shown !== undefined && shown.kind !== "editor") {
             showTab(TAB_OF_EACH_KIND[shown.cellKind]);
         }
-    }, [asked?.number]);
+    }, [asked?.stage]);
 
     const commandHighlighted =
         shown?.kind === "command" ? shown.commandName : null;

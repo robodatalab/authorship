@@ -18,6 +18,8 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
         concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")
         document = Document.from_cells([concept])
         model = Mock()
+        deployment = Mock()
+        deployment.client_async.return_value = model
         model.complete.side_effect = [
             streamed(
                 "1 | earth, Varn's house | Varn learns she is pregnant.\n"
@@ -27,7 +29,7 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
             streamed("3 | mars, the base | Varn gives birth on Mars."),
         ]
 
-        lay_out, ends, second_event, third_event = Plots(model).run(document)
+        lay_out, ends, second_event, third_event = Plots(deployment).run(document)
         laid_out = await lay_out(document)
         with_the_ends = await ends(laid_out)
         with_the_second_event = await second_event(with_the_ends)
@@ -62,13 +64,15 @@ class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
         concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")
         document = Document.from_cells([concept])
         model = Mock()
+        deployment = Mock()
+        deployment.client_async.return_value = model
         model.complete.side_effect = [
             streamed(
                 "1 | earth, Varn's house | Varn learns she is pregnant.\n"
                 "4 | mars, the base | Varn buries her son on Mars."
             ),
         ]
-        lay_out, ends, _, _ = Plots(model).run(document)
+        lay_out, ends, _, _ = Plots(deployment).run(document)
         laid_out = await lay_out(document)
 
         with_the_ends = await ends(laid_out)

@@ -15,6 +15,7 @@ import re
 from authordoc.cells.plot_cell import PlotEdge
 from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory, InteractiveScene
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
@@ -69,10 +70,11 @@ class ChoicesStep(StageStep):
 
 class Choices(Stage):
 
-    def __init__(self, model: CompletingModel) -> None:
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel]) -> None:
+        self._deployment = deployment
 
     def run(self, document: Document) -> list[StageStep]:
+        model = self._deployment.client_async()
         story = InteractiveAuthorStory(document)
 
         choices_steps: list[StageStep] = []
@@ -86,7 +88,7 @@ class Choices(Stage):
             # The story ends at a scene no edge leaves: it has no choices.
             if not edges:
                 continue
-            choices_step = ChoicesStep(scene, edges, self._model)
+            choices_step = ChoicesStep(scene, edges, model)
             choices_steps.append(choices_step)
 
         return choices_steps

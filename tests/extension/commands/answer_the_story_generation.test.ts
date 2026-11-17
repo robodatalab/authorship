@@ -4,78 +4,70 @@ import { AnswerTheStoryGenerationCommand } from "../../../extension/vscode_runti
 import { files } from "../vscode";
 import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
 
-const THE_STORY = `
+const THE_STORY_REVIEWED = `
 <!-- cell: markdown id="c1" -->
 
-She saw the door.
+She saw the door at last.
 `;
 
 beforeEach(forgetWhatTheEditorDid);
 afterEach(() => vi.unstubAllGlobals());
 
-describe("AnswerTheStoryGenerationCommand — answers the generation", () => {
-    it("sends the author's verdict, with the story as the editor has it", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({}),
-            })
-            .mockRejectedValueOnce(new Error("connection refused"));
-        vi.stubGlobal("fetch", fetched);
-        const session = openStory(THE_STORY);
+describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => {
+    it("accepting saves the story with the stage done", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi
+                .fn()
+                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+                .mockRejectedValue(new Error("connection refused")),
+        );
+        const session = openStory(THE_STORY_REVIEWED);
+        session.showTheStoryGeneration({
+            running: false,
+            error: null,
+            progress: { steps: [] },
+            stages: [],
+            asked: {
+                stage: "concept titles",
+                story: "",
+                shown: {
+                    kind: "command",
+                    cellKind: "salient-concept",
+                    commandName: "addStoryAnnotation",
+                },
+            },
+        });
 
         await new AnswerTheStoryGenerationCommand().invoke(session, {
             verdict: "accept",
         });
 
-        const [answeredAt, answered] = fetched.mock.calls[0];
-        expect(answeredAt).toContain("/generate/story/answer");
-        expect(JSON.parse(answered.body)).toEqual({
-            path: STORY_FILE,
-            verdict: "accept",
-            story: '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-        });
+        expect(files.get(STORY_FILE)).toContain(
+            "stage: concept titles: True\nstage: concepts: False\n",
+        );
     });
 
-    it("takes the story back as its file has it once answered, and shows where the generation stands", async () => {
-        const leftOffAtTheConcepts = {
-            running: false,
-            cancelled: false,
-            error: null,
-            progress: { steps: [] },
-            stages: [
-                { name: "concept titles", done: true },
-                { name: "concepts", done: false },
-            ],
-            asked: null,
-        };
+    it("stopping takes the story back as its file has it", async () => {
         files.set(
             STORY_FILE,
-            '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n',
+            '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
         );
         vi.stubGlobal(
             "fetch",
             vi
                 .fn()
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve({}),
-                })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve(leftOffAtTheConcepts),
-                }),
+                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+                .mockRejectedValue(new Error("connection refused")),
         );
-        const session = openStory(THE_STORY);
+        const session = openStory(THE_STORY_REVIEWED);
 
         await new AnswerTheStoryGenerationCommand().invoke(session, {
             verdict: "stop",
         });
 
         expect(session.document.text).toBe(
-            '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n',
+            '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
         );
-        expect(session.theStoryGeneration).toEqual(leftOffAtTheConcepts);
     });
 });

@@ -43,6 +43,12 @@ def build_fake_completion_model(reply: str = DEFAULT_REPLY) -> mock.MagicMock:
     return model
 
 
+def build_fake_deployment(model: mock.MagicMock) -> mock.MagicMock:
+    deployment = mock.MagicMock()
+    deployment.client_async.return_value = model
+    return deployment
+
+
 class Health(unittest.TestCase):
     def test_answers_while_the_server_is_up(self) -> None:
         response = TestClient(app).get("/health")
@@ -81,7 +87,7 @@ class Models(unittest.TestCase):
 
 class RequestBeforeTheModelsAreDeployed(unittest.TestCase):
     def test_is_told_the_models_are_still_being_deployed(self) -> None:
-        app.state.causal_model = None
+        app.state.causal_deployment = None
 
         response = TestClient(app).post(
             "/generate/blurb", json={"path": "manuscript.author", "text": ""}
@@ -120,7 +126,7 @@ class Jobs(unittest.TestCase):
         self.manuscript.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
-            app.state.causal_model = None
+            app.state.causal_deployment = None
 
         self.addCleanup(_restore_model)
         app.state.jobs = ParallelJobsManager()
@@ -136,7 +142,7 @@ class Jobs(unittest.TestCase):
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
-        app.state.causal_model = model
+        app.state.causal_deployment = build_fake_deployment(model)
         client = TestClient(app)
 
         started = client.post(
@@ -178,7 +184,7 @@ class Jobs(unittest.TestCase):
 
         model = build_fake_completion_model()
         model.complete.side_effect = complete
-        app.state.causal_model = model
+        app.state.causal_deployment = build_fake_deployment(model)
         client = TestClient(app)
 
         started = client.post(
@@ -240,13 +246,14 @@ class GenerateBlurb(unittest.TestCase):
         self.document.write_text(self.written, encoding="utf-8")
 
         def _restore_model():
-            app.state.causal_model = None
+            app.state.causal_deployment = None
 
         self.addCleanup(_restore_model)
 
-        app.state.causal_model = build_fake_completion_model(
+        self.model = build_fake_completion_model(
             reply="A woman loses her name."
         )
+        app.state.causal_deployment = build_fake_deployment(self.model)
         app.state.jobs = ParallelJobsManager()
 
     def test_runs_as_a_job_and_hands_the_blurb_back(self) -> None:
@@ -299,7 +306,7 @@ class GenerateBlurb(unittest.TestCase):
             await asyncio.to_thread(release.wait, 5)
             yield CompletionChunk(content="A woman loses her name.")
 
-        app.state.causal_model.complete.side_effect = complete
+        self.model.complete.side_effect = complete
         client = TestClient(app)
 
         started = client.post(
@@ -331,7 +338,7 @@ class GenerateBlurb(unittest.TestCase):
             await asyncio.to_thread(release.wait, 5)
             yield CompletionChunk(content="A woman loses her name.")
 
-        app.state.causal_model.complete.side_effect = complete
+        self.model.complete.side_effect = complete
         client = TestClient(app)
 
         started = client.post(
@@ -349,7 +356,7 @@ class GenerateBlurb(unittest.TestCase):
         self.assertEqual(status["text"], "")
         # The second chapter was never read: stopping is what it did, not merely
         # what it was told.
-        self.assertEqual(app.state.causal_model.complete.call_count, 1)
+        self.assertEqual(self.model.complete.call_count, 1)
         self.assertEqual(status["progress"], {"written": 1, "chapters": 2})
         self.assertEqual(client.get("/jobs").json(), {"jobs": []})
 
@@ -362,7 +369,7 @@ class GenerateBlurb(unittest.TestCase):
             await asyncio.to_thread(release.wait, 5)
             yield CompletionChunk(content="A woman loses her name.")
 
-        app.state.causal_model.complete.side_effect = complete
+        self.model.complete.side_effect = complete
         client = TestClient(app)
 
         started = client.post(
@@ -436,13 +443,14 @@ class GenerateRecap(unittest.TestCase):
             ).save()
 
         def _restore_model():
-            app.state.causal_model = None
+            app.state.causal_deployment = None
 
         self.addCleanup(_restore_model)
 
-        app.state.causal_model = build_fake_completion_model(
+        self.model = build_fake_completion_model(
             reply="She has lost her name."
         )
+        app.state.causal_deployment = build_fake_deployment(self.model)
         app.state.jobs = ParallelJobsManager()
 
     def start(self, *documents: str):
@@ -481,7 +489,7 @@ class GenerateRecap(unittest.TestCase):
         client = TestClient(app)
         started = self.start("a.author")
         wait_for_writing(client, started.json()["id"])
-        said = app.state.causal_model.complete.call_args_list[0].args[0][1]["content"]
+        said = self.model.complete.call_args_list[0].args[0][1]["content"]
         self.assertIn("The lantern had gone out.", said)
 
     def test_leaves_every_document_alone(self) -> None:
@@ -508,7 +516,7 @@ class GenerateRecap(unittest.TestCase):
             await asyncio.to_thread(release.wait, 5)
             yield CompletionChunk(content="She has lost her name.")
 
-        app.state.causal_model.complete.side_effect = complete
+        self.model.complete.side_effect = complete
         client = TestClient(app)
 
         started = self.start("a.author", "b.author")
@@ -522,7 +530,7 @@ class GenerateRecap(unittest.TestCase):
         status = wait_for_writing(client, started.json()["id"])
         self.assertIsNone(status["error"])
         self.assertEqual(status["text"], "")
-        self.assertEqual(app.state.causal_model.complete.call_count, 1)
+        self.assertEqual(self.model.complete.call_count, 1)
 
 
 class ExportEpub(unittest.TestCase):
@@ -665,7 +673,7 @@ class FixStyle(unittest.TestCase):
         # ends. A stub any shorter is refused by the checks that keep a chapter
         # cut off mid-answer out of the document, which is as it should be.
         self.model = build_fake_completion_model(CORRECTED)
-        app.state.style_model = self.model
+        app.state.style_deployment = build_fake_deployment(self.model)
 
     def start(self, **asked: object) -> dict:
         client = TestClient(app)
@@ -727,56 +735,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class StoryGenerationStatus(unittest.TestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self._dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._dir.cleanup)
-        self.document = Path(self._dir.name) / f"story{storydoc.EXTENSION}"
-        app.state.jobs = ParallelJobsManager()
-
-    def test_a_story_no_generation_runs_on_stands_where_its_checkpoint_left_it(self) -> None:
-        self.document.write_text(
-            '<!-- cell: GeneratedDocumentCheckpoint id="k1" -->\n\n'
-            "stage: concept titles: True\n"
-            "stage: concepts: False\n",
-            encoding="utf-8",
-        )
-
-        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
-
-        self.assertEqual(
-            response.json(),
-            {
-                "running": False,
-                "cancelled": False,
-                "error": None,
-                "progress": {
-                    "doing": "story",
-                    "done": 0,
-                    "of": None,
-                    "seconds": 0.0,
-                    "secondsPerItem": None,
-                    "state": "waiting",
-                    "steps": [],
-                },
-                "stages": [
-                    {"name": "concept titles", "done": True},
-                    {"name": "concepts", "done": False},
-                ],
-                "asked": None,
-            },
-        )
-
-    def test_a_story_never_generated_has_no_stages(self) -> None:
-        self.document.write_text('<!-- cell: markdown id="m1" -->\n\nShe saw the door.\n', encoding="utf-8")
-
-        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
-
-        self.assertEqual(response.json()["stages"], [])
-
-
-class StoryGenerationStageByStage(unittest.TestCase):
+class StoryGenerationStage(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self._dir = tempfile.TemporaryDirectory()
@@ -785,7 +744,7 @@ class StoryGenerationStageByStage(unittest.TestCase):
         app.state.jobs = ParallelJobsManager()
 
         def _restore_model():
-            app.state.writing_model = None
+            app.state.writing_deployment = None
 
         self.addCleanup(_restore_model)
 
@@ -798,12 +757,15 @@ class StoryGenerationStageByStage(unittest.TestCase):
             time.sleep(0.005)
         raise AssertionError("the stage did not finish within 5s")
 
-    def test_runs_the_first_stage_not_finished_and_asks_the_author_to_review_it(self) -> None:
-        self.document.write_text("", encoding="utf-8")
-        app.state.writing_model = build_fake_completion_model()
+    def test_runs_the_stage_it_is_given_and_asks_the_author_to_review_it(self) -> None:
+        model = build_fake_completion_model()
+        app.state.writing_deployment = build_fake_deployment(model)
         client = TestClient(app)
 
-        client.post("/generate/story", json={"path": str(self.document)})
+        client.post(
+            "/generate/story",
+            json={"path": str(self.document), "story": "", "stage": "concept titles"},
+        )
         status = self.wait_for_the_stage(client)
 
         self.assertEqual(
@@ -813,17 +775,8 @@ class StoryGenerationStageByStage(unittest.TestCase):
                 "cancelled": False,
                 "error": None,
                 "progress": mock.ANY,
-                "stages": [
-                    {"name": "concept titles", "done": False},
-                    {"name": "concepts", "done": False},
-                    {"name": "plots", "done": False},
-                    {"name": "mesh", "done": False},
-                    {"name": "scenes", "done": False},
-                    {"name": "choices", "done": False},
-                    {"name": "validity", "done": False},
-                ],
                 "asked": {
-                    "number": 1,
+                    "stage": "concept titles",
                     "story": "",
                     "shown": {
                         "kind": "command",
@@ -834,106 +787,58 @@ class StoryGenerationStageByStage(unittest.TestCase):
             },
         )
 
-    def test_accepting_saves_the_story_and_runs_the_next_stage_on_it(self) -> None:
-        self.document.write_text("", encoding="utf-8")
-        app.state.writing_model = build_fake_completion_model("### Motherhood\nA mother's care.")
+    def test_runs_the_stage_on_the_story_the_editor_sends(self) -> None:
+        model = build_fake_completion_model("### Motherhood\nA mother's care.")
+        app.state.writing_deployment = build_fake_deployment(model)
         client = TestClient(app)
-        client.post("/generate/story", json={"path": str(self.document)})
-        self.wait_for_the_stage(client)
 
         client.post(
-            "/generate/story/answer",
+            "/generate/story",
             json={
                 "path": str(self.document),
-                "verdict": "accept",
-                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
-                '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
-                "stage: concept titles: False\n",
+                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n',
+                "stage": "concepts",
             },
         )
         status = self.wait_for_the_stage(client)
 
         self.assertEqual(
-            status,
+            status["asked"],
             {
-                "running": False,
-                "cancelled": False,
-                "error": None,
-                "progress": mock.ANY,
-                "stages": [
-                    {"name": "concept titles", "done": True},
-                    {"name": "concepts", "done": False},
-                    {"name": "plots", "done": False},
-                    {"name": "mesh", "done": False},
-                    {"name": "scenes", "done": False},
-                    {"name": "choices", "done": False},
-                    {"name": "validity", "done": False},
-                ],
-                "asked": {
-                    "number": 2,
-                    "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
-                    "A mother's care.\n\n"
-                    '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
-                    "stage: concept titles: True\n"
-                    "stage: concepts: False\n"
-                    "stage: plots: False\n"
-                    "stage: mesh: False\n"
-                    "stage: scenes: False\n"
-                    "stage: choices: False\n"
-                    "stage: validity: False\n",
-                    "shown": {"kind": "tab", "cellKind": "salient-concept"},
-                },
+                "stage": "concepts",
+                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
+                "A mother's care.\n",
+                "shown": {"kind": "tab", "cellKind": "salient-concept"},
             },
         )
 
-    def test_stopping_drops_the_question_and_leaves_the_story_where_it_was(self) -> None:
-        self.document.write_text(
-            '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
-            '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
-            "stage: concept titles: True\n"
-            "stage: concepts: False\n",
-            encoding="utf-8",
-        )
-        app.state.writing_model = build_fake_completion_model("### Motherhood\nA mother's care.")
-        client = TestClient(app)
-        client.post("/generate/story", json={"path": str(self.document)})
-        self.wait_for_the_stage(client)
-
-        client.post(
-            "/generate/story/answer",
-            json={"path": str(self.document), "verdict": "stop", "story": ""},
-        )
-        status = client.get("/generate/story/status", params={"id": str(self.document)}).json()
-        saved = self.document.read_text(encoding="utf-8")
-
-        self.assertEqual(
-            status,
-            {
-                "running": False,
-                "cancelled": False,
-                "error": None,
-                "progress": mock.ANY,
-                "stages": [
-                    {"name": "concept titles", "done": True},
-                    {"name": "concepts", "done": False},
-                ],
-                "asked": None,
-            },
-        )
-        self.assertEqual(
-            saved,
-            '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
-            '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\n'
-            "stage: concept titles: True\n"
-            "stage: concepts: False\n",
-        )
-
-    def test_answering_a_story_no_generation_asks_about_is_a_miss(self) -> None:
-        self.document.write_text("", encoding="utf-8")
+    def test_a_stage_it_does_not_know_is_refused(self) -> None:
+        model = build_fake_completion_model()
+        app.state.writing_deployment = build_fake_deployment(model)
 
         response = TestClient(app).post(
-            "/generate/story/answer",
-            json={"path": str(self.document), "verdict": "accept", "story": ""},
+            "/generate/story",
+            json={"path": str(self.document), "story": "", "stage": "epilogue"},
         )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_story_no_stage_ran_on_has_no_story_generation(self) -> None:
+        response = TestClient(app).get("/generate/story/status", params={"id": str(self.document)})
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_cancelling_a_stage_that_is_done_drops_what_it_asks(self) -> None:
+        model = build_fake_completion_model()
+        app.state.writing_deployment = build_fake_deployment(model)
+        client = TestClient(app)
+        client.post(
+            "/generate/story",
+            json={"path": str(self.document), "story": "", "stage": "concept titles"},
+        )
+        self.wait_for_the_stage(client)
+
+        client.post("/jobs/cancel", json={"path": str(self.document)})
+        response = client.get("/generate/story/status", params={"id": str(self.document)})
 
         self.assertEqual(response.status_code, 404)

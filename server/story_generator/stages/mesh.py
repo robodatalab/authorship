@@ -13,6 +13,7 @@ from collections.abc import Sequence
 
 from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document, SalientConceptCell
+import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
@@ -149,10 +150,11 @@ nothing else.
 
 class Mesh(Stage):
 
-    def __init__(self, model: CompletingModel) -> None:
-        self._model = model
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel]) -> None:
+        self._deployment = deployment
 
     def run(self, document: Document) -> list[StageStep]:
+        model = self._deployment.client_async()
         plots_at_the_start = document.plots()
         if not plots_at_the_start:
             return []
@@ -165,7 +167,7 @@ class Mesh(Stage):
         mesh_steps: list[StageStep] = []
         for step_index, changes_at_step in enumerate(trajectory):
             for first_plot_idx, second_plot_idx in changes_at_step:
-                mesh_step = MeshStep(first_plot_idx, second_plot_idx, step_index, self._model)
+                mesh_step = MeshStep(first_plot_idx, second_plot_idx, step_index, model)
                 mesh_steps.append(mesh_step)
 
         return mesh_steps
