@@ -91,7 +91,7 @@ const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
     asked: {
         stage: "concepts",
         story: THE_STORY_REVIEWED,
-        shown: { kind: "tab", cellKind: "salient-concept" },
+        shown: { kind: "cells", cellKind: "salient-concept" },
     },
 };
 
@@ -364,7 +364,7 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
             commandsExecuted: ["authorship.manuscript.focus"],
         },
         {
-            shown: { kind: "tab", cellKind: "plot" },
+            shown: { kind: "cells", cellKind: "plot" },
             commandsExecuted: ["authorship.manuscript.focus"],
         },
         {

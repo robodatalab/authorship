@@ -26,7 +26,7 @@ from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import CommandShown, Shown, TabShown
+from server.story_generator.review import CommandShown, Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 # Where the author adds the concepts: the Salient Concepts tab's add button.
@@ -107,4 +107,4 @@ class Concepts(Stage):
         return concepts_steps
 
     def shown(self) -> Shown:
-        return TabShown(SALIENT_CONCEPT)
+        return CellsShown(SALIENT_CONCEPT)

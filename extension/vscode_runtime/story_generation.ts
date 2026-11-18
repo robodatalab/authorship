@@ -1,13 +1,13 @@
 import type { ServerJob } from "./server/jobs";
 
-// The sidebar tab of a kind of cell.
-export interface StoryGenerationTabShown {
-    kind: "tab";
+// The cells of a kind, in the editor's metadata pane.
+export interface StoryGenerationCellsShown {
+    kind: "cells";
     cellKind: string;
 }
 
-// The sidebar tab of a kind of cell, with the button of one of its commands
-// highlighted: what the author is to do there.
+// The button of one of the editor's commands, for a kind of cell, highlighted
+// in the metadata pane: what the author is to do there.
 export interface StoryGenerationCommandShown {
     kind: "command";
     cellKind: string;
@@ -21,7 +21,7 @@ export interface StoryGenerationEditorShown {
 
 // The part of authorship the story generation brings into view for the author.
 export type StoryGenerationShown =
-    | StoryGenerationTabShown
+    | StoryGenerationCellsShown
     | StoryGenerationCommandShown
     | StoryGenerationEditorShown;
 

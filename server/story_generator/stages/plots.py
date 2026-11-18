@@ -25,7 +25,7 @@ from authordoc.storydoc import Document
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import Shown, TabShown
+from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | what happens.
@@ -206,4 +206,4 @@ class Plots(Stage):
         return plot_steps
 
     def shown(self) -> Shown:
-        return TabShown(PLOT)
+        return CellsShown(PLOT)

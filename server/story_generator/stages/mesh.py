@@ -16,7 +16,7 @@ from authordoc.storydoc import Document, SalientConceptCell
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.review import Shown, TabShown
+from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 INSTRUCTIONS = """You help an author mesh the plots of an interactive story into one world. The story is built from its salient concepts: every concept has a plot that illustrates it, and every plot respects every concept, so that a character who is a mother acts as a mother in whichever plot she appears.
@@ -178,7 +178,7 @@ class Mesh(Stage):
         return mesh_steps
 
     def shown(self) -> Shown:
-        return TabShown(PLOT)
+        return CellsShown(PLOT)
 
 
 def _concepts_str(concepts: Sequence[SalientConceptCell]) -> str:

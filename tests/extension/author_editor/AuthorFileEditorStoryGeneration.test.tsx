@@ -39,7 +39,7 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
     asked: {
         stage: "concepts",
         story: '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
-        shown: { kind: "tab", cellKind: "salient-concept" },
+        shown: { kind: "cells", cellKind: "salient-concept" },
     },
 };
 

@@ -1876,6 +1876,42 @@ describe("the metadata and the manuscript panes", () => {
         expect(highlighted).toEqual(expected);
     });
 
+    describe("the cells the story generation asks the author to review", () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        it.each([
+            ["scrolls the metadata pane to the first cell of the kind", { kind: "cells", cellKind: "plot" }, 200],
+            ["leaves the metadata pane where it is for a review of the story", { kind: "editor" }, 0],
+        ] as const)("%s", async (_, shown, expectedScrollTop) => {
+            vi.spyOn(
+                HTMLElement.prototype,
+                "getBoundingClientRect",
+            ).mockImplementation(function (this: HTMLElement) {
+                return { top: this.dataset.cellId === "p1" ? 300 : 100 } as DOMRect;
+            });
+
+            await mountCanvas({
+                cells: [
+                    new SalientConceptCell("Door", [], "", false, null, "k1"),
+                    new PlotCell("Bell", [], [], "", false, null, "p1"),
+                ],
+                cellDrawings: DRAWN_BY_THEIR_IDS,
+                storyGeneration: {
+                    running: false,
+                    error: null,
+                    progress: { steps: [] },
+                    stages: [{ name: "plots", done: false }],
+                    asked: { stage: "plots", story: "", shown },
+                },
+            });
+
+            const metadata = document.querySelector(
+                ".author-file-editor-metadata-pane > ul",
+            )!;
+            expect(metadata.scrollTop).toBe(expectedScrollTop);
+        });
+    });
+
     it("draws no menu in a pane that holds none of the kinds offered", async () => {
         await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
 

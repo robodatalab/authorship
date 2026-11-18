@@ -307,6 +307,7 @@ export function AuthorFileEditorCanvas({
     }
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
+    const metadataOnThePage = useRef<HTMLUListElement>(null);
     const canvasDrawn = useRef<HTMLDivElement>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<
         number | null
@@ -434,6 +435,30 @@ export function AuthorFileEditorCanvas({
     }
 
     const shownByTheStoryGeneration = storyGeneration?.asked?.shown;
+    const cellKindTheAuthorIsToReview =
+        shownByTheStoryGeneration?.kind === "cells"
+            ? shownByTheStoryGeneration.cellKind
+            : null;
+
+    useEffect(() => {
+        const scrolled = metadataOnThePage.current;
+        const firstOfTheKind = cells.find(
+            (cell) => cell.kind === cellKindTheAuthorIsToReview,
+        );
+        if (!scrolled || firstOfTheKind === undefined) {
+            return;
+        }
+        const drawn = scrolled.querySelector(
+            `li[data-cell-id="${firstOfTheKind.uniqueId}"]`,
+        );
+        if (!drawn) {
+            return;
+        }
+        scrolled.scrollTop +=
+            drawn.getBoundingClientRect().top -
+            scrolled.getBoundingClientRect().top;
+    }, [storyGeneration?.asked?.stage]);
+
     const cellKindTheAuthorIsToAdd =
         shownByTheStoryGeneration?.kind === "command" &&
         shownByTheStoryGeneration.commandName === insertCommand?.commandName
@@ -471,12 +496,12 @@ export function AuthorFileEditorCanvas({
         const sectionsInThePane = sections.filter(
             (section) => paneHoldingTheKind(section.cell.kind) === pane,
         );
-        const scrolledByTheRuler =
-            scopeClassName === undefined && pane === MANUSCRIPT_PANE;
+        const listOfThePane =
+            pane === MANUSCRIPT_PANE ? cellsOnThePage : metadataOnThePage;
         return (
             <ul
                 className={scopeClassName}
-                ref={scrolledByTheRuler ? cellsOnThePage : undefined}
+                ref={scopeClassName === undefined ? listOfThePane : undefined}
             >
                 <li>
                     {insertCellMenu(

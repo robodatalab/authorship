@@ -18,19 +18,19 @@ class Shown(Protocol):
 
 
 @dataclass(frozen=True)
-class TabShown:
-    """The sidebar tab of a kind of cell."""
+class CellsShown:
+    """The cells of a kind, in the editor's metadata pane."""
 
     cell_kind: str
 
     def written(self) -> dict[str, Any]:
-        return {"kind": "tab", "cellKind": self.cell_kind}
+        return {"kind": "cells", "cellKind": self.cell_kind}
 
 
 @dataclass(frozen=True)
 class CommandShown:
-    """The sidebar tab of a kind of cell, with the button of one of its commands
-    highlighted: what the author is to do there."""
+    """The button of one of the editor's commands, for a kind of cell,
+    highlighted in the metadata pane: what the author is to do there."""
 
     cell_kind: str
     command_name: str
