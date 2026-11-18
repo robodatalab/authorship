@@ -33,3 +33,15 @@ export function placesNestedIn(story: Document): Map<string, PlaceCell[]> {
     }
     return nested;
 }
+
+export function placeMayLieWithin(
+    place: PlaceCell,
+    around: PlaceCell,
+    story: Document,
+): boolean {
+    const aroundTheAround = placesAround(around, story);
+    const aroundLiesWithinThePlace = aroundTheAround.some(
+        (outer) => outer.uniqueId === place.uniqueId,
+    );
+    return around.uniqueId !== place.uniqueId && !aroundLiesWithinThePlace;
+}

@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type {
+    DragEvent,
+    HTMLAttributes,
+    PointerEvent as ReactPointerEvent,
+    ReactNode,
+} from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
 import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "./StoryGraphLayout";
+import {
+    placeMayLieWithin,
+    placesNestedIn,
+} from "../../vscode_runtime/place_hierarchy";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -26,7 +35,7 @@ import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { CHARACTER } from "authordoc/cells/character_cell";
 import { PART } from "authordoc/cells/part_cell";
-import { PLACE } from "authordoc/cells/place_cell";
+import { PLACE, PlaceCell } from "authordoc/cells/place_cell";
 import { PLOT } from "authordoc/cells/plot_cell";
 import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
@@ -66,6 +75,8 @@ const KINDS_IN_THE_METADATA_PANE = new Set([
     CHARACTER,
     PLACE,
 ]);
+
+const CELL_DRAGGED = "application/x-authorship-cell";
 
 function paneHoldingTheKind(kind: string): string {
     return KINDS_IN_THE_METADATA_PANE.has(kind)
@@ -177,6 +188,15 @@ export function AuthorFileEditorCanvas({
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
     const storyDocument = useMemo(() => Document.fromCells(cells), [cells]);
+    const placesNestedInEachPlace = useMemo(
+        () => placesNestedIn(storyDocument),
+        [storyDocument],
+    );
+    const placeIdsNested = useMemo(() => {
+        const placesNested = [...placesNestedInEachPlace.values()].flat();
+        const ids = placesNested.map((place) => place.uniqueId);
+        return new Set(ids);
+    }, [placesNestedInEachPlace]);
     const storyWords = useMemo(
         () => new StoryWordsIterator(storyDocument),
         [storyDocument],
@@ -313,6 +333,12 @@ export function AuthorFileEditorCanvas({
     const cellsOnThePage = useRef<HTMLUListElement>(null);
     const [metadataPaneShows, showInTheMetadataPane] = useState(METADATA_PANE);
     const metadataOnThePage = useRef<HTMLUListElement>(null);
+    const [cellIdDragged, dragTheCell] = useState<string | null>(null);
+    const [dropAimedAt, aimTheDrop] = useState<string | null>(null);
+    const cellDragged =
+        cellIdDragged === null
+            ? undefined
+            : storyDocument.cellWithId(cellIdDragged);
     const canvasDrawn = useRef<HTMLDivElement>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<
         number | null
@@ -513,6 +539,263 @@ export function AuthorFileEditorCanvas({
         );
     }
 
+    function startDraggingTheCell(
+        cell: Cell,
+        event: DragEvent<HTMLElement>,
+    ): void {
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(CELL_DRAGGED, cell.uniqueId);
+        dragTheCell(cell.uniqueId);
+    }
+
+    function stopDraggingTheCell(): void {
+        dragTheCell(null);
+        aimTheDrop(null);
+    }
+
+    function dropZone(
+        aimedAt: string,
+        landsHere: boolean,
+        land: () => void,
+    ): Pick<
+        HTMLAttributes<HTMLElement>,
+        "onDragOver" | "onDragLeave" | "onDrop"
+    > {
+        return {
+            onDragOver: (event) => {
+                if (!landsHere) {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = "move";
+                aimTheDrop(aimedAt);
+            },
+            onDragLeave: (event) => {
+                const leftFor = event.relatedTarget as Node | null;
+                if (event.currentTarget.contains(leftFor)) {
+                    return;
+                }
+                aimTheDrop((aimed) => (aimed === aimedAt ? null : aimed));
+            },
+            onDrop: (event) => {
+                if (!landsHere) {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                land();
+                stopDraggingTheCell();
+            },
+        };
+    }
+
+    function cellFollowing(cell: Cell): string | null {
+        const standsAt = storyDocument.cells.findIndex(
+            (inTheStory) => inTheStory.uniqueId === cell.uniqueId,
+        );
+        const following = storyDocument.cells[standsAt + 1];
+        return following?.uniqueId ?? null;
+    }
+
+    function moveTheCellDragged(
+        beforeCellId: string | null,
+        placeHoldingIt: PlaceCell | null,
+    ): void {
+        if (cellDragged instanceof PlaceCell) {
+            invokeAuthorDocumentCommand(sendMessagesToVscode, "movePlace", {
+                placeCellId: cellDragged.uniqueId,
+                beforeCellId,
+                parentCellId: placeHoldingIt?.uniqueId ?? "",
+            });
+            return;
+        }
+        invokeAuthorDocumentCommand(sendMessagesToVscode, "moveCell", {
+            cellId: cellIdDragged,
+            beforeCellId,
+        });
+    }
+
+    function gapBefore(
+        beforeCellId: string | null,
+        pane: string,
+        placeHoldingTheGap: PlaceCell | null,
+        cellKindHighlighted: string | null = null,
+    ): ReactNode {
+        const aimedAt = `${pane}>${placeHoldingTheGap?.uniqueId ?? ""}>${beforeCellId ?? ""}`;
+        const draggedWithinItsPane =
+            cellDragged !== undefined &&
+            paneHoldingTheKind(cellDragged.kind) === pane;
+        const landsHere =
+            placeHoldingTheGap === null
+                ? draggedWithinItsPane
+                : cellDragged instanceof PlaceCell &&
+                  placeMayLieWithin(
+                      cellDragged,
+                      placeHoldingTheGap,
+                      storyDocument,
+                  );
+        return (
+            <div
+                className={
+                    dropAimedAt === aimedAt
+                        ? "author-file-editor-cell-drop-zone author-file-editor-cell-drop-zone-aimed-at"
+                        : "author-file-editor-cell-drop-zone"
+                }
+                {...dropZone(aimedAt, landsHere, () =>
+                    moveTheCellDragged(beforeCellId, placeHoldingTheGap),
+                )}
+            >
+                {placeHoldingTheGap === null
+                    ? insertCellMenu(beforeCellId, pane, cellKindHighlighted)
+                    : null}
+            </div>
+        );
+    }
+
+    function dropOntoTheCell(
+        cell: Cell,
+    ): Pick<
+        HTMLAttributes<HTMLElement>,
+        "onDragOver" | "onDragLeave" | "onDrop"
+    > {
+        if (!(cell instanceof PlaceCell)) {
+            return {};
+        }
+        const landsHere =
+            cellDragged instanceof PlaceCell &&
+            placeMayLieWithin(cellDragged, cell, storyDocument);
+        const nestedInIt = placesNestedInEachPlace.get(cell.uniqueId) ?? [];
+        const lastNested = nestedInIt[nestedInIt.length - 1];
+        const beforeCellId = cellFollowing(lastNested ?? cell);
+        return dropZone(cell.uniqueId, landsHere, () =>
+            moveTheCellDragged(beforeCellId, cell),
+        );
+    }
+
+    function classNameOfTheCellOnThePage(cell: Cell): string | undefined {
+        const classNames = [
+            cell.folded ? "author-file-editor-cell-folded" : null,
+            dropAimedAt === cell.uniqueId
+                ? "author-file-editor-cell-drop-zone-aimed-at"
+                : null,
+        ];
+        const classNamesGiven = classNames.filter(
+            (className) => className !== null,
+        );
+        return classNamesGiven.length === 0
+            ? undefined
+            : classNamesGiven.join(" ");
+    }
+
+    function cellWithItsState(cell: Cell, cellDrawn: ReactNode): ReactNode {
+        return (
+            <AuthorFileEditorCellState
+                cellCommands={cellCommands}
+                runCommand={commands.find(
+                    (command) =>
+                        command.runsCellsOfKind === cell.kind,
+                )}
+                cellId={cell.uniqueId}
+                cellIsFolded={cell.folded}
+                timesTheHostWroteIt={
+                    timesTheHostWroteEachCell[cell.uniqueId] ??
+                    0
+                }
+                proseErrors={proseErrors.filter(
+                    (proseError) =>
+                        proseError.cellId === cell.uniqueId &&
+                        proseError.isVisible,
+                )}
+                storyTextHighlights={storyTextHighlightsByCellId.get(
+                    cell.uniqueId,
+                )}
+                storyTextShown={
+                    storyTextShown?.cellId === cell.uniqueId
+                        ? storyTextShown
+                        : undefined
+                }
+                onStoryTextClicked={(clickedAt) =>
+                    selectThePassagesClicked(
+                        cell.uniqueId,
+                        clickedAt,
+                    )
+                }
+                onStoryTextShownAt={bringTheStoryTextIntoView}
+                findMatches={findMatchesByCellId.get(
+                    cell.uniqueId,
+                )}
+                currentFindMatch={
+                    find.current?.cellId === cell.uniqueId
+                        ? find.current
+                        : null
+                }
+                howFarTheCellHasBeenWritten={
+                    cellsBeingWritten[cell.uniqueId]
+                }
+                wordsInTheSection={
+                    wordsInEverySection[cell.uniqueId]
+                }
+                onStoryTextSelected={(
+                    selectedFrom,
+                    selectedTo,
+                ) =>
+                    sendMessagesToVscode({
+                        type: "storyTextSelected",
+                        storyTextSelected:
+                            selectedFrom === selectedTo
+                                ? null
+                                : {
+                                      cellId: cell.uniqueId,
+                                      startCharacterOffsetInCell:
+                                          selectedFrom,
+                                      endCharacterOffsetInCell:
+                                          selectedTo,
+                                  },
+                    })
+                }
+                onDragStarted={(event) => startDraggingTheCell(cell, event)}
+                onDragEnded={stopDraggingTheCell}
+                sendMessagesToVscode={sendMessagesToVscode}
+            >
+                {cellDrawn}
+            </AuthorFileEditorCellState>
+        );
+    }
+
+    function placesWithinThePlace(place: PlaceCell): ReactNode {
+        const within = placesNestedInEachPlace.get(place.uniqueId) ?? [];
+        if (within.length === 0 || place.folded) {
+            return null;
+        }
+        const lastWithin = within[within.length - 1];
+        const whatFollowsTheScope = cellFollowing(lastWithin);
+        return (
+            <ul className="author-file-editor-place-scope">
+                <li>{gapBefore(within[0].uniqueId, METADATA_PANE, place)}</li>
+                {within.map((nested, nestedIndex) => {
+                    const nestedDrawn = nested.accept<ReactNode>(cellRenderer);
+                    const whatFollowsIt =
+                        within[nestedIndex + 1]?.uniqueId ??
+                        whatFollowsTheScope;
+                    return (
+                        <li
+                            key={nested.uniqueId}
+                            data-cell-id={nested.uniqueId}
+                            className={classNameOfTheCellOnThePage(nested)}
+                            {...dropOntoTheCell(nested)}
+                        >
+                            {cellWithItsState(nested, nestedDrawn)}
+                            {placesWithinThePlace(nested)}
+                            {gapBefore(whatFollowsIt, METADATA_PANE, place)}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    }
+
     function cellsInScope(
         sections: CellsInASection<Cell>[],
         whatFollowsTheScope: string | null,
@@ -530,10 +813,11 @@ export function AuthorFileEditorCanvas({
                 ref={scopeClassName === undefined ? listOfThePane : undefined}
             >
                 <li>
-                    {insertCellMenu(
+                    {gapBefore(
                         sectionsInThePane[0]?.cell.uniqueId ??
                             whatFollowsTheScope,
                         pane,
+                        null,
                         scopeClassName === undefined
                             ? cellKindTheAuthorIsToAdd
                             : null,
@@ -544,7 +828,10 @@ export function AuthorFileEditorCanvas({
                     const whatFollowsTheSection =
                         sections[sectionIndex + 1]?.cell.uniqueId ??
                         whatFollowsTheScope;
-                    if (!sectionsInThePane.includes(section)) {
+                    if (
+                        !sectionsInThePane.includes(section) ||
+                        placeIdsNested.has(cell.uniqueId)
+                    ) {
                         return null;
                     }
                     const cellDrawn = cell.accept<ReactNode>(cellRenderer);
@@ -555,80 +842,13 @@ export function AuthorFileEditorCanvas({
                         <li
                             key={cell.uniqueId}
                             data-cell-id={cell.uniqueId}
-                            className={
-                                cell.folded
-                                    ? "author-file-editor-cell-folded"
-                                    : undefined
-                            }
+                            className={classNameOfTheCellOnThePage(cell)}
+                            {...dropOntoTheCell(cell)}
                         >
-                            <AuthorFileEditorCellState
-                                cellCommands={cellCommands}
-                                runCommand={commands.find(
-                                    (command) =>
-                                        command.runsCellsOfKind === cell.kind,
-                                )}
-                                cellId={cell.uniqueId}
-                                cellIsFolded={cell.folded}
-                                timesTheHostWroteIt={
-                                    timesTheHostWroteEachCell[cell.uniqueId] ??
-                                    0
-                                }
-                                proseErrors={proseErrors.filter(
-                                    (proseError) =>
-                                        proseError.cellId === cell.uniqueId &&
-                                        proseError.isVisible,
-                                )}
-                                storyTextHighlights={storyTextHighlightsByCellId.get(
-                                    cell.uniqueId,
-                                )}
-                                storyTextShown={
-                                    storyTextShown?.cellId === cell.uniqueId
-                                        ? storyTextShown
-                                        : undefined
-                                }
-                                onStoryTextClicked={(clickedAt) =>
-                                    selectThePassagesClicked(
-                                        cell.uniqueId,
-                                        clickedAt,
-                                    )
-                                }
-                                onStoryTextShownAt={bringTheStoryTextIntoView}
-                                findMatches={findMatchesByCellId.get(
-                                    cell.uniqueId,
-                                )}
-                                currentFindMatch={
-                                    find.current?.cellId === cell.uniqueId
-                                        ? find.current
-                                        : null
-                                }
-                                howFarTheCellHasBeenWritten={
-                                    cellsBeingWritten[cell.uniqueId]
-                                }
-                                wordsInTheSection={
-                                    wordsInEverySection[cell.uniqueId]
-                                }
-                                onStoryTextSelected={(
-                                    selectedFrom,
-                                    selectedTo,
-                                ) =>
-                                    sendMessagesToVscode({
-                                        type: "storyTextSelected",
-                                        storyTextSelected:
-                                            selectedFrom === selectedTo
-                                                ? null
-                                                : {
-                                                      cellId: cell.uniqueId,
-                                                      startCharacterOffsetInCell:
-                                                          selectedFrom,
-                                                      endCharacterOffsetInCell:
-                                                          selectedTo,
-                                                  },
-                                    })
-                                }
-                                sendMessagesToVscode={sendMessagesToVscode}
-                            >
-                                {cellDrawn}
-                            </AuthorFileEditorCellState>
+                            {cellWithItsState(cell, cellDrawn)}
+                            {cell instanceof PlaceCell
+                                ? placesWithinThePlace(cell)
+                                : null}
                             {opensASection(cell.kind) && !cell.folded
                                 ? cellsInScope(
                                       section.within,
@@ -645,7 +865,7 @@ export function AuthorFileEditorCanvas({
                                               ),
                                       ),
                                   )
-                                : insertCellMenu(whatFollowsTheSection, pane)}
+                                : gapBefore(whatFollowsTheSection, pane, null)}
                         </li>
                     );
                 })}

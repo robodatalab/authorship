@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PlaceCell } from "authordoc/cells/place_cell";
 import { Document } from "authordoc/storydoc";
-import { placesAround, placesNestedIn } from "../../extension/vscode_runtime/place_hierarchy";
+import { placeMayLieWithin, placesAround, placesNestedIn } from "../../extension/vscode_runtime/place_hierarchy";
 
 const ENGLAND = '<!-- cell: place id="en" title="England" -->\n';
 const HOLLOWMERE = '<!-- cell: place id="hv" title="Hollowmere" parent="en" -->\n';
@@ -46,5 +46,22 @@ describe("the places nested in every place", () => {
             ["en", ["hv", "hg"]],
             ["hv", ["ln"]],
         ]);
+    });
+});
+
+describe("a place lying within another", () => {
+    it.each([
+        ["may, given a place outside it", "ln", "hg", true],
+        ["may, given the place it already lies within", "ln", "hv", true],
+        ["may not, given itself", "hv", "hv", false],
+        ["may not, given a place that lies within it", "en", "ln", false],
+    ])("%s", (_, placeId, aroundId, expected) => {
+        const story = new Document([ENGLAND, HOLLOWMERE, THE_LANE, HARROWGATE].join("\n"));
+        const place = story.cellWithId(placeId) as PlaceCell;
+        const around = story.cellWithId(aroundId) as PlaceCell;
+
+        const mayLieWithin = placeMayLieWithin(place, around, story);
+
+        expect(mayLieWithin).toBe(expected);
     });
 });

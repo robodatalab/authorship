@@ -30,9 +30,9 @@ import { FoldCellCommand } from "./fold_cell";
 import { GenerateStoryCommand } from "./generate_story";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
-import { MoveCellDownCommand } from "./move_cell_down";
-import { MoveCellUpCommand } from "./move_cell_up";
+import { MoveCellCommand } from "./move_cell";
 import { MoveNodeInPlotCommand } from "./move_node_in_plot";
+import { MovePlaceCommand } from "./move_place";
 import { OpenAsTextCommand } from "./open_as_text";
 import { RemoveCharacterFromPlotCommand } from "./remove_character_from_plot";
 import { RemoveCharacterFromPlotEventCommand } from "./remove_character_from_plot_event";
@@ -43,7 +43,6 @@ import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
 import { RemoveReferenceFromSalientConceptCommand } from "./remove_reference_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
-import { SetParentOfPlaceCommand } from "./set_parent_of_place";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
@@ -74,8 +73,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
         "Unfold this section",
         false,
     ),
-    new MoveCellUpCommand(),
-    new MoveCellDownCommand(),
+    new MoveCellCommand(),
     new DeleteCellCommand(),
     new InsertCellCommand(),
     new ReplaceCellCommand(),
@@ -101,7 +99,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new RemoveCharacterFromPlotCommand(),
     new AddConceptToCharacterCommand(),
     new RemoveConceptFromCharacterCommand(),
-    new SetParentOfPlaceCommand(),
+    new MovePlaceCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

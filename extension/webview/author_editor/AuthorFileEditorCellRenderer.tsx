@@ -210,7 +210,6 @@ export class AuthorFileEditorCellRenderer implements CellVisitor<ReactNode> {
         return (
             <AuthorFileEditorPlaceCell
                 cell={cell}
-                story={this.story}
                 sendMessagesToVscode={this.sendMessagesToVscode}
             />
         );

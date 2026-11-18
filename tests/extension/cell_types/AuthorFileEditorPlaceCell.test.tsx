@@ -54,85 +54,12 @@ describe("a place cell", () => {
                 <MarkdownEditorMediator onEditingTheCell={() => undefined}>
                     <AuthorFileEditorPlaceCell
                         cell={story.cellWithId(placeId) as PlaceCell}
-                        story={story}
                         sendMessagesToVscode={(message) => posted.push(message)}
                     />
                 </MarkdownEditorMediator>,
             );
         });
     }
-
-    async function click(element: Element): Promise<void> {
-        await act(async () => {
-            element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        });
-    }
-
-    it("shows the place it lies within", async () => {
-        await mountThePlace("hv");
-
-        const parent = document.querySelector(
-            ".author-file-editor-place-parent .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown",
-        )?.textContent;
-        expect(parent).toBe("England");
-    });
-
-    it("offers every other place but those that lie within it", async () => {
-        await mountThePlace("hv");
-        await click(
-            document.querySelector(
-                ".author-file-editor-place-parent .author-file-editor-cell-reference-chosen",
-            )!,
-        );
-
-        const offered = [
-            ...document.querySelectorAll(
-                ".author-file-editor-place-parent .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
-            ),
-        ].map((place) => place.textContent);
-        expect(offered).toEqual(["Harrowgate"]);
-    });
-
-    it("asks for the place chosen to be its parent", async () => {
-        await mountThePlace("hv");
-        await click(
-            document.querySelector(
-                ".author-file-editor-place-parent .author-file-editor-cell-reference-chosen",
-            )!,
-        );
-
-        await click(
-            document.querySelector(
-                ".author-file-editor-place-parent .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
-            )!,
-        );
-
-        expect(posted).toEqual([
-            {
-                type: "invoke",
-                commandName: "setParentOfPlace",
-                commandArguments: { placeCellId: "hv", parentCellId: "hg" },
-            },
-        ]);
-    });
-
-    it("asks for it to be taken out of its parent", async () => {
-        await mountThePlace("hv");
-
-        await click(
-            document.querySelector(
-                ".author-file-editor-place-parent .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-removed",
-            )!,
-        );
-
-        expect(posted).toEqual([
-            {
-                type: "invoke",
-                commandName: "setParentOfPlace",
-                commandArguments: { placeCellId: "hv", parentCellId: "" },
-            },
-        ]);
-    });
 
     it("keeps its parent when it is renamed", async () => {
         await mountThePlace("hv");

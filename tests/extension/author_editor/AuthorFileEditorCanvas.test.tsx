@@ -249,7 +249,7 @@ describe("where the insert menus go", () => {
         for (const item of listItems().slice(1)) {
             const children = [...item.children];
             expect(children[0].className).toBe("test-cell");
-            expect(children[1].className).toBe(
+            expect(children[1].firstElementChild?.className).toBe(
                 "author-file-editor-insert-cell-menu",
             );
         }
@@ -501,14 +501,14 @@ describe("the commands on a cell", () => {
             cells: [markdownCell("one")],
             cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
-                command("moveCellUp", "cell"),
+                command("foldCell", "cell"),
                 command("deleteCell", "cell"),
             ],
         });
 
         expect(
             document.querySelectorAll(
-                ".author-file-editor-cell .author-file-editor-cell-actions-button",
+                ".author-file-editor-cell button.author-file-editor-cell-actions-button",
             ),
         ).toHaveLength(2);
     });
@@ -518,14 +518,14 @@ describe("the commands on a cell", () => {
             cells: [markdownCell("one")],
             cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
-                command("moveCellUp", "cell"),
+                command("foldCell", "cell"),
                 command("deleteCell", "cell"),
             ],
         });
 
         await click(
             document.querySelectorAll(
-                ".author-file-editor-cell-actions-button",
+                "button.author-file-editor-cell-actions-button",
             )[1],
         );
 
@@ -546,7 +546,7 @@ describe("the commands on a cell", () => {
         });
 
         for (const button of document.querySelectorAll(
-            ".author-file-editor-cell-actions-button",
+            "button.author-file-editor-cell-actions-button",
         )) {
             await click(button);
         }
@@ -624,7 +624,7 @@ describe("two commands drawn as one button", () => {
         });
         return [
             ...document.querySelectorAll(
-                ".author-file-editor-cell-actions-button",
+                "button.author-file-editor-cell-actions-button",
             ),
         ].map((button) => button.getAttribute("title") ?? "");
     }
@@ -651,7 +651,7 @@ describe("two commands drawn as one button", () => {
         });
 
         await click(
-            document.querySelector(".author-file-editor-cell-actions-button")!,
+            document.querySelector("button.author-file-editor-cell-actions-button")!,
         );
 
         expect(posted).toEqual([
@@ -911,7 +911,7 @@ describe("the scope of a part and of a chapter", () => {
         ]);
 
         const menu = document.querySelector(
-            "li[data-cell-id='c1'] > .author-file-editor-insert-cell-menu",
+            "li[data-cell-id='c1'] > .author-file-editor-cell-drop-zone > .author-file-editor-insert-cell-menu",
         )!;
         expect(menu).not.toBeNull();
         await click(menu.querySelector("button")!);
@@ -926,7 +926,7 @@ describe("the scope of a part and of a chapter", () => {
         ]);
 
         const menu = document.querySelector(
-            ".author-file-editor-part-scope > li > .author-file-editor-insert-cell-menu",
+            ".author-file-editor-part-scope > li > .author-file-editor-cell-drop-zone > .author-file-editor-insert-cell-menu",
         )!;
         await click(menu.querySelector("button")!);
 
@@ -2023,5 +2023,134 @@ describe("the metadata and the manuscript panes", () => {
                 (invocation) => invocation.commandArguments.beforeCellId,
             ),
         ).toEqual(expected);
+    });
+});
+
+describe("moving cells by dragging them", () => {
+    const DRAWN_WITH_THEIR_ACTIONS: CellDrawings = {
+        markdown: () => <AuthorFileEditorCell />,
+        character: () => <AuthorFileEditorCell />,
+        place: () => <AuthorFileEditorCell />,
+    };
+
+    const THE_STORY = [
+        new PlaceCell("Harrowgate", "", false, null, "hg"),
+        new PlaceCell("England", "", false, null, "en"),
+        new PlaceCell("Hollowmere", "", false, null, "hv", "en"),
+        new PlaceCell("The lane", "", false, null, "ln", "hv"),
+        new CharacterCell("Varn", "", false, null, "v1"),
+        markdownCell("She saw the door.", "m1"),
+    ];
+
+    const FIRST_GAP_OF_THE_METADATA =
+        ".author-file-editor-metadata-pane > ul > li:first-child > .author-file-editor-cell-drop-zone";
+    const FIRST_GAP_OF_THE_MANUSCRIPT =
+        ".author-file-editor-manuscript-pane > ul > li:first-child > .author-file-editor-cell-drop-zone";
+    const FIRST_GAP_WITHIN_ENGLAND =
+        "li[data-cell-id='en'] > .author-file-editor-place-scope > li:first-child > .author-file-editor-cell-drop-zone";
+
+    async function dragAndDrop(
+        draggedId: string,
+        droppedOnSelector: string,
+    ): Promise<void> {
+        const dataTransfer = {
+            setData: () => undefined,
+            effectAllowed: "",
+            dropEffect: "",
+        };
+        const handle = document.querySelector(
+            `li[data-cell-id='${draggedId}'] .author-file-editor-cell-drag-handle`,
+        )!;
+        const droppedOn = document.querySelector(droppedOnSelector)!;
+        await act(async () => {
+            const dragStarted = new Event("dragstart", { bubbles: true });
+            handle.dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
+        });
+        await act(async () => {
+            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
+            droppedOn.dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
+        });
+        await act(async () => {
+            const dropped = new Event("drop", { bubbles: true, cancelable: true });
+            droppedOn.dispatchEvent(Object.assign(dropped, { dataTransfer }));
+        });
+    }
+
+    it("draws every place under the place it lies within", async () => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+
+        const nestedUnder = [
+            ...document.querySelectorAll(".author-file-editor-place-scope"),
+        ].map((scope) => [
+            scope.parentElement!.getAttribute("data-cell-id"),
+            [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
+                nested.getAttribute("data-cell-id"),
+            ),
+        ]);
+
+        expect(nestedUnder).toEqual([
+            ["en", ["hv"]],
+            ["hv", ["ln"]],
+        ]);
+    });
+
+    it.each([
+        [
+            "a cell dropped in a gap, to stand before the cell after the gap",
+            "v1",
+            FIRST_GAP_OF_THE_METADATA,
+            [{ type: "invoke", commandName: "moveCell", commandArguments: { cellId: "v1", beforeCellId: "hg" } }],
+        ],
+        [
+            "a place dropped in a gap outside every place, out of the place it lies within",
+            "ln",
+            FIRST_GAP_OF_THE_METADATA,
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "ln", beforeCellId: "hg", parentCellId: "" } }],
+        ],
+        [
+            "a place dropped in a gap within a place, within that place",
+            "hg",
+            FIRST_GAP_WITHIN_ENGLAND,
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "hv", parentCellId: "en" } }],
+        ],
+        [
+            "a place dropped onto a place, within it after the places already in it",
+            "hg",
+            "li[data-cell-id='hv']",
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "v1", parentCellId: "hv" } }],
+        ],
+        ["nothing for a place dropped onto a place within it", "en", "li[data-cell-id='ln']", []],
+        ["nothing for a cell dropped in the other pane", "v1", FIRST_GAP_OF_THE_MANUSCRIPT, []],
+        ["nothing for a cell that is not a place dropped within a place", "v1", FIRST_GAP_WITHIN_ENGLAND, []],
+        ["nothing for a cell that is not a place dropped onto a place", "v1", "li[data-cell-id='hg']", []],
+    ])("asks to move %s", async (_, draggedId, droppedOnSelector, expected) => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+
+        await dragAndDrop(draggedId, droppedOnSelector);
+
+        expect(posted).toEqual(expected);
+    });
+
+    it("outlines where the cell dragged would land", async () => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+        const dataTransfer = { setData: () => undefined, effectAllowed: "", dropEffect: "" };
+        await act(async () => {
+            const dragStarted = new Event("dragstart", { bubbles: true });
+            document
+                .querySelector("li[data-cell-id='hg'] .author-file-editor-cell-drag-handle")!
+                .dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
+        });
+
+        await act(async () => {
+            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
+            document
+                .querySelector("li[data-cell-id='hv']")!
+                .dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
+        });
+
+        const outlined = [
+            ...document.querySelectorAll(".author-file-editor-cell-drop-zone-aimed-at"),
+        ].map((aimedAt) => aimedAt.getAttribute("data-cell-id"));
+        expect(outlined).toEqual(["hv"]);
     });
 });
