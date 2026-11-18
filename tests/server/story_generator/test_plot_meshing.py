@@ -2,6 +2,7 @@ import unittest
 from collections.abc import AsyncIterator
 from unittest.mock import Mock
 
+from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.storydoc import Document
@@ -162,4 +163,27 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
                 PlotNode("p2e3", None, "3", intersection.unique_id, [], "intersection"),
                 PlotNode("p2e4", None, "4", intersection.unique_id, [], "intersection"),
             ],
+        )
+
+
+class MeshStepCharacters(unittest.IsolatedAsyncioTestCase):
+    async def test_the_events_that_meet_take_part_with_the_characters_of_both(self):
+        varn = CharacterCell("Varn", "", False, None, "v1")
+        dax = CharacterCell("Dax", "", False, None, "x1")
+        lia = CharacterCell("Lia", "", False, None, "d1")
+        first_plot = PlotCell("plot 1", [PlotNode("p1e1", None, "1", "", ["v1", "d1"], "Varn hides the water.")], [], "", False, None, "plot-1")
+        second_plot = PlotCell("plot 2", [PlotNode("p2e1", None, "1", "", ["x1", "v1"], "Dax searches the base.")], [], "", False, None, "plot-2")
+        document = Document.from_cells([varn, dax, lia, first_plot, second_plot])
+        model = Mock()
+        deployment = Mock()
+        deployment.client_async.return_value = model
+        model.complete.side_effect = [streamed("mars, the base | Dax finds the water Varn hid.")]
+        (meeting,) = Mesh(deployment).run(document)
+
+        meshed = await meeting(document)
+
+        first, second = meshed.plots()
+        self.assertEqual(
+            (first.nodes[0].characters(meshed), second.nodes[0].characters(meshed)),
+            ([varn, lia, dax], [varn, lia, dax]),
         )

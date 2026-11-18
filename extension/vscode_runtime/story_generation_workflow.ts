@@ -14,6 +14,7 @@ import type {
 const STAGES_IN_ORDER = [
     "concept titles",
     "concepts",
+    "characters",
     "plots",
     "mesh",
     "scenes",
@@ -28,10 +29,6 @@ const STAGE_IN_THE_CHECKPOINT = "stage: ";
 const STAGE_DONE = "True";
 
 const STAGE_NOT_DONE = "False";
-
-// Opens the Authorship panel in the sidebar: VS Code gives every view a command
-// that focuses it.
-const OPEN_THE_AUTHORSHIP_PANEL = "authorship.manuscript.focus";
 
 function stagesDoneInTheCheckpoint(document: Document): Set<string> {
     const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
@@ -186,14 +183,10 @@ export class StoryGenerationWorkflow {
     }
 
     // Brings what the generation asks into view: the story as a stage leaves it,
-    // to review, in the editor, and the part of authorship the stage worked in. A
-    // tab, or a command in it, is shown in the Authorship panel, which is opened on
-    // it and draws its own part of it.
+    // to review, in the editor, which draws the part of authorship the stage
+    // worked in itself.
     private showWhatTheStageAsks(asked: StoryGenerationAsked): void {
         this.session.importDocumentFromText(asked.story);
-        if (asked.shown.kind !== "editor") {
-            void vscode.commands.executeCommand(OPEN_THE_AUTHORSHIP_PANEL);
-        }
     }
 
     private showTheStageJob(stageJob: StoryGenerationStageJob): void {

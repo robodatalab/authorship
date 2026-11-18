@@ -338,7 +338,7 @@ describe("a plot cell", () => {
 
             const conceptsShown = Array.from(
                 document.querySelectorAll(
-                    ".author-file-editor-plot-concepts .author-file-editor-plot-references-referenced .author-file-editor-story-annotation-passage-shown",
+                    ".author-file-editor-plot-concepts .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown",
                 ),
                 (concept) => concept.textContent,
             );
@@ -352,7 +352,7 @@ describe("a plot cell", () => {
                 eventIdSelected: null,
             });
             const removeButton = document.querySelector(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-references-referenced .author-file-editor-story-annotation-passage-removed",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-removed",
             )!;
 
             await click(removeButton);
@@ -376,14 +376,14 @@ describe("a plot cell", () => {
                 eventIdSelected: null,
             });
             const chooseButton = document.querySelector(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-reference-chosen",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-reference-chosen",
             )!;
 
             await click(chooseButton);
 
             const conceptsOffered = Array.from(
                 document.querySelectorAll(
-                    ".author-file-editor-plot-concepts .author-file-editor-plot-references-to-choose .author-file-editor-story-annotation-passage-shown",
+                    ".author-file-editor-plot-concepts .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
                 ),
                 (concept) => concept.textContent,
             );
@@ -397,17 +397,17 @@ describe("a plot cell", () => {
                 eventIdSelected: null,
             });
             const chooseButton = document.querySelector(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-reference-chosen",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-reference-chosen",
             )!;
             await click(chooseButton);
             const thePromise = document.querySelector(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-references-to-choose .author-file-editor-story-annotation-passage-shown",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
             )!;
 
             await click(thePromise);
 
             const offering = document.querySelector(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-references-to-choose",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-references-to-choose",
             );
             expect(posted).toEqual([
                 {
@@ -430,7 +430,7 @@ describe("a plot cell", () => {
             });
 
             const chooseButton = document.querySelector<HTMLButtonElement>(
-                ".author-file-editor-plot-concepts .author-file-editor-plot-reference-chosen",
+                ".author-file-editor-plot-concepts .author-file-editor-cell-reference-chosen",
             )!;
             expect(chooseButton.disabled).toBe(true);
         });
@@ -635,7 +635,7 @@ describe("a plot cell", () => {
 
             const named = [
                 ...document.querySelectorAll(
-                    `${referencesShown} .author-file-editor-plot-references-referenced .author-file-editor-story-annotation-passage-shown`,
+                    `${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
                 ),
             ].map((reference) => reference.textContent);
             expect(named).toEqual(expected);
@@ -651,14 +651,14 @@ describe("a plot cell", () => {
                 eventIdSelected: "e1",
             });
             const chooseButton = document.querySelector(
-                `${referencesShown} .author-file-editor-plot-reference-chosen`,
+                `${referencesShown} .author-file-editor-cell-reference-chosen`,
             )!;
 
             await click(chooseButton);
 
             const offered = [
                 ...document.querySelectorAll(
-                    `${referencesShown} .author-file-editor-plot-references-to-choose .author-file-editor-story-annotation-passage-shown`,
+                    `${referencesShown} .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown`,
                 ),
             ].map((reference) => reference.textContent);
             expect(offered).toEqual(expected);
@@ -690,11 +690,11 @@ describe("a plot cell", () => {
                 eventIdSelected: "e1",
             });
             const chooseButton = document.querySelector(
-                `${referencesShown} .author-file-editor-plot-reference-chosen`,
+                `${referencesShown} .author-file-editor-cell-reference-chosen`,
             )!;
             await click(chooseButton);
             const chosen = document.querySelector(
-                `${referencesShown} .author-file-editor-plot-references-to-choose .author-file-editor-story-annotation-passage-shown`,
+                `${referencesShown} .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown`,
             )!;
 
             await click(chosen);
@@ -728,7 +728,7 @@ describe("a plot cell", () => {
                 eventIdSelected: "e1",
             });
             const takeOut = document.querySelector(
-                `${referencesShown} .author-file-editor-plot-references-referenced .author-file-editor-story-annotation-passage-removed`,
+                `${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-removed`,
             )!;
 
             await click(takeOut);
@@ -1314,6 +1314,89 @@ describe("a plot cell", () => {
             { type: "selectPassage", cellKind: "plot", passageId: "n2" },
             { type: "showStoryWordRange", firstWord: 6, lastWord: 7 },
         ]);
+    });
+
+
+    describe("the plot's main characters", () => {
+        const FOLLOWING_VARN = [
+            THE_STORY,
+            '<!-- cell: character id="v1" title="Varn" -->',
+            "",
+            '<!-- cell: character id="d1" title="Lia" -->',
+            "",
+            '<!-- cell: plot id="p1" title="The door" characters="v1" -->',
+            "",
+            "She finds the door.",
+            "",
+        ].join("\n");
+
+        it("lists the characters the plot follows by their names", async () => {
+            await mountPlots({ story: FOLLOWING_VARN });
+
+            const followed = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-plot-characters .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown",
+                ),
+            ].map((character) => character.textContent);
+            expect(followed).toEqual(["Varn"]);
+        });
+
+        it("offers only the characters the plot does not follow yet", async () => {
+            await mountPlots({ story: FOLLOWING_VARN });
+            const chooseButton = document.querySelector(
+                ".author-file-editor-plot-characters .author-file-editor-cell-reference-chosen",
+            )!;
+
+            await click(chooseButton);
+
+            const offered = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-plot-characters .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
+                ),
+            ].map((character) => character.textContent);
+            expect(offered).toEqual(["Lia"]);
+        });
+
+        it("asks for the character chosen to be followed", async () => {
+            await mountPlots({ story: FOLLOWING_VARN });
+            await click(
+                document.querySelector(
+                    ".author-file-editor-plot-characters .author-file-editor-cell-reference-chosen",
+                )!,
+            );
+
+            await click(
+                document.querySelector(
+                    ".author-file-editor-plot-characters .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown",
+                )!,
+            );
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "addCharacterToPlot",
+                    commandArguments: { annotationCellId: "p1", characterCellId: "d1" },
+                },
+            ]);
+        });
+
+        it("asks for a character to stop being followed", async () => {
+            await mountPlots({ story: FOLLOWING_VARN });
+
+            await click(
+                document.querySelector(
+                    ".author-file-editor-plot-characters .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-removed",
+                )!,
+            );
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "removeCharacterFromPlot",
+                    commandArguments: { annotationCellId: "p1", characterCellId: "v1" },
+                },
+            ]);
+        });
     });
 
 });

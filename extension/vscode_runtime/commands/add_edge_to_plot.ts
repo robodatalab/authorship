@@ -40,17 +40,7 @@ export class AddEdgeToPlotCommand implements AuthorDocumentCommand {
             const edgeId = crypto.randomUUID();
             const edgeAdded = new PlotEdge(edgeId, fromNodeId, toNodeId);
             const edges = [...plot.edges, edgeAdded];
-            const withTheEdge = new PlotCell(
-                plot.title,
-                plot.nodes,
-                edges,
-                plot.overview,
-                plot.folded,
-                plot.at,
-                plot.uniqueId,
-            );
-            const concepts = plot.concepts(story);
-            const plotConnected = withTheEdge.withConcepts(concepts);
+            const plotConnected = plot.withEdges(edges);
             const storyChanged = story.withCell(plotConnected);
             return storyChanged;
         });

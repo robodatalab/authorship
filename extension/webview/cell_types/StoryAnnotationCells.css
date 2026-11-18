@@ -27,7 +27,7 @@
 }
 
 .author-file-editor-story-annotation-assign,
-.author-file-editor-plot-reference-chosen,
+.author-file-editor-cell-reference-chosen,
 .author-file-editor-story-annotation-passage-removed {
     display: inline-flex;
     align-items: center;
@@ -40,7 +40,7 @@
 }
 
 .author-file-editor-story-annotation-assign:hover:enabled,
-.author-file-editor-plot-reference-chosen:hover:enabled,
+.author-file-editor-cell-reference-chosen:hover:enabled,
 .author-file-editor-story-annotation-passage-shown:hover,
 .author-file-editor-story-annotation-passage-removed:hover {
     background: var(
@@ -50,7 +50,7 @@
 }
 
 .author-file-editor-story-annotation-assign:disabled,
-.author-file-editor-plot-reference-chosen:disabled {
+.author-file-editor-cell-reference-chosen:disabled {
     opacity: 0.4;
     cursor: default;
 }
@@ -115,7 +115,7 @@
     color: var(--vscode-list-inactiveSelectionForeground, inherit);
 }
 
-.author-file-editor-plot-references-referenced .author-file-editor-story-annotation-passage-shown {
+.author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown {
     cursor: default;
 }
 

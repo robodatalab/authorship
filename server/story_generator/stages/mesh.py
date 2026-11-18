@@ -5,17 +5,15 @@ put and the others turn round it, a seat a step, and with an odd number of plots
 one sits out every step. Every plot's event at a step happens at the step's
 moment, and the two events of every pair are rewritten to happen in one place,
 where the people of both plots come together: the two plots share a scene. The
-author reviews the meetings in the Plots tab."""
+author reviews the meetings in the metadata pane."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from authordoc.cells.plot_cell import PLOT
-from authordoc.storydoc import Document, SalientConceptCell
+from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
+from server.story_generator.interactive_author_story import InteractiveAuthorStory, written_under_their_titles
 from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
@@ -103,17 +101,19 @@ class MeshStep(StageStep):
         story = InteractiveAuthorStory(document)
         first_place_name = story.place_name_of(first_event)
         second_place_name = story.place_name_of(second_event)
+        first_who = story.names_of_the_characters_in(first_event) or "no one named"
+        second_who = story.names_of_the_characters_in(second_event) or "no one named"
         first_concepts = first_plot.concepts(document)
         second_concepts = second_plot.concepts(document)
-        first_written = _concepts_str(first_concepts)
-        second_written = _concepts_str(second_concepts)
+        first_written = written_under_their_titles(first_concepts)
+        second_written = written_under_their_titles(second_concepts)
         user = "Merge the two events."
         system = f"""
 Two story plot events meet, and we need to unify them.
-Event 1, at {first_place_name}:
+Event 1, at {first_place_name}, with {first_who}:
 {first_event.summary}
 
-Event 2, at {second_place_name}:
+Event 2, at {second_place_name}, with {second_who}:
 {second_event.summary}
 
 The events are a part of two plots that attempt to detail salient concepts:
@@ -137,10 +137,18 @@ nothing else.
         merged_event_desc, merged_event_place_name = _parse_event_str(merged_event_str)
         story_with_the_merged_place, merged_place = story.with_place_named(merged_event_place_name)
 
+        first_characters = first_event.characters(document)
+        second_characters = second_event.characters(document)
+        first_character_ids = [character.unique_id for character in first_characters]
+        only_in_the_second = [character for character in second_characters if character.unique_id not in first_character_ids]
+        merged_characters = [*first_characters, *only_in_the_second]
+
         first_meshed = first_event.with_summary(merged_event_desc)
         first_meshed = first_meshed.with_place(merged_place)
+        first_meshed = first_meshed.with_characters(merged_characters)
         second_meshed = second_event.with_summary(merged_event_desc)
         second_meshed = second_meshed.with_place(merged_place)
+        second_meshed = second_meshed.with_characters(merged_characters)
         # Both events happen at the step's moment: the mesh's schedule is the world's clock.
         moment = str(self._step_index + 1)
         first_meshed = first_meshed.with_timestamp(moment)
@@ -179,13 +187,6 @@ class Mesh(Stage):
 
     def shown(self) -> Shown:
         return CellsShown(PLOT)
-
-
-def _concepts_str(concepts: Sequence[SalientConceptCell]) -> str:
-    """The concepts, each under its title, with its description."""
-    described = [f"### {concept.title}\n{concept.source}" for concept in concepts]
-    written = "\n\n".join(described) or "None yet."
-    return written
 
 
 def _parse_event_str(event_str: str) -> tuple[str, str]:

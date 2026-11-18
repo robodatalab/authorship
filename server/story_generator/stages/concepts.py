@@ -1,9 +1,9 @@
 """The story's salient concepts: what the story is about, kept as its salient
 concept cells, first in the story. The author adds the concepts of their
-choosing in the Salient Concepts tab; then the model describes every one of them,
+choosing in the editor's metadata pane; then the model describes every one of them,
 in the light of the others, as what it is really about and in what light the
 story shows it. The model adds no concept: the story is about what the author
-chose. The author reviews the descriptions in the Salient Concepts tab.
+chose. The author reviews the descriptions in the metadata pane.
 
 A concept is an idea, not a thing that appears in the story: a general theme the
 story is built on, such as motherhood or war, or a story-specific hook, such as
@@ -29,7 +29,7 @@ from cortexgrid_infer import CompletingModel
 from server.story_generator.review import CommandShown, Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
-# Where the author adds the concepts: the Salient Concepts tab's add button.
+# Where the author adds the concepts: the metadata pane's button that adds a concept.
 ADD_THE_CONCEPTS = CommandShown(SALIENT_CONCEPT, "insertCell")
 
 DESCRIPTION_INSTRUCTIONS = """You help an author describe what an interactive story is about: its salient concepts, the ideas a reader should come away understanding, though the story never states them.
@@ -86,7 +86,7 @@ class DescribeConceptsStep(StageStep):
 
 class ConceptTitles(Stage):
     """The concepts of the author's choosing: the stage does no work of its own,
-    and the author adds the concepts at its review, in the Salient Concepts tab."""
+    and the author adds the concepts at its review, in the metadata pane."""
 
     def run(self, document: Document) -> list[StageStep]:
         return []

@@ -23,6 +23,10 @@ import {
     replaceTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    AuthorFileEditorCellReferences,
+    type AuthorFileEditorCellReferencesWording,
+} from "./AuthorFileEditorCellReferences";
 import { AuthorFileEditorStoryAnnotationShownInTheManuscript } from "./AuthorFileEditorStoryAnnotationShownInTheManuscript";
 import {
     PlotTrajectoryLanes,
@@ -49,21 +53,28 @@ const DELETE_THE_STORY_TEXT = "Delete the story text of this event";
 // How many of the words that tell an untitled event its row shows.
 const FIRST_WORDS_SHOWN = 6;
 const DISCONNECT_THE_NODES = "Disconnect these nodes";
-const PLOT_CONCEPTS_WORDING: AuthorFileEditorPlotReferencesWording = {
+const PLOT_CONCEPTS_WORDING: AuthorFileEditorCellReferencesWording = {
     heading: "Concepts",
     referenceOne: "Reference a salient concept from this plot",
     stopReferencing: "Stop referencing this concept",
     noneReferenced: "No concepts referenced yet",
     untitled: "Untitled concept",
 };
-const EVENT_PLACE_WORDING: AuthorFileEditorPlotReferencesWording = {
+const PLOT_CHARACTERS_WORDING: AuthorFileEditorCellReferencesWording = {
+    heading: "Main characters",
+    referenceOne: "Follow a character throughout this plot",
+    stopReferencing: "Stop following this character",
+    noneReferenced: "No main characters followed yet",
+    untitled: "Untitled character",
+};
+const EVENT_PLACE_WORDING: AuthorFileEditorCellReferencesWording = {
     heading: "Place",
     referenceOne: "Choose the place the event happens in",
     stopReferencing: "Take the event out of this place",
     noneReferenced: "No place chosen yet",
     untitled: "Untitled place",
 };
-const EVENT_CHARACTERS_WORDING: AuthorFileEditorPlotReferencesWording = {
+const EVENT_CHARACTERS_WORDING: AuthorFileEditorCellReferencesWording = {
     heading: "Characters",
     referenceOne: "Add a character to this event",
     stopReferencing: "Take this character out of the event",
@@ -115,6 +126,16 @@ export function AuthorFileEditorPlotCell({
     const conceptsToChoose = story
         .salientConcepts()
         .filter((concept) => !conceptIdsReferenced.includes(concept.uniqueId));
+    const charactersFollowed = cell.characters(story);
+    const characterIdsFollowed = charactersFollowed.map(
+        (character) => character.uniqueId,
+    );
+    const charactersInTheStory = story.cells.filter(
+        (storyCell) => storyCell instanceof CharacterCell,
+    );
+    const charactersToFollow = charactersInTheStory.filter(
+        (character) => !characterIdsFollowed.includes(character.uniqueId),
+    );
     const fields: AuthorFileEditorCellField[] = [
         {
             label: "Title",
@@ -198,7 +219,7 @@ export function AuthorFileEditorPlotCell({
                     />
                 </AuthorFileEditorCellCard>
                 <AuthorFileEditorCellCard>
-                    <AuthorFileEditorPlotReferences
+                    <AuthorFileEditorCellReferences
                         className="author-file-editor-plot-concepts"
                         referencedCells={conceptsReferenced}
                         cellsToChoose={conceptsToChoose}
@@ -220,6 +241,34 @@ export function AuthorFileEditorPlotCell({
                                 commandArguments: {
                                     annotationCellId: cell.uniqueId,
                                     conceptCellId,
+                                },
+                            })
+                        }
+                    />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellReferences
+                        className="author-file-editor-plot-characters"
+                        referencedCells={charactersFollowed}
+                        cellsToChoose={charactersToFollow}
+                        wording={PLOT_CHARACTERS_WORDING}
+                        onReferenced={(characterCellId) =>
+                            sendMessagesToVscode({
+                                type: "invoke",
+                                commandName: "addCharacterToPlot",
+                                commandArguments: {
+                                    annotationCellId: cell.uniqueId,
+                                    characterCellId,
+                                },
+                            })
+                        }
+                        onStoppedReferencing={(characterCellId) =>
+                            sendMessagesToVscode({
+                                type: "invoke",
+                                commandName: "removeCharacterFromPlot",
+                                commandArguments: {
+                                    annotationCellId: cell.uniqueId,
+                                    characterCellId,
                                 },
                             })
                         }
@@ -357,7 +406,7 @@ function AuthorFileEditorPlotEvent({
                 <h4>Event</h4>
             </div>
             <AuthorFileEditorCellFields fields={fields} />
-            <AuthorFileEditorPlotReferences
+            <AuthorFileEditorCellReferences
                 className="author-file-editor-plot-event-place"
                 referencedCells={placeReferenced}
                 cellsToChoose={placesToChoose}
@@ -367,7 +416,7 @@ function AuthorFileEditorPlotEvent({
                 }
                 onStoppedReferencing={() => sayOfTheEvent("place", "")}
             />
-            <AuthorFileEditorPlotReferences
+            <AuthorFileEditorCellReferences
                 className="author-file-editor-plot-event-characters"
                 referencedCells={charactersReferenced}
                 cellsToChoose={charactersToChoose}
@@ -453,110 +502,6 @@ function AuthorFileEditorPlotEvent({
                 </li>
             </ul>
         </section>
-    );
-}
-
-interface AuthorFileEditorPlotReferencedCell {
-    readonly uniqueId: string;
-    readonly title: string;
-}
-
-interface AuthorFileEditorPlotReferencesWording {
-    heading: string;
-    referenceOne: string;
-    stopReferencing: string;
-    noneReferenced: string;
-    untitled: string;
-}
-
-interface AuthorFileEditorPlotReferencesProps {
-    className: string;
-    referencedCells: readonly AuthorFileEditorPlotReferencedCell[];
-    cellsToChoose: readonly AuthorFileEditorPlotReferencedCell[];
-    wording: AuthorFileEditorPlotReferencesWording;
-    onReferenced: (cellId: string) => void;
-    onStoppedReferencing: (cellId: string) => void;
-}
-
-// The cells a plot or one of its events references: each can be stopped being
-// referenced, and the story's other cells of the kind can be chosen to be.
-function AuthorFileEditorPlotReferences({
-    className,
-    referencedCells,
-    cellsToChoose,
-    wording,
-    onReferenced,
-    onStoppedReferencing,
-}: AuthorFileEditorPlotReferencesProps) {
-    const [choosing, setChoosing] = useState(false);
-
-    function reference(cellId: string): void {
-        setChoosing(false);
-        onReferenced(cellId);
-    }
-
-    return (
-        <div className={className}>
-            <div className="author-file-editor-story-annotation-passages-heading">
-                <h4>{wording.heading}</h4>
-                <button
-                    type="button"
-                    className="author-file-editor-plot-reference-chosen"
-                    title={wording.referenceOne}
-                    aria-label={wording.referenceOne}
-                    aria-expanded={choosing}
-                    disabled={cellsToChoose.length === 0}
-                    onClick={() => setChoosing(!choosing)}
-                >
-                    <i className="codicon codicon-add" />
-                </button>
-            </div>
-            {choosing && cellsToChoose.length > 0 ? (
-                <ul className="author-file-editor-story-annotation-passages author-file-editor-plot-references-to-choose">
-                    {cellsToChoose.map((cell) => (
-                        <li
-                            key={cell.uniqueId}
-                            className="author-file-editor-story-annotation-passage"
-                        >
-                            <button
-                                type="button"
-                                className="author-file-editor-story-annotation-passage-shown"
-                                onClick={() => reference(cell.uniqueId)}
-                            >
-                                {cell.title || wording.untitled}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
-            {referencedCells.length === 0 ? (
-                <div className="author-file-editor-idle">
-                    {wording.noneReferenced}
-                </div>
-            ) : (
-                <ul className="author-file-editor-story-annotation-passages author-file-editor-plot-references-referenced">
-                    {referencedCells.map((cell) => (
-                        <li
-                            key={cell.uniqueId}
-                            className="author-file-editor-story-annotation-passage"
-                        >
-                            <span className="author-file-editor-story-annotation-passage-shown">
-                                {cell.title || wording.untitled}
-                            </span>
-                            <button
-                                type="button"
-                                className="author-file-editor-story-annotation-passage-removed"
-                                title={wording.stopReferencing}
-                                aria-label={wording.stopReferencing}
-                                onClick={() => onStoppedReferencing(cell.uniqueId)}
-                            >
-                                <i className="codicon codicon-close" />
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
     );
 }
 

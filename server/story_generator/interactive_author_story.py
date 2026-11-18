@@ -28,6 +28,7 @@ import re
 from collections.abc import Sequence
 from functools import cached_property
 
+from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
@@ -45,7 +46,8 @@ _CHOICE = re.compile(rf"^<li{_ATTRIBUTES}>(.*)</li>$")
 _CHOICES_CLOSED = "</ol>"
 _EDGE = "edge"
 
-# Parts the moment, the place and what happens of an event written out for the model.
+# Parts the moment, the place, the characters and what happens of an event written
+# out for the model.
 SEPARATOR = " | "
 
 
@@ -214,9 +216,10 @@ class InteractiveAuthorStory:
         return table
 
     def written_event(self, event: PlotNode) -> str:
-        """The event as its moment, place and what happens."""
+        """The event as its moment, place, characters and what happens."""
         place_name = self.place_name_of(event)
-        line = SEPARATOR.join((event.timestamp, place_name, event.summary))
+        names = self.names_of_the_characters_in(event)
+        line = SEPARATOR.join((event.timestamp, place_name, names, event.summary))
         return line
 
     def place_name_of(self, event: PlotNode) -> str:
@@ -246,6 +249,27 @@ class InteractiveAuthorStory:
 
     def written_concepts(self) -> str:
         """Every concept, each under its title, with its description."""
-        described = [f"### {concept.title}\n{concept.source}" for concept in self.document.salient_concepts()]
-        written = "\n\n".join(described) or "None yet."
+        concepts = self.document.salient_concepts()
+        written = written_under_their_titles(concepts)
         return written
+
+    def character_named(self, name: str) -> CharacterCell | None:
+        characters = [cell for cell in self.document.cells if isinstance(cell, CharacterCell)]
+        named = next((character for character in characters if character.title == name), None)
+        return named
+
+    def with_character(self, character: CharacterCell) -> InteractiveAuthorStory:
+        document = self.document.with_cells([*self.document.cells, character])
+        story = InteractiveAuthorStory(document)
+        return story
+
+    def names_of_the_characters_in(self, event: PlotNode) -> str:
+        characters = event.characters(self.document)
+        names = ", ".join(character.title for character in characters)
+        return names
+
+
+def written_under_their_titles(cells: Sequence[SalientConceptCell | CharacterCell]) -> str:
+    described = [f"### {cell.title}\n{cell.source}" for cell in cells]
+    written = "\n\n".join(described) or "None yet."
+    return written

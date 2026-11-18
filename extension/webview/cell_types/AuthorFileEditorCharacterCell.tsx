@@ -17,19 +17,41 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    AuthorFileEditorCellReferences,
+    type AuthorFileEditorCellReferencesWording,
+} from "./AuthorFileEditorCellReferences";
 import { CHARACTER, CharacterCell } from "authordoc/cells/character_cell";
+import type { Document } from "authordoc/storydoc";
+
+const CHARACTER_CONCEPTS_WORDING: AuthorFileEditorCellReferencesWording = {
+    heading: "Concepts",
+    referenceOne: "Have this character support a salient concept",
+    stopReferencing: "Stop having this character support this concept",
+    noneReferenced: "Supports no concepts yet",
+    untitled: "Untitled concept",
+};
 
 interface AuthorFileEditorCharacterCellProps {
     cell: CharacterCell;
+    story: Document;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorCharacterCell({
     cell,
+    story,
     sendMessagesToVscode,
 }: AuthorFileEditorCharacterCellProps) {
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
+    const conceptsSupported = cell.concepts(story);
+    const conceptIdsSupported = conceptsSupported.map(
+        (concept) => concept.uniqueId,
+    );
+    const conceptsToChoose = story
+        .salientConcepts()
+        .filter((concept) => !conceptIdsSupported.includes(concept.uniqueId));
     const fields: AuthorFileEditorCellField[] = [
         {
             label: "Name",
@@ -41,6 +63,7 @@ export function AuthorFileEditorCharacterCell({
                     cell.folded,
                     cell.at,
                     cell.uniqueId,
+                    cell._concepts,
                 );
                 replaceTheCell(sendMessagesToVscode, renamed);
             },
@@ -69,6 +92,34 @@ export function AuthorFileEditorCharacterCell({
                                 cell.uniqueId,
                                 backstory,
                             )
+                        }
+                    />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellReferences
+                        className="author-file-editor-character-concepts"
+                        referencedCells={conceptsSupported}
+                        cellsToChoose={conceptsToChoose}
+                        wording={CHARACTER_CONCEPTS_WORDING}
+                        onReferenced={(conceptCellId) =>
+                            sendMessagesToVscode({
+                                type: "invoke",
+                                commandName: "addConceptToCharacter",
+                                commandArguments: {
+                                    characterCellId: cell.uniqueId,
+                                    conceptCellId,
+                                },
+                            })
+                        }
+                        onStoppedReferencing={(conceptCellId) =>
+                            sendMessagesToVscode({
+                                type: "invoke",
+                                commandName: "removeConceptFromCharacter",
+                                commandArguments: {
+                                    characterCellId: cell.uniqueId,
+                                    conceptCellId,
+                                },
+                            })
                         }
                     />
                 </AuthorFileEditorCellCard>

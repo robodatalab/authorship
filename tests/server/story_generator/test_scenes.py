@@ -99,7 +99,7 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.model.complete.assert_called_once_with(
             [
                 {"role": "system", "content": SCENE_INSTRUCTIONS},
-                {"role": "user", "content": "Where: mars, the base\n\nWhat happens:\nDax takes the water from Varn and her son."},
+                {"role": "user", "content": "Where: mars, the base\nWho: no one named\n\nWhat happens:\nDax takes the water from Varn and her son."},
             ],
         )
 

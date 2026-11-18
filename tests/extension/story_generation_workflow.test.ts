@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-    StoryGenerationShown,
-    StoryGenerationStageJob,
-} from "../../extension/vscode_runtime/story_generation";
+import type { StoryGenerationStageJob } from "../../extension/vscode_runtime/story_generation";
 import { executedCommands, files, shownMessages } from "./vscode";
 import {
     closeTheStoryEditor,
@@ -26,6 +23,7 @@ She saw the door.
 
 stage: concept titles: True
 stage: concepts: False
+stage: characters: False
 stage: plots: False
 stage: mesh: False
 stage: scenes: False
@@ -41,6 +39,7 @@ She saw the door.
 
 stage: concept titles: True
 stage: concepts: True
+stage: characters: True
 stage: plots: True
 stage: mesh: True
 stage: scenes: True
@@ -56,6 +55,7 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: False
+stage: characters: False
 stage: plots: False
 stage: mesh: False
 stage: scenes: False
@@ -66,6 +66,7 @@ stage: validity: False
 const STAGES_LEFT_OFF_AT_THE_CONCEPTS = [
     { name: "concept titles", done: true },
     { name: "concepts", done: false },
+    { name: "characters", done: false },
     { name: "plots", done: false },
     { name: "mesh", done: false },
     { name: "scenes", done: false },
@@ -245,13 +246,14 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: True
+stage: characters: False
 stage: plots: False
 stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
 `);
-        expect(JSON.parse(started.body).stage).toBe("plots");
+        expect(JSON.parse(started.body).stage).toBe("characters");
     });
 });
 
@@ -353,49 +355,6 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
             stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
         });
     });
-
-    it.each<{ shown: StoryGenerationShown; commandsExecuted: string[] }>([
-        {
-            shown: {
-                kind: "command",
-                cellKind: "salient-concept",
-                commandName: "insertCell",
-            },
-            commandsExecuted: ["authorship.manuscript.focus"],
-        },
-        {
-            shown: { kind: "cells", cellKind: "plot" },
-            commandsExecuted: ["authorship.manuscript.focus"],
-        },
-        {
-            shown: { kind: "editor" },
-            commandsExecuted: [],
-        },
-    ])(
-        "opens the Authorship panel only on a part of its own: $shown.kind",
-        async ({ shown, commandsExecuted }) => {
-            vi.stubGlobal(
-                "fetch",
-                vi.fn().mockResolvedValueOnce({
-                    ok: true,
-                    json: () =>
-                        Promise.resolve({
-                            ...ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS,
-                            asked: {
-                                stage: "concepts",
-                                story: THE_STORY_REVIEWED,
-                                shown,
-                            },
-                        }),
-                }),
-            );
-            const session = openStory(LEFT_OFF_AT_THE_CONCEPTS);
-
-            await session.storyGenerationWorkflow.showWhereItStands();
-
-            expect(executedCommands).toEqual(commandsExecuted);
-        },
-    );
 
     it("follows a stage still running on the story's file until it stops", async () => {
         vi.stubGlobal(

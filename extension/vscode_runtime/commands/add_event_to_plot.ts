@@ -29,17 +29,7 @@ export class AddEventToPlotCommand implements AuthorDocumentCommand {
             }
             const eventAdded = new PlotNode(nodeId, null);
             const nodes = [...plot.nodes, eventAdded];
-            const withTheEvent = new PlotCell(
-                plot.title,
-                nodes,
-                plot.edges,
-                plot.overview,
-                plot.folded,
-                plot.at,
-                plot.uniqueId,
-            );
-            const concepts = plot.concepts(story);
-            const plotGrown = withTheEvent.withConcepts(concepts);
+            const plotGrown = plot.withNodes(nodes);
             const storyChanged = story.withCell(plotGrown);
             return storyChanged;
         });

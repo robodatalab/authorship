@@ -38,7 +38,8 @@ class SceneStep(StageStep):
         event, *_ = self._events
         story = InteractiveAuthorStory(document)
         place_name = story.place_name_of(event)
-        request = f"Where: {place_name}\n\nWhat happens:\n{event.summary}"
+        who = story.names_of_the_characters_in(event) or "no one named"
+        request = f"Where: {place_name}\nWho: {who}\n\nWhat happens:\n{event.summary}"
         messages = [{"role": "system", "content": SCENE_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
