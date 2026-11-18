@@ -1,8 +1,8 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlaceCell } from "authordoc/cells/place_cell";
-import { moveTheSection } from "authordoc/story_sections";
 import { placeMayLieWithin } from "../place_hierarchy";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { moveTheSection } from "./move_cell";
 
 export class MovePlaceCommand implements AuthorDocumentCommand {
     readonly commandName = "movePlace";
