@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AnswerTheStoryGenerationCommand } from "../../../extension/vscode_runtime/commands/answer_the_story_generation";
-import { files } from "../vscode";
+import { files, keptInTheWorkspace } from "../vscode";
 import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
 
-const THE_STORY_REVIEWED = `
+const THE_STORY_AWAITING_REVIEW = `
 <!-- cell: markdown id="c1" -->
 
 She saw the door at last.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: Review
 `;
 
 beforeEach(forgetWhatTheEditorDid);
@@ -17,27 +21,9 @@ describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => 
     it("accepting saves the story with the stage done", async () => {
         vi.stubGlobal(
             "fetch",
-            vi
-                .fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-                .mockRejectedValue(new Error("connection refused")),
+            vi.fn().mockRejectedValue(new Error("connection refused")),
         );
-        const session = openStory(THE_STORY_REVIEWED);
-        session.showTheStoryGeneration({
-            running: false,
-            error: null,
-            progress: { steps: [] },
-            stages: [],
-            asked: {
-                stage: "concept titles",
-                story: "",
-                shown: {
-                    kind: "command",
-                    cellKind: "salient-concept",
-                    commandName: "insertCell",
-                },
-            },
-        });
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
 
         await new AnswerTheStoryGenerationCommand().invoke(session, {
             verdict: "accept",
@@ -48,22 +34,16 @@ describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => 
         );
     });
 
-    it("stopping takes the story back as its file has it", async () => {
-        files.set(
-            STORY_FILE,
-            '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-        );
-        vi.stubGlobal(
-            "fetch",
-            vi
-                .fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-                .mockRejectedValue(new Error("connection refused")),
-        );
-        const session = openStory(THE_STORY_REVIEWED);
+    it("rejecting puts back the story as it was before the stage", async () => {
+        keptInTheWorkspace.set("storyGenerationReview:/stories/story.author", {
+            shown: { kind: "editor" },
+            storyBeforeTheStage:
+                '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
+        });
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
 
         await new AnswerTheStoryGenerationCommand().invoke(session, {
-            verdict: "stop",
+            verdict: "reject",
         });
 
         expect(session.document.text).toBe(

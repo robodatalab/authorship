@@ -8,6 +8,7 @@ import {
 import { RemoveConceptFromPlotCommand } from "../../../extension/vscode_runtime/commands/remove_concept_from_plot";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import { STORY_FILE, openStory } from "./open_story";
+import { workspaceState } from "../vscode";
 
 const THE_STORY = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
 
@@ -49,6 +50,7 @@ describe("RemoveConceptFromPlotCommand — makes a plot stop referencing a salie
             vscode.Uri.file(STORY_FILE),
             THE_STORY,
             edited as never,
+            workspaceState as never,
         );
         new RemoveConceptFromPlotCommand().invoke(session, {
             annotationCellId: "p1",

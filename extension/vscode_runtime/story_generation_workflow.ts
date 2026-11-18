@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 
 import { UnknownCell } from "authordoc/cells/unknown_cell";
-import type { Document } from "authordoc/storydoc";
+import { Document } from "authordoc/storydoc";
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import { fetchFromServer } from "./server/fetch";
 import { awaitServerJob, startServerJob } from "./server/jobs";
 import type {
     StoryGenerationAsked,
+    StoryGenerationShown,
     StoryGenerationStageJob,
     StoryGenerationWorkflowStage,
 } from "./story_generation";
@@ -28,44 +29,67 @@ const STAGE_IN_THE_CHECKPOINT = "stage: ";
 
 const STAGE_DONE = "True";
 
+const STAGE_AWAITING_REVIEW = "Review";
+
 const STAGE_NOT_DONE = "False";
 
-function stagesDoneInTheCheckpoint(document: Document): Set<string> {
+const REVIEW_KEPT_FOR = "storyGenerationReview:";
+
+const SHOWN_WITHOUT_THE_REVIEW_KEPT: StoryGenerationShown = { kind: "editor" };
+
+interface StoryGenerationReviewKept {
+    shown: StoryGenerationShown;
+    storyBeforeTheStage: string;
+}
+
+function stateOfEachStageInTheCheckpoint(
+    document: Document,
+): Map<string, string> {
     const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
     const lines = checkpoint?.source.split("\n") ?? [];
-    const stagesDone = new Set<string>();
+    const stateOfEachStage = new Map<string, string>();
     for (const line of lines) {
         if (!line.startsWith(STAGE_IN_THE_CHECKPOINT)) {
             continue;
         }
         const written = line.slice(STAGE_IN_THE_CHECKPOINT.length);
-        const doneAt = written.lastIndexOf(": ");
-        const stage = written.slice(0, doneAt);
-        const done = written.slice(doneAt + 2);
-        if (done === STAGE_DONE) {
-            stagesDone.add(stage);
-        }
+        const stateAt = written.lastIndexOf(": ");
+        const stage = written.slice(0, stateAt);
+        const state = written.slice(stateAt + 2);
+        stateOfEachStage.set(stage, state);
     }
-    return stagesDone;
+    return stateOfEachStage;
 }
 
 function stagesOf(document: Document): StoryGenerationWorkflowStage[] {
-    const stagesDone = stagesDoneInTheCheckpoint(document);
+    const stateOfEachStage = stateOfEachStageInTheCheckpoint(document);
     const stages = STAGES_IN_ORDER.map((name) => {
-        const done = stagesDone.has(name);
+        const done = stateOfEachStage.get(name) === STAGE_DONE;
         return { name, done };
     });
     return stages;
 }
 
-function withTheStageDone(document: Document, stageDone: string): Document {
-    const stages = stagesOf(document);
-    const lines = stages.map((stage) => {
-        const done =
-            stage.done || stage.name === stageDone
-                ? STAGE_DONE
-                : STAGE_NOT_DONE;
-        return `${STAGE_IN_THE_CHECKPOINT}${stage.name}: ${done}`;
+function stageAwaitingReview(document: Document): string | undefined {
+    const stateOfEachStage = stateOfEachStageInTheCheckpoint(document);
+    const stageAwaiting = STAGES_IN_ORDER.find(
+        (name) => stateOfEachStage.get(name) === STAGE_AWAITING_REVIEW,
+    );
+    return stageAwaiting;
+}
+
+function withTheStageIn(
+    document: Document,
+    stageChanged: string,
+    stateOfTheStage: string,
+): Document {
+    const stateOfEachStage = stateOfEachStageInTheCheckpoint(document);
+    const lines = STAGES_IN_ORDER.map((name) => {
+        const state =
+            name === stageChanged
+                ? stateOfTheStage
+                : (stateOfEachStage.get(name) ?? STAGE_NOT_DONE);
+        return `${STAGE_IN_THE_CHECKPOINT}${name}: ${state}`;
     });
     const source = lines.join("\n");
     const held = document.getCell(UnknownCell, CHECKPOINT);
@@ -76,11 +100,11 @@ function withTheStageDone(document: Document, stageDone: string): Document {
     const others = document.cells.filter(
         (cell) => cell.uniqueId !== checkpoint.uniqueId,
     );
-    const documentWithTheStageDone = document.withCells([
+    const documentWithTheStageChanged = document.withCells([
         ...others,
         checkpoint,
     ]);
-    return documentWithTheStageDone;
+    return documentWithTheStageChanged;
 }
 
 function withoutTheCheckpoint(document: Document): Document {
@@ -99,13 +123,21 @@ function showTheFailureToGenerate(failure: unknown): void {
 }
 
 export class StoryGenerationWorkflow {
-    constructor(private readonly session: AuthorFileEditorSession) {}
+    constructor(
+        private readonly session: AuthorFileEditorSession,
+        private readonly workspaceState: vscode.Memento,
+    ) {}
 
     async runTheNextStage(): Promise<void> {
         const stages = stagesOf(this.session.document);
         const nextStage = stages.find((stage) => !stage.done);
         if (nextStage === undefined) {
             this.session.showTheStoryGeneration(null);
+            return;
+        }
+        const stageAwaiting = stageAwaitingReview(this.session.document);
+        if (stageAwaiting !== undefined) {
+            this.showWhereItLeftOff();
             return;
         }
         try {
@@ -122,36 +154,48 @@ export class StoryGenerationWorkflow {
     }
 
     async accept(): Promise<void> {
-        const asked = this.session.theStoryGeneration?.asked ?? null;
-        if (asked === null) {
+        const stageAwaiting = stageAwaitingReview(this.session.document);
+        if (stageAwaiting === undefined) {
             return;
         }
-        await this.dropWhatTheStageAsks();
         this.session.changeTheDocument((document) => {
-            const documentWithTheStageDone = withTheStageDone(
+            const documentWithTheStageDone = withTheStageIn(
                 document,
-                asked.stage,
+                stageAwaiting,
+                STAGE_DONE,
             );
             return documentWithTheStageDone;
         });
         await this.session.writeTheDocumentToItsFile();
+        await this.workspaceState.update(this.keyOfTheReviewKept, undefined);
         await this.runTheNextStage();
     }
 
-    async stop(): Promise<void> {
-        await this.dropWhatTheStageAsks();
-        await this.session.readTheDocumentBackFromItsFile();
-        await this.showWhereItStands();
+    async reject(): Promise<void> {
+        const reviewKept = this.reviewKept();
+        if (reviewKept === undefined) {
+            void vscode.window.showErrorMessage(
+                "The story as it was before this stage is not kept in this workspace: accept it, or quit the generation.",
+            );
+            return;
+        }
+        this.session.importDocumentFromText(reviewKept.storyBeforeTheStage);
+        await this.session.writeTheDocumentToItsFile();
+        await this.workspaceState.update(this.keyOfTheReviewKept, undefined);
+        this.showWhereItLeftOff();
     }
 
-    async cancel(): Promise<void> {
-        const asked = this.session.theStoryGeneration?.asked ?? null;
+    async quit(): Promise<void> {
         await this.dropWhatTheStageAsks();
-        if (asked !== null) {
-            await this.session.readTheDocumentBackFromItsFile();
+        const reviewKept = this.reviewKept();
+        if (reviewKept !== undefined) {
+            this.session.importDocumentFromText(
+                reviewKept.storyBeforeTheStage,
+            );
         }
         this.session.changeTheDocument(withoutTheCheckpoint);
         await this.session.writeTheDocumentToItsFile();
+        await this.workspaceState.update(this.keyOfTheReviewKept, undefined);
         this.session.showTheStoryGeneration(null);
     }
 
@@ -174,12 +218,41 @@ export class StoryGenerationWorkflow {
             return;
         }
         const asked = stageJob.asked;
-        if (asked === null) {
-            this.showWhereItLeftOff();
-            return;
+        const stageAwaiting = stageAwaitingReview(this.session.document);
+        if (asked !== null && stageAwaiting === undefined) {
+            await this.keepWhatTheStageAsksForReview(asked);
         }
+        this.showWhereItLeftOff();
+    }
+
+    private get keyOfTheReviewKept(): string {
+        return `${REVIEW_KEPT_FOR}${this.session.uri.toString()}`;
+    }
+
+    private reviewKept(): StoryGenerationReviewKept | undefined {
+        const stageAwaiting = stageAwaitingReview(this.session.document);
+        if (stageAwaiting === undefined) {
+            return undefined;
+        }
+        const reviewKept = this.workspaceState.get<StoryGenerationReviewKept>(
+            this.keyOfTheReviewKept,
+        );
+        return reviewKept;
+    }
+
+    private async keepWhatTheStageAsksForReview(
+        asked: StoryGenerationAsked,
+    ): Promise<void> {
+        const bytes = await vscode.workspace.fs.readFile(this.session.uri);
+        const storyBeforeTheStage = new TextDecoder().decode(bytes);
+        const reviewKept: StoryGenerationReviewKept = {
+            shown: asked.shown,
+            storyBeforeTheStage,
+        };
+        await this.workspaceState.update(this.keyOfTheReviewKept, reviewKept);
         this.showWhatTheStageAsks(asked);
-        this.showTheStageJob(stageJob);
+        await this.session.writeTheDocumentToItsFile();
+        await this.dropWhatTheStageAsks();
     }
 
     private async followTheStage(path: string): Promise<void> {
@@ -206,7 +279,16 @@ export class StoryGenerationWorkflow {
     // to review, in the editor, which draws the part of authorship the stage
     // worked in itself.
     private showWhatTheStageAsks(asked: StoryGenerationAsked): void {
-        this.session.importDocumentFromText(asked.story);
+        const storyTheStageLeaves = new Document(
+            asked.story,
+            this.session.document.path,
+        );
+        const storyAwaitingReview = withTheStageIn(
+            storyTheStageLeaves,
+            asked.stage,
+            STAGE_AWAITING_REVIEW,
+        );
+        this.session.importDocumentFromText(storyAwaitingReview.text);
     }
 
     private showTheStageJob(stageJob: StoryGenerationStageJob): void {
@@ -216,6 +298,23 @@ export class StoryGenerationWorkflow {
 
     private showWhereItLeftOff(): void {
         const stages = stagesOf(this.session.document);
+        const stageAwaiting = stageAwaitingReview(this.session.document);
+        if (stageAwaiting !== undefined) {
+            const reviewKept = this.reviewKept();
+            const shown = reviewKept?.shown ?? SHOWN_WITHOUT_THE_REVIEW_KEPT;
+            this.session.showTheStoryGeneration({
+                running: false,
+                error: null,
+                progress: { steps: [] },
+                stages,
+                asked: {
+                    stage: stageAwaiting,
+                    story: this.session.document.text,
+                    shown,
+                },
+            });
+            return;
+        }
         const stagesDone = stages.filter((stage) => stage.done);
         const someStagesDoneAndSomeNot =
             stagesDone.length > 0 && stagesDone.length < stages.length;

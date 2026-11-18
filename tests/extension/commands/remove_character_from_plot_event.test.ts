@@ -8,6 +8,7 @@ import {
 import { RemoveCharacterFromPlotEventCommand } from "../../../extension/vscode_runtime/commands/remove_character_from_plot_event";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import { STORY_FILE, openStory } from "./open_story";
+import { workspaceState } from "../vscode";
 
 const THE_STORY = `<!-- cell: character id="v1" title="Varn" -->
 
@@ -56,6 +57,7 @@ describe("RemoveCharacterFromPlotEventCommand — takes a character out of one e
             vscode.Uri.file(STORY_FILE),
             THE_STORY,
             edited as never,
+            workspaceState as never,
         );
         new RemoveCharacterFromPlotEventCommand().invoke(session, {
             annotationCellId: "p1",

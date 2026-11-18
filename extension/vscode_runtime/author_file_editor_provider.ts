@@ -59,6 +59,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             uri,
             new TextDecoder().decode(bytes),
             this.edited,
+            this.context.workspaceState,
         );
     }
 

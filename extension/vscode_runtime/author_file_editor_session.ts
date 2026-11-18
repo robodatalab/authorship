@@ -59,7 +59,7 @@ export class AuthorFileEditorSession
 
     private storyGeneration: StoryGeneration | null = null;
 
-    readonly storyGenerationWorkflow = new StoryGenerationWorkflow(this);
+    readonly storyGenerationWorkflow: StoryGenerationWorkflow;
 
     constructor(
         readonly uri: vscode.Uri,
@@ -67,7 +67,12 @@ export class AuthorFileEditorSession
         private readonly edited: vscode.EventEmitter<
             vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
         >,
+        workspaceState: vscode.Memento,
     ) {
+        this.storyGenerationWorkflow = new StoryGenerationWorkflow(
+            this,
+            workspaceState,
+        );
         const proseErrorsSynchronizer = new CharacterRangeSynchronizer(
             this.proseErrors,
         );
@@ -499,7 +504,14 @@ export function openAuthorFileEditorSession(
     edited: vscode.EventEmitter<
         vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
     >,
+    workspaceState: vscode.Memento,
 ): AuthorFileEditorSession {
     const document = new Document(text, uri.fsPath);
-    return new AuthorFileEditorSession(uri, document, edited);
+    const session = new AuthorFileEditorSession(
+        uri,
+        document,
+        edited,
+        workspaceState,
+    );
+    return session;
 }

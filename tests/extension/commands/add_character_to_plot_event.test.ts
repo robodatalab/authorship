@@ -8,6 +8,7 @@ import {
 import { AddCharacterToPlotEventCommand } from "../../../extension/vscode_runtime/commands/add_character_to_plot_event";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import { STORY_FILE, openStory } from "./open_story";
+import { workspaceState } from "../vscode";
 
 const THE_STORY = `<!-- cell: character id="v1" title="Varn" -->
 
@@ -78,6 +79,7 @@ describe("AddCharacterToPlotEventCommand — puts a character in one event of a 
             vscode.Uri.file(STORY_FILE),
             THE_STORY,
             edited as never,
+            workspaceState as never,
         );
         new AddCharacterToPlotEventCommand().invoke(session, {
             annotationCellId: "p1",

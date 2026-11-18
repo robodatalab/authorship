@@ -8,6 +8,7 @@ import {
 import { AddConceptToPlotCommand } from "../../../extension/vscode_runtime/commands/add_concept_to_plot";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import { STORY_FILE, openStory } from "./open_story";
+import { workspaceState } from "../vscode";
 
 const THE_STORY = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
 
@@ -71,6 +72,7 @@ describe("AddConceptToPlotCommand — makes a plot reference a salient concept",
             vscode.Uri.file(STORY_FILE),
             THE_STORY,
             edited as never,
+            workspaceState as never,
         );
         new AddConceptToPlotCommand().invoke(session, {
             annotationCellId: "p1",

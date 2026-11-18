@@ -200,7 +200,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots: left off hereResumeCancel");
+        expect(status.textContent).toBe("plots: left off hereResumeQuit");
     });
 
     it("resuming generates the story again, from where it left off", async () => {
@@ -236,7 +236,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots20%3/15 [00:12<00:48, 4.00s/it]Cancel");
+        expect(status.textContent).toBe("plots20%3/15 [00:12<00:48, 4.00s/it]Quit");
     });
 
     it("says the time left and the rate are unknown before the first step is done", async () => {
@@ -245,7 +245,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots0%0/15 [00:03<?, ?it/s]Cancel");
+        expect(status.textContent).toBe("plots0%0/15 [00:03<?, ?it/s]Quit");
     });
 
     it("says the rate in steps a second for steps quicker than a second", async () => {
@@ -254,7 +254,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots20%3/15 [00:01<00:03, 4.00it/s]Cancel");
+        expect(status.textContent).toBe("plots20%3/15 [00:01<00:03, 4.00it/s]Quit");
     });
 
     it("fills the bar with the work done in the step it is at, too", async () => {
@@ -272,28 +272,28 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("validity38%1/4 [01:20<03:20, 80.00s/it]Cancel");
+        expect(status.textContent).toBe("validity38%1/4 [01:20<03:20, 80.00s/it]Quit");
     });
 
-    it("asks the author to use the command shown, then continue or stop", async () => {
+    it("asks the author to use the command shown, then continue or reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_THE_CONCEPTS);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concept titles: use the highlighted button, then continueContinueStopCancel",
+            "concept titles: use the highlighted button, then continueContinueRejectQuit",
         );
     });
 
-    it("asks the author to review the story the stage leaves, then accept or stop", async () => {
+    it("asks the author to review the story the stage leaves, then accept or reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concepts: review it, edit what you like, then acceptAcceptStopCancel",
+            "concepts: review it, edit what you like, then acceptAcceptRejectQuit",
         );
     });
 
@@ -312,17 +312,17 @@ describe("the story generation under the main menu's tools", () => {
         ]);
     });
 
-    it("stopping answers with a stop", async () => {
+    it("rejecting answers with a reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
-        const [, stopButton] = document.querySelectorAll("button");
+        const [, rejectButton] = document.querySelectorAll("button");
 
-        await act(async () => stopButton.click());
+        await act(async () => rejectButton.click());
 
         expect(posted).toEqual([
             {
                 type: "invoke",
                 commandName: "answerTheStoryGeneration",
-                commandArguments: { verdict: "stop" },
+                commandArguments: { verdict: "reject" },
             },
         ]);
     });
@@ -331,18 +331,18 @@ describe("the story generation under the main menu's tools", () => {
         ["while a stage works", WRITES],
         ["while a stage asks for a review", ASKS_FOR_A_REVIEW],
         ["once it has left off", LEFT_OFF],
-    ])("cancels the generation altogether %s", async (_, storyGeneration) => {
+    ])("quits the generation altogether %s", async (_, storyGeneration) => {
         await mountTheStoryGeneration(storyGeneration);
-        const cancelButton = [...document.querySelectorAll("button")].find(
-            (button) => button.textContent === "Cancel",
+        const quitButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent === "Quit",
         )!;
 
-        await act(async () => cancelButton.click());
+        await act(async () => quitButton.click());
 
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "cancelTheStoryGeneration",
+                commandName: "quitTheStoryGeneration",
                 commandArguments: {},
             },
         ]);

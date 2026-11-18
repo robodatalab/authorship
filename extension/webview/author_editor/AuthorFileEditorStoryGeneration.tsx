@@ -8,7 +8,7 @@ import "./AuthorFileEditorStoryGeneration.css";
 
 const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
 const GENERATE_STORY = "generateStory";
-const CANCEL_THE_STORY_GENERATION = "cancelTheStoryGeneration";
+const QUIT_THE_STORY_GENERATION = "quitTheStoryGeneration";
 
 // How every stage is drawn: finished, the one the generation is at, or to come.
 const ICON_OF_EACH_STATE: Record<string, string> = {
@@ -41,8 +41,8 @@ interface AuthorFileEditorStoryGenerationProps {
  * at, and those to come. Under them, what the stage it is at does: while it
  * works, how far along it is; once it is done, what the author is to do, and the
  * answers they can give: accept the story as they leave it, edits included, or
- * stop. Asked to do something themselves, with a command highlighted, the
- * author continues once done. Whatever the stage is doing, the author can cancel
+ * reject it. Asked to do something themselves, with a command highlighted, the
+ * author continues once done. Whatever the stage is doing, the author can quit
  * the generation altogether.
  */
 export function AuthorFileEditorStoryGeneration({
@@ -189,25 +189,25 @@ export function AuthorFileEditorStoryGeneration({
                             <button
                                 type="button"
                                 className="author-file-editor-story-generation-answer"
-                                onClick={() => answer("stop")}
+                                onClick={() => answer("reject")}
                             >
-                                Stop
+                                Reject
                             </button>
                         </>
                     )}
                     <button
                         type="button"
                         className="author-file-editor-story-generation-answer"
-                        title="Cancel the story generation altogether"
+                        title="Quit the story generation altogether"
                         onClick={() =>
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                CANCEL_THE_STORY_GENERATION,
+                                QUIT_THE_STORY_GENERATION,
                                 {},
                             )
                         }
                     >
-                        Cancel
+                        Quit
                     </button>
                 </div>
             )}

@@ -120,6 +120,24 @@ export const workspace = {
     asRelativePath: (uri: StubUri): string => uri.toString(),
 };
 
+export const keptInTheWorkspace = new Map<string, unknown>();
+
+export const workspaceState = {
+    keys: (): readonly string[] => [...keptInTheWorkspace.keys()],
+    get: <Kept>(key: string, fallback?: Kept): Kept | undefined =>
+        keptInTheWorkspace.has(key)
+            ? (keptInTheWorkspace.get(key) as Kept)
+            : fallback,
+    update: (key: string, value: unknown): Promise<void> => {
+        if (value === undefined) {
+            keptInTheWorkspace.delete(key);
+        } else {
+            keptInTheWorkspace.set(key, value);
+        }
+        return Promise.resolve();
+    },
+};
+
 export const FileType = { File: 1, Directory: 2 };
 
 export const commands = {

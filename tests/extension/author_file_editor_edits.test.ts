@@ -5,7 +5,7 @@ import {
     type AuthorFileEditorSession,
 } from "../../extension/vscode_runtime/author_file_editor_session";
 import { NoteCell } from "authordoc/cells/note_cell";
-import { EventEmitter, Uri } from "./vscode";
+import { EventEmitter, Uri, workspaceState } from "./vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
@@ -34,6 +34,7 @@ function openSession(text: string): OpenSession {
         Uri.file(DOCUMENT_PATH) as never,
         text,
         edited as never,
+        workspaceState as never,
     );
     return {
         session,
