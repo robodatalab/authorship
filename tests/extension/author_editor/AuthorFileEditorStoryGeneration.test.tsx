@@ -10,7 +10,7 @@ import type { StoryGeneration } from "../../../extension/vscode_runtime/story_ge
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: false,
     error: null,
-    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, state: "done", steps: [] }] },
+    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, seconds: 2, secondsPerItem: null, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: false },
         { name: "concepts", done: false },
@@ -30,7 +30,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 const ASKS_FOR_A_REVIEW: StoryGeneration = {
     running: false,
     error: null,
-    progress: { steps: [{ doing: "concepts", done: 1, of: 1, state: "done", steps: [] }] },
+    progress: { steps: [{ doing: "concepts", done: 1, of: 1, seconds: 9, secondsPerItem: 9, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: false },
@@ -46,7 +46,39 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
 const WRITES: StoryGeneration = {
     running: true,
     error: null,
-    progress: { steps: [{ doing: "plots", done: 3, of: 15, state: "running", steps: [] }] },
+    progress: {
+        steps: [{ doing: "plots", done: 3, of: 15, seconds: 12, secondsPerItem: 4, state: "running", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+        { name: "mesh", done: false },
+    ],
+    asked: null,
+};
+
+const WRITES_THE_FIRST_STEP: StoryGeneration = {
+    running: true,
+    error: null,
+    progress: {
+        steps: [{ doing: "plots", done: 0, of: 15, seconds: 3, secondsPerItem: null, state: "running", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+        { name: "mesh", done: false },
+    ],
+    asked: null,
+};
+
+const WRITES_QUICK_STEPS: StoryGeneration = {
+    running: true,
+    error: null,
+    progress: {
+        steps: [{ doing: "plots", done: 3, of: 15, seconds: 1, secondsPerItem: 0.25, state: "running", steps: [] }],
+    },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: true },
@@ -65,10 +97,12 @@ const PLAYS_THE_STORY: StoryGeneration = {
                 doing: "validity",
                 done: 1,
                 of: 4,
+                seconds: 80,
+                secondsPerItem: 80,
                 state: "running",
                 steps: [
-                    { doing: "Motherhood", done: 200, of: 200, state: "done", steps: [] },
-                    { doing: "War", done: 100, of: 200, state: "running", steps: [] },
+                    { doing: "Motherhood", done: 200, of: 200, seconds: 80, secondsPerItem: 0.4, state: "done", steps: [] },
+                    { doing: "War", done: 100, of: 200, seconds: 40, secondsPerItem: 0.4, state: "running", steps: [] },
                 ],
             },
         ],
@@ -192,9 +226,35 @@ describe("the story generation under the main menu's tools", () => {
         )!;
         const bar = status.querySelector('[role="progressbar"]')!;
         const filled = bar.firstElementChild as HTMLElement;
-        expect(status.textContent).toBe("plotsCancel");
         expect(bar.getAttribute("aria-valuenow")).toBe("20");
         expect(filled.style.width).toBe("20%");
+    });
+
+    it("says, like tqdm, the steps done, the time taken and left, and the time a step takes", async () => {
+        await mountTheStoryGeneration(WRITES);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots20%3/15 [00:12<00:48, 4.00s/it]Cancel");
+    });
+
+    it("says the time left and the rate are unknown before the first step is done", async () => {
+        await mountTheStoryGeneration(WRITES_THE_FIRST_STEP);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots0%0/15 [00:03<?, ?it/s]Cancel");
+    });
+
+    it("says the rate in steps a second for steps quicker than a second", async () => {
+        await mountTheStoryGeneration(WRITES_QUICK_STEPS);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots20%3/15 [00:01<00:03, 4.00it/s]Cancel");
     });
 
     it("fills the bar with the work done in the step it is at, too", async () => {
@@ -204,6 +264,15 @@ describe("the story generation under the main menu's tools", () => {
         const filled = bar.firstElementChild as HTMLElement;
         expect(bar.getAttribute("aria-valuenow")).toBe("38");
         expect(filled.style.width).toBe("37.5%");
+    });
+
+    it("leaves the work done in the step it is at out of the time left", async () => {
+        await mountTheStoryGeneration(PLAYS_THE_STORY);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("validity38%1/4 [01:20<03:20, 80.00s/it]Cancel");
     });
 
     it("asks the author to use the command shown, then continue or stop", async () => {

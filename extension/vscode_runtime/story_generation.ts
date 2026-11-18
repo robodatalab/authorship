@@ -39,6 +39,8 @@ export interface StoryGenerationStage {
     doing: string;
     done: number;
     of: number | null;
+    seconds: number;
+    secondsPerItem: number | null;
     state: "waiting" | "running" | "done";
     steps: StoryGenerationStage[];
 }

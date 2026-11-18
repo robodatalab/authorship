@@ -3,6 +3,7 @@ import {
     type SendMessagesToVscode,
 } from "./AuthorFileEditorCanvas";
 import type { StoryGeneration } from "../../vscode_runtime/story_generation";
+import { onTheClock } from "../elapsed_time";
 import "./AuthorFileEditorStoryGeneration.css";
 
 const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
@@ -17,6 +18,17 @@ const ICON_OF_EACH_STATE: Record<string, string> = {
     "left-off": "codicon codicon-debug-pause",
     "to-come": "codicon codicon-circle-outline",
 };
+
+function rateOfTheSteps(secondsPerStep: number | null): string {
+    if (secondsPerStep === null || secondsPerStep === 0) {
+        return "?it/s";
+    }
+    if (secondsPerStep > 1) {
+        return `${secondsPerStep.toFixed(2)}s/it`;
+    }
+    const stepsPerSecond = 1 / secondsPerStep;
+    return `${stepsPerSecond.toFixed(2)}it/s`;
+}
 
 interface AuthorFileEditorStoryGenerationProps {
     storyGeneration: StoryGeneration | null;
@@ -58,6 +70,18 @@ export function AuthorFileEditorStoryGeneration({
         ? (stepsDone + shareOfTheStepDone) / stepsOf
         : 0;
     const percentOfTheStageDone = shareOfTheStageDone * 100;
+    const wholePercentOfTheStageDone = Math.round(percentOfTheStageDone);
+    const secondsTheStageHasTaken = progressOfTheStageAt?.seconds ?? 0;
+    const secondsPerStep = progressOfTheStageAt?.secondsPerItem ?? null;
+    const stepsLeft =
+        stepsOf === null ? null : stepsOf - stepsDone - shareOfTheStepDone;
+    const timeTheStageHasTaken = onTheClock(secondsTheStageHasTaken);
+    const timeTheStageHasLeft =
+        stepsLeft === null || secondsPerStep === null
+            ? "?"
+            : onTheClock(stepsLeft * secondsPerStep);
+    const rateOfTheStage = rateOfTheSteps(secondsPerStep);
+    const stepsOfTheStage = `${stepsDone}/${stepsOf ?? "?"}`;
     const asked = storyGeneration.asked;
     const running = storyGeneration.running;
 
@@ -117,16 +141,24 @@ export function AuthorFileEditorStoryGeneration({
                             : `${stageAt.name}: ${stageDoes}`}
                     </span>
                     {stateOfTheStageAt === "working" && (
-                        <div
-                            className="author-file-editor-story-generation-progress"
-                            role="progressbar"
-                            aria-valuenow={Math.round(percentOfTheStageDone)}
-                        >
+                        <>
+                            <span className="author-file-editor-story-generation-progress-percent">
+                                {`${wholePercentOfTheStageDone}%`}
+                            </span>
                             <div
-                                className="author-file-editor-story-generation-progress-done"
-                                style={{ width: `${percentOfTheStageDone}%` }}
-                            />
-                        </div>
+                                className="author-file-editor-story-generation-progress"
+                                role="progressbar"
+                                aria-valuenow={wholePercentOfTheStageDone}
+                            >
+                                <div
+                                    className="author-file-editor-story-generation-progress-done"
+                                    style={{ width: `${percentOfTheStageDone}%` }}
+                                />
+                            </div>
+                            <span className="author-file-editor-story-generation-progress-steps-and-time">
+                                {`${stepsOfTheStage} [${timeTheStageHasTaken}<${timeTheStageHasLeft}, ${rateOfTheStage}]`}
+                            </span>
+                        </>
                     )}
                     {stateOfTheStageAt === "left-off" && (
                         <button

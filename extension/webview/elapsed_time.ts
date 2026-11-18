@@ -19,5 +19,5 @@ export function onTheClock(secondsSoFar: number): string {
     if (hours > 0) {
         return `${hours}:${String(minutes % 60).padStart(2, "0")}:${afterTheMinutes}`;
     }
-    return `${minutes}:${afterTheMinutes}`;
+    return `${String(minutes).padStart(2, "0")}:${afterTheMinutes}`;
 }
