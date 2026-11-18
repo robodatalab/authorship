@@ -83,13 +83,15 @@ body {
 }
 
 .author-file-editor-canvas ul.author-file-editor-part-scope,
-.author-file-editor-canvas ul.author-file-editor-chapter-scope {
+.author-file-editor-canvas ul.author-file-editor-chapter-scope,
+.author-file-editor-canvas ul.author-file-editor-place-scope {
     margin-left: 7px;
     padding-left: 12px;
     border-left: 1px solid;
 }
 
-.author-file-editor-canvas ul.author-file-editor-part-scope {
+.author-file-editor-canvas ul.author-file-editor-part-scope,
+.author-file-editor-canvas ul.author-file-editor-place-scope {
     border-left-color: var(--vscode-panel-border);
 }
 

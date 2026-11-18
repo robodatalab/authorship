@@ -17,19 +17,59 @@ import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
+import {
+    AuthorFileEditorCellReferences,
+    type AuthorFileEditorCellReferencesWording,
+} from "./AuthorFileEditorCellReferences";
+import { placesAround } from "../../vscode_runtime/place_hierarchy";
 import { PLACE, PlaceCell } from "authordoc/cells/place_cell";
+import type { Document } from "authordoc/storydoc";
+
+const PLACE_PARENT_WORDING: AuthorFileEditorCellReferencesWording = {
+    heading: "Parent",
+    referenceOne: "Choose the place this place lies within",
+    stopReferencing: "Take this place out of its parent",
+    noneReferenced: "Lies within no other place",
+    untitled: "Untitled place",
+};
 
 interface AuthorFileEditorPlaceCellProps {
     cell: PlaceCell;
+    story: Document;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorPlaceCell({
     cell,
+    story,
     sendMessagesToVscode,
 }: AuthorFileEditorPlaceCellProps) {
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
+    const parent = cell.parent(story);
+    const parentReferenced = parent === undefined ? [] : [parent];
+    const placesInTheStory = story.cells.filter(
+        (storyCell) => storyCell instanceof PlaceCell,
+    );
+    const placesToChoose = placesInTheStory.filter((other) => {
+        const aroundTheOther = placesAround(other, story);
+        const liesWithinThisPlace = aroundTheOther.some(
+            (outer) => outer.uniqueId === cell.uniqueId,
+        );
+        return (
+            other.uniqueId !== cell.uniqueId &&
+            other.uniqueId !== cell._parent &&
+            !liesWithinThisPlace
+        );
+    });
+
+    function setTheParent(parentCellId: string): void {
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName: "setParentOfPlace",
+            commandArguments: { placeCellId: cell.uniqueId, parentCellId },
+        });
+    }
     const fields: AuthorFileEditorCellField[] = [
         {
             label: "Name",
@@ -41,6 +81,7 @@ export function AuthorFileEditorPlaceCell({
                     cell.folded,
                     cell.at,
                     cell.uniqueId,
+                    cell._parent,
                 );
                 replaceTheCell(sendMessagesToVscode, renamed);
             },
@@ -70,6 +111,16 @@ export function AuthorFileEditorPlaceCell({
                                 description,
                             )
                         }
+                    />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellReferences
+                        className="author-file-editor-place-parent"
+                        referencedCells={parentReferenced}
+                        cellsToChoose={placesToChoose}
+                        wording={PLACE_PARENT_WORDING}
+                        onReferenced={setTheParent}
+                        onStoppedReferencing={() => setTheParent("")}
                     />
                 </AuthorFileEditorCellCard>
             </AuthorFileEditorCellBody>

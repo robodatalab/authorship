@@ -43,6 +43,7 @@ import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
 import { RemoveReferenceFromSalientConceptCommand } from "./remove_reference_from_salient_concept";
 import { ReplaceCellCommand } from "./replace_cell";
 import { RunAllCommand } from "./run_all";
+import { SetParentOfPlaceCommand } from "./set_parent_of_place";
 import { WriteBlurbCommand } from "./write_blurb";
 import { WriteStorySoFarCommand } from "./write_story_so_far";
 import { WriteTableOfContentsCommand } from "./write_table_of_contents";
@@ -100,6 +101,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new RemoveCharacterFromPlotCommand(),
     new AddConceptToCharacterCommand(),
     new RemoveConceptFromCharacterCommand(),
+    new SetParentOfPlaceCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),

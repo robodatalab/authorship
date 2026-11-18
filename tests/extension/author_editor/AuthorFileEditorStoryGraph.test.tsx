@@ -114,4 +114,41 @@ describe("the story graph", () => {
         expect(chosen).toEqual(expected);
     });
 
+
+    it("lays the places out as rails nested in the rails of the places they lie within", async () => {
+        chosen = [];
+        document.body.innerHTML = "";
+        const container = document.createElement("div");
+        document.body.append(container);
+        await act(async () => {
+            createRoot(container).render(
+                <AuthorFileEditorStoryGraph
+                    story={
+                        new Document(
+                            [
+                                '<!-- cell: place id="hv" title="Hollowmere" parent="en" -->',
+                                '<!-- cell: place id="hg" title="Harrowgate" -->',
+                                '<!-- cell: place id="en" title="England" -->',
+                                '<!-- cell: place id="ln" title="The lane" parent="hv" -->',
+                                "",
+                            ].join("\n"),
+                        )
+                    }
+                    onEventChosen={(plotNode) => chosen.push(plotNode)}
+                />,
+            );
+        });
+        await click([...document.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === "Places")!);
+
+        const rails = [...document.querySelectorAll<HTMLElement>(".author-file-editor-story-graph-rail")].map(
+            (rail) => [rail.textContent, rail.style.left],
+        );
+        expect(rails).toEqual([
+            ["Harrowgate", "0px"],
+            ["England", "0px"],
+            ["Hollowmere", "12px"],
+            ["The lane", "24px"],
+        ]);
+    });
+
 });

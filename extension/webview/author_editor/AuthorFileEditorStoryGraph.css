@@ -55,9 +55,7 @@
 
 .author-file-editor-story-graph-rail-title {
     position: absolute;
-    top: 50%;
     left: 8px;
-    width: 120px;
     overflow: hidden;
     transform: translateY(-50%);
     font-size: 0.9em;

@@ -2,6 +2,7 @@ import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { Document } from "authordoc/storydoc";
 
 const RAIL_TITLE_WIDTH = 140;
+const RAIL_INDENT = 12;
 const COLUMN_WIDTH = 180;
 const BOX_MARGIN = 12;
 const BOX_HEIGHT = 32;
@@ -42,8 +43,11 @@ export class StoryGraphRail {
     constructor(
         readonly railId: string,
         readonly title: string,
+        readonly left: number,
         readonly top: number,
         readonly height: number,
+        readonly enclosedHeight: number,
+        readonly titleWidth: number,
     ) {}
 }
 
@@ -206,7 +210,7 @@ export class StoryGraphLayout {
 
     constructor(
         story: Document,
-        railsOfTheKind: readonly (readonly [string, string])[],
+        railsOfTheKind: readonly (readonly [string, string, number])[],
         railIdsOfTheEvent: (event: StoryGraphEvent) => readonly string[],
     ) {
         const { events, eventIdOfEachNode } = eventsOfTheStory(story);
@@ -237,8 +241,8 @@ export class StoryGraphLayout {
         const someEventIsOnNoRail = railedEvents.some((railed) =>
             railed.includes(NO_RAIL),
         );
-        const railsShown: (readonly [string, string])[] = someEventIsOnNoRail
-            ? [...railsOfTheKind, [NO_RAIL, NO_RAIL_TITLE]]
+        const railsShown: (readonly [string, string, number])[] = someEventIsOnNoRail
+            ? [...railsOfTheKind, [NO_RAIL, NO_RAIL_TITLE, 0]]
             : [...railsOfTheKind];
 
         const stackOfEachBox = new Map<string, number>();
@@ -254,19 +258,41 @@ export class StoryGraphLayout {
         }
 
         let railTop = TIME_ROW_HEIGHT;
-        const rails: StoryGraphRail[] = [];
-        for (const [railId, title] of railsShown) {
+        const tops: number[] = [];
+        const heights: number[] = [];
+        for (const [railId] of railsShown) {
             const stacksOnTheRail = columnMoments.map(
                 (_moment, column) => boxesAtEachSpot.get(`${railId}#${column}`) ?? 0,
             );
             const deepest = Math.max(1, ...stacksOnTheRail);
             const height =
                 2 * RAIL_PADDING + deepest * BOX_HEIGHT + (deepest - 1) * BOX_GAP;
-            const rail = new StoryGraphRail(railId, title, railTop, height);
-            rails.push(rail);
+            tops.push(railTop);
+            heights.push(height);
             railTop += height;
         }
-        this.rails = rails;
+        this.rails = railsShown.map(([railId, title, depth], shown) => {
+            const followingRails = railsShown.slice(shown + 1);
+            const firstOutside = followingRails.findIndex(
+                ([, , followingDepth]) => followingDepth <= depth,
+            );
+            const railsEnclosed =
+                firstOutside === -1 ? followingRails.length : firstOutside;
+            const heightsEnclosed = heights.slice(shown, shown + 1 + railsEnclosed);
+            const enclosedHeight = heightsEnclosed.reduce((sum, height) => sum + height, 0);
+            const left = depth * RAIL_INDENT;
+            const titleWidth = RAIL_TITLE_WIDTH - left - 2 * BOX_MARGIN;
+            return new StoryGraphRail(
+                railId,
+                title,
+                left,
+                tops[shown],
+                heights[shown],
+                enclosedHeight,
+                titleWidth,
+            );
+        });
+        const rails = this.rails;
 
         const boxes: StoryGraphBox[] = [];
         for (const event of events) {

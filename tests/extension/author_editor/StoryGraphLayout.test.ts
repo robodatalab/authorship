@@ -28,13 +28,13 @@ const THE_STORY = `<!-- cell: character id="v1" title="Varn" -->
 </ol>
 `;
 
-const PLOTS: (readonly [string, string])[] = [
-    ["p1", "Love"],
-    ["p2", "Injustice"],
+const PLOTS: (readonly [string, string, number])[] = [
+    ["p1", "Love", 0],
+    ["p2", "Injustice", 0],
 ];
-const CHARACTERS: (readonly [string, string])[] = [
-    ["v1", "Varn"],
-    ["d1", "Lia"],
+const CHARACTERS: (readonly [string, string, number])[] = [
+    ["v1", "Varn", 0],
+    ["d1", "Lia", 0],
 ];
 
 describe("the layout of a story graph", () => {
@@ -105,7 +105,7 @@ describe("the layout of a story graph", () => {
     );
 
     it("puts an event on a rail of none when it belongs to none of the rails", () => {
-        const layout = new StoryGraphLayout(new Document(THE_STORY), [["v1", "Varn"]], (event) => event.characterIds);
+        const layout = new StoryGraphLayout(new Document(THE_STORY), [["v1", "Varn", 0]], (event) => event.characterIds);
 
         expect(layout.rails.map((rail) => [rail.railId, rail.title])).toEqual([
             ["v1", "Varn"],
@@ -118,7 +118,7 @@ describe("the layout of a story graph", () => {
             '<!-- cell: plot id="p1" title="Love" -->\n\n<ol>\n<li id="e1" timestamp="1">Varn asks.</li>\n<li id="e2">Lia waits.</li>\n</ol>\n',
         );
 
-        const layout = new StoryGraphLayout(story, [["p1", "Love"]], (event) => event.plotIds);
+        const layout = new StoryGraphLayout(story, [["p1", "Love", 0]], (event) => event.plotIds);
 
         expect(layout.columns.map((column) => column.momentWritten)).toEqual(["1", "–"]);
     });
@@ -128,4 +128,27 @@ describe("the layout of a story graph", () => {
 
         expect([layout.width, layout.height]).toEqual([500, 132]);
     });
+
+    it("encloses the rails nested in a rail, set in by how deep they are nested", () => {
+        const layout = new StoryGraphLayout(
+            new Document(THE_STORY),
+            [
+                ["h0", "England", 0],
+                ["h2", "The court", 1],
+                ["h1", "The house", 1],
+                ["h3", "The mill", 2],
+            ],
+            (event) => [event.placeId],
+        );
+
+        expect(
+            layout.rails.map((rail) => [rail.railId, rail.left, rail.top, rail.height, rail.enclosedHeight, rail.titleWidth]),
+        ).toEqual([
+            ["h0", 0, 28, 52, 208, 116],
+            ["h2", 12, 80, 52, 52, 104],
+            ["h1", 12, 132, 52, 104, 104],
+            ["h3", 24, 184, 52, 52, 92],
+        ]);
+    });
+
 });

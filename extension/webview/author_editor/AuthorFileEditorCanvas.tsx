@@ -5,6 +5,7 @@ import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndC
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
 import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "./StoryGraphLayout";
+import { placesNestedIn } from "../../vscode_runtime/place_hierarchy";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -177,6 +178,15 @@ export function AuthorFileEditorCanvas({
     );
     const sections = useMemo(() => cellsBySection(cells), [cells]);
     const storyDocument = useMemo(() => Document.fromCells(cells), [cells]);
+    const placesNestedInEachPlace = useMemo(
+        () => placesNestedIn(storyDocument),
+        [storyDocument],
+    );
+    const placeIdsNested = useMemo(() => {
+        const placesNested = [...placesNestedInEachPlace.values()].flat();
+        const ids = placesNested.map((place) => place.uniqueId);
+        return new Set(ids);
+    }, [placesNestedInEachPlace]);
     const storyWords = useMemo(
         () => new StoryWordsIterator(storyDocument),
         [storyDocument],
@@ -513,6 +523,107 @@ export function AuthorFileEditorCanvas({
         );
     }
 
+    function cellWithItsState(cell: Cell, cellDrawn: ReactNode): ReactNode {
+        return (
+            <AuthorFileEditorCellState
+                cellCommands={cellCommands}
+                runCommand={commands.find(
+                    (command) =>
+                        command.runsCellsOfKind === cell.kind,
+                )}
+                cellId={cell.uniqueId}
+                cellIsFolded={cell.folded}
+                timesTheHostWroteIt={
+                    timesTheHostWroteEachCell[cell.uniqueId] ??
+                    0
+                }
+                proseErrors={proseErrors.filter(
+                    (proseError) =>
+                        proseError.cellId === cell.uniqueId &&
+                        proseError.isVisible,
+                )}
+                storyTextHighlights={storyTextHighlightsByCellId.get(
+                    cell.uniqueId,
+                )}
+                storyTextShown={
+                    storyTextShown?.cellId === cell.uniqueId
+                        ? storyTextShown
+                        : undefined
+                }
+                onStoryTextClicked={(clickedAt) =>
+                    selectThePassagesClicked(
+                        cell.uniqueId,
+                        clickedAt,
+                    )
+                }
+                onStoryTextShownAt={bringTheStoryTextIntoView}
+                findMatches={findMatchesByCellId.get(
+                    cell.uniqueId,
+                )}
+                currentFindMatch={
+                    find.current?.cellId === cell.uniqueId
+                        ? find.current
+                        : null
+                }
+                howFarTheCellHasBeenWritten={
+                    cellsBeingWritten[cell.uniqueId]
+                }
+                wordsInTheSection={
+                    wordsInEverySection[cell.uniqueId]
+                }
+                onStoryTextSelected={(
+                    selectedFrom,
+                    selectedTo,
+                ) =>
+                    sendMessagesToVscode({
+                        type: "storyTextSelected",
+                        storyTextSelected:
+                            selectedFrom === selectedTo
+                                ? null
+                                : {
+                                      cellId: cell.uniqueId,
+                                      startCharacterOffsetInCell:
+                                          selectedFrom,
+                                      endCharacterOffsetInCell:
+                                          selectedTo,
+                                  },
+                    })
+                }
+                sendMessagesToVscode={sendMessagesToVscode}
+            >
+                {cellDrawn}
+            </AuthorFileEditorCellState>
+        );
+    }
+
+    function placesWithinThePlace(place: Cell): ReactNode {
+        const within = placesNestedInEachPlace.get(place.uniqueId) ?? [];
+        if (within.length === 0 || place.folded) {
+            return null;
+        }
+        return (
+            <ul className="author-file-editor-place-scope">
+                {within.map((nested) => {
+                    const nestedDrawn = nested.accept<ReactNode>(cellRenderer);
+                    return (
+                        <li
+                            key={nested.uniqueId}
+                            data-cell-id={nested.uniqueId}
+                            className={
+                                nested.folded
+                                    ? "author-file-editor-cell-folded"
+                                    : undefined
+                            }
+                        >
+                            {cellWithItsState(nested, nestedDrawn)}
+                            {placesWithinThePlace(nested)}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    }
+
     function cellsInScope(
         sections: CellsInASection<Cell>[],
         whatFollowsTheScope: string | null,
@@ -544,7 +655,10 @@ export function AuthorFileEditorCanvas({
                     const whatFollowsTheSection =
                         sections[sectionIndex + 1]?.cell.uniqueId ??
                         whatFollowsTheScope;
-                    if (!sectionsInThePane.includes(section)) {
+                    if (
+                        !sectionsInThePane.includes(section) ||
+                        placeIdsNested.has(cell.uniqueId)
+                    ) {
                         return null;
                     }
                     const cellDrawn = cell.accept<ReactNode>(cellRenderer);
@@ -561,74 +675,8 @@ export function AuthorFileEditorCanvas({
                                     : undefined
                             }
                         >
-                            <AuthorFileEditorCellState
-                                cellCommands={cellCommands}
-                                runCommand={commands.find(
-                                    (command) =>
-                                        command.runsCellsOfKind === cell.kind,
-                                )}
-                                cellId={cell.uniqueId}
-                                cellIsFolded={cell.folded}
-                                timesTheHostWroteIt={
-                                    timesTheHostWroteEachCell[cell.uniqueId] ??
-                                    0
-                                }
-                                proseErrors={proseErrors.filter(
-                                    (proseError) =>
-                                        proseError.cellId === cell.uniqueId &&
-                                        proseError.isVisible,
-                                )}
-                                storyTextHighlights={storyTextHighlightsByCellId.get(
-                                    cell.uniqueId,
-                                )}
-                                storyTextShown={
-                                    storyTextShown?.cellId === cell.uniqueId
-                                        ? storyTextShown
-                                        : undefined
-                                }
-                                onStoryTextClicked={(clickedAt) =>
-                                    selectThePassagesClicked(
-                                        cell.uniqueId,
-                                        clickedAt,
-                                    )
-                                }
-                                onStoryTextShownAt={bringTheStoryTextIntoView}
-                                findMatches={findMatchesByCellId.get(
-                                    cell.uniqueId,
-                                )}
-                                currentFindMatch={
-                                    find.current?.cellId === cell.uniqueId
-                                        ? find.current
-                                        : null
-                                }
-                                howFarTheCellHasBeenWritten={
-                                    cellsBeingWritten[cell.uniqueId]
-                                }
-                                wordsInTheSection={
-                                    wordsInEverySection[cell.uniqueId]
-                                }
-                                onStoryTextSelected={(
-                                    selectedFrom,
-                                    selectedTo,
-                                ) =>
-                                    sendMessagesToVscode({
-                                        type: "storyTextSelected",
-                                        storyTextSelected:
-                                            selectedFrom === selectedTo
-                                                ? null
-                                                : {
-                                                      cellId: cell.uniqueId,
-                                                      startCharacterOffsetInCell:
-                                                          selectedFrom,
-                                                      endCharacterOffsetInCell:
-                                                          selectedTo,
-                                                  },
-                                    })
-                                }
-                                sendMessagesToVscode={sendMessagesToVscode}
-                            >
-                                {cellDrawn}
-                            </AuthorFileEditorCellState>
+                            {cellWithItsState(cell, cellDrawn)}
+                            {placesWithinThePlace(cell)}
                             {opensASection(cell.kind) && !cell.folded
                                 ? cellsInScope(
                                       section.within,

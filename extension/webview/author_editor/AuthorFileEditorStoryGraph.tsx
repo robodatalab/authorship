@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { CharacterCell } from "authordoc/cells/character_cell";
 import { PlaceCell } from "authordoc/cells/place_cell";
 import type { Document } from "authordoc/storydoc";
+import { placesNestedIn } from "../../vscode_runtime/place_hierarchy";
 import {
     StoryGraphLayout,
     type StoryGraphBox,
@@ -15,14 +16,14 @@ const UNTITLED_EVENT = "Untitled event";
 
 interface AuthorFileEditorStoryGraphView {
     name: string;
-    railsOf: (story: Document) => (readonly [string, string])[];
+    railsOf: (story: Document) => (readonly [string, string, number])[];
     railIdsOf: (event: StoryGraphEvent) => readonly string[];
 }
 
 const PLOTS_VIEW: AuthorFileEditorStoryGraphView = {
     name: "Plots",
     railsOf: (story) =>
-        story.plots().map((plot) => [plot.uniqueId, plot.title || UNTITLED] as const),
+        story.plots().map((plot) => [plot.uniqueId, plot.title || UNTITLED, 0] as const),
     railIdsOf: (event) => event.plotIds,
 };
 
@@ -31,16 +32,32 @@ const CHARACTERS_VIEW: AuthorFileEditorStoryGraphView = {
     railsOf: (story) =>
         story.cells
             .filter((cell) => cell instanceof CharacterCell)
-            .map((character) => [character.uniqueId, character.title || UNTITLED] as const),
+            .map((character) => [character.uniqueId, character.title || UNTITLED, 0] as const),
     railIdsOf: (event) => event.characterIds,
 };
 
+function railsOfTheNestedPlaces(story: Document): (readonly [string, string, number])[] {
+    const nestedInEachPlace = placesNestedIn(story);
+    const placesNested = [...nestedInEachPlace.values()].flat();
+    const places = story.cells.filter((cell) => cell instanceof PlaceCell);
+    const outermost = places.filter((place) => !placesNested.includes(place));
+    const rails: (readonly [string, string, number])[] = [];
+    const railTheNestedPlaces = (place: PlaceCell, depth: number): void => {
+        rails.push([place.uniqueId, place.title || UNTITLED, depth]);
+        const nested = nestedInEachPlace.get(place.uniqueId) ?? [];
+        for (const inner of nested) {
+            railTheNestedPlaces(inner, depth + 1);
+        }
+    };
+    for (const place of outermost) {
+        railTheNestedPlaces(place, 0);
+    }
+    return rails;
+}
+
 const PLACES_VIEW: AuthorFileEditorStoryGraphView = {
     name: "Places",
-    railsOf: (story) =>
-        story.cells
-            .filter((cell) => cell instanceof PlaceCell)
-            .map((place) => [place.uniqueId, place.title || UNTITLED] as const),
+    railsOf: railsOfTheNestedPlaces,
     railIdsOf: (event) => [event.placeId],
 };
 
@@ -106,10 +123,18 @@ export function AuthorFileEditorStoryGraph({
                         <div
                             key={rail.railId}
                             className="author-file-editor-story-graph-rail"
-                            style={{ top: rail.top, height: rail.height }}
+                            style={{
+                                left: rail.left,
+                                top: rail.top,
+                                height: rail.enclosedHeight,
+                            }}
                         >
                             <span
                                 className="author-file-editor-story-graph-rail-title"
+                                style={{
+                                    top: rail.height / 2,
+                                    width: rail.titleWidth,
+                                }}
                                 title={rail.title}
                             >
                                 {rail.title}
