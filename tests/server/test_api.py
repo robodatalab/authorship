@@ -544,7 +544,7 @@ class StoryGenerationStage(unittest.TestCase):
                 "shown": {
                     "kind": "command",
                     "cellKind": "salient-concept",
-                    "commandName": "addStoryAnnotation",
+                    "commandName": "insertCell",
                 },
             },
         )

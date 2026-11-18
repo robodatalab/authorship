@@ -12,6 +12,7 @@ import {
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
+import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -173,6 +174,7 @@ async function mountCanvas(options: {
     cellDrawings?: CellDrawings;
     storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextShown?: StoryTextSpan | null;
+    storyGeneration?: StoryGeneration | null;
 }): Promise<void> {
     posted = [];
     document.body.innerHTML = "";
@@ -194,6 +196,7 @@ async function mountCanvas(options: {
                 }
                 storyAnnotationsSelected={options.storyAnnotationsSelected}
                 storyTextShown={options.storyTextShown}
+                storyGeneration={options.storyGeneration}
             />,
         );
     });
@@ -1828,6 +1831,49 @@ describe("the metadata and the manuscript panes", () => {
 
             expect(columns()).toBe("");
         });
+    });
+
+    it.each([
+        [
+            "the button that adds the kind the story generation asks for, at the top of the metadata pane",
+            { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+            [["salient-concept"], []],
+        ],
+        [
+            "no button when the story generation asks for a review",
+            { kind: "editor" },
+            [[], []],
+        ],
+    ] as const)("highlights %s", async (_, shown, expected) => {
+        await mountCanvas({
+            cells: [new PlotCell("Bell", [], [], "", false, null, "p1")],
+            cellTypes: [
+                cellType("plot", "primary"),
+                cellType("salient-concept", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+            storyGeneration: {
+                running: false,
+                error: null,
+                progress: { steps: [] },
+                stages: [{ name: "concept titles", done: false }],
+                asked: { stage: "concept titles", story: "", shown },
+            },
+        });
+
+        const highlighted = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-insert-cell-menu",
+            ),
+        ].map((menu) =>
+            [
+                ...menu.querySelectorAll(
+                    ".author-file-editor-insert-cell-menu-button-highlighted",
+                ),
+            ].map((button) => button.textContent),
+        );
+
+        expect(highlighted).toEqual(expected);
     });
 
     it("draws no menu in a pane that holds none of the kinds offered", async () => {

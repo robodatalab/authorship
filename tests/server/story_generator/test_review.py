@@ -13,8 +13,8 @@ class ShownWritten(unittest.TestCase):
             ("tab", TabShown(PLOT), {"kind": "tab", "cellKind": "plot"}),
             (
                 "command",
-                CommandShown(SALIENT_CONCEPT, "addStoryAnnotation"),
-                {"kind": "command", "cellKind": "salient-concept", "commandName": "addStoryAnnotation"},
+                CommandShown(SALIENT_CONCEPT, "insertCell"),
+                {"kind": "command", "cellKind": "salient-concept", "commandName": "insertCell"},
             ),
             ("editor", EditorShown(), {"kind": "editor"}),
         ]

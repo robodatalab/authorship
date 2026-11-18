@@ -359,7 +359,7 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
             shown: {
                 kind: "command",
                 cellKind: "salient-concept",
-                commandName: "addStoryAnnotation",
+                commandName: "insertCell",
             },
             commandsExecuted: ["authorship.manuscript.focus"],
         },

@@ -4,7 +4,7 @@ import { PlotEdge } from "authordoc/cells/plot_cell";
 import {
     PlotEdgeInALane,
     PlotTrajectoryLanes,
-} from "../../../extension/webview/panel/PlotTrajectoryLanes";
+} from "../../../extension/webview/cell_types/PlotTrajectoryLanes";
 
 describe("the lanes of a plot's trajectory", () => {
     it.each([

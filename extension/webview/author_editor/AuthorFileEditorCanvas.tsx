@@ -433,9 +433,17 @@ export function AuthorFileEditorCanvas({
             scrolled.clientHeight / 2;
     }
 
+    const shownByTheStoryGeneration = storyGeneration?.asked?.shown;
+    const cellKindTheAuthorIsToAdd =
+        shownByTheStoryGeneration?.kind === "command" &&
+        shownByTheStoryGeneration.commandName === insertCommand?.commandName
+            ? shownByTheStoryGeneration.cellKind
+            : null;
+
     function insertCellMenu(
         insertBeforeCellId: string | null,
         pane: string,
+        cellKindHighlighted: string | null = null,
     ): ReactNode {
         const cellTypesInThePane = cellTypes.filter(
             (cellType) => paneHoldingTheKind(cellType.cellKind) === pane,
@@ -447,6 +455,7 @@ export function AuthorFileEditorCanvas({
             <AuthorFileEditorInsertCellMenu
                 insertCommand={insertCommand}
                 cellTypes={cellTypesInThePane}
+                cellKindHighlighted={cellKindHighlighted}
                 insertBeforeCellId={insertBeforeCellId}
                 sendMessagesToVscode={sendMessagesToVscode}
             />
@@ -474,6 +483,9 @@ export function AuthorFileEditorCanvas({
                         sectionsInThePane[0]?.cell.uniqueId ??
                             whatFollowsTheScope,
                         pane,
+                        scopeClassName === undefined
+                            ? cellKindTheAuthorIsToAdd
+                            : null,
                     )}
                 </li>
                 {sections.map((section, sectionIndex) => {
@@ -654,6 +666,7 @@ export function AuthorFileEditorCanvas({
 interface AuthorFileEditorInsertCellMenuProps {
     insertCommand?: WebviewAuthorDocumentCommandCard;
     cellTypes: AuthorDocumentCellType[];
+    cellKindHighlighted: string | null;
     insertBeforeCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -661,6 +674,7 @@ interface AuthorFileEditorInsertCellMenuProps {
 function AuthorFileEditorInsertCellMenu({
     insertCommand,
     cellTypes,
+    cellKindHighlighted,
     insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuProps) {
@@ -677,13 +691,24 @@ function AuthorFileEditorInsertCellMenu({
         (cellType) => cellType.insertMenuGroup !== PRIMARY_INSERT_MENU_GROUP,
     );
 
+    const holdsTheKindHighlighted = cellTypes.some(
+        (cellType) => cellType.cellKind === cellKindHighlighted,
+    );
+
     return (
-        <div className="author-file-editor-insert-cell-menu">
+        <div
+            className={
+                holdsTheKindHighlighted
+                    ? "author-file-editor-insert-cell-menu author-file-editor-insert-cell-menu-highlighted"
+                    : "author-file-editor-insert-cell-menu"
+            }
+        >
             {cellTypesAlwaysShown.map((cellType) => (
                 <AuthorFileEditorInsertCellMenuButton
                     key={cellType.cellKind}
                     insertCommand={insertCommand}
                     cellType={cellType}
+                    isHighlighted={cellType.cellKind === cellKindHighlighted}
                     insertBeforeCellId={insertBeforeCellId}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
@@ -707,6 +732,10 @@ function AuthorFileEditorInsertCellMenu({
                                     key={cellType.cellKind}
                                     insertCommand={insertCommand}
                                     cellType={cellType}
+                                    isHighlighted={
+                                        cellType.cellKind ===
+                                        cellKindHighlighted
+                                    }
                                     insertBeforeCellId={insertBeforeCellId}
                                     sendMessagesToVscode={sendMessagesToVscode}
                                 />
@@ -722,6 +751,7 @@ function AuthorFileEditorInsertCellMenu({
 interface AuthorFileEditorInsertCellMenuButtonProps {
     insertCommand: WebviewAuthorDocumentCommandCard;
     cellType: AuthorDocumentCellType;
+    isHighlighted: boolean;
     insertBeforeCellId: string | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
@@ -729,13 +759,18 @@ interface AuthorFileEditorInsertCellMenuButtonProps {
 function AuthorFileEditorInsertCellMenuButton({
     insertCommand,
     cellType,
+    isHighlighted,
     insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
     return (
         <button
             type="button"
-            className="author-file-editor-insert-cell-menu-button"
+            className={
+                isHighlighted
+                    ? "author-file-editor-insert-cell-menu-button author-file-editor-insert-cell-menu-button-highlighted"
+                    : "author-file-editor-insert-cell-menu-button"
+            }
             title={`Add a ${cellType.menuLabel.toLowerCase()} section here`}
             onClick={() =>
                 invokeAuthorDocumentCommand(

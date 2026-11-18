@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
-import { AuthorshipPanelProvider } from "../../../extension/vscode_runtime/authorship_panel_provider";
 import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
+import type { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
+import { Document } from "authordoc/storydoc";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -52,7 +54,6 @@ async function openEditor(text: string): Promise<OpenEditor> {
     const provider = new AuthorFileEditorProvider(
         { extensionUri: Uri.file("/extension") } as never,
         vscodeWindow.createOutputChannel("Authorship") as never,
-        new AuthorshipPanelProvider({ extensionUri: Uri.file("/extension") } as never),
     );
     const editsRecorded: { undo(): void; redo(): void }[] = [];
     provider.onDidChangeCustomDocument((edit) =>
@@ -954,4 +955,91 @@ describe("the prose errors marked while the author types", () => {
             expect(theCellBeingTyped().marks()).toEqual(marksAfter);
         },
     );
+});
+
+describe("a salient concept's cell beside the manuscript", () => {
+    it("highlights the concept's words in the manuscript once the author asks it to", async () => {
+        editor = await openEditor(
+            [
+                '<!-- cell: markdown id="m1" -->',
+                "",
+                "She waited for him—a Companion knelt—head bowed.",
+                "",
+                '<!-- cell: salient-concept id="k1" title="The Companion" words="4-6" -->',
+                "",
+                "The man who kneels.",
+                "",
+            ].join("\n"),
+        );
+        const shownInTheManuscript = document.querySelector(
+            ".author-file-editor-story-annotation-shown-in-the-manuscript",
+        )!;
+
+        await act(async () => {
+            shownInTheManuscript.dispatchEvent(
+                new MouseEvent("click", { bubbles: true }),
+            );
+        });
+        await settle();
+        await openTheCellForTyping();
+
+        expect(theCellBeingTyped().marks()).toEqual([
+            {
+                range: {
+                    from: { lineNumber: 1, column: 22 },
+                    to: { lineNumber: 1, column: 49 },
+                },
+                options: {
+                    inlineClassName:
+                        "markdown-editor-story-text-highlight markdown-editor-story-text-highlight-0",
+                },
+            },
+        ]);
+    });
+
+    it("gives the concept the words the author selected in the manuscript", async () => {
+        editor = await openEditor(
+            [
+                '<!-- cell: markdown id="m1" -->',
+                "",
+                "She waited for him.",
+                "",
+                '<!-- cell: salient-concept id="k1" title="Waiting" -->',
+                "",
+                "Time spent for someone.",
+                "",
+            ].join("\n"),
+        );
+        const thePage = (
+            globalThis as unknown as {
+                acquireVsCodeApi: () => { postMessage: (message: unknown) => void };
+            }
+        ).acquireVsCodeApi();
+        await act(async () => {
+            thePage.postMessage({
+                type: "storyTextSelected",
+                storyTextSelected: {
+                    cellId: "m1",
+                    startCharacterOffsetInCell: 4,
+                    endCharacterOffsetInCell: 10,
+                },
+            });
+        });
+        await settle();
+        const assign = document.querySelector(
+            ".author-file-editor-metadata-pane .author-file-editor-story-annotation-assign",
+        )!;
+
+        await act(async () => {
+            assign.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+        await settle();
+
+        const concept = new Document(editor.documentText()).cellWithId(
+            "k1",
+        ) as SalientConceptCell;
+        expect(concept.references.map((reference) => reference.storyWordRange)).toEqual([
+            new StoryWordRange(1, 1),
+        ]);
+    });
 });

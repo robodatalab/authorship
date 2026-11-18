@@ -110,13 +110,16 @@ body {
 }
 
 .author-file-editor-insert-cell-menu:hover,
-.author-file-editor-insert-cell-menu:focus-within {
+.author-file-editor-insert-cell-menu:focus-within,
+.author-file-editor-insert-cell-menu-highlighted {
     opacity: 1;
 }
 
 .author-file-editor-pane
     > ul:hover
-    .author-file-editor-insert-cell-menu:not(:hover) {
+    .author-file-editor-insert-cell-menu:not(:hover):not(
+        .author-file-editor-insert-cell-menu-highlighted
+    ) {
     opacity: 0;
 }
 
@@ -203,4 +206,11 @@ body {
         --vscode-menu-selectionBackground,
         var(--vscode-list-activeSelectionBackground)
     );
+}
+
+.author-file-editor-insert-cell-menu-button-highlighted,
+.author-file-editor-insert-cell-menu-button-highlighted:hover {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    outline: 1px solid var(--vscode-focusBorder);
 }

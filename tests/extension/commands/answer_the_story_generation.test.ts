@@ -34,7 +34,7 @@ describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => 
                 shown: {
                     kind: "command",
                     cellKind: "salient-concept",
-                    commandName: "addStoryAnnotation",
+                    commandName: "insertCell",
                 },
             },
         });

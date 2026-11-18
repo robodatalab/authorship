@@ -22,7 +22,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
         shown: {
             kind: "command",
             cellKind: "salient-concept",
-            commandName: "addStoryAnnotation",
+            commandName: "insertCell",
         },
     },
 };

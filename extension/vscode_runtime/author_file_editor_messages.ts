@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import type { AuthorFileEditorMessage } from "./message_queue_between_vscode_and_webview";
+import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 
 export class ThePageIsReady implements AuthorFileEditorMessage {
@@ -34,6 +35,29 @@ export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
 
     invoke(session: AuthorFileEditorSession): void {
         session.theAuthorSelectedStoryText(this.storyTextSelected);
+    }
+}
+
+export class TheAuthorSelectedTheStoryAnnotation
+    implements AuthorFileEditorMessage
+{
+    constructor(
+        private readonly cellKind: string,
+        private readonly annotationCellId: string | null,
+    ) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        session.selectTheStoryAnnotation(this.cellKind, this.annotationCellId);
+    }
+}
+
+export class TheAuthorAskedToSeeTheStoryWords
+    implements AuthorFileEditorMessage
+{
+    constructor(private readonly storyWordRange: StoryWordRange) {}
+
+    invoke(session: AuthorFileEditorSession): void {
+        session.showTheStoryWordRange(this.storyWordRange);
     }
 }
 

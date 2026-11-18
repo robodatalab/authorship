@@ -13,6 +13,7 @@ import type { StoryGeneration } from "../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { parse } from "authordoc/parser";
+import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
@@ -23,6 +24,7 @@ interface WhatTheWebviewDraws {
     proseErrors: ProseCheckError[];
     storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
     storyTextShown: StoryTextSpan | null;
+    storyTextSelected: StoryTextSpan | null;
     findMatches: AuthorFileEditorFindMatch[];
     cellsBeingWritten: Record<string, number>;
     wordsInEverySection: Record<string, number>;
@@ -71,6 +73,9 @@ function processMessageFromVscode(
             .storyAnnotationsSelected as Record<string, StoryAnnotationSelected>;
     } else if (message.data?.type === "storyTextShown") {
         drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
+    } else if (message.data?.type === "storyTextSelected") {
+        drawn.storyTextSelected = message.data
+            .storyTextSelected as StoryTextSpan | null;
     } else if (message.data?.type === "findMatches") {
         drawn.findMatches = message.data
             .findMatches as AuthorFileEditorFindMatch[];
@@ -107,6 +112,7 @@ function openTheAuthorFileEditor(): void {
         proseErrors: [],
         storyAnnotationsSelected: {},
         storyTextShown: null,
+        storyTextSelected: null,
         findMatches: [],
         cellsBeingWritten: {},
         wordsInEverySection: {},
@@ -114,9 +120,14 @@ function openTheAuthorFileEditor(): void {
         storyGeneration: null,
     };
 
-    const cellRenderer = new AuthorFileEditorCellRenderer(sendMessagesToVscode);
-
     function drawTheCanvas(): void {
+        const story = Document.fromCells(drawn.cells);
+        const cellRenderer = new AuthorFileEditorCellRenderer(
+            sendMessagesToVscode,
+            story,
+            drawn.storyAnnotationsSelected,
+            drawn.storyTextSelected,
+        );
         root.render(
             <AuthorFileEditorCanvas
                 cells={drawn.cells}

@@ -30,7 +30,7 @@ from server.story_generator.review import CommandShown, Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
 
 # Where the author adds the concepts: the Salient Concepts tab's add button.
-ADD_THE_CONCEPTS = CommandShown(SALIENT_CONCEPT, "addStoryAnnotation")
+ADD_THE_CONCEPTS = CommandShown(SALIENT_CONCEPT, "insertCell")
 
 DESCRIPTION_INSTRUCTIONS = """You help an author describe what an interactive story is about: its salient concepts, the ideas a reader should come away understanding, though the story never states them.
 

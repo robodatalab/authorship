@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { Document } from "authordoc/storydoc";
-import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
+import type { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 
 vi.mock(
@@ -19,8 +19,11 @@ vi.mock("monaco-editor/editor/editor.api", async () => {
     return monacoEditorApi();
 });
 
-const { AuthorshipPanelSalientConcepts } = await import(
-    "../../../extension/webview/panel/AuthorshipPanelSalientConcepts"
+const { AuthorFileEditorSalientConceptCell } = await import(
+    "../../../extension/webview/cell_types/AuthorFileEditorSalientConceptCell"
+);
+const { MarkdownEditorMediator } = await import(
+    "../../../extension/webview/markdown/MarkdownEditor"
 );
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -49,37 +52,38 @@ const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: salient-concept id="k1" title="The d
 She finds the door.
 `;
 
-describe("the salient concepts tab", () => {
+describe("a salient concept cell", () => {
     let posted: unknown[] = [];
     let root: Root;
 
-    interface WhatTheTabIsGiven {
-        story: string | null;
-        storyAnnotationSelected?: StoryAnnotationSelected;
+    interface WhatTheCellIsGiven {
+        story: string;
+        isShownInTheManuscript?: boolean;
+        referenceIdSelected?: string | null;
         storyTextSelected?: StoryTextSpan | null;
     }
 
-    async function mountSalientConcepts(options: WhatTheTabIsGiven): Promise<void> {
+    async function mountSalientConcepts(options: WhatTheCellIsGiven): Promise<void> {
         posted = [];
         document.body.innerHTML = "";
         const container = document.createElement("div");
         document.body.append(container);
         root = createRoot(container);
+        const story = new Document(options.story);
         await act(async () => {
             root.render(
-                <AuthorshipPanelSalientConcepts
-                    story={
-                        options.story === null ? null : new Document(options.story)
-                    }
-                    storyAnnotationSelected={
-                        options.storyAnnotationSelected ?? {
-                            annotationCellId: null,
-                            passageId: null,
+                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                    <AuthorFileEditorSalientConceptCell
+                        cell={story.cellWithId("k1") as SalientConceptCell}
+                        story={story}
+                        isShownInTheManuscript={
+                            options.isShownInTheManuscript ?? false
                         }
-                    }
-                    storyTextSelected={options.storyTextSelected ?? null}
-                    sendMessagesToVscode={(message) => posted.push(message)}
-                />,
+                        referenceIdSelected={options.referenceIdSelected ?? null}
+                        storyTextSelected={options.storyTextSelected ?? null}
+                        sendMessagesToVscode={(message) => posted.push(message)}
+                    />
+                </MarkdownEditorMediator>,
             );
         });
     }
@@ -90,16 +94,11 @@ describe("the salient concepts tab", () => {
         });
     }
 
-    it("says so when no manuscript is open", async () => {
-        await mountSalientConcepts({ story: null });
-
-        expect(document.body.textContent).toBe("No manuscript open");
-    });
-
-    it("shows the selected concept's title, description and references below the list", async () => {
+    it("shows the concept's title, description and references", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
 
         const titleShown = document.querySelector<HTMLInputElement>(
@@ -109,7 +108,7 @@ describe("the salient concepts tab", () => {
             ".markdown-rendered p",
         )?.textContent;
         const referenceShown = document.querySelector(
-            ".authorship-panel-story-annotation-passage-shown",
+            ".author-file-editor-story-annotation-passage-shown",
         )?.textContent;
         expect(titleShown).toBe("The door");
         expect(descriptionShown).toBe("She finds the door.");
@@ -119,7 +118,8 @@ describe("the salient concepts tab", () => {
     it("asks for the concept's title to be replaced as the author types it", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
         const titleBox = document.querySelector<HTMLInputElement>(
             ".author-file-editor-cell-field-input",
@@ -148,12 +148,13 @@ describe("the salient concepts tab", () => {
     it("lists the references newest first", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
 
         const referencesShown = [
             ...document.querySelectorAll(
-                ".authorship-panel-story-annotation-passage-shown",
+                ".author-file-editor-story-annotation-passage-shown",
             ),
         ].map((reference) => reference.textContent);
         expect(referencesShown).toEqual(["the bell.", "the door."]);
@@ -167,7 +168,8 @@ describe("the salient concepts tab", () => {
                 THE_STORY,
                 '<!-- cell: salient-concept id="k1" title="The door" words="r1:2-3, r2:2-3" -->\n',
             ].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
 
         expect(reactSaid).not.toHaveBeenCalled();
@@ -176,10 +178,11 @@ describe("the salient concepts tab", () => {
     it("asks the host to select the second reference listed, and to show its words", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
         const secondReference = document.querySelectorAll(
-            ".authorship-panel-story-annotation-passage-shown",
+            ".author-file-editor-story-annotation-passage-shown",
         )[1];
 
         await click(secondReference);
@@ -193,12 +196,13 @@ describe("the salient concepts tab", () => {
     it("marks the reference selected", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: "r1" },
+            isShownInTheManuscript: true,
+                referenceIdSelected: "r1",
         });
 
         const referencesMarked = [
             ...document.querySelectorAll(
-                ".authorship-panel-story-annotation-passage-shown",
+                ".author-file-editor-story-annotation-passage-shown",
             ),
         ].map((reference) => reference.getAttribute("aria-pressed"));
         expect(referencesMarked).toEqual(["false", "true"]);
@@ -223,15 +227,13 @@ describe("the salient concepts tab", () => {
                     THE_STORY,
                     `<!-- cell: salient-concept id="k1" title="The door" words="${words}" -->\n`,
                 ].join("\n"),
-                storyAnnotationSelected: {
-                    annotationCellId: "k1",
-                    passageId: "r2",
-                },
+                isShownInTheManuscript: true,
+                referenceIdSelected: "r2",
             });
 
             const referencesShownMarked = [
                 ...document.querySelectorAll(
-                    ".authorship-panel-story-annotation-passage-shown",
+                    ".author-file-editor-story-annotation-passage-shown",
                 ),
             ].map((reference) => reference.getAttribute("aria-pressed"));
             expect(referencesShownMarked).toEqual(referencesMarked);
@@ -241,10 +243,11 @@ describe("the salient concepts tab", () => {
     it("asks for a reference to be taken out of the concept", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
         const removeButton = document.querySelector(
-            ".authorship-panel-story-annotation-passage-removed",
+            ".author-file-editor-story-annotation-passage-removed",
         )!;
 
         await click(removeButton);
@@ -264,11 +267,12 @@ describe("the salient concepts tab", () => {
     it("cannot assign anything until words are selected", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
         });
 
         const assignButton = document.querySelector<HTMLButtonElement>(
-            ".authorship-panel-story-annotation-assign",
+            ".author-file-editor-story-annotation-assign",
         )!;
         expect(assignButton.disabled).toBe(true);
     });
@@ -276,7 +280,8 @@ describe("the salient concepts tab", () => {
     it("asks for the selected words to be assigned to the selected concept", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR].join("\n"),
-            storyAnnotationSelected: { annotationCellId: "k1", passageId: null },
+            isShownInTheManuscript: true,
+                referenceIdSelected: null,
             storyTextSelected: {
                 cellId: "m1",
                 startCharacterOffsetInCell: 4,
@@ -284,7 +289,7 @@ describe("the salient concepts tab", () => {
             },
         });
         const assignButton = document.querySelector(
-            ".authorship-panel-story-annotation-assign",
+            ".author-file-editor-story-annotation-assign",
         )!;
 
         await click(assignButton);
@@ -302,4 +307,42 @@ describe("the salient concepts tab", () => {
             },
         ]);
     });
+
+    it.each([
+        ["highlighted, while they are not", false, "k1"],
+        ["no longer highlighted, while they are", true, null],
+    ])("asks for its words in the manuscript to be %s", async (_, isShownInTheManuscript, annotationCellId) => {
+        await mountSalientConcepts({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            isShownInTheManuscript,
+        });
+        const shownInTheManuscript = document.querySelector(
+            ".author-file-editor-story-annotation-shown-in-the-manuscript",
+        )!;
+
+        await click(shownInTheManuscript);
+
+        expect(posted).toEqual([
+            { type: "selectStoryAnnotation", cellKind: "salient-concept", annotationCellId },
+        ]);
+    });
+
+    it("asks for its words to be highlighted before a reference of it is selected, while they are not", async () => {
+        await mountSalientConcepts({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            isShownInTheManuscript: false,
+        });
+        const secondReference = document.querySelectorAll(
+            ".author-file-editor-story-annotation-passage-shown",
+        )[1];
+
+        await click(secondReference);
+
+        expect(posted).toEqual([
+            { type: "selectStoryAnnotation", cellKind: "salient-concept", annotationCellId: "k1" },
+            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
+            { type: "showStoryWordRange", firstWord: 2, lastWord: 3 },
+        ]);
+    });
+
 });
