@@ -21,12 +21,14 @@ import { BlurbCell } from "authordoc/cells/blurb_cell";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { ChapterCell } from "authordoc/cells/chapter_cell";
+import { CharacterCell } from "authordoc/cells/character_cell";
 import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
 import type { DividerCell } from "authordoc/cells/divider_cell";
 import type { ImageCell } from "authordoc/cells/image_cell";
 import { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import { PartCell } from "authordoc/cells/part_cell";
+import { PlaceCell } from "authordoc/cells/place_cell";
 import {
     PlotCell,
     PlotEdge,
@@ -114,6 +116,14 @@ class CellsDrawnAs implements CellVisitor<ReactNode> {
     }
 
     visitPlot(cell: PlotCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitCharacter(cell: CharacterCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitPlace(cell: PlaceCell): ReactNode {
         return this.drawn(cell);
     }
 
@@ -1367,7 +1377,7 @@ describe("the plots the story weaves", () => {
                     new PlotCell(
                         "Knocked first",
                         [
-                            new PlotNode("n0", null, "1.1", "the porch", "Someone knocks."),
+                            new PlotNode("n0", null, "1.1", "", [], "Someone knocks."),
                             new PlotNode("n1", new StoryWordRange(0, 1)),
                             new PlotNode("n2", new StoryWordRange(2, 2)),
                             new PlotNode("n3", new StoryWordRange(3, 4)),
@@ -1686,6 +1696,8 @@ describe("the manuscript and the metadata tabs", () => {
         "salient-concept": (cell) => (
             <div className="test-cell">{cell.uniqueId}</div>
         ),
+        character: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        place: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
     };
 
     function cellsDrawn(): (string | null)[] {
@@ -1705,6 +1717,8 @@ describe("the manuscript and the metadata tabs", () => {
                 new PlotCell("Bell", [], [], "", false, null, "p1"),
                 markdownCell("Twice", "m2"),
                 new SalientConceptCell("Door", [], "", false, null, "k1"),
+                new CharacterCell("Varn", "", false, null, "v1"),
+                new PlaceCell("The hall", "", false, null, "h1"),
             ],
             cellDrawings: DRAWN_BY_THEIR_IDS,
         });
@@ -1714,7 +1728,7 @@ describe("the manuscript and the metadata tabs", () => {
 
     it.each([
         ["Manuscript", ["m1", "m2"]],
-        ["Metadata", ["p1", "k1"]],
+        ["Metadata", ["p1", "k1", "v1", "h1"]],
     ])("draws the cells the %s tab holds once it is chosen", async (tabChosen, expected) => {
         await mountCanvas({
             cells: [
@@ -1722,6 +1736,8 @@ describe("the manuscript and the metadata tabs", () => {
                 new PlotCell("Bell", [], [], "", false, null, "p1"),
                 markdownCell("Twice", "m2"),
                 new SalientConceptCell("Door", [], "", false, null, "k1"),
+                new CharacterCell("Varn", "", false, null, "v1"),
+                new PlaceCell("The hall", "", false, null, "h1"),
             ],
             cellDrawings: DRAWN_BY_THEIR_IDS,
         });
@@ -1750,7 +1766,7 @@ describe("the manuscript and the metadata tabs", () => {
 
     it.each([
         ["Manuscript", ["markdown", "chapter"]],
-        ["Metadata", ["plot", "salient-concept"]],
+        ["Metadata", ["plot", "salient-concept", "character", "place"]],
     ])("offers the kinds the %s tab holds", async (tabChosen, expected) => {
         await mountCanvas({
             cellTypes: [
@@ -1758,6 +1774,8 @@ describe("the manuscript and the metadata tabs", () => {
                 cellType("plot", "primary"),
                 cellType("chapter", "primary"),
                 cellType("salient-concept", "primary"),
+                cellType("character", "primary"),
+                cellType("place", "primary"),
             ],
             cellDrawings: DRAWN_BY_THEIR_IDS,
         });

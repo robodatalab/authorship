@@ -18,12 +18,14 @@ from authordoc.cells.blurb_cell import BLURB, BlurbCell
 from authordoc.cells.cell import Cell
 from authordoc.cells.cell_visitor import CellVisitor
 from authordoc.cells.chapter_cell import ChapterCell
+from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.disclaimer_cell import DisclaimerCell
 from authordoc.cells.divider_cell import DividerCell
 from authordoc.cells.image_cell import IMAGE, ImageCell
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.note_cell import NoteCell
 from authordoc.cells.part_cell import PartCell
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell
 from authordoc.cells.recap_cell import RecapCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
@@ -370,6 +372,12 @@ class _BookBinding(CellVisitor[None]):
         pass
 
     def visit_plot(self, cell: PlotCell) -> None:
+        pass
+
+    def visit_character(self, cell: CharacterCell) -> None:
+        pass
+
+    def visit_place(self, cell: PlaceCell) -> None:
         pass
 
 

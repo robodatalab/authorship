@@ -4,12 +4,14 @@ import type { AboutCell } from "authordoc/cells/about_cell";
 import type { BlurbCell } from "authordoc/cells/blurb_cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import type { ChapterCell } from "authordoc/cells/chapter_cell";
+import type { CharacterCell } from "authordoc/cells/character_cell";
 import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
 import type { DividerCell } from "authordoc/cells/divider_cell";
 import type { ImageCell } from "authordoc/cells/image_cell";
 import type { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import type { PartCell } from "authordoc/cells/part_cell";
+import type { PlaceCell } from "authordoc/cells/place_cell";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import type { RecapCell } from "authordoc/cells/recap_cell";
 import type { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
@@ -19,12 +21,14 @@ import type { UnknownCell } from "authordoc/cells/unknown_cell";
 import { AuthorFileEditorAboutCell } from "../cell_types/AuthorFileEditorAboutCell";
 import { AuthorFileEditorBlurbCell } from "../cell_types/AuthorFileEditorBlurbCell";
 import { AuthorFileEditorChapterCell } from "../cell_types/AuthorFileEditorChapterCell";
+import { AuthorFileEditorCharacterCell } from "../cell_types/AuthorFileEditorCharacterCell";
 import { AuthorFileEditorDisclaimerCell } from "../cell_types/AuthorFileEditorDisclaimerCell";
 import { AuthorFileEditorDividerCell } from "../cell_types/AuthorFileEditorDividerCell";
 import { AuthorFileEditorImageCell } from "../cell_types/AuthorFileEditorImageCell";
 import { AuthorFileEditorMarkdownCell } from "../cell_types/AuthorFileEditorMarkdownCell";
 import { AuthorFileEditorNoteCell } from "../cell_types/AuthorFileEditorNoteCell";
 import { AuthorFileEditorPartCell } from "../cell_types/AuthorFileEditorPartCell";
+import { AuthorFileEditorPlaceCell } from "../cell_types/AuthorFileEditorPlaceCell";
 import { AuthorFileEditorPlotCell } from "../cell_types/AuthorFileEditorPlotCell";
 import { AuthorFileEditorRecapCell } from "../cell_types/AuthorFileEditorRecapCell";
 import { AuthorFileEditorSalientConceptCell } from "../cell_types/AuthorFileEditorSalientConceptCell";
@@ -149,6 +153,24 @@ export class AuthorFileEditorCellRenderer implements CellVisitor<ReactNode> {
     visitPlot(cell: PlotCell): ReactNode {
         return (
             <AuthorFileEditorPlotCell
+                cell={cell}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
+    }
+
+    visitCharacter(cell: CharacterCell): ReactNode {
+        return (
+            <AuthorFileEditorCharacterCell
+                cell={cell}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
+    }
+
+    visitPlace(cell: PlaceCell): ReactNode {
+        return (
+            <AuthorFileEditorPlaceCell
                 cell={cell}
                 sendMessagesToVscode={this.sendMessagesToVscode}
             />

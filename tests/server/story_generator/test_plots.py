@@ -58,6 +58,30 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
         (plot,) = with_every_event.plots()
         self.assertEqual(plot.concepts(with_every_event), [concept])
 
+    async def test_every_place_the_events_name_is_added_once(self) -> None:
+        concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")
+        document = Document.from_cells([concept])
+        model = Mock()
+        deployment = Mock()
+        deployment.client_async.return_value = model
+        model.complete.side_effect = [
+            streamed(
+                "1 | earth, Varn's house | Varn learns she is pregnant.\n"
+                "4 | mars, the base | Varn raises her son on Mars."
+            ),
+            streamed("2 | earth, Varn's house | Varn hides it from mission control."),
+            streamed("3 | mars, the base | Varn gives birth on Mars."),
+        ]
+
+        lay_out, ends, second_event, third_event = Plots(deployment).run(document)
+        laid_out = await lay_out(document)
+        with_the_ends = await ends(laid_out)
+        with_the_second_event = await second_event(with_the_ends)
+        with_every_event = await third_event(with_the_second_event)
+
+        _, _, varns_house, the_base = with_every_event.cells
+        self.assertEqual((varns_house.title, the_base.title), ("earth, Varn's house", "mars, the base"))
+
 
 class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
     async def test_writes_the_ends_into_the_first_and_last_events_of_the_plot(self) -> None:

@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from unittest.mock import Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell, SalientConceptReference
 from authordoc.cells.story_word_range import StoryWordRange
@@ -22,8 +23,8 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         varn = PlotCell(
             "Motherhood",
             [
-                PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("e2", None, "2", "mars, Varn's room", "Varn shares her water with her son."),
+                PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("e2", None, "2", "r1", [], "Varn shares her water with her son."),
             ],
             [],
             "",
@@ -34,8 +35,8 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         dax = PlotCell(
             "Brutal father",
             [
-                PlotNode("f1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("f2", None, "2.5", "mars, the base", "Dax drinks in front of the thirsty."),
+                PlotNode("f1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("f2", None, "2.5", "b1", [], "Dax drinks in front of the thirsty."),
             ],
             [],
             "",
@@ -43,7 +44,9 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
             None,
             "p2",
         )
-        self.document = Document.from_cells([varn, dax])
+        the_base = PlaceCell("mars, the base", "", False, None, "b1")
+        varns_room = PlaceCell("mars, Varn's room", "", False, None, "r1")
+        self.document = Document.from_cells([the_base, varns_room, varn, dax])
         self.model = Mock()
         self.deployment = Mock()
         self.deployment.client_async.return_value = self.model
@@ -108,7 +111,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         arrival = SalientConceptCell("Arrival", [SalientConceptReference("r1", StoryWordRange(1, 4))], "", False, None, "k1")
         landing = PlotCell(
             "Arrival",
-            [PlotNode("g1", StoryWordRange(0, 6), "0", "mars, the port", "The ship lands.")],
+            [PlotNode("g1", StoryWordRange(0, 6), "0", "t1", [], "The ship lands.")],
             [],
             "",
             False,
@@ -117,7 +120,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         )
         varn = PlotCell(
             "Motherhood",
-            [PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son.")],
+            [PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son.")],
             [],
             "",
             False,
@@ -126,7 +129,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         )
         dax = PlotCell(
             "Brutal father",
-            [PlotNode("f1", None, "1", "mars, the base", "Dax takes the water from Varn and her son.")],
+            [PlotNode("f1", None, "1", "b1", [], "Dax takes the water from Varn and her son.")],
             [],
             "",
             False,
@@ -139,8 +142,8 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         model.complete.return_value = streamed("Dax took the water while Varn held her son close.")
         where_they_meet = SceneStep(
             [
-                PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("f1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
+                PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("f1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
             ],
             model,
         )

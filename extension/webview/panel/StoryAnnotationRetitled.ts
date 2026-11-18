@@ -3,12 +3,14 @@ import type { BlurbCell } from "authordoc/cells/blurb_cell";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import type { ChapterCell } from "authordoc/cells/chapter_cell";
+import type { CharacterCell } from "authordoc/cells/character_cell";
 import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
 import type { DividerCell } from "authordoc/cells/divider_cell";
 import type { ImageCell } from "authordoc/cells/image_cell";
 import type { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import type { PartCell } from "authordoc/cells/part_cell";
+import type { PlaceCell } from "authordoc/cells/place_cell";
 import { PlotCell } from "authordoc/cells/plot_cell";
 import type { RecapCell } from "authordoc/cells/recap_cell";
 import { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
@@ -94,6 +96,14 @@ export class StoryAnnotationRetitled implements CellVisitor<Cell> {
     }
 
     visitRecap(cell: RecapCell): RecapCell {
+        return cell;
+    }
+
+    visitCharacter(cell: CharacterCell): CharacterCell {
+        return cell;
+    }
+
+    visitPlace(cell: PlaceCell): PlaceCell {
         return cell;
     }
 

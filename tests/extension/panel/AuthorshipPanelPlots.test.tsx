@@ -57,11 +57,19 @@ const THE_DOOR_ON_ITS_PASSAGE = `<!-- cell: plot id="p1" title="The door" nodes=
 She finds the door.
 `;
 
-const THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT = `<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->
+const THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT = `<!-- cell: place id="h1" title="The hall" -->
+
+<!-- cell: place id="h2" title="The stairs" -->
+
+<!-- cell: character id="v1" title="Varn" -->
+
+<!-- cell: character id="d1" title="Lia" -->
+
+<!-- cell: plot id="p1" title="The door" edges="x1:e1>e2" -->
 
 <ol title="She finds the door.">
-<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>
-<li id="e2" timestamp="1.2" location="the hall">She opens the door.</li>
+<li id="e1" timestamp="1.1" place="h1" characters="v1" words="2-3">She finds the door.</li>
+<li id="e2" timestamp="1.2" place="h1">She opens the door.</li>
 </ol>
 `;
 
@@ -235,8 +243,8 @@ describe("the plots tab", () => {
             ),
         ].map((event) => [event.textContent, event.getAttribute("title")]);
         expect(eventsShown).toEqual([
-            ["She finds the door.", "1.1 · the hall · the door."],
-            ["She opens the door.", "1.2 · the hall · Not told in the story yet"],
+            ["She finds the door.", "1.1 · The hall · the door."],
+            ["She opens the door.", "1.2 · The hall · Not told in the story yet"],
         ]);
     });
 
@@ -325,7 +333,7 @@ describe("the plots tab", () => {
 
             const conceptsShown = Array.from(
                 document.querySelectorAll(
-                    ".authorship-panel-plot-concepts .authorship-panel-story-annotation-passage-shown",
+                    ".authorship-panel-plot-concepts .authorship-panel-plot-references-referenced .authorship-panel-story-annotation-passage-shown",
                 ),
                 (concept) => concept.textContent,
             );
@@ -338,7 +346,7 @@ describe("the plots tab", () => {
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
             });
             const removeButton = document.querySelector(
-                ".authorship-panel-plot-concepts .authorship-panel-story-annotation-passage-removed",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-references-referenced .authorship-panel-story-annotation-passage-removed",
             )!;
 
             await click(removeButton);
@@ -361,14 +369,14 @@ describe("the plots tab", () => {
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
             });
             const chooseButton = document.querySelector(
-                ".authorship-panel-plot-concept-chosen",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-reference-chosen",
             )!;
 
             await click(chooseButton);
 
             const conceptsOffered = Array.from(
                 document.querySelectorAll(
-                    ".authorship-panel-plot-concepts-to-choose .authorship-panel-story-annotation-passage-shown",
+                    ".authorship-panel-plot-concepts .authorship-panel-plot-references-to-choose .authorship-panel-story-annotation-passage-shown",
                 ),
                 (concept) => concept.textContent,
             );
@@ -381,17 +389,17 @@ describe("the plots tab", () => {
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: null },
             });
             const chooseButton = document.querySelector(
-                ".authorship-panel-plot-concept-chosen",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-reference-chosen",
             )!;
             await click(chooseButton);
             const thePromise = document.querySelector(
-                ".authorship-panel-plot-concepts-to-choose .authorship-panel-story-annotation-passage-shown",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-references-to-choose .authorship-panel-story-annotation-passage-shown",
             )!;
 
             await click(thePromise);
 
             const offering = document.querySelector(
-                ".authorship-panel-plot-concepts-to-choose",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-references-to-choose",
             );
             expect(posted).toEqual([
                 {
@@ -413,7 +421,7 @@ describe("the plots tab", () => {
             });
 
             const chooseButton = document.querySelector<HTMLButtonElement>(
-                ".authorship-panel-plot-concept-chosen",
+                ".authorship-panel-plot-concepts .authorship-panel-plot-reference-chosen",
             )!;
             expect(chooseButton.disabled).toBe(true);
         });
@@ -442,16 +450,16 @@ describe("the plots tab", () => {
             });
         }
 
-        it("is shown with its summary, timestamp, location and the words that tell it", async () => {
+        it("is shown with its summary, timestamp and the words that tell it", async () => {
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
             });
 
             const wordsShown = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-story-annotation-passage-shown",
+                ".authorship-panel-plot-event-story-text .authorship-panel-story-annotation-passage-shown",
             )?.textContent;
-            expect(eventFieldsShown()).toEqual(["She finds the door.", "1.1", "the hall"]);
+            expect(eventFieldsShown()).toEqual(["She finds the door.", "1.1"]);
             expect(wordsShown).toBe("the door.");
         });
 
@@ -490,10 +498,10 @@ describe("the plots tab", () => {
             });
 
             const said = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-plot-event-untold",
+                ".authorship-panel-plot-event-story-text .authorship-panel-plot-event-untold",
             )?.textContent;
             const deleteTheStoryText = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-story-annotation-passage-removed",
+                ".authorship-panel-plot-event-story-text .authorship-panel-story-annotation-passage-removed",
             );
             expect(said).toBe("Not told in the story yet");
             expect(deleteTheStoryText).toBeNull();
@@ -513,17 +521,12 @@ describe("the plots tab", () => {
                     ".authorship-panel-plot-event .author-file-editor-cell-field-input",
                 ),
             ].map((field) => field.placeholder);
-            expect(placeholders).toEqual([
-                "",
-                "Story time",
-                "Location in the story, comma separated",
-            ]);
+            expect(placeholders).toEqual(["", "Story time"]);
         });
 
         it.each([
             ["summary", 0, "summary", "She finds the red door."],
             ["timestamp", 1, "timestamp", "2.1"],
-            ["location", 2, "location", "the hall, by the stairs"],
         ])(
             "asks for the event's %s, and only that, to be changed as the author types it",
             async (_, index, field, said) => {
@@ -558,7 +561,7 @@ describe("the plots tab", () => {
                 storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
             });
             const takeTheWordsAway = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-story-annotation-passage-removed",
+                ".authorship-panel-plot-event-story-text .authorship-panel-story-annotation-passage-removed",
             )!;
 
             await click(takeTheWordsAway);
@@ -583,7 +586,7 @@ describe("the plots tab", () => {
                 },
             });
             const tellTheEvent = document.querySelector(
-                ".authorship-panel-plot-event .authorship-panel-story-annotation-assign",
+                ".authorship-panel-plot-event-story-text .authorship-panel-story-annotation-assign",
             )!;
 
             await click(tellTheEvent);
@@ -603,6 +606,115 @@ describe("the plots tab", () => {
             ]);
         });
 
+        it.each([
+            ["the place it happens in", ".authorship-panel-plot-event-place", ["The hall"]],
+            ["the characters in it", ".authorship-panel-plot-event-characters", ["Varn"]],
+        ])("shows %s by name", async (_, referencesShown, expected) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+
+            const named = [
+                ...document.querySelectorAll(
+                    `${referencesShown} .authorship-panel-plot-references-referenced .authorship-panel-story-annotation-passage-shown`,
+                ),
+            ].map((reference) => reference.textContent);
+            expect(named).toEqual(expected);
+        });
+
+        it.each([
+            ["the places other than its own", ".authorship-panel-plot-event-place", ["The stairs"]],
+            ["the characters not in it yet", ".authorship-panel-plot-event-characters", ["Lia"]],
+        ])("offers %s", async (_, referencesShown, expected) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+            const chooseButton = document.querySelector(
+                `${referencesShown} .authorship-panel-plot-reference-chosen`,
+            )!;
+
+            await click(chooseButton);
+
+            const offered = [
+                ...document.querySelectorAll(
+                    `${referencesShown} .authorship-panel-plot-references-to-choose .authorship-panel-story-annotation-passage-shown`,
+                ),
+            ].map((reference) => reference.textContent);
+            expect(offered).toEqual(expected);
+        });
+
+        it.each([
+            [
+                "the place chosen to be the event's",
+                ".authorship-panel-plot-event-place",
+                {
+                    type: "invoke",
+                    commandName: "changePlotEvent",
+                    commandArguments: { annotationCellId: "p1", nodeId: "e1", field: "place", said: "h2" },
+                },
+            ],
+            [
+                "the character chosen to be put in the event",
+                ".authorship-panel-plot-event-characters",
+                {
+                    type: "invoke",
+                    commandName: "addCharacterToPlotEvent",
+                    commandArguments: { annotationCellId: "p1", nodeId: "e1", characterCellId: "d1" },
+                },
+            ],
+        ])("asks for %s", async (_, referencesShown, asked) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+            const chooseButton = document.querySelector(
+                `${referencesShown} .authorship-panel-plot-reference-chosen`,
+            )!;
+            await click(chooseButton);
+            const chosen = document.querySelector(
+                `${referencesShown} .authorship-panel-plot-references-to-choose .authorship-panel-story-annotation-passage-shown`,
+            )!;
+
+            await click(chosen);
+
+            expect(posted).toEqual([asked]);
+        });
+
+        it.each([
+            [
+                "out of its place",
+                ".authorship-panel-plot-event-place",
+                {
+                    type: "invoke",
+                    commandName: "changePlotEvent",
+                    commandArguments: { annotationCellId: "p1", nodeId: "e1", field: "place", said: "" },
+                },
+            ],
+            [
+                "a character out of it",
+                ".authorship-panel-plot-event-characters",
+                {
+                    type: "invoke",
+                    commandName: "removeCharacterFromPlotEvent",
+                    commandArguments: { annotationCellId: "p1", nodeId: "e1", characterCellId: "v1" },
+                },
+            ],
+        ])("asks for the event to be taken %s", async (_, referencesShown, asked) => {
+            await mountPlots({
+                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
+                storyAnnotationSelected: { annotationCellId: "p1", passageId: "e1" },
+            });
+            const takeOut = document.querySelector(
+                `${referencesShown} .authorship-panel-plot-references-referenced .authorship-panel-story-annotation-passage-removed`,
+            )!;
+
+            await click(takeOut);
+
+            expect(posted).toEqual([asked]);
+        });
+
         it("cannot be told with words until words are selected", async () => {
             await mountPlots({
                 story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
@@ -610,7 +722,7 @@ describe("the plots tab", () => {
             });
 
             const tellTheEvent = document.querySelector<HTMLButtonElement>(
-                ".authorship-panel-plot-event .authorship-panel-story-annotation-assign",
+                ".authorship-panel-plot-event-story-text .authorship-panel-story-annotation-assign",
             )!;
             expect(tellTheEvent.disabled).toBe(true);
         });

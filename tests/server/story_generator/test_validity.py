@@ -17,8 +17,8 @@ class PlotValidityStepCall(unittest.IsolatedAsyncioTestCase):
         plot_begun = PlotCell(
             "Motherhood",
             [
-                PlotNode("e1", StoryWordRange(0, 1), "1", "mars, the base", "Varn waits."),
-                PlotNode("e2", StoryWordRange(2, 4), "2", "mars, the base", "Varn gives birth."),
+                PlotNode("e1", StoryWordRange(0, 1), "1", "b1", [], "Varn waits."),
+                PlotNode("e2", StoryWordRange(2, 4), "2", "b1", [], "Varn gives birth."),
             ],
             [PlotEdge("x1", "e1", "e2")],
             "",

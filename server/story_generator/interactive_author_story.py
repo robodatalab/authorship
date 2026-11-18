@@ -2,10 +2,10 @@
 and the story generator read from the document, or write into it, beyond its
 storydoc format.
 
-Every plot event has a timestamp and a location: the timestamp is a clock shared
-by all the plots, and the location runs from the broadest place to the most
-specific, as in "earth, Varn's house". Events at the same moment and in the same
-place form one scene.
+Every plot event has a timestamp and a place: the timestamp is a clock shared by
+all the plots, and the place is a place cell, named from the broadest place to the
+most specific, as in "earth, Varn's house". Events at the same moment and in the
+same place form one scene.
 
 Every scene is told by a markdown cell, which every event of the scene points at.
 A scene that the story goes on from ends with the opening of a sentence, left
@@ -29,6 +29,7 @@ from collections.abc import Sequence
 from functools import cached_property
 
 from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
@@ -214,8 +215,24 @@ class InteractiveAuthorStory:
 
     def written_event(self, event: PlotNode) -> str:
         """The event as its moment, place and what happens."""
-        line = SEPARATOR.join((event.timestamp, event.location, event.summary))
+        place_name = self.place_name_of(event)
+        line = SEPARATOR.join((event.timestamp, place_name, event.summary))
         return line
+
+    def place_name_of(self, event: PlotNode) -> str:
+        place = event.place(self.document)
+        place_name = "" if place is None else place.title
+        return place_name
+
+    def with_place_named(self, name: str) -> tuple[InteractiveAuthorStory, PlaceCell]:
+        places = [cell for cell in self.document.cells if isinstance(cell, PlaceCell)]
+        named = next((place for place in places if place.title == name), None)
+        if named is not None:
+            return self, named
+        place = PlaceCell(name)
+        document = self.document.with_cells([*self.document.cells, place])
+        story = InteractiveAuthorStory(document)
+        return story, place
 
     def plots_of(self, concept: SalientConceptCell) -> list[PlotCell]:
         """The plots that reference the concept, in the order of the plots."""

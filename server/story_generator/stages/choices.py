@@ -53,7 +53,8 @@ class ChoicesStep(StageStep):
             plot = document.get_plot_of_edge(edge)
             next_event = plot.get_node_by_id(edge.to_node_id)
             next_scene = story.scene_of(next_event)
-            could_happen.append(f"{number}. {next_event.location}: {next_event.summary}\n{next_scene.text}")
+            next_place_name = story.place_name_of(next_event)
+            could_happen.append(f"{number}. {next_place_name}: {next_event.summary}\n{next_scene.text}")
         written_could_happen = "\n\n".join(could_happen)
         request = f"The scene:\n{self._scene.text}\n\nWhat could happen next:\n{written_could_happen}"
         messages = [{"role": "system", "content": CHOICES_INSTRUCTIONS}, {"role": "user", "content": request}]

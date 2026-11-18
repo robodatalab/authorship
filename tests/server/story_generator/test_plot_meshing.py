@@ -2,6 +2,7 @@ import unittest
 from collections.abc import AsyncIterator
 from unittest.mock import Mock
 
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
@@ -95,10 +96,10 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
         first_plot = PlotCell(
             "plot 1",
             [
-                PlotNode("p1e1", None, "1", "earth, house 1", "Plot 1, event 1."),
-                PlotNode("p1e2", None, "2", "earth, house 1", "Plot 1, event 2."),
-                PlotNode("p1e3", None, "3", "earth, house 1", "Plot 1, event 3."),
-                PlotNode("p1e4", None, "4", "earth, house 1", "Plot 1, event 4."),
+                PlotNode("p1e1", None, "1", "h1", [], "Plot 1, event 1."),
+                PlotNode("p1e2", None, "2", "h1", [], "Plot 1, event 2."),
+                PlotNode("p1e3", None, "3", "h1", [], "Plot 1, event 3."),
+                PlotNode("p1e4", None, "4", "h1", [], "Plot 1, event 4."),
             ],
             [],
             "",
@@ -109,10 +110,10 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
         second_plot = PlotCell(
             "plot 2",
             [
-                PlotNode("p2e1", None, "1.5", "earth, house 2", "Plot 2, event 1."),
-                PlotNode("p2e2", None, "2.5", "earth, house 2", "Plot 2, event 2."),
-                PlotNode("p2e3", None, "3.5", "earth, house 2", "Plot 2, event 3."),
-                PlotNode("p2e4", None, "4.5", "earth, house 2", "Plot 2, event 4."),
+                PlotNode("p2e1", None, "1.5", "h2", [], "Plot 2, event 1."),
+                PlotNode("p2e2", None, "2.5", "h2", [], "Plot 2, event 2."),
+                PlotNode("p2e3", None, "3.5", "h2", [], "Plot 2, event 3."),
+                PlotNode("p2e4", None, "4.5", "h2", [], "Plot 2, event 4."),
             ],
             [],
             "",
@@ -120,7 +121,9 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
             None,
             "plot-2",
         )
-        self.document = Document.from_cells([first_plot, second_plot])
+        house_1 = PlaceCell("earth, house 1", "", False, None, "h1")
+        house_2 = PlaceCell("earth, house 2", "", False, None, "h2")
+        self.document = Document.from_cells([house_1, house_2, first_plot, second_plot])
         model = Mock()
         deployment = Mock()
         deployment.client_async.return_value = model
@@ -140,22 +143,23 @@ class MeshRunTest(unittest.IsolatedAsyncioTestCase):
         third_document = await third_step(second_document)
         fourth_document = await fourth_step(third_document)
 
-        meshed_first, meshed_second = fourth_document.plots()
+        _, _, meshed_first, meshed_second, intersection = fourth_document.cells
+        self.assertEqual(intersection.title, "intersection location")
         self.assertSequenceEqual(
             meshed_first.nodes,
             [
-                PlotNode("p1e1", None, "1", "intersection location", "intersection"),
-                PlotNode("p1e2", None, "2", "intersection location", "intersection"),
-                PlotNode("p1e3", None, "3", "intersection location", "intersection"),
-                PlotNode("p1e4", None, "4", "intersection location", "intersection"),
+                PlotNode("p1e1", None, "1", intersection.unique_id, [], "intersection"),
+                PlotNode("p1e2", None, "2", intersection.unique_id, [], "intersection"),
+                PlotNode("p1e3", None, "3", intersection.unique_id, [], "intersection"),
+                PlotNode("p1e4", None, "4", intersection.unique_id, [], "intersection"),
             ],
         )
         self.assertSequenceEqual(
             meshed_second.nodes,
             [
-                PlotNode("p2e1", None, "1", "intersection location", "intersection"),
-                PlotNode("p2e2", None, "2", "intersection location", "intersection"),
-                PlotNode("p2e3", None, "3", "intersection location", "intersection"),
-                PlotNode("p2e4", None, "4", "intersection location", "intersection"),
+                PlotNode("p2e1", None, "1", intersection.unique_id, [], "intersection"),
+                PlotNode("p2e2", None, "2", intersection.unique_id, [], "intersection"),
+                PlotNode("p2e3", None, "3", intersection.unique_id, [], "intersection"),
+                PlotNode("p2e4", None, "4", intersection.unique_id, [], "intersection"),
             ],
         )

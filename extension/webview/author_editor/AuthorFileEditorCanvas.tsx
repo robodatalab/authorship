@@ -22,7 +22,9 @@ import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/fi
 import type { StoryGeneration } from "../../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
+import { CHARACTER } from "authordoc/cells/character_cell";
 import { PART } from "authordoc/cells/part_cell";
+import { PLACE } from "authordoc/cells/place_cell";
 import { PLOT } from "authordoc/cells/plot_cell";
 import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
@@ -54,7 +56,12 @@ const PRIMARY_INSERT_MENU_GROUP = "primary";
 const MANUSCRIPT_TAB = "Manuscript";
 const METADATA_TAB = "Metadata";
 const AUTHOR_FILE_EDITOR_TABS = [MANUSCRIPT_TAB, METADATA_TAB];
-const KINDS_ON_THE_METADATA_TAB = new Set([PLOT, SALIENT_CONCEPT]);
+const KINDS_ON_THE_METADATA_TAB = new Set([
+    PLOT,
+    SALIENT_CONCEPT,
+    CHARACTER,
+    PLACE,
+]);
 
 function tabHoldingTheKind(kind: string): string {
     return KINDS_ON_THE_METADATA_TAB.has(kind) ? METADATA_TAB : MANUSCRIPT_TAB;

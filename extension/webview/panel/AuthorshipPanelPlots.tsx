@@ -31,6 +31,8 @@ import {
     type StoryAnnotationInTheStory,
     type StoryWordRangeInTheStory,
 } from "authordoc/iterators/story_annotations_iterator";
+import { CharacterCell } from "authordoc/cells/character_cell";
+import { PlaceCell } from "authordoc/cells/place_cell";
 import {
     PLOT,
     PlotCell,
@@ -59,9 +61,27 @@ const DELETE_THE_STORY_TEXT = "Delete the story text of this event";
 // How many of the words that tell an untitled event its row shows.
 const FIRST_WORDS_SHOWN = 6;
 const DISCONNECT_THE_NODES = "Disconnect these nodes";
-const REFERENCE_A_CONCEPT = "Reference a salient concept from this plot";
-const STOP_REFERENCING_THE_CONCEPT = "Stop referencing this concept";
-const UNTITLED_CONCEPT = "Untitled concept";
+const PLOT_CONCEPTS_WORDING: AuthorshipPanelPlotReferencesWording = {
+    heading: "Concepts",
+    referenceOne: "Reference a salient concept from this plot",
+    stopReferencing: "Stop referencing this concept",
+    noneReferenced: "No concepts referenced yet",
+    untitled: "Untitled concept",
+};
+const EVENT_PLACE_WORDING: AuthorshipPanelPlotReferencesWording = {
+    heading: "Place",
+    referenceOne: "Choose the place the event happens in",
+    stopReferencing: "Take the event out of this place",
+    noneReferenced: "No place chosen yet",
+    untitled: "Untitled place",
+};
+const EVENT_CHARACTERS_WORDING: AuthorshipPanelPlotReferencesWording = {
+    heading: "Characters",
+    referenceOne: "Add a character to this event",
+    stopReferencing: "Take this character out of the event",
+    noneReferenced: "No characters in the event yet",
+    untitled: "Untitled character",
+};
 const TRAJECTORY_ROW_HEIGHT = 22;
 const TRAJECTORY_LANE_WIDTH = 14;
 const TRAJECTORY_NODE_RADIUS = 4;
@@ -169,6 +189,7 @@ export function AuthorshipPanelPlots({
             content: (
                 <AuthorshipPanelPlotEvent
                     key={eventShown.nodeId}
+                    story={story}
                     plotCell={plotCellShown}
                     plotNode={eventShown}
                     passage={passageOfTheEventShown}
@@ -187,6 +208,7 @@ export function AuthorshipPanelPlots({
 }
 
 interface AuthorshipPanelPlotEventProps {
+    story: Document;
     plotCell: PlotCell;
     plotNode: PlotNode;
     passage: StoryWordRangeInTheStory | null;
@@ -197,6 +219,7 @@ interface AuthorshipPanelPlotEventProps {
 // The event selected in a plot's trajectory: what it is, when and where it
 // happens, and the story text that tells it.
 function AuthorshipPanelPlotEvent({
+    story,
     plotCell,
     plotNode,
     passage,
@@ -231,22 +254,74 @@ function AuthorshipPanelPlotEvent({
             placeholder: "Story time",
             onSaid: (timestamp) => sayOfTheEvent("timestamp", timestamp),
         },
-        {
-            label: "Location",
-            said: plotNode.location,
-            placeholder: "Location in the story, comma separated",
-            onSaid: (location) => sayOfTheEvent("location", location),
-        },
     ];
+    const place = plotNode.place(story);
+    const placeReferenced = place === undefined ? [] : [place];
+    const placesInTheStory = story.cells.filter(
+        (cell) => cell instanceof PlaceCell,
+    );
+    const placesToChoose = placesInTheStory.filter(
+        (other) => other.uniqueId !== plotNode.placeId,
+    );
+    const charactersReferenced = plotNode.characters(story);
+    const charactersInTheStory = story.cells.filter(
+        (cell) => cell instanceof CharacterCell,
+    );
+    const charactersToChoose = charactersInTheStory.filter(
+        (character) => !plotNode.characterIds.includes(character.uniqueId),
+    );
+
+    function sayOfTheEventsCharacter(
+        commandName: string,
+        characterCellId: string,
+    ): void {
+        sendMessagesToVscode({
+            type: "invoke",
+            commandName,
+            commandArguments: {
+                annotationCellId: plotCell.uniqueId,
+                nodeId: plotNode.nodeId,
+                characterCellId,
+            },
+        });
+    }
 
     return (
         <section className="authorship-panel-story-annotation-details authorship-panel-plot-event">
             <h4>Event</h4>
             <AuthorFileEditorCellFields fields={fields} />
+            <AuthorshipPanelPlotReferences
+                className="authorship-panel-plot-event-place"
+                referencedCells={placeReferenced}
+                cellsToChoose={placesToChoose}
+                wording={EVENT_PLACE_WORDING}
+                onReferenced={(placeCellId) =>
+                    sayOfTheEvent("place", placeCellId)
+                }
+                onStoppedReferencing={() => sayOfTheEvent("place", "")}
+            />
+            <AuthorshipPanelPlotReferences
+                className="authorship-panel-plot-event-characters"
+                referencedCells={charactersReferenced}
+                cellsToChoose={charactersToChoose}
+                wording={EVENT_CHARACTERS_WORDING}
+                onReferenced={(characterCellId) =>
+                    sayOfTheEventsCharacter(
+                        "addCharacterToPlotEvent",
+                        characterCellId,
+                    )
+                }
+                onStoppedReferencing={(characterCellId) =>
+                    sayOfTheEventsCharacter(
+                        "removeCharacterFromPlotEvent",
+                        characterCellId,
+                    )
+                }
+            />
             <div className="authorship-panel-story-annotation-passages-heading">
                 <h4>Story text</h4>
             </div>
-            <ul className="authorship-panel-story-annotation-passages">
+            <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-event-story-text">
                 <li className="authorship-panel-story-annotation-passage">
                     {passage === null ? (
                         <span className="authorship-panel-plot-event-untold">
@@ -333,6 +408,14 @@ function AuthorshipPanelPlot({
     onRetitled,
     sendMessagesToVscode,
 }: AuthorshipPanelPlotProps) {
+    const conceptsReferenced = plotCell.concepts(story);
+    const conceptIdsReferenced = conceptsReferenced.map(
+        (concept) => concept.uniqueId,
+    );
+    const conceptsToChoose = story
+        .salientConcepts()
+        .filter((concept) => !conceptIdsReferenced.includes(concept.uniqueId));
+
     // Selected words tell the event added; with none selected, the event is
     // added untold, and selected for the author to say what it is.
     function addAnEvent(): void {
@@ -379,10 +462,31 @@ function AuthorshipPanelPlot({
                 }
                 sendMessagesToVscode={sendMessagesToVscode}
             />
-            <AuthorshipPanelPlotConcepts
-                story={story}
-                plotCell={plotCell}
-                sendMessagesToVscode={sendMessagesToVscode}
+            <AuthorshipPanelPlotReferences
+                className="authorship-panel-plot-concepts"
+                referencedCells={conceptsReferenced}
+                cellsToChoose={conceptsToChoose}
+                wording={PLOT_CONCEPTS_WORDING}
+                onReferenced={(conceptCellId) =>
+                    sendMessagesToVscode({
+                        type: "invoke",
+                        commandName: "addConceptToPlot",
+                        commandArguments: {
+                            annotationCellId: plotCell.uniqueId,
+                            conceptCellId,
+                        },
+                    })
+                }
+                onStoppedReferencing={(conceptCellId) =>
+                    sendMessagesToVscode({
+                        type: "invoke",
+                        commandName: "removeConceptFromPlot",
+                        commandArguments: {
+                            annotationCellId: plotCell.uniqueId,
+                            conceptCellId,
+                        },
+                    })
+                }
             />
             <div className="authorship-panel-story-annotation-passages-heading">
                 <h4>Trajectory</h4>
@@ -402,6 +506,7 @@ function AuthorshipPanelPlot({
                 </div>
             ) : (
                 <AuthorshipPanelPlotTrajectory
+                    story={story}
                     plotCell={plotCell}
                     passages={plot.passages}
                     nodeIdSelected={nodeIdSelected}
@@ -412,104 +517,99 @@ function AuthorshipPanelPlot({
     );
 }
 
-interface AuthorshipPanelPlotConceptsProps {
-    story: Document;
-    plotCell: PlotCell;
-    sendMessagesToVscode: SendMessagesToVscode;
+interface AuthorshipPanelPlotReferencedCell {
+    readonly uniqueId: string;
+    readonly title: string;
 }
 
-// The salient concepts the plot references: each can be stopped being
-// referenced, and the story's other concepts can be chosen to be referenced.
-function AuthorshipPanelPlotConcepts({
-    story,
-    plotCell,
-    sendMessagesToVscode,
-}: AuthorshipPanelPlotConceptsProps) {
+interface AuthorshipPanelPlotReferencesWording {
+    heading: string;
+    referenceOne: string;
+    stopReferencing: string;
+    noneReferenced: string;
+    untitled: string;
+}
+
+interface AuthorshipPanelPlotReferencesProps {
+    className: string;
+    referencedCells: readonly AuthorshipPanelPlotReferencedCell[];
+    cellsToChoose: readonly AuthorshipPanelPlotReferencedCell[];
+    wording: AuthorshipPanelPlotReferencesWording;
+    onReferenced: (cellId: string) => void;
+    onStoppedReferencing: (cellId: string) => void;
+}
+
+// The cells a plot or one of its events references: each can be stopped being
+// referenced, and the story's other cells of the kind can be chosen to be.
+function AuthorshipPanelPlotReferences({
+    className,
+    referencedCells,
+    cellsToChoose,
+    wording,
+    onReferenced,
+    onStoppedReferencing,
+}: AuthorshipPanelPlotReferencesProps) {
     const [choosing, setChoosing] = useState(false);
-    const referenced = plotCell.concepts(story);
-    const referencedIds = referenced.map((concept) => concept.uniqueId);
-    const conceptsInTheStory = story.salientConcepts();
-    const unreferenced = conceptsInTheStory.filter(
-        (concept) => !referencedIds.includes(concept.uniqueId),
-    );
 
-    function reference(conceptCellId: string): void {
+    function reference(cellId: string): void {
         setChoosing(false);
-        sendMessagesToVscode({
-            type: "invoke",
-            commandName: "addConceptToPlot",
-            commandArguments: {
-                annotationCellId: plotCell.uniqueId,
-                conceptCellId,
-            },
-        });
-    }
-
-    function stopReferencing(conceptCellId: string): void {
-        sendMessagesToVscode({
-            type: "invoke",
-            commandName: "removeConceptFromPlot",
-            commandArguments: {
-                annotationCellId: plotCell.uniqueId,
-                conceptCellId,
-            },
-        });
+        onReferenced(cellId);
     }
 
     return (
-        <>
+        <div className={className}>
             <div className="authorship-panel-story-annotation-passages-heading">
-                <h4>Concepts</h4>
+                <h4>{wording.heading}</h4>
                 <button
                     type="button"
-                    className="authorship-panel-plot-concept-chosen"
-                    title={REFERENCE_A_CONCEPT}
-                    aria-label={REFERENCE_A_CONCEPT}
+                    className="authorship-panel-plot-reference-chosen"
+                    title={wording.referenceOne}
+                    aria-label={wording.referenceOne}
                     aria-expanded={choosing}
-                    disabled={unreferenced.length === 0}
+                    disabled={cellsToChoose.length === 0}
                     onClick={() => setChoosing(!choosing)}
                 >
                     <i className="codicon codicon-add" />
                 </button>
             </div>
-            {choosing && unreferenced.length > 0 ? (
-                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-concepts-to-choose">
-                    {unreferenced.map((concept) => (
+            {choosing && cellsToChoose.length > 0 ? (
+                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-references-to-choose">
+                    {cellsToChoose.map((cell) => (
                         <li
-                            key={concept.uniqueId}
+                            key={cell.uniqueId}
                             className="authorship-panel-story-annotation-passage"
                         >
                             <button
                                 type="button"
                                 className="authorship-panel-story-annotation-passage-shown"
-                                onClick={() => reference(concept.uniqueId)}
+                                onClick={() => reference(cell.uniqueId)}
                             >
-                                {concept.title || UNTITLED_CONCEPT}
+                                {cell.title || wording.untitled}
                             </button>
                         </li>
                     ))}
                 </ul>
             ) : null}
-            {referenced.length === 0 ? (
+            {referencedCells.length === 0 ? (
                 <div className="authorship-panel-idle">
-                    No concepts referenced yet
+                    {wording.noneReferenced}
                 </div>
             ) : (
-                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-concepts">
-                    {referenced.map((concept) => (
+                <ul className="authorship-panel-story-annotation-passages authorship-panel-plot-references-referenced">
+                    {referencedCells.map((cell) => (
                         <li
-                            key={concept.uniqueId}
+                            key={cell.uniqueId}
                             className="authorship-panel-story-annotation-passage"
                         >
                             <span className="authorship-panel-story-annotation-passage-shown">
-                                {concept.title || UNTITLED_CONCEPT}
+                                {cell.title || wording.untitled}
                             </span>
                             <button
                                 type="button"
                                 className="authorship-panel-story-annotation-passage-removed"
-                                title={STOP_REFERENCING_THE_CONCEPT}
-                                aria-label={STOP_REFERENCING_THE_CONCEPT}
-                                onClick={() => stopReferencing(concept.uniqueId)}
+                                title={wording.stopReferencing}
+                                aria-label={wording.stopReferencing}
+                                onClick={() => onStoppedReferencing(cell.uniqueId)}
                             >
                                 <i className="codicon codicon-close" />
                             </button>
@@ -517,11 +617,12 @@ function AuthorshipPanelPlotConcepts({
                     ))}
                 </ul>
             )}
-        </>
+        </div>
     );
 }
 
 interface AuthorshipPanelPlotTrajectoryProps {
+    story: Document;
     plotCell: PlotCell;
     passages: readonly StoryWordRangeInTheStory[];
     nodeIdSelected: string | null;
@@ -529,6 +630,7 @@ interface AuthorshipPanelPlotTrajectoryProps {
 }
 
 function AuthorshipPanelPlotTrajectory({
+    story,
     plotCell,
     passages,
     nodeIdSelected,
@@ -684,7 +786,9 @@ function AuthorshipPanelPlotTrajectory({
                         passage === null
                             ? TOLD_BY_NO_WORDS
                             : passage.wordsItCovers;
-                    const said = [plotNode.timestamp, plotNode.location, told]
+                    const place = plotNode.place(story);
+                    const placeNamed = place?.title ?? "";
+                    const said = [plotNode.timestamp, placeNamed, told]
                         .filter((part) => part !== "")
                         .join(" · ");
                     const named =

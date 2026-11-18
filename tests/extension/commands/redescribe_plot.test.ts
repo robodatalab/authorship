@@ -14,7 +14,7 @@ She saw the door.
 <!-- cell: plot title="The door" id="p1" -->
 
 <ol title="She finds the door.">
-<li id="e1" timestamp="1.1" location="the hall" words="2-3">She finds the door.</li>
+<li id="e1" timestamp="1.1" place="h1" words="2-3">She finds the door.</li>
 </ol>
 `;
 
@@ -36,7 +36,7 @@ describe("RedescribePlotCommand — gives a plot a new overview", () => {
         expect(session.document.cellWithId("p1")).toMatchObject({
             overview: "She finds a door.",
             nodes: [
-                new PlotNode("e1", new StoryWordRange(2, 3), "2.1", "the hall", "She finds the door."),
+                new PlotNode("e1", new StoryWordRange(2, 3), "2.1", "h1", [], "She finds the door."),
             ],
         });
     });

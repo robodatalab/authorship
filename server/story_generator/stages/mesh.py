@@ -15,6 +15,7 @@ from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document, SalientConceptCell
 import cortexgrid
 from cortexgrid_infer import CompletingModel
+from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.review import Shown, TabShown
 from server.story_generator.stage import Stage, StageStep
 
@@ -99,6 +100,9 @@ class MeshStep(StageStep):
         first_event = first_plot.nodes[self._step_index]
         second_event = second_plot.nodes[self._step_index]
 
+        story = InteractiveAuthorStory(document)
+        first_place_name = story.place_name_of(first_event)
+        second_place_name = story.place_name_of(second_event)
         first_concepts = first_plot.concepts(document)
         second_concepts = second_plot.concepts(document)
         first_written = _concepts_str(first_concepts)
@@ -106,10 +110,10 @@ class MeshStep(StageStep):
         user = "Merge the two events."
         system = f"""
 Two story plot events meet, and we need to unify them.
-Event 1, at {first_event.location}:
+Event 1, at {first_place_name}:
 {first_event.summary}
 
-Event 2, at {second_event.location}:
+Event 2, at {second_place_name}:
 {second_event.summary}
 
 The events are a part of two plots that attempt to detail salient concepts:
@@ -130,12 +134,13 @@ nothing else.
         chunks = [chunk.content async for chunk in streamed]
         merged_event_str = "".join(chunks)
 
-        merged_event_desc, merged_event_location = _parse_event_str(merged_event_str)
+        merged_event_desc, merged_event_place_name = _parse_event_str(merged_event_str)
+        story_with_the_merged_place, merged_place = story.with_place_named(merged_event_place_name)
 
         first_meshed = first_event.with_summary(merged_event_desc)
-        first_meshed = first_meshed.with_location(merged_event_location)
+        first_meshed = first_meshed.with_place(merged_place)
         second_meshed = second_event.with_summary(merged_event_desc)
-        second_meshed = second_meshed.with_location(merged_event_location)
+        second_meshed = second_meshed.with_place(merged_place)
         # Both events happen at the step's moment: the mesh's schedule is the world's clock.
         moment = str(self._step_index + 1)
         first_meshed = first_meshed.with_timestamp(moment)
@@ -143,7 +148,7 @@ nothing else.
 
         first_plot_meshed = first_plot.with_node(first_meshed)
         second_plot_meshed = second_plot.with_node(second_meshed)
-        meshed = document.with_cell(first_plot_meshed)
+        meshed = story_with_the_merged_place.document.with_cell(first_plot_meshed)
         meshed = meshed.with_cell(second_plot_meshed)
         return meshed
 
@@ -184,10 +189,10 @@ def _concepts_str(concepts: Sequence[SalientConceptCell]) -> str:
 
 
 def _parse_event_str(event_str: str) -> tuple[str, str]:
-    """The merged event's description and location, from the model's answer: the
-    location, a bar, then the description, as in "earth, the square | Varn meets
-    the lawyer."."""
-    written_location, _, written_desc = event_str.partition("|")
-    location = written_location.strip()
+    """The merged event's description and the name of its place, from the model's
+    answer: the place, a bar, then the description, as in "earth, the square | Varn
+    meets the lawyer."."""
+    written_place_name, _, written_desc = event_str.partition("|")
+    place_name = written_place_name.strip()
     desc = written_desc.strip()
-    return desc, location
+    return desc, place_name

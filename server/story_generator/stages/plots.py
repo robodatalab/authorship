@@ -96,10 +96,29 @@ class PlotEndsStep(StageStep):
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
-        plot = document.get_plot_of_node(self._first)
-        plot_with_the_start = plot.with_node(PlotNode(self._first.node_id, None, *start))
-        plot_with_the_ends = plot_with_the_start.with_node(PlotNode(self._last.node_id, None, *end))
-        document_with_the_ends = document.with_cell(plot_with_the_ends)
+        start_moment, start_place_name, start_summary = start
+        end_moment, end_place_name, end_summary = end
+        story = InteractiveAuthorStory(document)
+        story_with_the_start_place, start_place = story.with_place_named(start_place_name)
+        story_with_both_places, end_place = story_with_the_start_place.with_place_named(end_place_name)
+        plot = story_with_both_places.document.get_plot_of_node(self._first)
+        start_event = PlotNode(
+            node_id=self._first.node_id,
+            story_word_range=None,
+            timestamp=start_moment,
+            place_id=start_place.unique_id,
+            summary=start_summary,
+        )
+        end_event = PlotNode(
+            node_id=self._last.node_id,
+            story_word_range=None,
+            timestamp=end_moment,
+            place_id=end_place.unique_id,
+            summary=end_summary,
+        )
+        plot_with_the_start = plot.with_node(start_event)
+        plot_with_the_ends = plot_with_the_start.with_node(end_event)
+        document_with_the_ends = story_with_both_places.document.with_cell(plot_with_the_ends)
         return document_with_the_ends
 
 
@@ -130,9 +149,18 @@ class InBetweenStep(StageStep):
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
-        (event,) = _parse_events_table_returned_by_llm(written)
-        plot_with_the_event = plot.with_node(PlotNode(self._at.node_id, None, *event))
-        document_with_the_event = document.with_cell(plot_with_the_event)
+        ((moment, place_name, summary),) = _parse_events_table_returned_by_llm(written)
+        story_with_the_place, place = story.with_place_named(place_name)
+        plot_with_the_place = story_with_the_place.document.get_plot_of_node(self._at)
+        event = PlotNode(
+            node_id=self._at.node_id,
+            story_word_range=None,
+            timestamp=moment,
+            place_id=place.unique_id,
+            summary=summary,
+        )
+        plot_with_the_event = plot_with_the_place.with_node(event)
+        document_with_the_event = story_with_the_place.document.with_cell(plot_with_the_event)
         return document_with_the_event
 
 

@@ -15,6 +15,7 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
+from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
@@ -35,7 +36,9 @@ class SceneStep(StageStep):
 
     async def __call__(self, document: Document) -> Document:
         event, *_ = self._events
-        request = f"Where: {event.location}\n\nWhat happens:\n{event.summary}"
+        story = InteractiveAuthorStory(document)
+        place_name = story.place_name_of(event)
+        request = f"Where: {place_name}\n\nWhat happens:\n{event.summary}"
         messages = [{"role": "system", "content": SCENE_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
@@ -65,7 +68,7 @@ class Scenes(Stage):
         events_of_scene: dict[tuple[str, str], list[PlotNode]] = {}
         for plot in document.plots():
             for event in plot.nodes:
-                events = events_of_scene.setdefault((event.timestamp, event.location), [])
+                events = events_of_scene.setdefault((event.timestamp, event.place_id), [])
                 events.append(event)
         scene_steps: list[StageStep] = [SceneStep(events, model) for events in events_of_scene.values()]
         return scene_steps
