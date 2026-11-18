@@ -166,7 +166,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots: left off hereResume");
+        expect(status.textContent).toBe("plots: left off hereResumeCancel");
     });
 
     it("resuming generates the story again, from where it left off", async () => {
@@ -192,7 +192,7 @@ describe("the story generation under the main menu's tools", () => {
         )!;
         const bar = status.querySelector('[role="progressbar"]')!;
         const filled = bar.firstElementChild as HTMLElement;
-        expect(status.textContent).toBe("plots");
+        expect(status.textContent).toBe("plotsCancel");
         expect(bar.getAttribute("aria-valuenow")).toBe("20");
         expect(filled.style.width).toBe("20%");
     });
@@ -213,7 +213,7 @@ describe("the story generation under the main menu's tools", () => {
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concept titles: use the highlighted button, then continueContinueStop",
+            "concept titles: use the highlighted button, then continueContinueStopCancel",
         );
     });
 
@@ -224,7 +224,7 @@ describe("the story generation under the main menu's tools", () => {
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concepts: review it, edit what you like, then acceptAcceptStop",
+            "concepts: review it, edit what you like, then acceptAcceptStopCancel",
         );
     });
 
@@ -257,4 +257,26 @@ describe("the story generation under the main menu's tools", () => {
             },
         ]);
     });
+
+    it.each([
+        ["while a stage works", WRITES],
+        ["while a stage asks for a review", ASKS_FOR_A_REVIEW],
+        ["once it has left off", LEFT_OFF],
+    ])("cancels the generation altogether %s", async (_, storyGeneration) => {
+        await mountTheStoryGeneration(storyGeneration);
+        const cancelButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent === "Cancel",
+        )!;
+
+        await act(async () => cancelButton.click());
+
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "cancelTheStoryGeneration",
+                commandArguments: {},
+            },
+        ]);
+    });
+
 });

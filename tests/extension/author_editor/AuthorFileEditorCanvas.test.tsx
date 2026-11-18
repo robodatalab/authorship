@@ -1730,6 +1730,38 @@ describe("the metadata and the manuscript panes", () => {
         ]);
     });
 
+    it("highlights the plot of an event clicked in the graph, and shows its words in the manuscript", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once upon a time", "m1"),
+                new PlotCell(
+                    "Bell",
+                    [new PlotNode("e1", new StoryWordRange(0, 2), "1", "", [], "The bell rings.")],
+                    [],
+                    "",
+                    false,
+                    null,
+                    "p1",
+                ),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+        const graphTab = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].find((tab) => tab.textContent === "Graph")!;
+        await click(graphTab);
+
+        await click(document.querySelector(".author-file-editor-story-graph-event")!);
+
+        expect(posted).toEqual([
+            { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId: "p1" },
+            { type: "selectPassage", cellKind: "plot", passageId: "e1" },
+            { type: "showStoryWordRange", firstWord: 0, lastWord: 2 },
+        ]);
+    });
+
     it.each([
         ["Metadata", ["p1", "k1"], false],
         ["Graph", [], true],

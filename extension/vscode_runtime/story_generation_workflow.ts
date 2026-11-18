@@ -83,6 +83,15 @@ function withTheStageDone(document: Document, stageDone: string): Document {
     return documentWithTheStageDone;
 }
 
+function withoutTheCheckpoint(document: Document): Document {
+    const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
+    const others = document.cells.filter(
+        (cell) => cell.uniqueId !== checkpoint?.uniqueId,
+    );
+    const documentWithoutTheCheckpoint = document.withCells(others);
+    return documentWithoutTheCheckpoint;
+}
+
 function showTheFailureToGenerate(failure: unknown): void {
     void vscode.window.showErrorMessage(
         `Cannot generate the story — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
@@ -133,6 +142,17 @@ export class StoryGenerationWorkflow {
         await this.dropWhatTheStageAsks();
         await this.session.readTheDocumentBackFromItsFile();
         await this.showWhereItStands();
+    }
+
+    async cancel(): Promise<void> {
+        const asked = this.session.theStoryGeneration?.asked ?? null;
+        await this.dropWhatTheStageAsks();
+        if (asked !== null) {
+            await this.session.readTheDocumentBackFromItsFile();
+        }
+        this.session.changeTheDocument(withoutTheCheckpoint);
+        await this.session.writeTheDocumentToItsFile();
+        this.session.showTheStoryGeneration(null);
     }
 
     async showWhereItStands(): Promise<void> {

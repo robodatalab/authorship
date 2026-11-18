@@ -282,6 +282,46 @@ describe("StoryGenerationWorkflow.stop — the author stops at what a stage leav
     });
 });
 
+describe("StoryGenerationWorkflow.cancel — the author cancels the generation altogether", () => {
+    it("drops what a stage asks, and saves the story as its file has it, without the record of the stages", async () => {
+        files.set(STORY_FILE, LEFT_OFF_AT_THE_CONCEPTS);
+        const fetched = vi
+            .fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(THE_STORY_REVIEWED);
+        session.showTheStoryGeneration({
+            ...ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS,
+            stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
+        });
+
+        await session.storyGenerationWorkflow.cancel();
+
+        const [droppedAt] = fetched.mock.calls[0];
+        expect([droppedAt, files.get(STORY_FILE), session.theStoryGeneration]).toEqual([
+            expect.stringContaining("/jobs/cancel"),
+            NEVER_GENERATED,
+            null,
+        ]);
+    });
+
+    it("saves the story as the editor has it, without the record of the stages, once the generation has left off", async () => {
+        files.set(STORY_FILE, NEVER_GENERATED);
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }),
+        );
+        const session = openStory(THE_STORY_REVIEWED);
+
+        await session.storyGenerationWorkflow.cancel();
+
+        expect([files.get(STORY_FILE), session.theStoryGeneration]).toEqual([
+            '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n',
+            null,
+        ]);
+    });
+});
+
 describe("StoryGenerationWorkflow.showWhereItStands — the generation of a story opened", () => {
     it("asks the server about the stage running on the story's file", async () => {
         const fetched = vi.fn().mockResolvedValueOnce(NO_STAGE_RUNS);

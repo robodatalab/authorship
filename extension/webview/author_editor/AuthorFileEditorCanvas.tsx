@@ -4,6 +4,7 @@ import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
 import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
+import type { StoryGraphPlotNode } from "./StoryGraphLayout";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -427,6 +428,27 @@ export function AuthorFileEditorCanvas({
                 theOneOfItsGroupTheDocumentCallsFor(command)),
     );
 
+    function showTheEventInTheManuscript(plotNode: StoryGraphPlotNode): void {
+        sendMessagesToVscode({
+            type: "selectStoryAnnotation",
+            cellKind: PLOT,
+            annotationCellId: plotNode.plotId,
+        });
+        sendMessagesToVscode({
+            type: "selectPassage",
+            cellKind: PLOT,
+            passageId: plotNode.nodeId,
+        });
+        if (plotNode.storyWordRange === null) {
+            return;
+        }
+        sendMessagesToVscode({
+            type: "showStoryWordRange",
+            firstWord: plotNode.storyWordRange.firstWord,
+            lastWord: plotNode.storyWordRange.lastWord,
+        });
+    }
+
     function bringTheStoryTextIntoView(top: number, bottom: number): void {
         const scrolled = cellsOnThePage.current;
         if (!scrolled) {
@@ -681,7 +703,10 @@ export function AuthorFileEditorCanvas({
                     {metadataPaneShows === METADATA_PANE ? (
                         cellsInScope(sections, null, METADATA_PANE)
                     ) : (
-                        <AuthorFileEditorStoryGraph story={storyDocument} />
+                        <AuthorFileEditorStoryGraph
+                            story={storyDocument}
+                            onEventChosen={showTheEventInTheManuscript}
+                        />
                     )}
                 </section>
                 <div

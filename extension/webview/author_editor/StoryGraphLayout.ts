@@ -1,3 +1,4 @@
+import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { Document } from "authordoc/storydoc";
 
 const RAIL_TITLE_WIDTH = 140;
@@ -11,16 +12,30 @@ const NO_RAIL = "";
 const NO_RAIL_TITLE = "None";
 const NO_MOMENT_WRITTEN = "–";
 
+export class StoryGraphPlotNode {
+    constructor(
+        readonly plotId: string,
+        readonly nodeId: string,
+        readonly storyWordRange: StoryWordRange | null,
+    ) {}
+}
+
 export class StoryGraphEvent {
     constructor(
         readonly eventId: string,
         readonly moment: number | null,
         readonly momentWritten: string,
         readonly summary: string,
-        readonly plotIds: readonly string[],
+        readonly plotNodes: readonly StoryGraphPlotNode[],
         readonly characterIds: readonly string[],
         readonly placeId: string,
     ) {}
+
+    get plotIds(): string[] {
+        const plotIds = this.plotNodes.map((plotNode) => plotNode.plotId);
+        const distinct = new Set(plotIds);
+        return [...distinct];
+    }
 }
 
 export class StoryGraphRail {
@@ -90,14 +105,19 @@ function eventsOfTheStory(story: Document): StoryGraphEventsOfTheStory {
                     ? `${moment}@${node.placeId}`
                     : nodeKey(plot.uniqueId, node.nodeId);
             const met = eventOfEachMeeting.get(meeting);
-            const plotIds = union(met?.plotIds ?? [], [plot.uniqueId]);
+            const plotNode = new StoryGraphPlotNode(
+                plot.uniqueId,
+                node.nodeId,
+                node.storyWordRange,
+            );
+            const plotNodes = [...(met?.plotNodes ?? []), plotNode];
             const characterIds = union(met?.characterIds ?? [], node.characterIds);
             const event = new StoryGraphEvent(
                 meeting,
                 moment,
                 met?.momentWritten ?? node.timestamp,
                 met?.summary ?? node.summary,
-                plotIds,
+                plotNodes,
                 characterIds,
                 node.placeId,
             );

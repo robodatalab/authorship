@@ -9,6 +9,7 @@ import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
 import { AssignStoryTextToPlotEventCommand } from "./assign_story_text_to_plot_event";
 import { AddEventToPlotCommand } from "./add_event_to_plot";
 import { AnswerTheStoryGenerationCommand } from "./answer_the_story_generation";
+import { CancelTheStoryGenerationCommand } from "./cancel_the_story_generation";
 import { ChangePlotEventCommand } from "./change_plot_event";
 import { RemoveStoryTextFromPlotEventCommand } from "./remove_story_text_from_plot_event";
 import { RedescribePlotCommand } from "./redescribe_plot";
@@ -112,6 +113,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new WriteTableOfContentsCommand(),
     new GenerateStoryCommand(),
     new AnswerTheStoryGenerationCommand(),
+    new CancelTheStoryGenerationCommand(),
 ];
 
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {

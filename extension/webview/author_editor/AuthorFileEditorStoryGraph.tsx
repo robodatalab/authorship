@@ -2,7 +2,12 @@ import { useId, useMemo, useState } from "react";
 import { CharacterCell } from "authordoc/cells/character_cell";
 import { PlaceCell } from "authordoc/cells/place_cell";
 import type { Document } from "authordoc/storydoc";
-import { StoryGraphLayout, type StoryGraphEvent } from "./StoryGraphLayout";
+import {
+    StoryGraphLayout,
+    type StoryGraphBox,
+    type StoryGraphEvent,
+    type StoryGraphPlotNode,
+} from "./StoryGraphLayout";
 import "./AuthorFileEditorStoryGraph.css";
 
 const UNTITLED = "Untitled";
@@ -43,10 +48,12 @@ const STORY_GRAPH_VIEWS = [PLOTS_VIEW, CHARACTERS_VIEW, PLACES_VIEW];
 
 interface AuthorFileEditorStoryGraphProps {
     story: Document;
+    onEventChosen: (plotNode: StoryGraphPlotNode) => void;
 }
 
 export function AuthorFileEditorStoryGraph({
     story,
+    onEventChosen,
 }: AuthorFileEditorStoryGraphProps) {
     const [viewShown, showTheView] = useState(PLOTS_VIEW);
     const arrowheadId = useId();
@@ -55,6 +62,15 @@ export function AuthorFileEditorStoryGraph({
         const laidOut = new StoryGraphLayout(story, rails, viewShown.railIdsOf);
         return laidOut;
     }, [story, viewShown]);
+
+    function chooseTheEvent(box: StoryGraphBox): void {
+        const event = layout.events.find((laidOut) => laidOut.eventId === box.eventId)!;
+        const [firstPlotNode] = event.plotNodes;
+        const plotNodeOfTheRail = event.plotNodes.find(
+            (plotNode) => plotNode.plotId === box.railId,
+        );
+        onEventChosen(plotNodeOfTheRail ?? firstPlotNode);
+    }
 
     return (
         <div className="author-file-editor-story-graph">
@@ -128,8 +144,9 @@ export function AuthorFileEditorStoryGraph({
                         ))}
                     </svg>
                     {layout.boxes.map((box) => (
-                        <div
+                        <button
                             key={`${box.eventId}#${box.railId}`}
+                            type="button"
                             className="author-file-editor-story-graph-event"
                             style={{
                                 left: box.left,
@@ -138,9 +155,10 @@ export function AuthorFileEditorStoryGraph({
                                 height: box.height,
                             }}
                             title={box.summary}
+                            onClick={() => chooseTheEvent(box)}
                         >
                             {box.summary || UNTITLED_EVENT}
-                        </div>
+                        </button>
                     ))}
                 </div>
             </div>
