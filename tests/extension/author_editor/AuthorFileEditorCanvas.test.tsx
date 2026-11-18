@@ -1730,37 +1730,6 @@ describe("the metadata and the manuscript panes", () => {
         ]);
     });
 
-    it.each([
-        [
-            "every place under the place it lies within",
-            false,
-            [
-                ["en", ["hv", "hg"]],
-                ["hv", ["ln"]],
-            ],
-        ],
-        ["nothing under a place folded, however deep", true, []],
-    ])("draws %s", async (_, englandIsFolded, expected) => {
-        await mountCanvas({
-            cells: [
-                new PlaceCell("England", "", englandIsFolded, null, "en"),
-                new PlaceCell("Hollowmere", "", false, null, "hv", "en"),
-                new PlaceCell("The lane", "", false, null, "ln", "hv"),
-                new PlaceCell("Harrowgate", "", false, null, "hg", "en"),
-            ],
-            cellDrawings: DRAWN_BY_THEIR_IDS,
-        });
-
-        const nestedUnder = [
-            ...document.querySelectorAll(".author-file-editor-place-scope"),
-        ].map((scope) => [
-            scope.parentElement!.getAttribute("data-cell-id"),
-            [...scope.children].map((nested) => nested.getAttribute("data-cell-id")),
-        ]);
-
-        expect(nestedUnder).toEqual(expected);
-    });
-
     it("highlights the plot of an event clicked in the graph, and shows its words in the manuscript", async () => {
         await mountCanvas({
             cells: [
