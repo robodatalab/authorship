@@ -38,17 +38,7 @@ export class AssignStoryTextToPlotCommand implements AuthorDocumentCommand {
             const nodeId = crypto.randomUUID();
             const nodeAdded = new PlotNode(nodeId, wordsAssigned);
             const nodes = [...plot.nodes, nodeAdded];
-            const withTheEvent = new PlotCell(
-                plot.title,
-                nodes,
-                plot.edges,
-                plot.overview,
-                plot.folded,
-                plot.at,
-                plot.uniqueId,
-            );
-            const concepts = plot.concepts(story);
-            const plotTold = withTheEvent.withConcepts(concepts);
+            const plotTold = plot.withNodes(nodes);
             const storyChanged = story.withCell(plotTold);
             return storyChanged;
         });

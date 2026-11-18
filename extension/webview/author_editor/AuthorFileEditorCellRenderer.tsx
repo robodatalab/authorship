@@ -4,33 +4,55 @@ import type { AboutCell } from "authordoc/cells/about_cell";
 import type { BlurbCell } from "authordoc/cells/blurb_cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import type { ChapterCell } from "authordoc/cells/chapter_cell";
+import type { CharacterCell } from "authordoc/cells/character_cell";
 import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
 import type { DividerCell } from "authordoc/cells/divider_cell";
 import type { ImageCell } from "authordoc/cells/image_cell";
 import type { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import type { PartCell } from "authordoc/cells/part_cell";
-import type { PlotCell } from "authordoc/cells/plot_cell";
+import type { PlaceCell } from "authordoc/cells/place_cell";
+import { PLOT, type PlotCell } from "authordoc/cells/plot_cell";
 import type { RecapCell } from "authordoc/cells/recap_cell";
-import type { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
+import {
+    SALIENT_CONCEPT,
+    type SalientConceptCell,
+} from "authordoc/cells/salient_concept_cell";
 import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell";
 import type { TitlePageCell } from "authordoc/cells/title_page_cell";
 import type { UnknownCell } from "authordoc/cells/unknown_cell";
+import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+import type { Document } from "authordoc/storydoc";
+import {
+    NO_STORY_ANNOTATION_SELECTED,
+    type StoryAnnotationSelected,
+} from "../../vscode_runtime/story_annotation_selection";
 import { AuthorFileEditorAboutCell } from "../cell_types/AuthorFileEditorAboutCell";
 import { AuthorFileEditorBlurbCell } from "../cell_types/AuthorFileEditorBlurbCell";
 import { AuthorFileEditorChapterCell } from "../cell_types/AuthorFileEditorChapterCell";
+import { AuthorFileEditorCharacterCell } from "../cell_types/AuthorFileEditorCharacterCell";
 import { AuthorFileEditorDisclaimerCell } from "../cell_types/AuthorFileEditorDisclaimerCell";
 import { AuthorFileEditorDividerCell } from "../cell_types/AuthorFileEditorDividerCell";
 import { AuthorFileEditorImageCell } from "../cell_types/AuthorFileEditorImageCell";
 import { AuthorFileEditorMarkdownCell } from "../cell_types/AuthorFileEditorMarkdownCell";
 import { AuthorFileEditorNoteCell } from "../cell_types/AuthorFileEditorNoteCell";
 import { AuthorFileEditorPartCell } from "../cell_types/AuthorFileEditorPartCell";
+import { AuthorFileEditorPlaceCell } from "../cell_types/AuthorFileEditorPlaceCell";
+import { AuthorFileEditorPlotCell } from "../cell_types/AuthorFileEditorPlotCell";
 import { AuthorFileEditorRecapCell } from "../cell_types/AuthorFileEditorRecapCell";
+import { AuthorFileEditorSalientConceptCell } from "../cell_types/AuthorFileEditorSalientConceptCell";
 import { AuthorFileEditorTableOfContentsCell } from "../cell_types/AuthorFileEditorTableOfContentsCell";
 import { AuthorFileEditorTitlePageCell } from "../cell_types/AuthorFileEditorTitlePageCell";
 
 export class AuthorFileEditorCellRenderer implements CellVisitor<ReactNode> {
-    constructor(private readonly sendMessagesToVscode: SendMessagesToVscode) {}
+    constructor(
+        private readonly sendMessagesToVscode: SendMessagesToVscode,
+        private readonly story: Document,
+        private readonly storyAnnotationsSelected: Readonly<
+            Record<string, StoryAnnotationSelected>
+        >,
+        private readonly storyTextSelected: StoryTextSpan | null,
+    ) {}
 
     visitMarkdown(cell: MarkdownCell): ReactNode {
         return (
@@ -135,12 +157,62 @@ export class AuthorFileEditorCellRenderer implements CellVisitor<ReactNode> {
         );
     }
 
-    visitSalientConcept(_cell: SalientConceptCell): ReactNode {
-        return null;
+    visitSalientConcept(cell: SalientConceptCell): ReactNode {
+        const selected =
+            this.storyAnnotationsSelected[SALIENT_CONCEPT] ??
+            NO_STORY_ANNOTATION_SELECTED;
+        const isShownInTheManuscript =
+            selected.annotationCellId === cell.uniqueId;
+        return (
+            <AuthorFileEditorSalientConceptCell
+                cell={cell}
+                story={this.story}
+                isShownInTheManuscript={isShownInTheManuscript}
+                referenceIdSelected={
+                    isShownInTheManuscript ? selected.passageId : null
+                }
+                storyTextSelected={this.storyTextSelected}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
     }
 
-    visitPlot(_cell: PlotCell): ReactNode {
-        return null;
+    visitPlot(cell: PlotCell): ReactNode {
+        const selected =
+            this.storyAnnotationsSelected[PLOT] ?? NO_STORY_ANNOTATION_SELECTED;
+        const isShownInTheManuscript =
+            selected.annotationCellId === cell.uniqueId;
+        return (
+            <AuthorFileEditorPlotCell
+                cell={cell}
+                story={this.story}
+                isShownInTheManuscript={isShownInTheManuscript}
+                eventIdSelected={
+                    isShownInTheManuscript ? selected.passageId : null
+                }
+                storyTextSelected={this.storyTextSelected}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
+    }
+
+    visitCharacter(cell: CharacterCell): ReactNode {
+        return (
+            <AuthorFileEditorCharacterCell
+                cell={cell}
+                story={this.story}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
+    }
+
+    visitPlace(cell: PlaceCell): ReactNode {
+        return (
+            <AuthorFileEditorPlaceCell
+                cell={cell}
+                sendMessagesToVscode={this.sendMessagesToVscode}
+            />
+        );
     }
 
     visitUnknown(_cell: UnknownCell): ReactNode {

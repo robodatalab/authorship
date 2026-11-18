@@ -12,11 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(new ModelServer(context, serverPort(), log));
 
     const authorshipPanel = new AuthorshipPanelProvider(context);
-    const authorFileEditor = new AuthorFileEditorProvider(
-        context,
-        log,
-        authorshipPanel,
-    );
+    const authorFileEditor = new AuthorFileEditorProvider(context, log);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
             AuthorFileEditorProvider.viewType,

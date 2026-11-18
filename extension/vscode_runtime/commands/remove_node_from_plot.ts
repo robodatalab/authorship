@@ -25,17 +25,8 @@ export class RemoveNodeFromPlotCommand implements AuthorDocumentCommand {
             const edgesKept = plot.edges.filter(
                 (edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId,
             );
-            const withoutTheNode = new PlotCell(
-                plot.title,
-                nodesKept,
-                edgesKept,
-                plot.overview,
-                plot.folded,
-                plot.at,
-                plot.uniqueId,
-            );
-            const concepts = plot.concepts(story);
-            const plotKept = withoutTheNode.withConcepts(concepts);
+            const withoutTheNode = plot.withNodes(nodesKept);
+            const plotKept = withoutTheNode.withEdges(edgesKept);
             const storyChanged = story.withCell(plotKept);
             return storyChanged;
         });

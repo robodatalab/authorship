@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { ReactNode } from "react";
+import type { DragEvent, ReactNode } from "react";
 import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
@@ -58,6 +58,8 @@ interface AuthorFileEditorCellStateProps {
     onStoryTextSelected?: (selectedFrom: number, selectedTo: number) => void;
     onStoryTextClicked?: (clickedAt: number) => void;
     onStoryTextShownAt?: (top: number, bottom: number) => void;
+    onDragStarted?: (event: DragEvent<HTMLElement>) => void;
+    onDragEnded?: () => void;
     sendMessagesToVscode: SendMessagesToVscode;
     children?: ReactNode;
 }
@@ -80,6 +82,8 @@ const AuthorFileEditorCellStateContext = createContext<
     onStoryTextSelected: () => undefined,
     onStoryTextClicked: () => undefined,
     onStoryTextShownAt: () => undefined,
+    onDragStarted: () => undefined,
+    onDragEnded: () => undefined,
     sendMessagesToVscode: () => undefined,
 });
 
@@ -99,6 +103,8 @@ export function AuthorFileEditorCellState({
     onStoryTextSelected = () => undefined,
     onStoryTextClicked = () => undefined,
     onStoryTextShownAt = () => undefined,
+    onDragStarted = () => undefined,
+    onDragEnded = () => undefined,
     sendMessagesToVscode,
     children,
 }: AuthorFileEditorCellStateProps) {
@@ -120,6 +126,8 @@ export function AuthorFileEditorCellState({
                 onStoryTextSelected,
                 onStoryTextClicked,
                 onStoryTextShownAt,
+                onDragStarted,
+                onDragEnded,
                 sendMessagesToVscode,
             }}
         >
@@ -143,10 +151,26 @@ export function useAuthorFileEditorCellTimesTheHostWroteIt(): number {
 }
 
 export function AuthorFileEditorCellActions() {
-    const { cellCommands, cellId, cellIsFolded, sendMessagesToVscode } =
-        useContext(AuthorFileEditorCellStateContext);
+    const {
+        cellCommands,
+        cellId,
+        cellIsFolded,
+        onDragStarted,
+        onDragEnded,
+        sendMessagesToVscode,
+    } = useContext(AuthorFileEditorCellStateContext);
     return (
         <div className="author-file-editor-cell-actions">
+            <span
+                className="author-file-editor-cell-actions-button author-file-editor-cell-drag-handle"
+                draggable
+                title="Drag to move"
+                aria-label="Drag to move"
+                onDragStart={onDragStarted}
+                onDragEnd={onDragEnded}
+            >
+                <i className="codicon codicon-gripper" />
+            </span>
             {cellCommands
                 .filter((command) => isDrawnOnCell(command, cellIsFolded))
                 .map((command) => (

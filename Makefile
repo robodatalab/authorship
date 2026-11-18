@@ -22,3 +22,4 @@ build: node_modules
 	@touch node_modules
 	npm run package
 	npx @vscode/vsce package --no-dependencies --skip-license --out dist/authorship.vsix
+	find dist -mindepth 1 ! -name authorship.vsix -delete

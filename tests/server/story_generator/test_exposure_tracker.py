@@ -14,10 +14,10 @@ class ExposureTrackerGetExposure(unittest.TestCase):
         varn_begun = PlotCell(
             "Motherhood",
             [
-                PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("e2", None, "2", "mars, Varn's room", "Varn shares her water with her son."),
-                PlotNode("e3", None, "3", "mars, the base", "Varn leaves the base with her son."),
-                PlotNode("e4", None, "4", "mars, the dunes", "Varn and her son find a spring."),
+                PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("e2", None, "2", "r1", [], "Varn shares her water with her son."),
+                PlotNode("e3", None, "3", "b1", [], "Varn leaves the base with her son."),
+                PlotNode("e4", None, "4", "u1", [], "Varn and her son find a spring."),
             ],
             [],
             "",
@@ -33,16 +33,16 @@ class ExposureTrackerGetExposure(unittest.TestCase):
             ("nothing_seen", [], 0.0),
             (
                 "one_of_its_plots_four_events_seen",
-                [PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son.")],
+                [PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son.")],
                 0.25,
             ),
             (
                 "every_event_of_its_plot_seen",
                 [
-                    PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                    PlotNode("e2", None, "2", "mars, Varn's room", "Varn shares her water with her son."),
-                    PlotNode("e3", None, "3", "mars, the base", "Varn leaves the base with her son."),
-                    PlotNode("e4", None, "4", "mars, the dunes", "Varn and her son find a spring."),
+                    PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
+                    PlotNode("e2", None, "2", "r1", [], "Varn shares her water with her son."),
+                    PlotNode("e3", None, "3", "b1", [], "Varn leaves the base with her son."),
+                    PlotNode("e4", None, "4", "u1", [], "Varn and her son find a spring."),
                 ],
                 1.0,
             ),
@@ -58,7 +58,7 @@ class ExposureTrackerGetExposure(unittest.TestCase):
 
     def test_is_nothing_for_a_concept_no_plot_shows(self) -> None:
         tracker = ExposureTracker(self.document)
-        tracker.see([PlotNode("e1", None, "1", "mars, the base", "Dax takes the water from Varn and her son.")])
+        tracker.see([PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son.")])
 
         exposure = tracker.get_exposure(self.war)
 

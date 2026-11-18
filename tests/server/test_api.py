@@ -544,7 +544,7 @@ class StoryGenerationStage(unittest.TestCase):
                 "shown": {
                     "kind": "command",
                     "cellKind": "salient-concept",
-                    "commandName": "addStoryAnnotation",
+                    "commandName": "insertCell",
                 },
             },
         )
@@ -569,7 +569,7 @@ class StoryGenerationStage(unittest.TestCase):
                 "stage": "concepts",
                 "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
                 "A mother's care.\n",
-                "shown": {"kind": "tab", "cellKind": "salient-concept"},
+                "shown": {"kind": "cells", "cellKind": "salient-concept"},
             },
         )
 

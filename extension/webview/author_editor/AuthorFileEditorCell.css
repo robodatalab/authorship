@@ -92,6 +92,10 @@
     cursor: pointer;
 }
 
+.author-file-editor-cell-drag-handle {
+    cursor: grab;
+}
+
 .author-file-editor-cell-actions-button:hover {
     background: var(
         --vscode-toolbar-hoverBackground,

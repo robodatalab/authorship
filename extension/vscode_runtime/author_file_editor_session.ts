@@ -61,12 +61,6 @@ export class AuthorFileEditorSession
 
     readonly storyGenerationWorkflow = new StoryGenerationWorkflow(this);
 
-    private readonly documentOrSelectionChanged =
-        new vscode.EventEmitter<void>();
-
-    readonly onDocumentOrSelectionChanged =
-        this.documentOrSelectionChanged.event;
-
     constructor(
         readonly uri: vscode.Uri,
         documentOpened: Document,
@@ -125,10 +119,6 @@ export class AuthorFileEditorSession
         return Object.fromEntries(selectedOfEachKind);
     }
 
-    get theStoryTextSelected(): StoryTextSpan | null {
-        return this.storyTextSelected;
-    }
-
     get theStoryGeneration(): StoryGeneration | null {
         return this.storyGeneration;
     }
@@ -136,7 +126,6 @@ export class AuthorFileEditorSession
     showTheStoryGeneration(storyGeneration: StoryGeneration | null): void {
         this.storyGeneration = storyGeneration;
         this.sendTheStoryGeneration();
-        this.documentOrSelectionChanged.fire();
     }
 
     private sendTheStoryGeneration(): void {
@@ -155,7 +144,6 @@ export class AuthorFileEditorSession
             passageId: null,
         });
         this.sendStoryAnnotationsSelected();
-        this.documentOrSelectionChanged.fire();
     }
 
     selectThePassage(cellKind: string, passageId: string | null): void {
@@ -167,12 +155,11 @@ export class AuthorFileEditorSession
             passageId,
         });
         this.sendStoryAnnotationsSelected();
-        this.documentOrSelectionChanged.fire();
     }
 
     theAuthorSelectedStoryText(storyTextSelected: StoryTextSpan | null): void {
         this.storyTextSelected = storyTextSelected;
-        this.documentOrSelectionChanged.fire();
+        this.sendStoryTextSelected();
     }
 
     showTheStoryWordRange(storyWordRange: StoryWordRange): void {
@@ -371,6 +358,13 @@ export class AuthorFileEditorSession
         });
     }
 
+    sendStoryTextSelected(): void {
+        void this.panel?.webview.postMessage({
+            type: "storyTextSelected",
+            storyTextSelected: this.storyTextSelected,
+        });
+    }
+
     sendFindMatches(): void {
         void this.panel?.webview.postMessage({
             type: "findMatches",
@@ -385,10 +379,10 @@ export class AuthorFileEditorSession
         });
         this.sendProseErrors();
         this.sendStoryAnnotationsSelected();
+        this.sendStoryTextSelected();
         this.sendFindMatches();
         this.sendWordCounts();
         this.sendTheStoryGeneration();
-        this.documentOrSelectionChanged.fire();
     }
 
     private sendWhatChanged(asItStoodBefore: Document): void {
@@ -433,7 +427,6 @@ export class AuthorFileEditorSession
         this.sendProseErrors();
         this.sendFindMatches();
         this.sendWordCounts();
-        this.documentOrSelectionChanged.fire();
     }
 }
 

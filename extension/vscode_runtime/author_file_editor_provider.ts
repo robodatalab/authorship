@@ -10,7 +10,9 @@ import {
 import {
     ReadTheDocumentBackFromItsFile,
     TheAuthorIsEditingTheCell,
+    TheAuthorAskedToSeeTheStoryWords,
     TheAuthorSelectedStoryText,
+    TheAuthorSelectedTheStoryAnnotation,
     TheAuthorSelectedThePassage,
     TheAuthorTypedInTheCell,
     ThePageIsReady,
@@ -22,7 +24,7 @@ import {
     authorDocumentCommandCards,
 } from "./commands/author_document_commands";
 import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
-import type { AuthorshipPanelProvider } from "./authorship_panel_provider";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { loadTemplates, watchSettings } from "./settings/file";
 import { watchTheAuthorFileForChanges } from "./author_file_watcher";
@@ -43,7 +45,6 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly log: vscode.LogOutputChannel,
-        private readonly authorshipPanel: AuthorshipPanelProvider,
     ) {}
 
     async openCustomDocument(
@@ -109,7 +110,10 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                 markdown?: string;
                 storyTextSelected?: StoryTextSpan | null;
                 cellKind?: string;
+                annotationCellId?: string | null;
                 passageId?: string | null;
+                firstWord?: number;
+                lastWord?: number;
             }) => {
                 if (message?.type === "typed" && message.cellId) {
                     void documentChangesMessageQueue.post(
@@ -127,6 +131,28 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
                         new TheAuthorSelectedStoryText(
                             message.storyTextSelected ?? null,
                         ),
+                    );
+                } else if (
+                    message?.type === "selectStoryAnnotation" &&
+                    message.cellKind
+                ) {
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorSelectedTheStoryAnnotation(
+                            message.cellKind,
+                            message.annotationCellId ?? null,
+                        ),
+                    );
+                } else if (
+                    message?.type === "showStoryWordRange" &&
+                    message.firstWord !== undefined &&
+                    message.lastWord !== undefined
+                ) {
+                    const storyWordRange = new StoryWordRange(
+                        message.firstWord,
+                        message.lastWord,
+                    );
+                    void documentChangesMessageQueue.post(
+                        new TheAuthorAskedToSeeTheStoryWords(storyWordRange),
                     );
                 } else if (
                     message?.type === "selectPassage" &&
@@ -163,22 +189,11 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             documentChangesMessageQueue,
         );
 
-        if (panel.active) {
-            this.authorshipPanel.follow(session);
-        }
-        const followingTheActiveEditor = panel.onDidChangeViewState(() => {
-            if (panel.active) {
-                this.authorshipPanel.follow(session);
-            }
-        });
-
         panel.onDidDispose(() => {
             templatesWatcher.dispose();
             settingsChanged.dispose();
             watchingTheFile.dispose();
             onMessageFromWebView.dispose();
-            followingTheActiveEditor.dispose();
-            this.authorshipPanel.stopFollowing(session);
             this.documentChangesMessageQueues.delete(session.uri.toString());
         });
     }

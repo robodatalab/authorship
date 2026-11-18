@@ -1,19 +1,21 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { AuthorDocumentCommand } from "./author_document_command";
+import { AddCharacterToPlotCommand } from "./add_character_to_plot";
+import { AddCharacterToPlotEventCommand } from "./add_character_to_plot_event";
+import { AddConceptToCharacterCommand } from "./add_concept_to_character";
 import { AddConceptToPlotCommand } from "./add_concept_to_plot";
 import { AddEdgeToPlotCommand } from "./add_edge_to_plot";
-import { AddStoryAnnotationCommand } from "./add_story_annotation";
 import { AssignStoryTextToPlotCommand } from "./assign_story_text_to_plot";
 import { AssignStoryTextToPlotEventCommand } from "./assign_story_text_to_plot_event";
 import { AddEventToPlotCommand } from "./add_event_to_plot";
 import { AnswerTheStoryGenerationCommand } from "./answer_the_story_generation";
+import { CancelTheStoryGenerationCommand } from "./cancel_the_story_generation";
 import { ChangePlotEventCommand } from "./change_plot_event";
 import { RemoveStoryTextFromPlotEventCommand } from "./remove_story_text_from_plot_event";
 import { RedescribePlotCommand } from "./redescribe_plot";
 import { AssignStoryTextToSalientConceptCommand } from "./assign_story_text_to_salient_concept";
 import { CheckProseCommand } from "./check_prose";
 import { DeleteCellCommand } from "./delete_cell";
-import { DeleteStoryAnnotationCommand } from "./delete_story_annotation";
 import { DivideIntoPartsCommand } from "./divide_into_parts";
 import { ExportEpubCommand } from "./export_epub";
 import { ExportMarkdownCommand } from "./export_markdown";
@@ -28,10 +30,13 @@ import { FoldCellCommand } from "./fold_cell";
 import { GenerateStoryCommand } from "./generate_story";
 import { ImportMarkdownCommand } from "./import_markdown";
 import { InsertCellCommand } from "./insert_cell";
-import { MoveCellDownCommand } from "./move_cell_down";
-import { MoveCellUpCommand } from "./move_cell_up";
+import { MoveCellCommand } from "./move_cell";
 import { MoveNodeInPlotCommand } from "./move_node_in_plot";
+import { MovePlaceCommand } from "./move_place";
 import { OpenAsTextCommand } from "./open_as_text";
+import { RemoveCharacterFromPlotCommand } from "./remove_character_from_plot";
+import { RemoveCharacterFromPlotEventCommand } from "./remove_character_from_plot_event";
+import { RemoveConceptFromCharacterCommand } from "./remove_concept_from_character";
 import { RemoveConceptFromPlotCommand } from "./remove_concept_from_plot";
 import { RemoveEdgeFromPlotCommand } from "./remove_edge_from_plot";
 import { RemoveNodeFromPlotCommand } from "./remove_node_from_plot";
@@ -68,15 +73,12 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
         "Unfold this section",
         false,
     ),
-    new MoveCellUpCommand(),
-    new MoveCellDownCommand(),
+    new MoveCellCommand(),
     new DeleteCellCommand(),
     new InsertCellCommand(),
     new ReplaceCellCommand(),
     new FindInTheDocumentCommand(),
     new ReplaceFindMatchesCommand(),
-    new AddStoryAnnotationCommand(),
-    new DeleteStoryAnnotationCommand(),
     new AssignStoryTextToSalientConceptCommand(),
     new AssignStoryTextToPlotCommand(),
     new AssignStoryTextToPlotEventCommand(),
@@ -91,6 +93,13 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new RemoveEdgeFromPlotCommand(),
     new AddConceptToPlotCommand(),
     new RemoveConceptFromPlotCommand(),
+    new AddCharacterToPlotEventCommand(),
+    new RemoveCharacterFromPlotEventCommand(),
+    new AddCharacterToPlotCommand(),
+    new RemoveCharacterFromPlotCommand(),
+    new AddConceptToCharacterCommand(),
+    new RemoveConceptFromCharacterCommand(),
+    new MovePlaceCommand(),
     new ImportMarkdownCommand(),
     new ExportMarkdownCommand(),
     new ExportEpubCommand(),
@@ -104,6 +113,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new WriteTableOfContentsCommand(),
     new GenerateStoryCommand(),
     new AnswerTheStoryGenerationCommand(),
+    new CancelTheStoryGenerationCommand(),
 ];
 
 export function authorDocumentCommandCards(): WebviewAuthorDocumentCommandCard[] {

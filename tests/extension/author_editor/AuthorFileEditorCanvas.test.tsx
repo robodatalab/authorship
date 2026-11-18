@@ -12,6 +12,7 @@ import {
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
+import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -21,12 +22,14 @@ import { BlurbCell } from "authordoc/cells/blurb_cell";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { ChapterCell } from "authordoc/cells/chapter_cell";
+import { CharacterCell } from "authordoc/cells/character_cell";
 import type { DisclaimerCell } from "authordoc/cells/disclaimer_cell";
 import type { DividerCell } from "authordoc/cells/divider_cell";
 import type { ImageCell } from "authordoc/cells/image_cell";
 import { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import { PartCell } from "authordoc/cells/part_cell";
+import { PlaceCell } from "authordoc/cells/place_cell";
 import {
     PlotCell,
     PlotEdge,
@@ -117,6 +120,14 @@ class CellsDrawnAs implements CellVisitor<ReactNode> {
         return this.drawn(cell);
     }
 
+    visitCharacter(cell: CharacterCell): ReactNode {
+        return this.drawn(cell);
+    }
+
+    visitPlace(cell: PlaceCell): ReactNode {
+        return this.drawn(cell);
+    }
+
     visitUnknown(cell: UnknownCell): ReactNode {
         return this.drawn(cell);
     }
@@ -163,6 +174,7 @@ async function mountCanvas(options: {
     cellDrawings?: CellDrawings;
     storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextShown?: StoryTextSpan | null;
+    storyGeneration?: StoryGeneration | null;
 }): Promise<void> {
     posted = [];
     document.body.innerHTML = "";
@@ -184,6 +196,7 @@ async function mountCanvas(options: {
                 }
                 storyAnnotationsSelected={options.storyAnnotationsSelected}
                 storyTextShown={options.storyTextShown}
+                storyGeneration={options.storyGeneration}
             />,
         );
     });
@@ -197,7 +210,7 @@ function insertMenus(): Element[] {
 
 function listItems(): Element[] {
     return [
-        ...document.querySelectorAll(".author-file-editor-canvas > ul > li"),
+        ...document.querySelectorAll(".author-file-editor-manuscript-pane > ul > li"),
     ];
 }
 
@@ -236,7 +249,7 @@ describe("where the insert menus go", () => {
         for (const item of listItems().slice(1)) {
             const children = [...item.children];
             expect(children[0].className).toBe("test-cell");
-            expect(children[1].className).toBe(
+            expect(children[1].firstElementChild?.className).toBe(
                 "author-file-editor-insert-cell-menu",
             );
         }
@@ -488,14 +501,14 @@ describe("the commands on a cell", () => {
             cells: [markdownCell("one")],
             cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
-                command("moveCellUp", "cell"),
+                command("foldCell", "cell"),
                 command("deleteCell", "cell"),
             ],
         });
 
         expect(
             document.querySelectorAll(
-                ".author-file-editor-cell .author-file-editor-cell-actions-button",
+                ".author-file-editor-cell button.author-file-editor-cell-actions-button",
             ),
         ).toHaveLength(2);
     });
@@ -505,14 +518,14 @@ describe("the commands on a cell", () => {
             cells: [markdownCell("one")],
             cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: [
-                command("moveCellUp", "cell"),
+                command("foldCell", "cell"),
                 command("deleteCell", "cell"),
             ],
         });
 
         await click(
             document.querySelectorAll(
-                ".author-file-editor-cell-actions-button",
+                "button.author-file-editor-cell-actions-button",
             )[1],
         );
 
@@ -533,7 +546,7 @@ describe("the commands on a cell", () => {
         });
 
         for (const button of document.querySelectorAll(
-            ".author-file-editor-cell-actions-button",
+            "button.author-file-editor-cell-actions-button",
         )) {
             await click(button);
         }
@@ -611,7 +624,7 @@ describe("two commands drawn as one button", () => {
         });
         return [
             ...document.querySelectorAll(
-                ".author-file-editor-cell-actions-button",
+                "button.author-file-editor-cell-actions-button",
             ),
         ].map((button) => button.getAttribute("title") ?? "");
     }
@@ -638,7 +651,7 @@ describe("two commands drawn as one button", () => {
         });
 
         await click(
-            document.querySelector(".author-file-editor-cell-actions-button")!,
+            document.querySelector("button.author-file-editor-cell-actions-button")!,
         );
 
         expect(posted).toEqual([
@@ -898,7 +911,7 @@ describe("the scope of a part and of a chapter", () => {
         ]);
 
         const menu = document.querySelector(
-            "li[data-cell-id='c1'] > .author-file-editor-insert-cell-menu",
+            "li[data-cell-id='c1'] > .author-file-editor-cell-drop-zone > .author-file-editor-insert-cell-menu",
         )!;
         expect(menu).not.toBeNull();
         await click(menu.querySelector("button")!);
@@ -913,7 +926,7 @@ describe("the scope of a part and of a chapter", () => {
         ]);
 
         const menu = document.querySelector(
-            ".author-file-editor-part-scope > li > .author-file-editor-insert-cell-menu",
+            ".author-file-editor-part-scope > li > .author-file-editor-cell-drop-zone > .author-file-editor-insert-cell-menu",
         )!;
         await click(menu.querySelector("button")!);
 
@@ -1367,7 +1380,7 @@ describe("the plots the story weaves", () => {
                     new PlotCell(
                         "Knocked first",
                         [
-                            new PlotNode("n0", null, "1.1", "the porch", "Someone knocks."),
+                            new PlotNode("n0", null, "1.1", "", [], "Someone knocks."),
                             new PlotNode("n1", new StoryWordRange(0, 1)),
                             new PlotNode("n2", new StoryWordRange(2, 2)),
                             new PlotNode("n3", new StoryWordRange(3, 4)),
@@ -1666,7 +1679,7 @@ describe("the plots the story weaves", () => {
             ).mockReturnValue(400);
             await mountTheStoryOfTheDoor({});
             const story = document.querySelector(
-                ".author-file-editor-canvas > ul",
+                ".author-file-editor-manuscript-pane > ul",
             )!;
 
             scrolledTo.mockReturnValue(600);
@@ -1676,5 +1689,468 @@ describe("the plots the story weaves", () => {
 
             expect(areaInViewOnTheRuler()).toEqual(["300", "200"]);
         });
+    });
+});
+
+describe("the metadata and the manuscript panes", () => {
+    const DRAWN_BY_THEIR_IDS: CellDrawings = {
+        markdown: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        plot: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        "salient-concept": (cell) => (
+            <div className="test-cell">{cell.uniqueId}</div>
+        ),
+        character: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+        place: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
+    };
+
+    function cellsDrawnIn(pane: string): (string | null)[] {
+        return [...document.querySelectorAll(`${pane} .test-cell`)].map(
+            (drawn) => drawn.textContent,
+        );
+    }
+
+    it("labels the metadata pane on the left, with the graph beside it, and the manuscript pane on the right", async () => {
+        await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+        const metadataTabs = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].map((tab) => [tab.textContent, tab.getAttribute("aria-selected")]);
+        const manuscriptTitle = document.querySelector(
+            ".author-file-editor-manuscript-pane .author-file-editor-pane-title",
+        )?.textContent;
+
+        expect([metadataTabs, manuscriptTitle]).toEqual([
+            [
+                ["Metadata", "true"],
+                ["Graph", "false"],
+            ],
+            "Manuscript",
+        ]);
+    });
+
+    it("highlights the plot of an event clicked in the graph, and shows its words in the manuscript", async () => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once upon a time", "m1"),
+                new PlotCell(
+                    "Bell",
+                    [new PlotNode("e1", new StoryWordRange(0, 2), "1", "", [], "The bell rings.")],
+                    [],
+                    "",
+                    false,
+                    null,
+                    "p1",
+                ),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+        const graphTab = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].find((tab) => tab.textContent === "Graph")!;
+        await click(graphTab);
+
+        await click(document.querySelector(".author-file-editor-story-graph-event")!);
+
+        expect(posted).toEqual([
+            { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId: "p1" },
+            { type: "selectPassage", cellKind: "plot", passageId: "e1" },
+            { type: "showStoryWordRange", firstWord: 0, lastWord: 2 },
+        ]);
+    });
+
+    it.each([
+        ["Metadata", ["p1", "k1"], false],
+        ["Graph", [], true],
+    ])("shows in the metadata pane, once %s is chosen, its cells or the graph", async (chosen, cellsShown, graphShown) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+        const tab = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].find((drawn) => drawn.textContent === chosen)!;
+
+        await click(tab);
+
+        const graph = document.querySelector(
+            ".author-file-editor-metadata-pane .author-file-editor-story-graph",
+        );
+        expect([cellsDrawnIn(".author-file-editor-metadata-pane"), graph !== null]).toEqual([
+            cellsShown,
+            graphShown,
+        ]);
+    });
+
+    it.each([
+        [".author-file-editor-metadata-pane", ["p1", "k1", "v1", "h1"]],
+        [".author-file-editor-manuscript-pane", ["m1", "m2"]],
+    ])("draws in %s the cells it holds", async (pane, expected) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                markdownCell("Twice", "m2"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+                new CharacterCell("Varn", "", false, null, "v1"),
+                new PlaceCell("The hall", "", false, null, "h1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        expect(cellsDrawnIn(pane)).toEqual(expected);
+    });
+
+    it.each([
+        [".author-file-editor-metadata-pane", ["plot", "salient-concept", "character", "place"]],
+        [".author-file-editor-manuscript-pane", ["markdown", "chapter"]],
+    ])("offers in %s the kinds it holds", async (pane, expected) => {
+        await mountCanvas({
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("plot", "primary"),
+                cellType("chapter", "primary"),
+                cellType("salient-concept", "primary"),
+                cellType("character", "primary"),
+                cellType("place", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        const offered = [
+            ...document.querySelectorAll(
+                `${pane} .author-file-editor-insert-cell-menu button`,
+            ),
+        ].map((button) => button.textContent);
+
+        expect(offered).toEqual(expected);
+    });
+
+    describe("the splitter between them", () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        function canvasDrawnFrom20To1020(): void {
+            vi.spyOn(
+                HTMLElement.prototype,
+                "getBoundingClientRect",
+            ).mockReturnValue({ left: 20, width: 1000 } as DOMRect);
+        }
+
+        async function drag(clientXs: number[]): Promise<void> {
+            const splitter = document.querySelector('[role="separator"]')!;
+            await act(async () => {
+                splitter.dispatchEvent(
+                    new MouseEvent("pointerdown", { bubbles: true }),
+                );
+            });
+            for (const clientX of clientXs) {
+                await act(async () => {
+                    document.dispatchEvent(
+                        new MouseEvent("pointermove", { clientX }),
+                    );
+                });
+            }
+        }
+
+        function columns(): string {
+            const canvas = document.querySelector<HTMLElement>(
+                ".author-file-editor-canvas",
+            )!;
+            return canvas.style.gridTemplateColumns;
+        }
+
+        it.each([
+            ["where it is dragged to", 320, "300px auto minmax(0, 1fr) auto"],
+            ["no narrower than the narrowest pane", 50, "160px auto minmax(0, 1fr) auto"],
+            ["no wider than leaves the manuscript the narrowest pane", 1000, "840px auto minmax(0, 1fr) auto"],
+        ])("makes the metadata pane %s", async (_, clientX, expected) => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+            canvasDrawnFrom20To1020();
+
+            await drag([clientX]);
+
+            expect(columns()).toBe(expected);
+        });
+
+        it("stops resizing the panes once it is let go", async () => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+            canvasDrawnFrom20To1020();
+            await drag([320]);
+
+            await act(async () => {
+                document.dispatchEvent(new MouseEvent("pointerup"));
+            });
+            await act(async () => {
+                document.dispatchEvent(
+                    new MouseEvent("pointermove", { clientX: 500 }),
+                );
+            });
+
+            expect(columns()).toBe("300px auto minmax(0, 1fr) auto");
+        });
+
+        it("leaves the panes as wide as they are drawn until it is dragged", async () => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+            expect(columns()).toBe("");
+        });
+    });
+
+    it.each([
+        [
+            "the button that adds the kind the story generation asks for, at the top of the metadata pane",
+            { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+            [["salient-concept"], []],
+        ],
+        [
+            "no button when the story generation asks for a review",
+            { kind: "editor" },
+            [[], []],
+        ],
+    ] as const)("highlights %s", async (_, shown, expected) => {
+        await mountCanvas({
+            cells: [new PlotCell("Bell", [], [], "", false, null, "p1")],
+            cellTypes: [
+                cellType("plot", "primary"),
+                cellType("salient-concept", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+            storyGeneration: {
+                running: false,
+                error: null,
+                progress: { steps: [] },
+                stages: [{ name: "concept titles", done: false }],
+                asked: { stage: "concept titles", story: "", shown },
+            },
+        });
+
+        const highlighted = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-insert-cell-menu",
+            ),
+        ].map((menu) =>
+            [
+                ...menu.querySelectorAll(
+                    ".author-file-editor-insert-cell-menu-button-highlighted",
+                ),
+            ].map((button) => button.textContent),
+        );
+
+        expect(highlighted).toEqual(expected);
+    });
+
+    describe("the cells the story generation asks the author to review", () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        it.each([
+            ["scrolls the metadata pane to the first cell of the kind", { kind: "cells", cellKind: "plot" }, 200],
+            ["leaves the metadata pane where it is for a review of the story", { kind: "editor" }, 0],
+        ] as const)("%s", async (_, shown, expectedScrollTop) => {
+            vi.spyOn(
+                HTMLElement.prototype,
+                "getBoundingClientRect",
+            ).mockImplementation(function (this: HTMLElement) {
+                return { top: this.dataset.cellId === "p1" ? 300 : 100 } as DOMRect;
+            });
+
+            await mountCanvas({
+                cells: [
+                    new SalientConceptCell("Door", [], "", false, null, "k1"),
+                    new PlotCell("Bell", [], [], "", false, null, "p1"),
+                ],
+                cellDrawings: DRAWN_BY_THEIR_IDS,
+                storyGeneration: {
+                    running: false,
+                    error: null,
+                    progress: { steps: [] },
+                    stages: [{ name: "plots", done: false }],
+                    asked: { stage: "plots", story: "", shown },
+                },
+            });
+
+            const metadata = document.querySelector(
+                ".author-file-editor-metadata-pane > ul",
+            )!;
+            expect(metadata.scrollTop).toBe(expectedScrollTop);
+        });
+    });
+
+    it("draws no menu in a pane that holds none of the kinds offered", async () => {
+        await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+        const menus = document.querySelectorAll(
+            ".author-file-editor-metadata-pane .author-file-editor-insert-cell-menu",
+        );
+
+        expect(menus.length).toBe(0);
+    });
+
+    it.each([
+        [".author-file-editor-metadata-pane", ["p1", "k1", null]],
+        [".author-file-editor-manuscript-pane", ["m1", "m2", "p1"]],
+    ])("inserts in %s before what follows each menu", async (pane, expected) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                markdownCell("Twice", "m2"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellTypes: [
+                cellType("markdown", "primary"),
+                cellType("plot", "primary"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        for (const menu of document.querySelectorAll(
+            `${pane} .author-file-editor-insert-cell-menu`,
+        )) {
+            await click(menu.querySelector("button")!);
+        }
+
+        expect(
+            posted.map(
+                (invocation) => invocation.commandArguments.beforeCellId,
+            ),
+        ).toEqual(expected);
+    });
+});
+
+describe("moving cells by dragging them", () => {
+    const DRAWN_WITH_THEIR_ACTIONS: CellDrawings = {
+        markdown: () => <AuthorFileEditorCell />,
+        character: () => <AuthorFileEditorCell />,
+        place: () => <AuthorFileEditorCell />,
+    };
+
+    const THE_STORY = [
+        new PlaceCell("Harrowgate", "", false, null, "hg"),
+        new PlaceCell("England", "", false, null, "en"),
+        new PlaceCell("Hollowmere", "", false, null, "hv", "en"),
+        new PlaceCell("The lane", "", false, null, "ln", "hv"),
+        new CharacterCell("Varn", "", false, null, "v1"),
+        markdownCell("She saw the door.", "m1"),
+    ];
+
+    const FIRST_GAP_OF_THE_METADATA =
+        ".author-file-editor-metadata-pane > ul > li:first-child > .author-file-editor-cell-drop-zone";
+    const FIRST_GAP_OF_THE_MANUSCRIPT =
+        ".author-file-editor-manuscript-pane > ul > li:first-child > .author-file-editor-cell-drop-zone";
+    const FIRST_GAP_WITHIN_ENGLAND =
+        "li[data-cell-id='en'] > .author-file-editor-place-scope > li:first-child > .author-file-editor-cell-drop-zone";
+
+    async function dragAndDrop(
+        draggedId: string,
+        droppedOnSelector: string,
+    ): Promise<void> {
+        const dataTransfer = {
+            setData: () => undefined,
+            effectAllowed: "",
+            dropEffect: "",
+        };
+        const handle = document.querySelector(
+            `li[data-cell-id='${draggedId}'] .author-file-editor-cell-drag-handle`,
+        )!;
+        const droppedOn = document.querySelector(droppedOnSelector)!;
+        await act(async () => {
+            const dragStarted = new Event("dragstart", { bubbles: true });
+            handle.dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
+        });
+        await act(async () => {
+            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
+            droppedOn.dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
+        });
+        await act(async () => {
+            const dropped = new Event("drop", { bubbles: true, cancelable: true });
+            droppedOn.dispatchEvent(Object.assign(dropped, { dataTransfer }));
+        });
+    }
+
+    it("draws every place under the place it lies within", async () => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+
+        const nestedUnder = [
+            ...document.querySelectorAll(".author-file-editor-place-scope"),
+        ].map((scope) => [
+            scope.parentElement!.getAttribute("data-cell-id"),
+            [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
+                nested.getAttribute("data-cell-id"),
+            ),
+        ]);
+
+        expect(nestedUnder).toEqual([
+            ["en", ["hv"]],
+            ["hv", ["ln"]],
+        ]);
+    });
+
+    it.each([
+        [
+            "a cell dropped in a gap, to stand before the cell after the gap",
+            "v1",
+            FIRST_GAP_OF_THE_METADATA,
+            [{ type: "invoke", commandName: "moveCell", commandArguments: { cellId: "v1", beforeCellId: "hg" } }],
+        ],
+        [
+            "a place dropped in a gap outside every place, out of the place it lies within",
+            "ln",
+            FIRST_GAP_OF_THE_METADATA,
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "ln", beforeCellId: "hg", parentCellId: "" } }],
+        ],
+        [
+            "a place dropped in a gap within a place, within that place",
+            "hg",
+            FIRST_GAP_WITHIN_ENGLAND,
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "hv", parentCellId: "en" } }],
+        ],
+        [
+            "a place dropped onto a place, within it after the places already in it",
+            "hg",
+            "li[data-cell-id='hv']",
+            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "v1", parentCellId: "hv" } }],
+        ],
+        ["nothing for a place dropped onto a place within it", "en", "li[data-cell-id='ln']", []],
+        ["nothing for a cell dropped in the other pane", "v1", FIRST_GAP_OF_THE_MANUSCRIPT, []],
+        ["nothing for a cell that is not a place dropped within a place", "v1", FIRST_GAP_WITHIN_ENGLAND, []],
+        ["nothing for a cell that is not a place dropped onto a place", "v1", "li[data-cell-id='hg']", []],
+    ])("asks to move %s", async (_, draggedId, droppedOnSelector, expected) => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+
+        await dragAndDrop(draggedId, droppedOnSelector);
+
+        expect(posted).toEqual(expected);
+    });
+
+    it("outlines where the cell dragged would land", async () => {
+        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+        const dataTransfer = { setData: () => undefined, effectAllowed: "", dropEffect: "" };
+        await act(async () => {
+            const dragStarted = new Event("dragstart", { bubbles: true });
+            document
+                .querySelector("li[data-cell-id='hg'] .author-file-editor-cell-drag-handle")!
+                .dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
+        });
+
+        await act(async () => {
+            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
+            document
+                .querySelector("li[data-cell-id='hv']")!
+                .dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
+        });
+
+        const outlined = [
+            ...document.querySelectorAll(".author-file-editor-cell-drop-zone-aimed-at"),
+        ].map((aimedAt) => aimedAt.getAttribute("data-cell-id"));
+        expect(outlined).toEqual(["hv"]);
     });
 });

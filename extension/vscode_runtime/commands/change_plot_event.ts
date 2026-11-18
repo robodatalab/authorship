@@ -1,18 +1,28 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import { PlaceCell } from "authordoc/cells/place_cell";
 import { PlotCell, type PlotNode } from "authordoc/cells/plot_cell";
+import type { Document } from "authordoc/storydoc";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 // What of an event the author can say, and how each is said of it.
-const SAID_OF_AN_EVENT: Record<string, (event: PlotNode, said: string) => PlotNode> = {
+const SAID_OF_AN_EVENT: Record<
+    string,
+    (event: PlotNode, said: string, story: Document) => PlotNode
+> = {
     summary: (event, said) => event.withSummary(said),
     timestamp: (event, said) => event.withTimestamp(said),
-    location: (event, said) => event.withLocation(said),
+    place: (event, said, story) => {
+        const referenced = story.cellWithId(said);
+        const place = referenced instanceof PlaceCell ? referenced : null;
+        const placed = event.withPlace(place);
+        return placed;
+    },
 };
 
 /**
- * Says one thing of one event of a plot — its summary, its timestamp or its
- * location — in the plot as the document has it now, so that nothing else said
- * of the plot since the page last drew it is undone.
+ * Says one thing of one event of a plot — its summary, its timestamp or the id
+ * of its place — in the plot as the document has it now, so that nothing else
+ * said of the plot since the page last drew it is undone.
  */
 export class ChangePlotEventCommand implements AuthorDocumentCommand {
     readonly commandName = "changePlotEvent";
@@ -40,7 +50,7 @@ export class ChangePlotEventCommand implements AuthorDocumentCommand {
             if (event === undefined) {
                 return story;
             }
-            const eventChanged = sayIt(event, said);
+            const eventChanged = sayIt(event, said, story);
             const plotChanged = plot.withNode(eventChanged);
             const storyChanged = story.withCell(plotChanged);
             return storyChanged;

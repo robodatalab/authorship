@@ -10,7 +10,7 @@ body {
 .author-file-editor-canvas {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 2fr) auto minmax(0, 3fr) auto;
     height: 100vh;
     overflow: hidden;
 }
@@ -25,19 +25,73 @@ body {
     list-style: none;
 }
 
-.author-file-editor-canvas > ul {
+.author-file-editor-pane {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+}
+
+.author-file-editor-pane-splitter {
+    width: 4px;
+    cursor: col-resize;
+    border-left: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    touch-action: none;
+}
+
+.author-file-editor-pane-splitter:hover {
+    background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+}
+
+.author-file-editor-pane-title {
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--vscode-descriptionForeground);
+    border-bottom: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+}
+
+.author-file-editor-pane-tabs {
+    display: flex;
+    gap: 12px;
+}
+
+.author-file-editor-pane-tab {
+    padding: 0;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: none;
+    border-bottom: 1px solid transparent;
+    cursor: pointer;
+}
+
+.author-file-editor-pane-tab[aria-selected="true"] {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder);
+}
+
+.author-file-editor-pane > ul {
     overflow-y: auto;
     padding: 6px 12px 40vh;
 }
 
 .author-file-editor-canvas ul.author-file-editor-part-scope,
-.author-file-editor-canvas ul.author-file-editor-chapter-scope {
+.author-file-editor-canvas ul.author-file-editor-chapter-scope,
+.author-file-editor-canvas ul.author-file-editor-place-scope {
     margin-left: 7px;
     padding-left: 12px;
     border-left: 1px solid;
 }
 
-.author-file-editor-canvas ul.author-file-editor-part-scope {
+.author-file-editor-canvas ul.author-file-editor-part-scope,
+.author-file-editor-canvas ul.author-file-editor-place-scope {
     border-left-color: var(--vscode-panel-border);
 }
 
@@ -69,6 +123,16 @@ body {
     background: color-mix(in srgb, var(--vscode-panel-border) 55%, transparent);
 }
 
+.author-file-editor-cell-drop-zone {
+    min-height: 22px;
+}
+
+.author-file-editor-cell-drop-zone-aimed-at {
+    border-radius: 6px;
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
 .author-file-editor-insert-cell-menu {
     display: flex;
     justify-content: center;
@@ -80,13 +144,16 @@ body {
 }
 
 .author-file-editor-insert-cell-menu:hover,
-.author-file-editor-insert-cell-menu:focus-within {
+.author-file-editor-insert-cell-menu:focus-within,
+.author-file-editor-insert-cell-menu-highlighted {
     opacity: 1;
 }
 
-.author-file-editor-canvas
+.author-file-editor-pane
     > ul:hover
-    .author-file-editor-insert-cell-menu:not(:hover) {
+    .author-file-editor-insert-cell-menu:not(:hover):not(
+        .author-file-editor-insert-cell-menu-highlighted
+    ) {
     opacity: 0;
 }
 
@@ -173,4 +240,11 @@ body {
         --vscode-menu-selectionBackground,
         var(--vscode-list-activeSelectionBackground)
     );
+}
+
+.author-file-editor-insert-cell-menu-button-highlighted,
+.author-file-editor-insert-cell-menu-button-highlighted:hover {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    outline: 1px solid var(--vscode-focusBorder);
 }

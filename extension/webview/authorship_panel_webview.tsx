@@ -5,20 +5,12 @@ import {
 } from "./panel/AuthorshipPanelCanvas";
 import type { ModelServingStatus } from "./panel/AuthorshipPanelServingStatus";
 import type { AsyncJobStatus } from "./panel/AuthorshipPanelAsyncJobs";
-import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
-import type { StoryGeneration } from "../vscode_runtime/story_generation";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
-import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
 interface WhatThePanelDraws {
     models?: ModelServingStatus[] | null;
     jobs?: AsyncJobStatus[] | null;
-    story?: Document | null;
-    storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
-    storyTextSelected?: StoryTextSpan | null;
-    storyGeneration?: StoryGeneration | null;
 }
 
 function processMessageFromVscode(
@@ -29,15 +21,6 @@ function processMessageFromVscode(
         drawn.models = message.data.models as ModelServingStatus[] | null;
     } else if (message.data?.type === "jobs") {
         drawn.jobs = message.data.jobs as AsyncJobStatus[] | null;
-    } else if (message.data?.type === "document") {
-        const text = message.data.text as string | null;
-        drawn.story = text === null ? null : new Document(text);
-        drawn.storyAnnotationsSelected = message.data
-            .storyAnnotationsSelected as Record<string, StoryAnnotationSelected>;
-        drawn.storyTextSelected = message.data
-            .storyTextSelected as StoryTextSpan | null;
-        drawn.storyGeneration = message.data
-            .storyGeneration as StoryGeneration | null;
     } else {
         return false;
     }
@@ -55,10 +38,6 @@ function openTheAuthorshipPanel(): void {
             <AuthorshipPanelCanvas
                 models={drawn.models}
                 jobs={drawn.jobs}
-                story={drawn.story}
-                storyAnnotationsSelected={drawn.storyAnnotationsSelected}
-                storyTextSelected={drawn.storyTextSelected}
-                storyGeneration={drawn.storyGeneration}
                 sendMessagesToVscode={sendMessagesToVscode}
             />,
         );

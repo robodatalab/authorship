@@ -1,0 +1,240 @@
+.author-file-editor-story-annotation-shown-in-the-manuscript {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 4px;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-story-annotation-shown-in-the-manuscript[aria-pressed="true"] {
+    color: var(--vscode-foreground);
+}
+
+.author-file-editor-story-annotation-shown-in-the-manuscript:hover {
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
+}
+
+.author-file-editor-idle {
+    padding: 2px 4px;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-annotation-assign,
+.author-file-editor-cell-reference-chosen,
+.author-file-editor-story-annotation-passage-removed {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 4px;
+    color: inherit;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-story-annotation-assign:hover:enabled,
+.author-file-editor-cell-reference-chosen:hover:enabled,
+.author-file-editor-story-annotation-passage-shown:hover,
+.author-file-editor-story-annotation-passage-removed:hover {
+    background: var(
+        --vscode-toolbar-hoverBackground,
+        var(--vscode-list-hoverBackground)
+    );
+}
+
+.author-file-editor-story-annotation-assign:disabled,
+.author-file-editor-cell-reference-chosen:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.author-file-editor-story-annotation-passages-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 4px;
+}
+
+.author-file-editor-story-annotation-passages-heading h4 {
+    margin: 0;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-plot-event-place,
+.author-file-editor-plot-event-characters,
+.author-file-editor-plot-event-story-text {
+    margin-top: 10px;
+}
+
+.author-file-editor-story-annotation-passages {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.author-file-editor-story-annotation-passage {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 3px;
+}
+
+.author-file-editor-story-annotation-passage-selected {
+    background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.author-file-editor-story-annotation-passage-shown {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px;
+    overflow: hidden;
+    font: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-story-annotation-passage-selected
+    .author-file-editor-story-annotation-passage-shown {
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
+}
+
+.author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown {
+    cursor: default;
+}
+
+.author-file-editor-plot-trajectory {
+    position: relative;
+}
+
+.author-file-editor-plot-trajectory-dragging
+    .author-file-editor-story-annotation-passage-shown:hover,
+.author-file-editor-plot-trajectory-dragging
+    .author-file-editor-story-annotation-passage-removed:hover {
+    background: none;
+}
+
+.author-file-editor-plot-trajectory-row-dragged {
+    outline: 1px dashed var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.author-file-editor-plot-trajectory-lanes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.author-file-editor-plot-trajectory-lane-0 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-blue,
+        #3794ff
+    );
+}
+
+.author-file-editor-plot-trajectory-lane-1 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-purple,
+        #b180d7
+    );
+}
+
+.author-file-editor-plot-trajectory-lane-2 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-orange,
+        #d18616
+    );
+}
+
+.author-file-editor-plot-trajectory-lane-3 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-green,
+        #89d185
+    );
+}
+
+.author-file-editor-plot-trajectory-lane-4 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-red,
+        #f14c4c
+    );
+}
+
+.author-file-editor-plot-trajectory-lane-5 {
+    --author-file-editor-plot-trajectory-lane-color: var(
+        --vscode-charts-yellow,
+        #cca700
+    );
+}
+
+.author-file-editor-plot-trajectory-edge-line {
+    fill: none;
+    stroke: var(--author-file-editor-plot-trajectory-lane-color);
+    stroke-width: 2;
+}
+
+.author-file-editor-plot-trajectory-edge-arrowhead {
+    fill: var(--author-file-editor-plot-trajectory-lane-color);
+}
+
+.author-file-editor-plot-trajectory-edge-grip {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 10;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+.author-file-editor-plot-trajectory-edge:hover
+    .author-file-editor-plot-trajectory-edge-line {
+    stroke-width: 3;
+}
+
+.author-file-editor-plot-trajectory-node {
+    fill: var(--vscode-editor-background);
+    stroke: var(--author-file-editor-plot-trajectory-lane-color);
+    stroke-width: 2;
+    pointer-events: all;
+    cursor: crosshair;
+}
+
+.author-file-editor-plot-trajectory-node-selected {
+    fill: var(--author-file-editor-plot-trajectory-lane-color);
+}
+
+.author-file-editor-plot-trajectory-node-dragged {
+    stroke: var(--vscode-focusBorder);
+    stroke-dasharray: 2 2;
+}
+
+.author-file-editor-plot-trajectory-connection {
+    stroke: var(--vscode-focusBorder);
+    stroke-width: 2;
+    stroke-dasharray: 3 2;
+}
+
+.author-file-editor-plot-event-untold {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+}

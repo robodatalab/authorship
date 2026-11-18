@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from unittest.mock import Mock
 
 from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
 from authordoc.cells.story_word_range import StoryWordRange
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
@@ -24,8 +25,8 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         varn = PlotCell(
             "Motherhood",
             [
-                PlotNode("e1", StoryWordRange(0, 9), "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("e2", StoryWordRange(10, 16), "2", "mars, Varn's room", "Varn shares her water with her son."),
+                PlotNode("e1", StoryWordRange(0, 9), "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("e2", StoryWordRange(10, 16), "2", "r1", [], "Varn shares her water with her son."),
             ],
             [PlotEdge("x1", "e1", "e2")],
             "",
@@ -36,8 +37,8 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         dax = PlotCell(
             "Brutal father",
             [
-                PlotNode("f1", StoryWordRange(0, 9), "1", "mars, the base", "Dax takes the water from Varn and her son."),
-                PlotNode("f2", StoryWordRange(17, 22), "2.5", "mars, the base", "Dax drinks in front of the thirsty."),
+                PlotNode("f1", StoryWordRange(0, 9), "1", "b1", [], "Dax takes the water from Varn and her son."),
+                PlotNode("f2", StoryWordRange(17, 22), "2.5", "b1", [], "Dax drinks in front of the thirsty."),
             ],
             [PlotEdge("x2", "f1", "f2")],
             "",
@@ -47,6 +48,8 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
         )
         self.document = Document.from_cells(
             [
+                PlaceCell("mars, the base", "", False, None, "b1"),
+                PlaceCell("mars, Varn's room", "", False, None, "r1"),
                 varn,
                 dax,
                 MarkdownCell("Dax took the water while Varn held her son close.", False, None, "s1"),

@@ -9,33 +9,39 @@ The causality runs from the concept to the plot: every event is written to
 show the plot's concept, so how the concept shows at an event is what the event
 says.
 
-The model writes an event as its moment on the world's clock, its place and what
-happens, separated by bars, and the author reviews the plots in the Plots tab:
+Every plot follows the main characters of its concept, and the model writes an
+event as its moment on the world's clock, its place, the characters who take
+part in it and what happens, separated by bars. A character the story does not
+have yet is added with a backstory no longer than its part. The author reviews
+the plots in the metadata pane:
 
-    1 | earth, Varn's house | Varn is given command of a ship bound for Mars.
+    1 | earth, Varn's house | Varn, Lia | Varn is given command of a ship bound for Mars.
 """
 
 from __future__ import annotations
 
 from uuid import uuid4
 
+from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
+from server.story_generator.interactive_author_story import InteractiveAuthorStory, written_under_their_titles
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import Shown, TabShown
+from server.story_generator.review import Shown, CellsShown
+from server.story_generator.secondary_characters import with_the_characters_named
 from server.story_generator.stage import Stage, StageStep
 
-EVENTS = """Each event is written on one line as: moment | place | what happens.
+EVENTS = """Each event is written on one line as: moment | place | characters | what happens.
 - The moment is on the world's clock: numbers separated by dots, as in 2.3, where a greater moment is a later one.
 - The place runs from the broadest to the most specific, separated by commas, as in "earth, Varn's house".
+- The characters are everyone who takes part, separated by commas: a main character by the name given, anyone else by a name of their own.
 - What happens is a plain, simple statement of what happens and why."""
 
 ENDS_INSTRUCTIONS = f"""You help an author write an interactive story built from its salient concepts: the ideas a reader should come away understanding.
 
-You are given one concept. Think of the story that would best illustrate it, and write how that story starts and how it ends. Leave room between the two moments for the events that will be written between them.
+You are given one concept and the main characters its story follows. Think of the story that would best illustrate it, and write how that story starts and how it ends. Leave room between the two moments for the events that will be written between them.
 
 {EVENTS}
 
@@ -43,7 +49,7 @@ Write two lines, the start and then the end, and nothing else."""
 
 IN_BETWEEN_INSTRUCTIONS = f"""You help an author write an interactive story built from its salient concepts: the ideas a reader should come away understanding.
 
-You are given one concept, and two events of the story that best illustrates it: one before and one after. Write the one event that happens between them: caused by the event before, causing the event after, and showing the concept. Its moment lies between theirs.
+You are given one concept, the main characters its story follows, and two events of that story: one before and one after. Write the one event that happens between them: caused by the event before, causing the event after, and showing the concept. Its moment lies between theirs.
 
 {EVENTS}
 
@@ -53,18 +59,41 @@ Write one line and nothing else."""
 EVENTS_FOR_EVERY_PLOT = 4
 
 
-def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, str]]:
-    """The moment, place and what happens of every event the table lists, in
-    order; a line that is not an event is left out."""
-    events: list[tuple[str, str, str]] = []
+def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, list[str], str]]:
+    """The moment, place, characters and what happens of every event the table
+    lists, in order; a line that is not an event is left out."""
+    events: list[tuple[str, str, list[str], str]] = []
     for line in table.splitlines():
-        parts = line.split("|", 2)
-        if len(parts) != 3:
+        parts = line.split("|", 3)
+        if len(parts) != 4:
             continue
-        written_moment, place, summary = [part.strip() for part in parts]
+        written_moment, place, written_names, summary = [part.strip() for part in parts]
         moment = written_moment.lstrip("-* ")
-        events.append((moment, place, summary))
+        names_written = [name.strip() for name in written_names.split(",")]
+        names = [name for name in names_written if name]
+        events.append((moment, place, names, summary))
     return events
+
+
+async def _with_the_event_told(
+    story: InteractiveAuthorStory,
+    node_id: str,
+    event_written: tuple[str, str, list[str], str],
+    model: CompletingModel,
+) -> tuple[InteractiveAuthorStory, PlotNode]:
+    moment, place_name, names, summary = event_written
+    story_with_the_place, place = story.with_place_named(place_name)
+    story_with_the_characters, characters = await with_the_characters_named(story_with_the_place, names, f"The event:\n{summary}", model)
+    character_ids = [character.unique_id for character in characters]
+    event = PlotNode(
+        node_id=node_id,
+        story_word_range=None,
+        timestamp=moment,
+        place_id=place.unique_id,
+        character_ids=character_ids,
+        summary=summary,
+    )
+    return story_with_the_characters, event
 
 
 class LayOutPlotsStep(StageStep):
@@ -90,16 +119,21 @@ class PlotEndsStep(StageStep):
         self._model = model
 
     async def __call__(self, document: Document) -> Document:
-        request = f"{self._concept.title}: {self._concept.source}"
+        plot = document.get_plot_of_node(self._first)
+        main_characters = plot.characters(document)
+        main_characters_written = written_under_their_titles(main_characters)
+        request = f"{self._concept.title}: {self._concept.source}\n\nThe main characters:\n{main_characters_written}"
         messages = [{"role": "system", "content": ENDS_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
-        plot = document.get_plot_of_node(self._first)
-        plot_with_the_start = plot.with_node(PlotNode(self._first.node_id, None, *start))
-        plot_with_the_ends = plot_with_the_start.with_node(PlotNode(self._last.node_id, None, *end))
-        document_with_the_ends = document.with_cell(plot_with_the_ends)
+        story = InteractiveAuthorStory(document)
+        story_with_the_start, start_event = await _with_the_event_told(story, self._first.node_id, start, self._model)
+        story_with_both_ends, end_event = await _with_the_event_told(story_with_the_start, self._last.node_id, end, self._model)
+        plot_with_the_start = plot.with_node(start_event)
+        plot_with_the_ends = plot_with_the_start.with_node(end_event)
+        document_with_the_ends = story_with_both_ends.document.with_cell(plot_with_the_ends)
         return document_with_the_ends
 
 
@@ -121,8 +155,11 @@ class InBetweenStep(StageStep):
         event_after = plot.get_node_by_id(self._after.node_id)
         written_before = story.written_event(event_before)
         written_after = story.written_event(event_after)
+        main_characters = plot.characters(document)
+        main_characters_written = written_under_their_titles(main_characters)
         request = (
             f"{self._concept.title}: {self._concept.source}\n\n"
+            f"The main characters:\n{main_characters_written}\n\n"
             f"The event before:\n{written_before}\n\n"
             f"The event after:\n{written_after}"
         )
@@ -130,9 +167,10 @@ class InBetweenStep(StageStep):
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
-        (event,) = _parse_events_table_returned_by_llm(written)
-        plot_with_the_event = plot.with_node(PlotNode(self._at.node_id, None, *event))
-        document_with_the_event = document.with_cell(plot_with_the_event)
+        (event_written,) = _parse_events_table_returned_by_llm(written)
+        story_with_the_event, event = await _with_the_event_told(story, self._at.node_id, event_written, self._model)
+        plot_with_the_event = plot.with_node(event)
+        document_with_the_event = story_with_the_event.document.with_cell(plot_with_the_event)
         return document_with_the_event
 
 
@@ -150,11 +188,14 @@ class Plots(Stage):
         # each leading to the next.
         plots = []
         trajectories = []
+        characters = [cell for cell in document.cells if isinstance(cell, CharacterCell)]
         for concept in concepts:
             placeholders = [PlotNode(str(uuid4()), None) for _ in range(plot_length)]
             edges = [PlotEdge(str(uuid4()), cause.node_id, effect.node_id) for cause, effect in zip(placeholders, placeholders[1:])]
             plot_laid_out = PlotCell(concept.title, placeholders, edges, "", False, None, str(uuid4()))
-            plot = plot_laid_out.with_concepts([concept])
+            plot_of_the_concept = plot_laid_out.with_concepts([concept])
+            main_characters = [character for character in characters if concept in character.concepts(document)]
+            plot = plot_of_the_concept.with_characters(main_characters)
             plots.append(plot)
             trajectories.append((concept, placeholders))
         lay_out_step = LayOutPlotsStep(plots)
@@ -178,4 +219,4 @@ class Plots(Stage):
         return plot_steps
 
     def shown(self) -> Shown:
-        return TabShown(PLOT)
+        return CellsShown(PLOT)

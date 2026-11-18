@@ -1,8 +1,5 @@
 import * as vscode from "vscode";
 
-import { StoryWordRange } from "authordoc/cells/story_word_range";
-import type { AuthorFileEditorSession } from "./author_file_editor_session";
-import { authorDocumentCommand } from "./commands/author_document_commands";
 import { fetchFromServer } from "./server/fetch";
 
 const MILLISECONDS_BETWEEN_STATUS_POLLS = 1500;
@@ -13,8 +10,6 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private statusPollTimer?: ReturnType<typeof setInterval>;
     private readonly whenEachJobFirstAppeared = new Map<string, number>();
-    private sessionFollowed?: AuthorFileEditorSession;
-    private followingTheSession?: vscode.Disposable;
 
     constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -32,37 +27,8 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage((message) => {
             if (message?.type === "ready") {
                 void this.pollTheServer();
-                this.showTheDocument();
             } else if (message?.type === "stopJob") {
                 void this.stopJob(message.path as string);
-            } else if (message?.type === "selectStoryAnnotation") {
-                this.sessionFollowed?.selectTheStoryAnnotation(
-                    message.cellKind as string,
-                    message.annotationCellId as string | null,
-                );
-            } else if (message?.type === "selectPassage") {
-                this.sessionFollowed?.selectThePassage(
-                    message.cellKind as string,
-                    message.passageId as string | null,
-                );
-            } else if (message?.type === "typed") {
-                this.sessionFollowed?.theAuthorTypedInTheCell(
-                    message.cellId as string,
-                    message.markdown as string,
-                );
-            } else if (message?.type === "showStoryWordRange") {
-                const storyWordRange = new StoryWordRange(
-                    message.firstWord as number,
-                    message.lastWord as number,
-                );
-                this.sessionFollowed?.showTheStoryWordRange(storyWordRange);
-            } else if (message?.type === "invoke" && this.sessionFollowed) {
-                void authorDocumentCommand(
-                    message.commandName as string,
-                )?.invoke(
-                    this.sessionFollowed,
-                    message.commandArguments as Record<string, unknown>,
-                );
             }
         });
 
@@ -78,41 +44,6 @@ export class AuthorshipPanelProvider implements vscode.WebviewViewProvider {
                 this.statusPollTimer = undefined;
             }
             this.view = undefined;
-        });
-    }
-
-    follow(session: AuthorFileEditorSession): void {
-        if (this.sessionFollowed === session) {
-            return;
-        }
-        this.followingTheSession?.dispose();
-        this.sessionFollowed = session;
-        this.followingTheSession = vscode.Disposable.from(
-            session.onDocumentOrSelectionChanged(() =>
-                this.showTheDocument(),
-            ),
-        );
-        this.showTheDocument();
-    }
-
-    stopFollowing(session: AuthorFileEditorSession): void {
-        if (this.sessionFollowed !== session) {
-            return;
-        }
-        this.followingTheSession?.dispose();
-        this.followingTheSession = undefined;
-        this.sessionFollowed = undefined;
-        this.showTheDocument();
-    }
-
-    private showTheDocument(): void {
-        const session = this.sessionFollowed;
-        void this.view?.webview.postMessage({
-            type: "document",
-            text: session?.document.text ?? null,
-            storyAnnotationsSelected: session?.theStoryAnnotationsSelected ?? {},
-            storyTextSelected: session?.theStoryTextSelected ?? null,
-            storyGeneration: session?.theStoryGeneration ?? null,
         });
     }
 
