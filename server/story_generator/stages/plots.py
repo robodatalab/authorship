@@ -30,6 +30,7 @@ from server.story_generator.interactive_author_story import InteractiveAuthorSto
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import Shown, CellsShown
+from server.story_generator.secondary_characters import with_the_characters_named
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | characters | what happens.
@@ -54,10 +55,6 @@ You are given one concept, the main characters its story follows, and two events
 
 Write one line and nothing else."""
 
-SECONDARY_CHARACTER_INSTRUCTIONS = """You help an author write an interactive story. A character the story has no backstory for takes part in one of its events.
-
-Write the character's backstory in one or two sentences: who they are, and why they take part. Write the sentences and nothing else."""
-
 # The events every plot has, for every plot the story has.
 EVENTS_FOR_EVERY_PLOT = 4
 
@@ -78,25 +75,6 @@ def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, list
     return events
 
 
-async def _with_the_characters_named(
-    story: InteractiveAuthorStory, names: list[str], summary: str, model: CompletingModel
-) -> tuple[InteractiveAuthorStory, list[CharacterCell]]:
-    characters: list[CharacterCell] = []
-    for name in names:
-        named = story.character_named(name)
-        if named is None:
-            request = f"The character: {name}\n\nThe event:\n{summary}"
-            messages = [{"role": "system", "content": SECONDARY_CHARACTER_INSTRUCTIONS}, {"role": "user", "content": request}]
-            streamed = model.complete(messages)
-            chunks = [chunk.content async for chunk in streamed]
-            written = "".join(chunks)
-            backstory = written.strip()
-            named = CharacterCell(name, backstory)
-            story = story.with_character(named)
-        characters.append(named)
-    return story, characters
-
-
 async def _with_the_event_told(
     story: InteractiveAuthorStory,
     node_id: str,
@@ -105,7 +83,7 @@ async def _with_the_event_told(
 ) -> tuple[InteractiveAuthorStory, PlotNode]:
     moment, place_name, names, summary = event_written
     story_with_the_place, place = story.with_place_named(place_name)
-    story_with_the_characters, characters = await _with_the_characters_named(story_with_the_place, names, summary, model)
+    story_with_the_characters, characters = await with_the_characters_named(story_with_the_place, names, f"The event:\n{summary}", model)
     character_ids = [character.unique_id for character in characters]
     event = PlotNode(
         node_id=node_id,

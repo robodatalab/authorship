@@ -7,12 +7,8 @@ from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
 from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.stages.plots import (
-    ENDS_INSTRUCTIONS,
-    IN_BETWEEN_INSTRUCTIONS,
-    SECONDARY_CHARACTER_INSTRUCTIONS,
-    Plots,
-)
+from server.story_generator.secondary_characters import SECONDARY_CHARACTER_INSTRUCTIONS
+from server.story_generator.stages.plots import ENDS_INSTRUCTIONS, IN_BETWEEN_INSTRUCTIONS, Plots
 
 
 async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
