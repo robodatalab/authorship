@@ -753,6 +753,10 @@ export function AuthorFileEditorCanvas({
                     ) : (
                         <AuthorFileEditorStoryGraph
                             story={storyDocument}
+                            plotEventSelected={
+                                storyAnnotationsSelected[PLOT] ??
+                                NO_STORY_ANNOTATION_SELECTED
+                            }
                             onEventChosen={showTheEventInTheManuscript}
                         />
                     )}

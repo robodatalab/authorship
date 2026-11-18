@@ -6,6 +6,7 @@ import { Document } from "authordoc/storydoc";
 import { AuthorFileEditorStoryGraph } from "../../../extension/webview/author_editor/AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "../../../extension/webview/author_editor/StoryGraphLayout";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
+import { NO_STORY_ANNOTATION_SELECTED } from "../../../extension/vscode_runtime/story_annotation_selection";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,10 +32,22 @@ const THE_STORY = `<!-- cell: character id="v1" title="Varn" -->
 </ol>
 `;
 
+const THE_LOVE_LEADING_ON = `<!-- cell: plot id="p1" title="Love" edges="x1:e1>e2, x2:e2>e3" -->
+
+<ol>
+<li id="e1" timestamp="1">Varn asks Lia to walk.</li>
+<li id="e2" timestamp="2">Lia stands before the court.</li>
+<li id="e3" timestamp="3">Varn leaves the town.</li>
+</ol>
+`;
+
 describe("the story graph", () => {
     let chosen: StoryGraphPlotNode[] = [];
 
-    async function mountTheGraph(): Promise<void> {
+    async function mountTheGraph(
+        story = THE_STORY,
+        plotEventSelected = NO_STORY_ANNOTATION_SELECTED,
+    ): Promise<void> {
         chosen = [];
         document.body.innerHTML = "";
         const container = document.createElement("div");
@@ -42,7 +55,8 @@ describe("the story graph", () => {
         await act(async () => {
             createRoot(container).render(
                 <AuthorFileEditorStoryGraph
-                    story={new Document(THE_STORY)}
+                    story={new Document(story)}
+                    plotEventSelected={plotEventSelected}
                     onEventChosen={(plotNode) => chosen.push(plotNode)}
                 />,
             );
@@ -115,29 +129,41 @@ describe("the story graph", () => {
     });
 
 
+    it.each([
+        ["the event leading on and both arrows", "e2", ["Lia stands before the court."], ["M 308 54 H 320 V 54 H 332", "M 488 54 H 500 V 54 H 512"]],
+        ["the last event and the arrow leading to it", "e3", ["Varn leaves the town."], ["M 488 54 H 500 V 54 H 512"]],
+        ["nothing, once the event chosen is not in the story", "e9", [], []],
+    ])("highlights, once an event of a plot is chosen, %s", async (_, nodeId, eventsHighlighted, arrowsHighlighted) => {
+        await mountTheGraph(THE_LOVE_LEADING_ON, { annotationCellId: "p1", passageId: nodeId });
+
+        const events = [
+            ...document.querySelectorAll(".author-file-editor-story-graph-event-selected"),
+        ].map((event) => event.textContent);
+        const arrows = [
+            ...document.querySelectorAll(".author-file-editor-story-graph-arrow-of-the-selected-event"),
+        ].map((arrow) => arrow.getAttribute("d"));
+        expect([events, arrows]).toEqual([eventsHighlighted, arrowsHighlighted]);
+    });
+
+    it("highlights an event shared by plots on the rail of each of them", async () => {
+        await mountTheGraph(THE_STORY, { annotationCellId: "p2", passageId: "f1" });
+
+        const events = [
+            ...document.querySelectorAll(".author-file-editor-story-graph-event-selected"),
+        ].map((event) => event.textContent);
+        expect(events).toEqual(["Lia stands before the court.", "Lia stands before the court."]);
+    });
+
     it("lays the places out as rails nested in the rails of the places they lie within", async () => {
-        chosen = [];
-        document.body.innerHTML = "";
-        const container = document.createElement("div");
-        document.body.append(container);
-        await act(async () => {
-            createRoot(container).render(
-                <AuthorFileEditorStoryGraph
-                    story={
-                        new Document(
-                            [
-                                '<!-- cell: place id="hv" title="Hollowmere" parent="en" -->',
-                                '<!-- cell: place id="hg" title="Harrowgate" -->',
-                                '<!-- cell: place id="en" title="England" -->',
-                                '<!-- cell: place id="ln" title="The lane" parent="hv" -->',
-                                "",
-                            ].join("\n"),
-                        )
-                    }
-                    onEventChosen={(plotNode) => chosen.push(plotNode)}
-                />,
-            );
-        });
+        await mountTheGraph(
+            [
+                '<!-- cell: place id="hv" title="Hollowmere" parent="en" -->',
+                '<!-- cell: place id="hg" title="Harrowgate" -->',
+                '<!-- cell: place id="en" title="England" -->',
+                '<!-- cell: place id="ln" title="The lane" parent="hv" -->',
+                "",
+            ].join("\n"),
+        );
         await click([...document.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === "Places")!);
 
         const rails = [...document.querySelectorAll<HTMLElement>(".author-file-editor-story-graph-rail")].map(

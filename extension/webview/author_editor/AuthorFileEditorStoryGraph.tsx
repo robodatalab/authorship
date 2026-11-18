@@ -3,6 +3,7 @@ import { CharacterCell } from "authordoc/cells/character_cell";
 import { PlaceCell } from "authordoc/cells/place_cell";
 import type { Document } from "authordoc/storydoc";
 import { placesNestedIn } from "../../vscode_runtime/place_hierarchy";
+import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import {
     StoryGraphLayout,
     type StoryGraphBox,
@@ -65,20 +66,38 @@ const STORY_GRAPH_VIEWS = [PLOTS_VIEW, CHARACTERS_VIEW, PLACES_VIEW];
 
 interface AuthorFileEditorStoryGraphProps {
     story: Document;
+    plotEventSelected: StoryAnnotationSelected;
     onEventChosen: (plotNode: StoryGraphPlotNode) => void;
 }
 
 export function AuthorFileEditorStoryGraph({
     story,
+    plotEventSelected,
     onEventChosen,
 }: AuthorFileEditorStoryGraphProps) {
     const [viewShown, showTheView] = useState(PLOTS_VIEW);
     const arrowheadId = useId();
+    const arrowheadOfTheSelectedEventId = useId();
     const layout = useMemo(() => {
         const rails = viewShown.railsOf(story);
         const laidOut = new StoryGraphLayout(story, rails, viewShown.railIdsOf);
         return laidOut;
     }, [story, viewShown]);
+    const eventSelected = layout.events.find((event) =>
+        event.plotNodes.some(
+            (plotNode) =>
+                plotNode.plotId === plotEventSelected.annotationCellId &&
+                plotNode.nodeId === plotEventSelected.passageId,
+        ),
+    );
+    const eventIdSelected = eventSelected?.eventId ?? null;
+    const arrowsOfTheSelectedEvent = layout.arrows.filter(
+        (arrow) =>
+            arrow.fromEventId === eventIdSelected || arrow.toEventId === eventIdSelected,
+    );
+    const arrowsOfOtherEvents = layout.arrows.filter(
+        (arrow) => !arrowsOfTheSelectedEvent.includes(arrow),
+    );
 
     function chooseTheEvent(box: StoryGraphBox): void {
         const event = layout.events.find((laidOut) => laidOut.eventId === box.eventId)!;
@@ -149,6 +168,7 @@ export function AuthorFileEditorStoryGraph({
                         <defs>
                             <marker
                                 id={arrowheadId}
+                                className="author-file-editor-story-graph-arrowhead"
                                 viewBox="0 0 10 10"
                                 refX="10"
                                 refY="5"
@@ -158,8 +178,20 @@ export function AuthorFileEditorStoryGraph({
                             >
                                 <path d="M 0 0 L 10 5 L 0 10 z" />
                             </marker>
+                            <marker
+                                id={arrowheadOfTheSelectedEventId}
+                                className="author-file-editor-story-graph-arrowhead-of-the-selected-event"
+                                viewBox="0 0 10 10"
+                                refX="10"
+                                refY="5"
+                                markerWidth="4"
+                                markerHeight="4"
+                                orient="auto-start-reverse"
+                            >
+                                <path d="M 0 0 L 10 5 L 0 10 z" />
+                            </marker>
                         </defs>
-                        {layout.arrows.map((arrow, drawn) => (
+                        {arrowsOfOtherEvents.map((arrow, drawn) => (
                             <path
                                 key={`${arrow.fromEventId}>${arrow.toEventId}#${drawn}`}
                                 className="author-file-editor-story-graph-arrow"
@@ -167,12 +199,24 @@ export function AuthorFileEditorStoryGraph({
                                 markerEnd={`url(#${arrowheadId})`}
                             />
                         ))}
+                        {arrowsOfTheSelectedEvent.map((arrow, drawn) => (
+                            <path
+                                key={`${arrow.fromEventId}>${arrow.toEventId}#${drawn}`}
+                                className="author-file-editor-story-graph-arrow author-file-editor-story-graph-arrow-of-the-selected-event"
+                                d={arrow.path}
+                                markerEnd={`url(#${arrowheadOfTheSelectedEventId})`}
+                            />
+                        ))}
                     </svg>
                     {layout.boxes.map((box) => (
                         <button
                             key={`${box.eventId}#${box.railId}`}
                             type="button"
-                            className="author-file-editor-story-graph-event"
+                            className={
+                                box.eventId === eventIdSelected
+                                    ? "author-file-editor-story-graph-event author-file-editor-story-graph-event-selected"
+                                    : "author-file-editor-story-graph-event"
+                            }
                             style={{
                                 left: box.left,
                                 top: box.top,
