@@ -55,6 +55,28 @@ body {
         var(--vscode-widget-border, var(--vscode-panel-border, transparent));
 }
 
+.author-file-editor-pane-tabs {
+    display: flex;
+    gap: 12px;
+}
+
+.author-file-editor-pane-tab {
+    padding: 0;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: none;
+    border-bottom: 1px solid transparent;
+    cursor: pointer;
+}
+
+.author-file-editor-pane-tab[aria-selected="true"] {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder);
+}
+
 .author-file-editor-pane > ul {
     overflow-y: auto;
     padding: 6px 12px 40vh;

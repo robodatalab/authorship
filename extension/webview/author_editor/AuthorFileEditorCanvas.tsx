@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
+import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
 import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
@@ -56,6 +57,8 @@ const NARROWEST_PANE_PX = 160;
 
 const MANUSCRIPT_PANE = "Manuscript";
 const METADATA_PANE = "Metadata";
+const STORY_GRAPH = "Graph";
+const WHAT_THE_METADATA_PANE_SHOWS = [METADATA_PANE, STORY_GRAPH];
 const KINDS_IN_THE_METADATA_PANE = new Set([
     PLOT,
     SALIENT_CONCEPT,
@@ -307,6 +310,7 @@ export function AuthorFileEditorCanvas({
     }
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
+    const [metadataPaneShows, showInTheMetadataPane] = useState(METADATA_PANE);
     const metadataOnThePage = useRef<HTMLUListElement>(null);
     const canvasDrawn = useRef<HTMLDivElement>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<
@@ -657,10 +661,28 @@ export function AuthorFileEditorCanvas({
                     className="author-file-editor-pane author-file-editor-metadata-pane"
                     aria-label={METADATA_PANE}
                 >
-                    <h2 className="author-file-editor-pane-title">
-                        {METADATA_PANE}
-                    </h2>
-                    {cellsInScope(sections, null, METADATA_PANE)}
+                    <div
+                        className="author-file-editor-pane-title author-file-editor-pane-tabs"
+                        role="tablist"
+                    >
+                        {WHAT_THE_METADATA_PANE_SHOWS.map((shown) => (
+                            <button
+                                key={shown}
+                                type="button"
+                                role="tab"
+                                className="author-file-editor-pane-tab"
+                                aria-selected={shown === metadataPaneShows}
+                                onClick={() => showInTheMetadataPane(shown)}
+                            >
+                                {shown}
+                            </button>
+                        ))}
+                    </div>
+                    {metadataPaneShows === METADATA_PANE ? (
+                        cellsInScope(sections, null, METADATA_PANE)
+                    ) : (
+                        <AuthorFileEditorStoryGraph story={storyDocument} />
+                    )}
                 </section>
                 <div
                     className="author-file-editor-pane-splitter"

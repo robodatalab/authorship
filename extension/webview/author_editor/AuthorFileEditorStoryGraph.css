@@ -1,0 +1,99 @@
+.author-file-editor-story-graph {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+}
+
+.author-file-editor-story-graph-views {
+    display: flex;
+    gap: 4px;
+    padding: 6px 12px;
+}
+
+.author-file-editor-story-graph-view {
+    padding: 3px 10px;
+    font: inherit;
+    color: var(--vscode-descriptionForeground);
+    background: none;
+    border: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.author-file-editor-story-graph-view[aria-selected="true"] {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+}
+
+.author-file-editor-story-graph-chart {
+    overflow: auto;
+    padding: 0 12px 12px;
+}
+
+.author-file-editor-story-graph-drawn {
+    position: relative;
+}
+
+.author-file-editor-story-graph-moment {
+    position: absolute;
+    top: 6px;
+    transform: translateX(-50%);
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-graph-rail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    border: 1px solid
+        var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+    border-radius: 8px;
+}
+
+.author-file-editor-story-graph-rail-title {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    width: 120px;
+    overflow: hidden;
+    transform: translateY(-50%);
+    font-size: 0.9em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.author-file-editor-story-graph-arrows {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.author-file-editor-story-graph-arrows marker path {
+    fill: var(--vscode-foreground);
+}
+
+.author-file-editor-story-graph-arrow {
+    fill: none;
+    stroke: var(--vscode-foreground);
+    stroke-width: 1.2;
+    opacity: 0.7;
+}
+
+.author-file-editor-story-graph-event {
+    position: absolute;
+    box-sizing: border-box;
+    padding: 0 8px;
+    overflow: hidden;
+    font-size: 0.9em;
+    line-height: 30px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-foreground);
+    border-radius: 6px;
+}

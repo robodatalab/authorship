@@ -1709,14 +1709,54 @@ describe("the metadata and the manuscript panes", () => {
         );
     }
 
-    it("labels the metadata pane on the left and the manuscript pane on the right", async () => {
+    it("labels the metadata pane on the left, with the graph beside it, and the manuscript pane on the right", async () => {
         await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
 
-        const titles = [
-            ...document.querySelectorAll(".author-file-editor-pane-title"),
-        ].map((title) => title.textContent);
+        const metadataTabs = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].map((tab) => [tab.textContent, tab.getAttribute("aria-selected")]);
+        const manuscriptTitle = document.querySelector(
+            ".author-file-editor-manuscript-pane .author-file-editor-pane-title",
+        )?.textContent;
 
-        expect(titles).toEqual(["Metadata", "Manuscript"]);
+        expect([metadataTabs, manuscriptTitle]).toEqual([
+            [
+                ["Metadata", "true"],
+                ["Graph", "false"],
+            ],
+            "Manuscript",
+        ]);
+    });
+
+    it.each([
+        ["Metadata", ["p1", "k1"], false],
+        ["Graph", [], true],
+    ])("shows in the metadata pane, once %s is chosen, its cells or the graph", async (chosen, cellsShown, graphShown) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+        const tab = [
+            ...document.querySelectorAll(
+                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+            ),
+        ].find((drawn) => drawn.textContent === chosen)!;
+
+        await click(tab);
+
+        const graph = document.querySelector(
+            ".author-file-editor-metadata-pane .author-file-editor-story-graph",
+        );
+        expect([cellsDrawnIn(".author-file-editor-metadata-pane"), graph !== null]).toEqual([
+            cellsShown,
+            graphShown,
+        ]);
     });
 
     it.each([
