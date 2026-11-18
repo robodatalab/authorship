@@ -4,6 +4,7 @@ import {
     AuthorFileEditorCellHeaderTitle,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    AuthorFileEditorCellCard,
     useAuthorFileEditorCellFindHighlights,
     useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
@@ -53,20 +54,24 @@ export function AuthorFileEditorCharacterCell({
                 <AuthorFileEditorCellHeaderTitle title={cell.title} />
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                <AuthorFileEditorCellFields fields={fields} />
-                <MarkdownEditor
-                    cellId={cell.uniqueId}
-                    highlights={findHighlights}
-                    markdown={cell.source}
-                    timesTheHostWroteIt={timesTheHostWroteIt}
-                    onMarkdownCommitted={(backstory) =>
-                        sayTheAuthorTypedInTheCell(
-                            sendMessagesToVscode,
-                            cell.uniqueId,
-                            backstory,
-                        )
-                    }
-                />
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellFields fields={fields} />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <MarkdownEditor
+                        cellId={cell.uniqueId}
+                        highlights={findHighlights}
+                        markdown={cell.source}
+                        timesTheHostWroteIt={timesTheHostWroteIt}
+                        onMarkdownCommitted={(backstory) =>
+                            sayTheAuthorTypedInTheCell(
+                                sendMessagesToVscode,
+                                cell.uniqueId,
+                                backstory,
+                            )
+                        }
+                    />
+                </AuthorFileEditorCellCard>
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

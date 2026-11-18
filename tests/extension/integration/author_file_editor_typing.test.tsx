@@ -171,7 +171,7 @@ async function settle(): Promise<void> {
 async function openTheCellForTyping(): Promise<void> {
     await act(async () => {
         document
-            .querySelector(".markdown-rendered")
+            .querySelector(".author-file-editor-manuscript-pane .markdown-rendered")
             ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     });
 }

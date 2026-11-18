@@ -207,7 +207,7 @@ function insertMenus(): Element[] {
 
 function listItems(): Element[] {
     return [
-        ...document.querySelectorAll(".author-file-editor-canvas > ul > li"),
+        ...document.querySelectorAll(".author-file-editor-manuscript-pane > ul > li"),
     ];
 }
 
@@ -1676,7 +1676,7 @@ describe("the plots the story weaves", () => {
             ).mockReturnValue(400);
             await mountTheStoryOfTheDoor({});
             const story = document.querySelector(
-                ".author-file-editor-canvas > ul",
+                ".author-file-editor-manuscript-pane > ul",
             )!;
 
             scrolledTo.mockReturnValue(600);
@@ -1689,7 +1689,7 @@ describe("the plots the story weaves", () => {
     });
 });
 
-describe("the manuscript and the metadata tabs", () => {
+describe("the metadata and the manuscript panes", () => {
     const DRAWN_BY_THEIR_IDS: CellDrawings = {
         markdown: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
         plot: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
@@ -1700,74 +1700,45 @@ describe("the manuscript and the metadata tabs", () => {
         place: (cell) => <div className="test-cell">{cell.uniqueId}</div>,
     };
 
-    function cellsDrawn(): (string | null)[] {
-        return [...document.querySelectorAll(".test-cell")].map(
+    function cellsDrawnIn(pane: string): (string | null)[] {
+        return [...document.querySelectorAll(`${pane} .test-cell`)].map(
             (drawn) => drawn.textContent,
         );
     }
 
-    function tabs(): Element[] {
-        return [...document.querySelectorAll('[role="tab"]')];
-    }
-
-    it("draws the manuscript first", async () => {
-        await mountCanvas({
-            cells: [
-                markdownCell("Once", "m1"),
-                new PlotCell("Bell", [], [], "", false, null, "p1"),
-                markdownCell("Twice", "m2"),
-                new SalientConceptCell("Door", [], "", false, null, "k1"),
-                new CharacterCell("Varn", "", false, null, "v1"),
-                new PlaceCell("The hall", "", false, null, "h1"),
-            ],
-            cellDrawings: DRAWN_BY_THEIR_IDS,
-        });
-
-        expect(cellsDrawn()).toEqual(["m1", "m2"]);
-    });
-
-    it.each([
-        ["Manuscript", ["m1", "m2"]],
-        ["Metadata", ["p1", "k1", "v1", "h1"]],
-    ])("draws the cells the %s tab holds once it is chosen", async (tabChosen, expected) => {
-        await mountCanvas({
-            cells: [
-                markdownCell("Once", "m1"),
-                new PlotCell("Bell", [], [], "", false, null, "p1"),
-                markdownCell("Twice", "m2"),
-                new SalientConceptCell("Door", [], "", false, null, "k1"),
-                new CharacterCell("Varn", "", false, null, "v1"),
-                new PlaceCell("The hall", "", false, null, "h1"),
-            ],
-            cellDrawings: DRAWN_BY_THEIR_IDS,
-        });
-
-        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
-        await click(tab);
-
-        expect(cellsDrawn()).toEqual(expected);
-    });
-
-    it("marks the tab shown as selected", async () => {
+    it("labels the metadata pane on the left and the manuscript pane on the right", async () => {
         await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
 
-        await click(tabs()[1]);
+        const titles = [
+            ...document.querySelectorAll(".author-file-editor-pane-title"),
+        ].map((title) => title.textContent);
 
-        expect(
-            tabs().map((tab) => [
-                tab.textContent,
-                tab.getAttribute("aria-selected"),
-            ]),
-        ).toEqual([
-            ["Manuscript", "false"],
-            ["Metadata", "true"],
-        ]);
+        expect(titles).toEqual(["Metadata", "Manuscript"]);
     });
 
     it.each([
-        ["Manuscript", ["markdown", "chapter"]],
-        ["Metadata", ["plot", "salient-concept", "character", "place"]],
-    ])("offers the kinds the %s tab holds", async (tabChosen, expected) => {
+        [".author-file-editor-metadata-pane", ["p1", "k1", "v1", "h1"]],
+        [".author-file-editor-manuscript-pane", ["m1", "m2"]],
+    ])("draws in %s the cells it holds", async (pane, expected) => {
+        await mountCanvas({
+            cells: [
+                markdownCell("Once", "m1"),
+                new PlotCell("Bell", [], [], "", false, null, "p1"),
+                markdownCell("Twice", "m2"),
+                new SalientConceptCell("Door", [], "", false, null, "k1"),
+                new CharacterCell("Varn", "", false, null, "v1"),
+                new PlaceCell("The hall", "", false, null, "h1"),
+            ],
+            cellDrawings: DRAWN_BY_THEIR_IDS,
+        });
+
+        expect(cellsDrawnIn(pane)).toEqual(expected);
+    });
+
+    it.each([
+        [".author-file-editor-metadata-pane", ["plot", "salient-concept", "character", "place"]],
+        [".author-file-editor-manuscript-pane", ["markdown", "chapter"]],
+    ])("offers in %s the kinds it holds", async (pane, expected) => {
         await mountCanvas({
             cellTypes: [
                 cellType("markdown", "primary"),
@@ -1780,28 +1751,99 @@ describe("the manuscript and the metadata tabs", () => {
             cellDrawings: DRAWN_BY_THEIR_IDS,
         });
 
-        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
-        await click(tab);
-
-        expect(
-            [...insertMenus()[0].querySelectorAll("button")].map(
-                (button) => button.textContent,
+        const offered = [
+            ...document.querySelectorAll(
+                `${pane} .author-file-editor-insert-cell-menu button`,
             ),
-        ).toEqual(expected);
+        ].map((button) => button.textContent);
+
+        expect(offered).toEqual(expected);
+    });
+
+    describe("the splitter between them", () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        function canvasDrawnFrom20To1020(): void {
+            vi.spyOn(
+                HTMLElement.prototype,
+                "getBoundingClientRect",
+            ).mockReturnValue({ left: 20, width: 1000 } as DOMRect);
+        }
+
+        async function drag(clientXs: number[]): Promise<void> {
+            const splitter = document.querySelector('[role="separator"]')!;
+            await act(async () => {
+                splitter.dispatchEvent(
+                    new MouseEvent("pointerdown", { bubbles: true }),
+                );
+            });
+            for (const clientX of clientXs) {
+                await act(async () => {
+                    document.dispatchEvent(
+                        new MouseEvent("pointermove", { clientX }),
+                    );
+                });
+            }
+        }
+
+        function columns(): string {
+            const canvas = document.querySelector<HTMLElement>(
+                ".author-file-editor-canvas",
+            )!;
+            return canvas.style.gridTemplateColumns;
+        }
+
+        it.each([
+            ["where it is dragged to", 320, "300px auto minmax(0, 1fr) auto"],
+            ["no narrower than the narrowest pane", 50, "160px auto minmax(0, 1fr) auto"],
+            ["no wider than leaves the manuscript the narrowest pane", 1000, "840px auto minmax(0, 1fr) auto"],
+        ])("makes the metadata pane %s", async (_, clientX, expected) => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+            canvasDrawnFrom20To1020();
+
+            await drag([clientX]);
+
+            expect(columns()).toBe(expected);
+        });
+
+        it("stops resizing the panes once it is let go", async () => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+            canvasDrawnFrom20To1020();
+            await drag([320]);
+
+            await act(async () => {
+                document.dispatchEvent(new MouseEvent("pointerup"));
+            });
+            await act(async () => {
+                document.dispatchEvent(
+                    new MouseEvent("pointermove", { clientX: 500 }),
+                );
+            });
+
+            expect(columns()).toBe("300px auto minmax(0, 1fr) auto");
+        });
+
+        it("leaves the panes as wide as they are drawn until it is dragged", async () => {
+            await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+            expect(columns()).toBe("");
+        });
+    });
+
+    it("draws no menu in a pane that holds none of the kinds offered", async () => {
+        await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
+
+        const menus = document.querySelectorAll(
+            ".author-file-editor-metadata-pane .author-file-editor-insert-cell-menu",
+        );
+
+        expect(menus.length).toBe(0);
     });
 
     it.each([
-        [
-            "the manuscript",
-            "Manuscript",
-            ["m1", "m2", "p1"],
-        ],
-        [
-            "the metadata",
-            "Metadata",
-            ["p1", "k1", null],
-        ],
-    ])("inserts on %s tab before what follows each menu", async (_case, tabChosen, expected) => {
+        [".author-file-editor-metadata-pane", ["p1", "k1", null]],
+        [".author-file-editor-manuscript-pane", ["m1", "m2", "p1"]],
+    ])("inserts in %s before what follows each menu", async (pane, expected) => {
         await mountCanvas({
             cells: [
                 markdownCell("Once", "m1"),
@@ -1815,10 +1857,10 @@ describe("the manuscript and the metadata tabs", () => {
             ],
             cellDrawings: DRAWN_BY_THEIR_IDS,
         });
-        const tab = tabs().find((drawn) => drawn.textContent === tabChosen)!;
-        await click(tab);
 
-        for (const menu of insertMenus()) {
+        for (const menu of document.querySelectorAll(
+            `${pane} .author-file-editor-insert-cell-menu`,
+        )) {
             await click(menu.querySelector("button")!);
         }
 
@@ -1827,47 +1869,5 @@ describe("the manuscript and the metadata tabs", () => {
                 (invocation) => invocation.commandArguments.beforeCellId,
             ),
         ).toEqual(expected);
-    });
-
-    it("goes back to the manuscript when the host shows its words", async () => {
-        const cells = [
-            markdownCell("Once", "m1"),
-            new PlotCell("Bell", [], [], "", false, null, "p1"),
-        ];
-        document.body.innerHTML = "";
-        const container = document.createElement("div");
-        document.body.append(container);
-        const root = createRoot(container);
-        await act(async () => {
-            root.render(
-                <AuthorFileEditorCanvas
-                    cells={cells}
-                    commands={[INSERT_COMMAND]}
-                    cellTypes={[]}
-                    sendMessagesToVscode={() => undefined}
-                    cellRenderer={new CellsDrawnAs(DRAWN_BY_THEIR_IDS)}
-                />,
-            );
-        });
-        await click(tabs()[1]);
-
-        await act(async () => {
-            root.render(
-                <AuthorFileEditorCanvas
-                    cells={cells}
-                    commands={[INSERT_COMMAND]}
-                    cellTypes={[]}
-                    sendMessagesToVscode={() => undefined}
-                    cellRenderer={new CellsDrawnAs(DRAWN_BY_THEIR_IDS)}
-                    storyTextShown={{
-                        cellId: "m1",
-                        startCharacterOffsetInCell: 0,
-                        endCharacterOffsetInCell: 4,
-                    }}
-                />,
-            );
-        });
-
-        expect(cellsDrawn()).toEqual(["m1"]);
     });
 });

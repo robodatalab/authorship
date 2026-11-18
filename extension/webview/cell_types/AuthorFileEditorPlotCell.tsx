@@ -4,6 +4,7 @@ import {
     AuthorFileEditorCellHeaderTitle,
     AuthorFileEditorCellBody,
     AuthorFileEditorCellFooter,
+    AuthorFileEditorCellCard,
     useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
@@ -44,16 +45,20 @@ export function AuthorFileEditorPlotCell({
                 <AuthorFileEditorCellHeaderTitle title={cell.title} />
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
-                <AuthorFileEditorCellFields fields={fields} />
-                <MarkdownEditor
-                    cellId={cell.uniqueId}
-                    markdown={cell.overview}
-                    timesTheHostWroteIt={timesTheHostWroteIt}
-                    onMarkdownCommitted={(overview) => {
-                        const overviewed = cell.withOverview(overview);
-                        replaceTheCell(sendMessagesToVscode, overviewed);
-                    }}
-                />
+                <AuthorFileEditorCellCard>
+                    <AuthorFileEditorCellFields fields={fields} />
+                </AuthorFileEditorCellCard>
+                <AuthorFileEditorCellCard>
+                    <MarkdownEditor
+                        cellId={cell.uniqueId}
+                        markdown={cell.overview}
+                        timesTheHostWroteIt={timesTheHostWroteIt}
+                        onMarkdownCommitted={(overview) => {
+                            const overviewed = cell.withOverview(overview);
+                            replaceTheCell(sendMessagesToVscode, overviewed);
+                        }}
+                    />
+                </AuthorFileEditorCellCard>
             </AuthorFileEditorCellBody>
             <AuthorFileEditorCellFooter></AuthorFileEditorCellFooter>
         </AuthorFileEditorCell>

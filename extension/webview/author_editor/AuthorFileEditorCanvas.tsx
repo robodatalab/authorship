@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
@@ -52,19 +52,21 @@ import "./AuthorFileEditorCanvas.css";
 const CELL_BUTTON_GROUP = "cell";
 const INSERT_BUTTON_GROUP = "insert";
 const PRIMARY_INSERT_MENU_GROUP = "primary";
+const NARROWEST_PANE_PX = 160;
 
-const MANUSCRIPT_TAB = "Manuscript";
-const METADATA_TAB = "Metadata";
-const AUTHOR_FILE_EDITOR_TABS = [MANUSCRIPT_TAB, METADATA_TAB];
-const KINDS_ON_THE_METADATA_TAB = new Set([
+const MANUSCRIPT_PANE = "Manuscript";
+const METADATA_PANE = "Metadata";
+const KINDS_IN_THE_METADATA_PANE = new Set([
     PLOT,
     SALIENT_CONCEPT,
     CHARACTER,
     PLACE,
 ]);
 
-function tabHoldingTheKind(kind: string): string {
-    return KINDS_ON_THE_METADATA_TAB.has(kind) ? METADATA_TAB : MANUSCRIPT_TAB;
+function paneHoldingTheKind(kind: string): string {
+    return KINDS_IN_THE_METADATA_PANE.has(kind)
+        ? METADATA_PANE
+        : MANUSCRIPT_PANE;
 }
 
 export interface WebviewAuthorDocumentCommandCard {
@@ -305,17 +307,39 @@ export function AuthorFileEditorCanvas({
     }
 
     const cellsOnThePage = useRef<HTMLUListElement>(null);
-    const [cellIdInView, setCellIdInView] = useState<string>();
-    const [tabShown, showTheTab] = useState(MANUSCRIPT_TAB);
-    const cellTypesOnTheTab = cellTypes.filter(
-        (cellType) => tabHoldingTheKind(cellType.cellKind) === tabShown,
-    );
+    const canvasDrawn = useRef<HTMLDivElement>(null);
+    const [metadataPaneWidth, resizeTheMetadataPane] = useState<
+        number | null
+    >(null);
+    const columnsOfThePanesResized =
+        metadataPaneWidth === null
+            ? undefined
+            : `${metadataPaneWidth}px auto minmax(0, 1fr) auto`;
 
-    useEffect(() => {
-        if (storyTextShown) {
-            showTheTab(MANUSCRIPT_TAB);
+    function resizeThePanesAsTheSplitterIsDragged(
+        pressed: ReactPointerEvent<HTMLDivElement>,
+    ): void {
+        const canvas = canvasDrawn.current;
+        if (!canvas) {
+            return;
         }
-    }, [storyTextShown]);
+        pressed.preventDefault();
+        const canvasDrawnAt = canvas.getBoundingClientRect();
+        const widest = canvasDrawnAt.width - NARROWEST_PANE_PX;
+        const followThePointer = (moved: PointerEvent): void => {
+            const reached = moved.clientX - canvasDrawnAt.left;
+            const notNarrower = Math.max(reached, NARROWEST_PANE_PX);
+            const width = Math.min(notNarrower, widest);
+            resizeTheMetadataPane(width);
+        };
+        const letGo = (): void => {
+            document.removeEventListener("pointermove", followThePointer);
+            document.removeEventListener("pointerup", letGo);
+        };
+        document.addEventListener("pointermove", followThePointer);
+        document.addEventListener("pointerup", letGo);
+    }
+    const [cellIdInView, setCellIdInView] = useState<string>();
 
     const find = useAuthorFileEditorFind(
         findMatches,
@@ -364,7 +388,7 @@ export function AuthorFileEditorCanvas({
             watching.observe(drawn);
         }
         return () => watching.disconnect();
-    }, [sections, tabShown]);
+    }, [sections]);
 
     function everyCellIsDrawnOn(
         command: WebviewAuthorDocumentCommandCard,
@@ -409,11 +433,20 @@ export function AuthorFileEditorCanvas({
             scrolled.clientHeight / 2;
     }
 
-    function insertCellMenu(insertBeforeCellId: string | null): ReactNode {
+    function insertCellMenu(
+        insertBeforeCellId: string | null,
+        pane: string,
+    ): ReactNode {
+        const cellTypesInThePane = cellTypes.filter(
+            (cellType) => paneHoldingTheKind(cellType.cellKind) === pane,
+        );
+        if (cellTypesInThePane.length === 0) {
+            return null;
+        }
         return (
             <AuthorFileEditorInsertCellMenu
                 insertCommand={insertCommand}
-                cellTypes={cellTypesOnTheTab}
+                cellTypes={cellTypesInThePane}
                 insertBeforeCellId={insertBeforeCellId}
                 sendMessagesToVscode={sendMessagesToVscode}
             />
@@ -423,20 +456,24 @@ export function AuthorFileEditorCanvas({
     function cellsInScope(
         sections: CellsInASection<Cell>[],
         whatFollowsTheScope: string | null,
+        pane: string,
         scopeClassName?: string,
     ): ReactNode {
-        const sectionsOnTheTab = sections.filter(
-            (section) => tabHoldingTheKind(section.cell.kind) === tabShown,
+        const sectionsInThePane = sections.filter(
+            (section) => paneHoldingTheKind(section.cell.kind) === pane,
         );
+        const scrolledByTheRuler =
+            scopeClassName === undefined && pane === MANUSCRIPT_PANE;
         return (
             <ul
                 className={scopeClassName}
-                ref={scopeClassName ? undefined : cellsOnThePage}
+                ref={scrolledByTheRuler ? cellsOnThePage : undefined}
             >
                 <li>
                     {insertCellMenu(
-                        sectionsOnTheTab[0]?.cell.uniqueId ??
+                        sectionsInThePane[0]?.cell.uniqueId ??
                             whatFollowsTheScope,
+                        pane,
                     )}
                 </li>
                 {sections.map((section, sectionIndex) => {
@@ -444,7 +481,7 @@ export function AuthorFileEditorCanvas({
                     const whatFollowsTheSection =
                         sections[sectionIndex + 1]?.cell.uniqueId ??
                         whatFollowsTheScope;
-                    if (!sectionsOnTheTab.includes(section)) {
+                    if (!sectionsInThePane.includes(section)) {
                         return null;
                     }
                     const cellDrawn = cell.accept<ReactNode>(cellRenderer);
@@ -533,6 +570,7 @@ export function AuthorFileEditorCanvas({
                                 ? cellsInScope(
                                       section.within,
                                       whatFollowsTheSection,
+                                      pane,
                                       scopeOf(
                                           cell,
                                           !sections
@@ -544,7 +582,7 @@ export function AuthorFileEditorCanvas({
                                               ),
                                       ),
                                   )
-                                : insertCellMenu(whatFollowsTheSection)}
+                                : insertCellMenu(whatFollowsTheSection, pane)}
                         </li>
                     );
                 })}
@@ -553,25 +591,15 @@ export function AuthorFileEditorCanvas({
     }
 
     return (
-        <div className="author-file-editor-canvas">
+        <div
+            className="author-file-editor-canvas"
+            ref={canvasDrawn}
+            style={{ gridTemplateColumns: columnsOfThePanesResized }}
+        >
             <AuthorFileEditorMainMenu
                 commands={mainMenuCommands}
                 sendMessagesToVscode={sendMessagesToVscode}
             >
-                <div className="author-file-editor-tabs" role="tablist">
-                    {AUTHOR_FILE_EDITOR_TABS.map((tab) => (
-                        <button
-                            key={tab}
-                            type="button"
-                            role="tab"
-                            className="author-file-editor-tab"
-                            aria-selected={tab === tabShown}
-                            onClick={() => showTheTab(tab)}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
                 <AuthorFileEditorPartAndChapterInView
                     cells={cells}
                     cellIdInView={cellIdInView}
@@ -588,14 +616,36 @@ export function AuthorFileEditorCanvas({
                     sendMessagesToVscode({ type: "editing", cellId })
                 }
             >
-                {cellsInScope(sections, null)}
-                {tabShown === MANUSCRIPT_TAB && (
-                    <AuthorFileEditorOverviewRuler
-                        scrolledList={cellsOnThePage}
-                        marks={whatTheOverviewRulerShows.marks}
-                        arrows={whatTheOverviewRulerShows.arrows}
-                    />
-                )}
+                <section
+                    className="author-file-editor-pane author-file-editor-metadata-pane"
+                    aria-label={METADATA_PANE}
+                >
+                    <h2 className="author-file-editor-pane-title">
+                        {METADATA_PANE}
+                    </h2>
+                    {cellsInScope(sections, null, METADATA_PANE)}
+                </section>
+                <div
+                    className="author-file-editor-pane-splitter"
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Drag to resize the metadata and manuscript panes"
+                    onPointerDown={resizeThePanesAsTheSplitterIsDragged}
+                />
+                <section
+                    className="author-file-editor-pane author-file-editor-manuscript-pane"
+                    aria-label={MANUSCRIPT_PANE}
+                >
+                    <h2 className="author-file-editor-pane-title">
+                        {MANUSCRIPT_PANE}
+                    </h2>
+                    {cellsInScope(sections, null, MANUSCRIPT_PANE)}
+                </section>
+                <AuthorFileEditorOverviewRuler
+                    scrolledList={cellsOnThePage}
+                    marks={whatTheOverviewRulerShows.marks}
+                    arrows={whatTheOverviewRulerShows.arrows}
+                />
             </MarkdownEditorMediator>
         </div>
     );
