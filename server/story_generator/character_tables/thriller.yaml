@@ -85,144 +85,144 @@ motivation:
   - protecting someone
 traits:
   temperament:
-    - cool under pressure
-    - paranoid and meticulous
-    - cocky and fast-talking
-    - stoic and sparing with words
-    - intense and relentlessly driven
-    - volatile and dangerous when cornered
-    - methodical and patient
-    - idealistic and stubborn
-    - ruthless and charming
-    - jittery and quick-thinking
-    - cynical and darkly funny
-    - disciplined and humourless
-    - affable and hard to read
-    - hot-headed and impulsive
-    - smooth and manipulative
+    - cool-headed
+    - paranoid
+    - cocky
+    - stoic
+    - driven
+    - volatile
+    - methodical
+    - idealistic
+    - ruthless
+    - jittery
+    - cynical
+    - disciplined
+    - affable
+    - hot-headed
+    - manipulative
   quirk:
-    - clocks every exit on entering a room
-    - memorises licence plates without trying
-    - changes phones every week
-    - sleeps with a pistol within reach
-    - speaks five languages and switches mid-sentence
-    - never gives a real name at a hotel
-    - runs ten miles every morning in any weather
-    - drinks only from bottles opened in sight
-    - sketches floor plans on napkins
-    - cracks knuckles before every decision
-    - hums the same pop song when focused
-    - reads people's shoes before their faces
-    - keeps a go-bag packed by the door
-    - chews nicotine gum constantly
-    - taps out messages in Morse on any table
+    - clocks exits
+    - memorises licence plates
+    - burner phones
+    - sleeps armed
+    - switches languages
+    - uses aliases
+    - morning runner
+    - sealed drinks only
+    - sketches floor plans
+    - cracks knuckles
+    - hums pop songs
+    - reads shoes
+    - packed go-bag
+    - nicotine gum
+    - taps Morse code
   flaw:
-    - trusts no one, not even allies
-    - kills too easily
-    - cannot walk away from a fight
-    - hooked on painkillers since an old injury
-    - follows orders without asking why
-    - lies to loved ones as easily as to enemies
-    - obsessive to the point of self-destruction
-    - underestimates anyone who seems ordinary
-    - craves control over every detail
-    - puts the mission above every person
-    - falls for the wrong people at the worst times
-    - escalates every confrontation
+    - distrustful
+    - trigger-happy
+    - brawler
+    - painkiller addict
+    - blindly obedient
+    - liar
+    - obsessive
+    - arrogant
+    - control freak
+    - mission first
+    - falls for wrong people
+    - escalates everything
 background:
   upbringing:
-    - grew up on army bases across three continents
-    - raised in a border town run by cartels
-    - grew up in a gated suburb behind a picture-perfect facade
-    - grew up in a grey apartment block in a former Soviet city
-    - spent childhood in a refugee camp
-    - raised in a hacker squat above a nightclub
-    - grew up in a rust-belt town where the factory closed overnight
-    - raised on a survivalist compound in the mountains
-    - grew up in a casino city where everyone worked an angle
-    - trained at a strict military academy from the age of ten
-    - grew up among the container yards of a busy port
-    - raised in luxury on money no one asked about
+    - army bases
+    - cartel border town
+    - gated suburb
+    - post-Soviet tower block
+    - refugee camp
+    - hacker squat
+    - rust-belt town
+    - survivalist compound
+    - casino city
+    - military academy
+    - container port
+    - laundered luxury
   family:
-    - the child of a spy who never came home
-    - raised by an uncle who kept books for the mob
-    - the estranged child of a senator
-    - the sibling of a bomber who made the headlines
-    - part of a family living in witness protection
-    - a foster kid who aged out with nothing
-    - the child of a decorated general who demanded greatness
-    - the reluctant heir of a crime family
-    - the child of whistleblowers who died in a convenient car crash
-    - the eldest of four, raising the rest since fifteen
-    - the child of a cop on the take
-    - raised by grandparents after both parents went to prison
+    - missing spy parent
+    - mob accountant uncle
+    - senator's estranged child
+    - bomber's sibling
+    - witness protection
+    - aged-out foster kid
+    - general's child
+    - reluctant crime heir
+    - murdered whistleblower parents
+    - raised own siblings
+    - crooked cop parent
+    - parents in prison
   occupation:
-    - a former special forces operator
-    - an intelligence analyst
-    - a defence attorney
-    - an investigative journalist
-    - a hacker for hire
-    - a corporate fixer
-    - a hostage negotiator
-    - a getaway driver
-    - a bodyguard to a billionaire
-    - an FBI field agent
-    - an ER doctor
-    - a private military contractor
-    - an art dealer who launders money
-    - a cryptographer
-    - a homicide detective
-    - a commercial pilot
+    - ex-special forces
+    - intelligence analyst
+    - defence attorney
+    - investigative journalist
+    - hacker for hire
+    - corporate fixer
+    - hostage negotiator
+    - getaway driver
+    - bodyguard
+    - federal agent
+    - emergency doctor
+    - military contractor
+    - crooked art dealer
+    - cryptographer
+    - homicide detective
+    - commercial pilot
   turning point:
-    - framed for an assassination and on the run
-    - witnessed a murder at the top of the government
-    - picked up the wrong bag at an airport
-    - holds a flash drive everyone is willing to kill for
-    - has 48 hours to pay a ransom for a kidnapped loved one
-    - disavowed by the agency in the middle of a mission
-    - betrayed by a partner and left for dead
-    - discovered the employer launders money for terrorists
-    - just received the code word that wakes a long-dormant cover
-    - the last living witness in a federal case
-    - stumbled onto a conspiracy during a routine audit
-    - released from prison owing the wrong people
+    - framed assassin
+    - witnessed government murder
+    - wrong bag
+    - stolen flash drive
+    - kidnapped loved one
+    - disavowed
+    - betrayed by partner
+    - terror-funding employer
+    - sleeper activation
+    - last federal witness
+    - audit conspiracy
+    - owes the wrong people
 looks:
   build:
-    - lean and athletic
-    - built like a boxer
-    - average in every way and easy to forget
-    - tall and long-legged
-    - heavy-shouldered and powerful
-    - slim and catlike
-    - hulking and quiet
-    - sinewy and tense
-    - soft around the middle and deceptively strong
-    - fit and light-footed
+    - athletic
+    - boxer's build
+    - forgettable
+    - long-legged
+    - powerful
+    - catlike
+    - hulking
+    - sinewy
+    - deceptively soft
+    - light-footed
   features:
-    - a bullet scar on one shoulder
-    - a tattoo hastily covered by another
-    - ice-blue eyes that rarely blink
-    - a shaved head
-    - a mangled ear from an old fight
-    - a surgically altered face that still feels unfamiliar
-    - heavily calloused knuckles
-    - a burn scar along the neck
-    - a jagged scar through one eyebrow
-    - a perfect smile that looks rehearsed
-    - sun-damaged skin from years in the desert
-    - a missing fingertip
-    - a prosthetic leg from a roadside bomb
-    - hair dyed a different colour every few weeks
+    - bullet scar
+    - covered tattoo
+    - ice-blue eyes
+    - shaved head
+    - mangled ear
+    - altered face
+    - calloused knuckles
+    - neck burn scar
+    - split eyebrow
+    - rehearsed smile
+    - sun-damaged skin
+    - missing fingertip
+    - prosthetic leg
+    - dyed hair
   style:
-    - dresses in forgettable grey to blend in anywhere
-    - wears a sharp suit that hides a holster
-    - never takes off mirrored sunglasses
-    - wears running shoes with everything
-    - dresses like a tourist on purpose
-    - carries no wallet, no ID and no photos
-    - wears an expensive watch and nothing else of value
-    - moves with the stillness of a trained shooter
-    - wears a leather jacket scuffed from a motorcycle crash
-    - wears cargo trousers with every pocket full
-    - changes appearance to suit every room
-    - wears a baseball cap pulled low against cameras
+    - forgettable grey
+    - sharp suit
+    - mirrored sunglasses
+    - running shoes
+    - tourist disguise
+    - no ID
+    - expensive watch
+    - shooter's stillness
+    - scuffed leather jacket
+    - cargo trousers
+    - chameleon
+    - low baseball cap

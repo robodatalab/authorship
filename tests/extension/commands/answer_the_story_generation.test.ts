@@ -34,29 +34,9 @@ describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => 
         );
     });
 
-    it("restarting runs the stage again on the story as it was before it", async () => {
+    it("rejecting runs the stage again on the story as it was before it", async () => {
         const fetched = vi.fn().mockRejectedValue(new Error("connection refused"));
         vi.stubGlobal("fetch", fetched);
-        keptInTheWorkspace.set("storyGenerationReview:/stories/story.author", {
-            shown: { kind: "editor" },
-            storyBeforeTheStage:
-                '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-        });
-        const session = openStory(THE_STORY_AWAITING_REVIEW);
-
-        await new AnswerTheStoryGenerationCommand().invoke(session, {
-            verdict: "restart",
-        });
-
-        const [, started] = fetched.mock.calls[0];
-        expect(JSON.parse(started.body)).toEqual({
-            path: STORY_FILE,
-            story: '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-            stage: "concept titles",
-        });
-    });
-
-    it("rejecting puts back the story as it was before the stage", async () => {
         keptInTheWorkspace.set("storyGenerationReview:/stories/story.author", {
             shown: { kind: "editor" },
             storyBeforeTheStage:
@@ -68,8 +48,11 @@ describe("AnswerTheStoryGenerationCommand — answers what a stage asks", () => 
             verdict: "reject",
         });
 
-        expect(session.document.text).toBe(
-            '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-        );
+        const [, started] = fetched.mock.calls[0];
+        expect(JSON.parse(started.body)).toEqual({
+            path: STORY_FILE,
+            story: '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
+            stage: "concept titles",
+        });
     });
 });

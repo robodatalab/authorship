@@ -85,144 +85,144 @@ motivation:
   - secrecy
 traits:
   temperament:
-    - observant and reserved
-    - charming and evasive
-    - prim and exacting
-    - gossipy and warm
-    - pompous and easily flustered
-    - cool and unreadable
-    - nosy and good-natured
-    - impatient and brilliant
-    - mild-mannered and meticulous
-    - theatrical and vain
-    - wry and perceptive
-    - anxious and eager to please
-    - genial on the surface, calculating beneath
-    - blunt and plain-spoken
-    - absent-minded and kind
+    - observant
+    - evasive
+    - prim
+    - gossipy
+    - pompous
+    - unreadable
+    - nosy
+    - brilliant
+    - meticulous
+    - theatrical
+    - wry
+    - eager to please
+    - calculating
+    - blunt
+    - absent-minded
   quirk:
-    - jots everything in a tiny leather notebook
-    - polishes spectacles when thinking
-    - quotes poetry at inappropriate moments
-    - never forgets a face but always forgets names
-    - does the crossword in ink every morning
-    - taps a pencil whenever telling a lie
-    - takes tea at precisely four o'clock
-    - straightens crooked pictures in other people's homes
-    - eavesdrops without the slightest shame
-    - carries a magnifying glass and uses it on everything
-    - lapses into French when upset
-    - collects samples of other people's handwriting
-    - always arrives exactly five minutes early
-    - chews on a pipe that is never lit
-    - bets on everything, even the weather
+    - leather notebook
+    - polishes spectacles
+    - quotes poetry
+    - forgets names
+    - crossword in ink
+    - pencil tapper
+    - four o'clock tea
+    - straightens pictures
+    - eavesdropper
+    - magnifying glass
+    - lapses into French
+    - collects handwriting
+    - always early
+    - unlit pipe
+    - bets on everything
   flaw:
-    - cannot keep a secret for long
-    - leaps to conclusions and defends them stubbornly
-    - snobbish about anyone without the right schooling
-    - lies smoothly and often
-    - spends far beyond any means
-    - too proud to admit a mistake
-    - meddles where unwelcome
-    - covets other people's success
-    - turns to blackmail when cornered
-    - trusts charm over evidence
-    - cannot resist reading other people's letters
-    - gossips cruelly behind every back
+    - blabbermouth
+    - jumps to conclusions
+    - snob
+    - liar
+    - spendthrift
+    - too proud
+    - meddler
+    - envious
+    - blackmailer
+    - gullible
+    - snoop
+    - cruel gossip
 background:
   upbringing:
-    - grew up in a crumbling country manor with dwindling servants
-    - raised in a seaside boarding house full of odd lodgers
-    - grew up in a vicarage in a village that lived on gossip
-    - raised in the back rooms of an antiques shop
-    - grew up between embassies abroad
-    - raised above a pub where everyone knew everyone's business
-    - grew up in a crowded city tenement
-    - raised in a respectable household that hid ugly truths
-    - grew up in a railway town where the night trains never stopped
-    - raised in a convent school with strict rules
-    - grew up on a country estate as the gardener's child
-    - grew up in a university town among bickering professors
+    - crumbling manor
+    - seaside boarding house
+    - village vicarage
+    - antiques shop
+    - embassies abroad
+    - village pub
+    - city tenement
+    - respectable facade
+    - railway town
+    - convent school
+    - gardener's cottage
+    - university town
   family:
-    - the poor relation tolerated at every family gathering
-    - raised by a wealthy aunt with firm expectations
-    - the disinherited child of a newspaper magnate
-    - the child of a police inspector killed on duty
-    - the adopted heir resented by every blood relative
-    - the middle child of five, overlooked by all
-    - the child of a famous novelist who put the family in books
-    - stepchild of a parent who remarried for money
-    - one of two siblings who have not spoken in a decade
-    - the sole heir of an eccentric millionaire
-    - the child of a convicted poisoner
-    - raised by a doting widowed parent who never remarried
+    - poor relation
+    - wealthy aunt
+    - disinherited heir
+    - slain inspector's child
+    - resented adopted heir
+    - overlooked middle child
+    - novelist parent
+    - gold-digger stepparent
+    - estranged sibling
+    - millionaire's sole heir
+    - poisoner parent
+    - widowed parent
   occupation:
-    - a village post office clerk
-    - a retired police inspector
-    - a family solicitor
-    - a society columnist
-    - a country doctor
-    - a museum curator
-    - a vicar
-    - a private enquiry agent
-    - a long-serving butler
-    - an insurance investigator
-    - a crossword compiler
-    - an auction house appraiser
-    - a bookshop owner
-    - a forensic accountant
-    - a crime reporter
-    - a hotel concierge
+    - post office clerk
+    - retired inspector
+    - family solicitor
+    - society columnist
+    - country doctor
+    - museum curator
+    - vicar
+    - enquiry agent
+    - butler
+    - insurance investigator
+    - crossword compiler
+    - auction appraiser
+    - bookshop owner
+    - forensic accountant
+    - crime reporter
+    - hotel concierge
   turning point:
-    - found a body in the library and became the prime suspect
-    - invited to a weekend party by a host no guest has met
-    - received a letter from someone presumed dead
-    - stranded in a country house cut off by floodwater
-    - the last person to see the victim alive
-    - hired to find a missing heir who does not want to be found
-    - named in a will that has everyone else furious
-    - framed with forged letters and racing to clear the family name
-    - saw something from a train window that no one believes
-    - returned home after twenty years to a village that kept its secrets
-    - holds the only key to a locked room where a murder happened
-    - asked by a dying client to reopen a closed case
+    - body in the library
+    - mysterious invitation
+    - letter from the dead
+    - flooded in
+    - last to see victim
+    - missing heir
+    - contested will
+    - forged letters
+    - train-window sighting
+    - homecoming
+    - locked-room key
+    - reopened case
 looks:
   build:
-    - plump and bustling
-    - trim and upright
-    - small and birdlike
-    - tall and angular
-    - stout and short-necked
-    - slender and elegant
-    - rangy and loose-limbed
-    - portly and dignified
-    - delicate and fine-boned
-    - square and solid
+    - plump
+    - trim
+    - birdlike
+    - angular
+    - stout
+    - slender
+    - rangy
+    - portly
+    - fine-boned
+    - square
   features:
-    - a monocle worn more for effect than sight
-    - sharp grey eyes that miss nothing
-    - a perpetually raised eyebrow
-    - a scar hidden beneath a high collar
-    - a gold tooth that flashes when smiling
-    - immaculately pomaded hair with not a strand out of place
-    - a face so forgettable no one can describe it
-    - a limp from an old fall nobody discusses
-    - a beauty mark above the lip
-    - half-moon spectacles perched low on the nose
-    - a dimpled chin and an innocent face that disarms everyone
-    - restless hands that are never still
-    - heavy-lidded eyes that look bored and are not
-    - a faint smell of pipe tobacco and peppermint
+    - monocle
+    - sharp grey eyes
+    - raised eyebrow
+    - hidden scar
+    - gold tooth
+    - pomaded hair
+    - forgettable face
+    - limp
+    - beauty mark
+    - half-moon spectacles
+    - innocent face
+    - restless hands
+    - heavy-lidded eyes
+    - smells of peppermint
   style:
-    - wears tweed in all weathers
-    - dresses in impeccable tailoring a decade out of fashion
-    - carries an umbrella, rain or shine
-    - wears a pocket watch and checks it constantly
-    - lives in cardigans with pockets full of sweets
-    - dresses in mourning black for someone never named
-    - wears a hat tipped low over the eyes
-    - dresses loudly to be remembered
-    - dresses plainly to be forgotten
-    - carries a silver-topped cane
-    - always wears gloves, even indoors
-    - moves quietly and lingers in corners
+    - tweed
+    - dated tailoring
+    - umbrella
+    - pocket watch
+    - cardigans
+    - mourning black
+    - low-brimmed hat
+    - loud clothes
+    - plain clothes
+    - silver-topped cane
+    - gloves
+    - lurks in corners

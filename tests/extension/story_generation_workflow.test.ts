@@ -334,45 +334,7 @@ stage: validity: False
     });
 });
 
-describe("StoryGenerationWorkflow.reject — the author rejects what a stage leaves", () => {
-    it("saves the story as it was before the stage, and shows where it left off", async () => {
-        files.set(STORY_FILE, THE_STORY_AWAITING_REVIEW);
-        keptInTheWorkspace.set(
-            THE_REVIEW_KEPT_FOR_THE_STORY,
-            THE_REVIEW_OF_THE_CONCEPTS_KEPT,
-        );
-        const session = openStory(THE_STORY_AWAITING_REVIEW);
-
-        await session.storyGenerationWorkflow.reject();
-
-        expect([
-            files.get(STORY_FILE),
-            session.document.text,
-            keptInTheWorkspace.size,
-        ]).toEqual([LEFT_OFF_AT_THE_CONCEPTS, LEFT_OFF_AT_THE_CONCEPTS, 0]);
-        expect(session.theStoryGeneration).toEqual({
-            running: false,
-            error: null,
-            progress: { steps: [] },
-            stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
-            asked: null,
-        });
-    });
-
-    it("says so, and keeps the story, when the workspace does not keep the story as it was before the stage", async () => {
-        files.set(STORY_FILE, THE_STORY_AWAITING_REVIEW);
-        const session = openStory(THE_STORY_AWAITING_REVIEW);
-
-        await session.storyGenerationWorkflow.reject();
-
-        expect(files.get(STORY_FILE)).toBe(THE_STORY_AWAITING_REVIEW);
-        expect(shownMessages).toEqual([
-            "The story as it was before this stage is not kept in this workspace: accept it, or quit the generation.",
-        ]);
-    });
-});
-
-describe("StoryGenerationWorkflow.restart — the author has a stage run again", () => {
+describe("StoryGenerationWorkflow.reject — the author rejects what a stage leaves, and has it run again", () => {
     it("saves the story as it was before the stage, and runs the stage again on it", async () => {
         files.set(STORY_FILE, THE_STORY_AWAITING_REVIEW);
         const fetched = vi
@@ -389,7 +351,7 @@ describe("StoryGenerationWorkflow.restart — the author has a stage run again",
         );
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
-        await session.storyGenerationWorkflow.restart();
+        await session.storyGenerationWorkflow.reject();
 
         const [startedAt, started] = fetched.mock.calls[0];
         expect([startedAt, JSON.parse(started.body), files.get(STORY_FILE), keptInTheWorkspace.size]).toEqual([
@@ -405,7 +367,7 @@ describe("StoryGenerationWorkflow.restart — the author has a stage run again",
         vi.stubGlobal("fetch", fetched);
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
-        await session.storyGenerationWorkflow.restart();
+        await session.storyGenerationWorkflow.reject();
 
         expect(fetched).not.toHaveBeenCalled();
         expect(shownMessages).toEqual([

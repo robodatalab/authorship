@@ -293,7 +293,7 @@ describe("the story generation under the main menu's tools", () => {
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concepts: review it, edit what you like, then acceptAcceptRejectRestartQuit",
+            "concepts: review it, edit what you like, then acceptAcceptRejectQuit",
         );
     });
 
@@ -323,23 +323,6 @@ describe("the story generation under the main menu's tools", () => {
                 type: "invoke",
                 commandName: "answerTheStoryGeneration",
                 commandArguments: { verdict: "reject" },
-            },
-        ]);
-    });
-
-    it("restarting answers with a restart", async () => {
-        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
-        const restartButton = [...document.querySelectorAll("button")].find(
-            (button) => button.textContent === "Restart",
-        )!;
-
-        await act(async () => restartButton.click());
-
-        expect(posted).toEqual([
-            {
-                type: "invoke",
-                commandName: "answerTheStoryGeneration",
-                commandArguments: { verdict: "restart" },
             },
         ]);
     });

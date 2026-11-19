@@ -175,13 +175,6 @@ export class StoryGenerationWorkflow {
     async reject(): Promise<void> {
         const putBack = await this.putBackTheStoryBeforeTheStage();
         if (putBack) {
-            this.showWhereItLeftOff();
-        }
-    }
-
-    async restart(): Promise<void> {
-        const putBack = await this.putBackTheStoryBeforeTheStage();
-        if (putBack) {
             await this.runTheNextStage();
         }
     }
