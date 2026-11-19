@@ -93,12 +93,12 @@ export function AuthorFileEditorStoryGeneration({
         );
     }
 
-    function whatTheStageDoes(): string {
+    function whatTheStageDoes(): string | null {
         if (asked === null) {
             return "left off here";
         }
         if (asked.shown.kind === "command") {
-            return "use the highlighted button, then continue";
+            return null;
         }
         return "review it, edit what you like, then accept";
     }
@@ -136,7 +136,7 @@ export function AuthorFileEditorStoryGeneration({
             {stageAt !== undefined && (
                 <div className="author-file-editor-story-generation-status">
                     <span className="author-file-editor-story-generation-doing">
-                        {stateOfTheStageAt === "working"
+                        {stateOfTheStageAt === "working" || stageDoes === null
                             ? stageAt.name
                             : `${stageAt.name}: ${stageDoes}`}
                     </span>

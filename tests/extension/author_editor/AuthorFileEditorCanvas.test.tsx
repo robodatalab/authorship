@@ -1948,6 +1948,31 @@ describe("the metadata and the manuscript panes", () => {
         expect(highlighted).toEqual(expected);
     });
 
+    it("points the author at the button that adds the kind the story generation asks for, saying what to do", async () => {
+        await mountCanvas({
+            cellTypes: [cellType("salient-concept", "primary")],
+            storyGeneration: {
+                running: false,
+                error: null,
+                progress: { steps: [] },
+                stages: [{ name: "concept titles", done: false }],
+                asked: {
+                    stage: "concept titles",
+                    story: "",
+                    shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+                },
+            },
+        });
+
+        const bubbles = [
+            ...document.querySelectorAll(".author-file-editor-insert-cell-menu-bubble"),
+        ].map((bubble) => bubble.textContent);
+
+        expect(bubbles).toEqual([
+            "Add every salient-concept your story needs here, then press Continue",
+        ]);
+    });
+
     describe("the cells the story generation asks the author to review", () => {
         afterEach(() => vi.restoreAllMocks());
 

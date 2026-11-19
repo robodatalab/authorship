@@ -275,14 +275,14 @@ describe("the story generation under the main menu's tools", () => {
         expect(status.textContent).toBe("validity38%1/4 [01:20<03:20, 80.00s/it]Quit");
     });
 
-    it("asks the author to use the command shown, then continue or reject", async () => {
+    it("names the stage that asks the author to use the command shown, then continue or reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_THE_CONCEPTS);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concept titles: use the highlighted button, then continueContinueRejectQuit",
+            "concept titlesContinueRejectQuit",
         );
     });
 

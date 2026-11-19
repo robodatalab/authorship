@@ -1059,7 +1059,8 @@ function AuthorFileEditorInsertCellMenuButton({
     insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
-    return (
+    const kindAdded = cellType.menuLabel.toLowerCase();
+    const button = (
         <button
             type="button"
             className={
@@ -1067,7 +1068,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     ? "author-file-editor-insert-cell-menu-button author-file-editor-insert-cell-menu-button-highlighted"
                     : "author-file-editor-insert-cell-menu-button"
             }
-            title={`Add a ${cellType.menuLabel.toLowerCase()} section here`}
+            title={`Add a ${kindAdded} section here`}
             onClick={() =>
                 invokeAuthorDocumentCommand(
                     sendMessagesToVscode,
@@ -1082,5 +1083,19 @@ function AuthorFileEditorInsertCellMenuButton({
             <i className={insertCommand.iconClassName} />
             {cellType.menuLabel}
         </button>
+    );
+    if (!isHighlighted) {
+        return button;
+    }
+    return (
+        <span className="author-file-editor-insert-cell-menu-button-pointed-at">
+            {button}
+            <span
+                className="author-file-editor-insert-cell-menu-bubble"
+                role="tooltip"
+            >
+                {`Add every ${kindAdded} your story needs here, then press Continue`}
+            </span>
+        </span>
     );
 }
