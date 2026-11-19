@@ -86,28 +86,28 @@ motivation:
 traits:
   temperament:
     - unreadable
-    - wired
-    - mercenary
+    - jumpy
+    - only cares about money
     - idealistic
     - cynical
-    - terse
+    - speaks in few words
     - reckless
     - menacingly polite
     - lonely
-    - clinical
-    - irreverent
+    - cold and detached
+    - mocks everything
     - vigilant
     - smooth-talking
     - obsessive
     - theatrical
   quirk:
     - talks in third person
-    - taps data jack
+    - taps the computer plug in the skull
     - mood-colored eyes
-    - eats real food
+    - eats real food, never synthetic
     - collects paper books
     - quotes old movies
-    - runs self-diagnostics
+    - runs health checks on own implants
     - sleeps in bathtub
     - overtips vendors
     - avoids ads
@@ -117,81 +117,81 @@ traits:
     - counts exits
     - glitchy laugh
   flaw:
-    - memory junkie
+    - addicted to playing other people's recorded memories
     - sellout
     - compulsive hacker
     - trusts machines
-    - upgrade addict
+    - addicted to getting new body implants
     - liar
     - bridge burner
     - reputation-obsessed
-    - stim addict
+    - addicted to stimulant drugs
     - treats people like code
     - grudge holder
-    - spendthrift
+    - wastes money
 background:
   upbringing:
-    - megablock
-    - corporate arcology
-    - flooded stilt district
+    - huge apartment tower the size of a city block
+    - self-contained city in a corporate skyscraper
+    - flooded slum of houses on stilts
     - black market
-    - capsule hotel
+    - hotel of tiny sleeping pods
     - street gang
     - gated suburb
     - data center
-    - orbital station
-    - refugee enclave
+    - space station orbiting Earth
+    - walled-off refugee neighborhood
     - corporate boarding school
-    - cyberclinic back room
+    - back room of an implant surgery clinic
   family:
     - gene-edited child
     - raised by AI nanny
     - disowned corporate heir
     - vanished hacker parent
-    - street-doc grandmother
+    - grandmother was a back-alley doctor
     - clone
     - corrupt cop parent
     - abandoned at birth
     - gang boss guardian
     - pop idol sibling
-    - indebted gig workers
-    - trophy adoptee
+    - parents were gig workers deep in debt
+    - adopted by the rich to show off
   occupation:
-    - netrunner
-    - fixer
-    - street samurai
+    - hacker who breaks into computer networks
+    - middleman who arranges criminal jobs
+    - hired street fighter with combat implants
     - black-market surgeon
     - data courier
     - security guard
     - drone pilot
-    - holo-ad designer
+    - designer of hologram ads
     - organ smuggler
-    - pirate journalist
+    - reporter running an illegal news channel
     - debt collector
     - noodle-bar cook
     - club DJ
     - corporate assassin
-    - memory broker
+    - buys and sells people's memories
     - maintenance tech
   turning point:
     - stolen prototype
     - someone else's memories
     - blacklisted whistleblower
-    - market-crashing datachip
+    - data chip that could crash markets
     - framed by AI
-    - witnessed black op
-    - lapsed cyberware subscription
+    - witnessed a secret illegal operation
+    - fell behind on payments for body implants
     - labor camp escapee
     - dead sibling's message
     - debt to crime boss
-    - rogue AI infection
+    - brain infected by an out-of-control AI
     - viral fame
 looks:
   build:
     - lean
-    - chrome-plated
+    - body covered in metal plating
     - lightning-quick
-    - gaunt
+    - very thin and bony
     - sculpted
     - hunched
     - armored
@@ -199,30 +199,30 @@ looks:
     - doll-like
     - soft
   features:
-    - chrome jaw
+    - metal jaw
     - pulsing tattoos
     - mirrored eyes
     - barcode tattoo
     - electric blue hair
-    - skull data ports
+    - computer sockets in the skull
     - ripped-out implant scar
     - surgically long fingers
-    - ad-printed skin
+    - skin printed with advertisements
     - holographic mask
-    - red cyber eye
+    - red robotic eye
     - arm blade
-    - modulated voice
-    - bioluminescent freckles
+    - electronically altered voice
+    - glowing freckles
   style:
-    - translucent raincoat
-    - corporate grays
+    - see-through raincoat
+    - gray corporate office clothes
     - sunglasses at night
     - blinking LED jacket
     - vintage band shirts
     - grinning face mask
-    - boosted reflexes
+    - reflexes sped up by implants
     - hood always up
     - gang colors
     - expensive suit
     - cheap rings
-    - camera drones
+    - followed by camera drones

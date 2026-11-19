@@ -86,15 +86,15 @@ motivation:
 traits:
   temperament:
     - jumpy
-    - morbidly cheerful
+    - cheerful about death and gore
     - cold
-    - devout
+    - deeply religious
     - skeptical
     - chatty
     - haunted
     - rational
     - timid
-    - sardonic
+    - mocking and sarcastic
     - eerily calm
     - superstitious
     - thrill-seeking
@@ -114,7 +114,7 @@ traits:
     - records strange sounds
     - leaves food out
     - flinches at scratching
-    - knows local deaths
+    - knows every death in town
     - keeps baby teeth
   flaw:
     - stubborn skeptic
@@ -144,30 +144,30 @@ background:
     - boarding school
     - roadside motel
   family:
-    - spiritualist grandparent
+    - grandparent who claimed to talk to spirits
     - drowned twin
-    - fraudulent medium parent
-    - sealed adoption
+    - parent who faked talking to the dead
+    - adoption records kept secret
     - vanished parent
-    - devout aunt
+    - deeply religious aunt
     - secretive old family
-    - taxidermist parent
+    - parent who stuffed dead animals
     - locked indoors
     - cursed bloodline
-    - asylum orderly parent
-    - tainted fortune
+    - parent worked at an asylum
+    - family money with a dark past
   occupation:
     - night nurse
-    - hospice chaplain
-    - parapsychology student
+    - priest who comforts the dying
+    - student of ghosts and psychic powers
     - mortician
     - small-town deputy
     - true-crime podcaster
     - long-haul trucker
     - biology teacher
     - babysitter
-    - estate clearer
-    - psychiatric orderly
+    - clears out dead people's houses
+    - worker at a mental hospital
     - horror novelist
     - cemetery groundskeeper
     - ghost hunter
@@ -179,11 +179,11 @@ background:
     - missing time
     - cursed job
     - call from the dead
-    - new basement door
+    - found a new door in the basement
     - witness to disappearance
     - broken deathbed promise
-    - cave relic
-    - seance
+    - found a relic in a cave
+    - a gathering to contact the dead
     - snowed in
     - century-old photograph
 looks:
@@ -205,7 +205,7 @@ looks:
     - bitten nails
     - colourless eyes
     - trembling hands
-    - port-wine birthmark
+    - large dark red birthmark
     - cold smile
     - grey skin
     - glass eye
@@ -218,9 +218,9 @@ looks:
     - all black
     - buttoned-up
     - heavy flashlight
-    - wary gait
+    - walks warily
     - outdated hand-me-downs
-    - funeral best
+    - best funeral clothes
     - crucifix and charms
     - old camera
     - hood up

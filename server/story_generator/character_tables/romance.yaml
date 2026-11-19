@@ -87,7 +87,7 @@ traits:
   temperament:
     - tender-hearted
     - flirtatious
-    - aloof
+    - cool and distant
     - sentimental
     - prickly
     - dreamy
@@ -101,23 +101,23 @@ traits:
     - bubbly
     - intense
   quirk:
-    - unsent letters
-    - blusher
+    - writes letters they never send
+    - blushes easily
     - presses flowers
     - reads endings first
     - hums love songs
     - keeps ticket stubs
-    - stress baker
-    - ring fidgeter
+    - bakes when stressed
+    - fiddles with rings when nervous
     - quotes Shakespeare
     - nicknames everyone
-    - midnight dancer
+    - dances alone at midnight
     - talks to photographs
     - overdresses
     - speaks in lyrics
     - remembers coffee orders
   flaw:
-    - idealizes partners
+    - sees every partner as perfect
     - pushes people away
     - proud
     - possessive
@@ -125,7 +125,7 @@ traits:
     - insecure
     - serial dater
     - tests partners
-    - fickle
+    - quickly loses interest in people
     - vain
     - stuck in past
     - liar
@@ -136,26 +136,26 @@ background:
     - family manor
     - above a flower shop
     - ranch
-    - city walk-up
+    - small city apartment up many stairs
     - small-town bakery
     - traveling theater
     - boarding school
     - lighthouse
-    - faded old money
+    - rich family gone broke
     - grand hotel
   family:
     - happily married parents
     - divorced mother
-    - heir with strings
+    - heir whose inheritance has conditions
     - youngest of many
     - unmarried aunt
-    - scandalous parentage
-    - arranged betrothal
+    - born from a scandalous affair
+    - arranged marriage
     - widowed father
     - family feud
     - matchmaker grandmother
     - distant adoptive parents
-    - jilted sibling
+    - sibling left at the altar
   occupation:
     - florist
     - pastry chef
@@ -172,15 +172,15 @@ background:
     - museum curator
     - lounge pianist
     - ranch hand
-    - diplomatic translator
+    - translator for diplomats
   turning point:
     - sibling marrying ex
     - fake engagement
-    - snowed-in inn
+    - snowed in at an inn
     - falling for rival
     - shared inheritance
     - lost bet
-    - jilted on television
+    - dumped on television
     - road trip with ex
     - fleeing arranged marriage
     - secret admirer
@@ -195,16 +195,16 @@ looks:
     - wiry
     - lanky
     - delicate
-    - farm-strong
+    - strong from farm work
     - long-legged
-    - bear-like
+    - big and broad like a bear
   features:
     - long lashes
     - single dimple
-    - sun-streaked curls
+    - curls lightened by the sun
     - lip scar
     - ink-stained fingers
-    - smoky voice
+    - low, rough voice
     - freckles
     - gray eyes
     - crooked smile
@@ -214,15 +214,15 @@ looks:
     - thick eyebrows
     - silver rings
   style:
-    - rolled linen sleeves
-    - sandalwood scent
+    - rolled-up linen sleeves
+    - warm, woody scent
     - soft cashmere
     - leather jacket
-    - dancer's grace
+    - moves like a dancer
     - silk scarf
-    - tailored
+    - perfectly fitted clothes
     - flannel and boots
     - antique watch
     - grand entrances
     - bright colors
-    - effortlessly expensive
+    - looks rich without trying

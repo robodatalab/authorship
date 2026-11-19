@@ -102,21 +102,21 @@ traits:
     - goofy
     - nerdy
   quirk:
-    - margin doodler
-    - silent headphones
+    - doodles in notebook margins
+    - wears headphones with no music
     - knows locker combinations
     - pen chewer
-    - secrets notebook
-    - library lunches
+    - keeps a notebook of secrets
+    - eats lunch in the library
     - speaks in memes
     - always late
     - practices autographs
     - sneaks snacks
-    - blind texter
+    - texts without looking
     - changes hair color
     - knows camera blind spots
-    - self-narrator
-    - unused skateboard
+    - narrates their life out loud
+    - carries a skateboard but never rides
   flaw:
     - rumor spreader
     - cheater
@@ -128,22 +128,22 @@ traits:
     - cruel
     - procrastinator
     - blabbermouth
-    - bad role models
+    - looks up to the wrong people
     - quitter
 background:
   upbringing:
     - wrong side of tracks
     - rich neighborhood
-    - five schools
+    - been to five schools
     - church family
-    - cramped duplex
+    - cramped half of a shared house
     - farm
-    - raised online
+    - raised by the internet
     - apartment complex
     - homeschooled
     - small town
     - trailer
-    - faculty housing
+    - teachers' housing on campus
   family:
     - principal's kid
     - teenage mom
@@ -151,15 +151,15 @@ background:
     - custody battle
     - living with grandparent
     - town's richest family
-    - minds younger siblings
+    - looks after younger siblings
     - foster kid
     - parent in prison
-    - grade-obsessed parents
+    - parents obsessed with grades
     - stepfamily
     - pastor's kid
   occupation:
     - scholarship student
-    - varsity quarterback
+    - star of the school football team
     - student council president
     - cheer captain
     - drama club lead
@@ -172,20 +172,20 @@ background:
     - newspaper editor
     - star swimmer
     - chemistry teacher
-    - guidance counselor
+    - school counselor
     - robotics captain
   turning point:
-    - academic probation
+    - one bad grade from expulsion
     - party video
     - gym fire witness
     - new kid
     - secret tutor
-    - prom court joke
+    - voted prom royalty as a joke
     - read teacher's emails
     - benched
     - kicked off team
     - anonymous gossip account
-    - held back
+    - held back a year
     - fake dating
 looks:
   build:
@@ -195,7 +195,7 @@ looks:
     - muscular
     - skinny
     - athletic
-    - gawky
+    - awkward and clumsy
     - stocky
     - pale
     - average
@@ -208,22 +208,22 @@ looks:
     - eyebrow piercing
     - signed cast
     - big eyes
-    - cowlick
-    - stick-and-poke tattoo
+    - hair that sticks up
+    - homemade tattoo
     - taped glasses
     - sunburned nose
-    - nervous flush
+    - goes red when nervous
     - birthmark
   style:
-    - letterman jacket
-    - grunge flannel
+    - school sports team jacket
+    - scruffy flannel shirts
     - band shirts
     - oversized hoodie
     - school colors
     - overdressed
     - designer labels
     - protest pins
-    - runway strut
+    - walks like a model
     - hood up
     - worn sneakers
     - goth

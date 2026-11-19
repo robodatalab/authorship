@@ -87,7 +87,7 @@ traits:
   temperament:
     - observant
     - evasive
-    - prim
+    - stiff and proper
     - gossipy
     - pompous
     - unreadable
@@ -95,24 +95,24 @@ traits:
     - brilliant
     - meticulous
     - theatrical
-    - wry
+    - dry sense of humour
     - eager to please
     - calculating
     - blunt
     - absent-minded
   quirk:
     - leather notebook
-    - polishes spectacles
+    - polishes their glasses
     - quotes poetry
     - forgets names
-    - crossword in ink
+    - does crosswords in pen
     - pencil tapper
     - four o'clock tea
     - straightens pictures
     - eavesdropper
     - magnifying glass
     - lapses into French
-    - collects handwriting
+    - collects samples of handwriting
     - always early
     - unlit pipe
     - bets on everything
@@ -121,7 +121,7 @@ traits:
     - jumps to conclusions
     - snob
     - liar
-    - spendthrift
+    - wastes money
     - too proud
     - meddler
     - envious
@@ -133,12 +133,12 @@ background:
   upbringing:
     - crumbling manor
     - seaside boarding house
-    - village vicarage
+    - village priest's house
     - antiques shop
     - embassies abroad
     - village pub
-    - city tenement
-    - respectable facade
+    - run-down city apartment block
+    - home that looked respectable from outside
     - railway town
     - convent school
     - gardener's cottage
@@ -147,7 +147,7 @@ background:
     - poor relation
     - wealthy aunt
     - disinherited heir
-    - slain inspector's child
+    - child of a murdered police inspector
     - resented adopted heir
     - overlooked middle child
     - novelist parent
@@ -158,19 +158,19 @@ background:
     - widowed parent
   occupation:
     - post office clerk
-    - retired inspector
-    - family solicitor
-    - society columnist
+    - retired police inspector
+    - family lawyer
+    - writes gossip about the rich
     - country doctor
     - museum curator
-    - vicar
-    - enquiry agent
+    - village priest
+    - private detective
     - butler
     - insurance investigator
-    - crossword compiler
-    - auction appraiser
+    - writes crossword puzzles
+    - values items for auction
     - bookshop owner
-    - forensic accountant
+    - accountant who investigates fraud
     - crime reporter
     - hotel concierge
   turning point:
@@ -180,42 +180,42 @@ background:
     - flooded in
     - last to see victim
     - missing heir
-    - contested will
+    - family fight over a will
     - forged letters
-    - train-window sighting
+    - saw something from a train window
     - homecoming
-    - locked-room key
+    - has the key to the locked room
     - reopened case
 looks:
   build:
     - plump
-    - trim
+    - slim and fit
     - birdlike
-    - angular
+    - lean and bony
     - stout
     - slender
-    - rangy
-    - portly
+    - long-limbed and lean
+    - pot-bellied
     - fine-boned
-    - square
+    - broad and solid
   features:
     - monocle
     - sharp grey eyes
     - raised eyebrow
     - hidden scar
     - gold tooth
-    - pomaded hair
+    - slicked-back hair
     - forgettable face
     - limp
     - beauty mark
-    - half-moon spectacles
+    - half-moon reading glasses
     - innocent face
     - restless hands
     - heavy-lidded eyes
     - smells of peppermint
   style:
     - tweed
-    - dated tailoring
+    - old-fashioned tailored clothes
     - umbrella
     - pocket watch
     - cardigans

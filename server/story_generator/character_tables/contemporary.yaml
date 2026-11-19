@@ -87,15 +87,15 @@ traits:
   temperament:
     - shy
     - cheerful
-    - sardonic
+    - sarcastic
     - anxious
     - easygoing
     - brooding
     - blunt
     - restless
-    - conflict-averse
+    - avoids arguments
     - competitive
-    - melancholy
+    - quietly sad
     - calm
     - sharp-tongued
     - idealistic
@@ -105,49 +105,49 @@ traits:
     - knuckle cracker
     - names houseplants
     - same lunch daily
-    - voice memos
+    - records voice messages instead of typing
     - quotes sitcoms
     - sits facing door
     - apologizes to furniture
-    - counts coffees
+    - keeps count of every coffee
     - doodles floor plans
-    - laughs late
-    - carries paperback
+    - laughs at jokes a beat too late
+    - always carries a paperback book
     - rearranges bookshelves
-    - multilingual swearer
+    - swears in several languages
     - drums on tables
   flaw:
     - liar
-    - spendthrift
+    - wastes money
     - pushover
     - heavy drinker
-    - ghoster
+    - cuts people off without explanation
     - know-it-all
-    - self-saboteur
+    - ruins their own chances
     - gossip
     - jealous
     - quitter
-    - opportunist
-    - deflects with sarcasm
+    - takes advantage of any situation
+    - dodges serious talk with sarcasm
 background:
   upbringing:
     - above a laundromat
-    - rust-belt town
+    - dying factory town
     - foster care
     - gated suburb
     - dairy farm
-    - military brat
+    - moving between army bases
     - immigrant neighborhood
     - family restaurant
     - commune
     - trailer park
-    - gentrifying neighborhood
+    - poor neighborhood filling with rich newcomers
     - seaside town
   family:
     - raised by grandmother
     - eldest of six
     - surgeon parents
-    - estranged father
+    - not speaking to father
     - single mother
     - family of lawyers
     - orphan
@@ -161,16 +161,16 @@ background:
     - stand-up comedian
     - overqualified barista
     - real estate agent
-    - public defender
+    - free lawyer for the poor
     - food truck owner
     - social media manager
     - paramedic
     - wedding planner
     - freelance photographer
-    - sous-chef
+    - assistant head chef
     - junior architect
-    - rideshare driver
-    - vet tech
+    - drives for a taxi app
+    - vet assistant
     - startup founder
     - tattoo artist
   turning point:
@@ -181,10 +181,10 @@ background:
     - wedding doubts
     - crime witness
     - on probation
-    - missing tenant's belongings
+    - stuck with a vanished tenant's belongings
     - lottery win
     - caring for parent
-    - non-compete
+    - contract forbids working for rivals
     - dumped after moving
 looks:
   build:
@@ -194,16 +194,16 @@ looks:
     - lean
     - heavy-set
     - petite
-    - gangly
+    - lanky
     - stocky
-    - stooped
-    - willowy
+    - hunched
+    - tall, slim and graceful
   features:
     - broken nose
     - gap teeth
     - dark circles
-    - tattoo sleeve
-    - premature gray
+    - arm covered in tattoos
+    - early gray hair
     - dimples
     - heavy glasses
     - eyebrow scar
@@ -218,11 +218,11 @@ looks:
     - thrift blazer
     - scrubs
     - business casual
-    - canvas tote
+    - tote bag
     - cheap cologne
     - all black
-    - loud prints
+    - bright patterns
     - earbuds
-    - oversized knitwear
+    - baggy sweaters
     - baseball cap
-    - bouncer stance
+    - stands like a nightclub bouncer

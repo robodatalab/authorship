@@ -85,144 +85,144 @@ motivation:
   - exploration
 traits:
   temperament:
-    - stoic
+    - never shows pain or feelings
     - reckless
-    - clinical
-    - honor-bound
-    - serene
+    - cold and logical
+    - always keeps their word
+    - calm
     - jittery
-    - world-weary
+    - tired of having seen it all
     - boastful
     - paranoid
     - idealistic
-    - imperious
+    - commanding and arrogant
     - cheerful
     - haunted
     - curious
     - ruthless
   quirk:
     - talks to ship
-    - taps hull for luck
-    - collects soil samples
-    - swears in alien
-    - magnetic boots
-    - hums fleet anthems
+    - taps the ship's wall for luck
+    - collects dirt from every planet
+    - swears in alien languages
+    - always wears boots that stick to metal floors
+    - hums space navy anthems
     - alien pet
-    - likes heavy gravity
+    - prefers planets with strong gravity
     - eats only rations
     - tells time by stars
     - sleeps in cockpit
-    - compulsive bettor
-    - recites fallen crew
-    - belter drawl
-    - tinkerer
+    - bets on everything
+    - recites the names of dead crewmates
+    - slow accent from the asteroid mines
+    - always taking gadgets apart
   flaw:
     - trusts machines
-    - stim addict
+    - addicted to stimulant drugs
     - gambler
     - blindly obedient
-    - xenophobe
+    - hates aliens and outsiders
     - secret hoarder
-    - mercenary
+    - loyal only to money
     - too proud
     - vengeful
     - careless with lives
-    - zealot
-    - imperial nostalgia
+    - fanatic for a cause
+    - misses the empire
 background:
   upbringing:
-    - generation ship
-    - twilight slums
+    - ship on a centuries-long voyage
+    - slums in endless dusk
     - mining colony
-    - imperial court
+    - the emperor's court
     - refugee camps
-    - orbital monastery
-    - cargo hauler
+    - monastery orbiting a planet
+    - cargo ship
     - military academy
-    - gas giant city
-    - terraforming colony
-    - station undercity
-    - quarantine habitat
+    - city floating in a gas planet's clouds
+    - colony making a planet livable
+    - lower decks of a space station
+    - sealed-off quarantine base
   family:
-    - illegitimate heir
+    - heir born outside marriage
     - orphaned by pirates
-    - android caretaker
+    - raised by a robot
     - disgraced admiral parent
-    - smuggler clan
-    - pilot dynasty
-    - spare corporate heir
+    - family of smugglers
+    - generations of famous pilots
+    - unneeded backup heir to a company
     - sold for debt
-    - gene-engineered
-    - alien adoptive family
-    - coup survivor
+    - genes designed in a lab
+    - adopted by aliens
+    - survived a violent overthrow
     - rebel grandparent
   occupation:
-    - starship engineer
+    - spaceship engineer
     - smuggler
-    - jump navigator
-    - imperial diplomat
+    - navigator for faster-than-light jumps
+    - diplomat for the empire
     - bounty hunter
-    - fleet marine
-    - xenobiologist
-    - salvage diver
+    - soldier in the space navy
+    - scientist who studies alien life
+    - scavenges wrecked spaceships
     - ship's medic
     - cargo captain
-    - court spy
-    - terraforming surveyor
-    - jump-gate technician
-    - rebel courier
-    - cantina owner
+    - spy at the emperor's court
+    - surveys planets to make them livable
+    - repairs portals between star systems
+    - rebel messenger
+    - bar owner
     - exiled noble
   turning point:
     - bounty on head
     - ambush survivor
     - mystery cargo
-    - woke from cryosleep
-    - stolen prototype
-    - doomsday codes
+    - woke after years frozen
+    - stole a secret experimental machine
+    - holds codes to destroy worlds
     - suicide mission
-    - employer's genocide
+    - boss wiped out a whole people
     - crash-landed
-    - political betrothal
-    - ancient distress beacon
-    - framed assassin
+    - engaged for political reasons
+    - found an ancient distress call
+    - framed for an assassination
 looks:
   build:
-    - gaunt
-    - squat
-    - lean spacer
-    - battle-hardened
-    - gene-perfect
-    - half-cybernetic
+    - thin and bony
+    - short and wide
+    - lean from life in space
+    - toughened by war
+    - perfect body from designed genes
+    - half machine
     - wiry
-    - barrel-chested
-    - statuesque
+    - big round chest
+    - tall and striking
     - small and nimble
   features:
-    - cybernetic eye
+    - mechanical eye
     - glowing tattoos
-    - radiation-white hair
+    - hair turned white by radiation
     - mechanical hand
-    - blue-tinted skin
-    - branded barcode
-    - cat-like pupils
-    - decompression scar
-    - neural port
+    - slightly blue skin
+    - barcode burned into skin
+    - slit pupils like a cat
+    - scar from being exposed to space
+    - a socket in the base of the skull for accessing cyberspace
     - glowing freckles
-    - alien symbiote
-    - filed teeth
+    - alien creature sharing their body
+    - teeth filed to points
     - frostbitten ears
-    - voice modulator
+    - device that changes their voice
   style:
     - patched flight suit
-    - court silks
+    - fine silks from the royal court
     - combat armor
     - long coat
     - salvaged gear
-    - defunct navy uniform
+    - uniform of a navy that no longer exists
     - smuggler's cloak
-    - zero-g gait
-    - ritual jewelry
-    - military bearing
-    - pressure suit
+    - walks as if weightless
+    - religious jewelry
+    - stands and moves like a soldier
+    - space suit
     - ceremonial blade

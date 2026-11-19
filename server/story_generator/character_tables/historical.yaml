@@ -86,11 +86,11 @@ motivation:
   - land
 traits:
   temperament:
-    - grave
+    - serious
     - hot-blooded
-    - pious
+    - deeply religious
     - sly
-    - melancholy
+    - gloomy
     - reckless
     - stern
     - curious
@@ -99,49 +99,49 @@ traits:
     - absent-minded
     - calculating
     - prickly
-    - sardonic
-    - earnest
+    - sarcastic
+    - sincere
   quirk:
     - quotes scripture
     - counts rosary beads
     - bows too deeply
-    - writes in cipher
+    - writes in secret code
     - spits for luck
-    - carries saint's knucklebone
+    - carries a dead saint's finger bone
     - fears poison
     - swears in Latin
     - hums battle hymns
     - sits facing door
     - feeds stray dogs
     - laughs at funerals
-    - snuffs candles barehanded
+    - puts out candles with bare fingers
     - collects opponents' teeth
     - talks to horses
   flaw:
     - gambler
     - drunkard
-    - fawns over nobles
+    - sucks up to nobles
     - vain
     - liar
     - touchy about honor
     - too proud
     - superstitious
     - jealous
-    - spendthrift
+    - wastes money
     - blindly obedient
     - cruel when afraid
 background:
   upbringing:
     - crumbling castle
     - convent orphanage
-    - riverside tanneries
+    - smelly leather-making yards by the river
     - imperial Kyoto court
-    - raiding longship
+    - raiding Viking ship
     - merchant house in Venice
-    - frontier legion camp
+    - army camp at the edge of the Roman Empire
     - slums of London
     - sugar plantation
-    - desert caravanserai
+    - desert inn where camel caravans stop
     - revolutionary Paris
     - plague-struck village
   family:
@@ -154,18 +154,18 @@ background:
     - heretic family
     - widowed innkeeper father
     - disinherited twin
-    - courtesan mother
+    - mother was a high-class prostitute
     - sold by parents
     - cruel stepmother
   occupation:
     - monastery scribe
     - gladiator
-    - court physician
-    - pirate quartermaster
+    - doctor at the royal palace
+    - pirate who keeps the ship's supplies and loot
     - spice merchant
-    - courtier
+    - noble who hangs around the king seeking favors
     - royal mapmaker
-    - ronin
+    - samurai with no master
     - plague doctor
     - glassblower
     - tax collector
@@ -185,45 +185,45 @@ background:
     - returned from captivity
     - dangerous message
     - fled arranged marriage
-    - debtors' prison
+    - jailed for unpaid debts
     - witnessed royal poisoning
 looks:
   build:
-    - gaunt
+    - very thin and bony
     - broad-shouldered
     - small
     - heavyset
     - underfed
     - barrel-chested
-    - willowy
+    - tall, slim and graceful
     - muscular
     - round-faced
     - stooped
   features:
-    - pox scars
+    - smallpox scars
     - blind eye
-    - cropped ear
+    - part of an ear cut off
     - branded thumb
     - white hair
     - ink-stained fingers
     - broken nose
     - blackened teeth
-    - wine-stain birthmark
+    - dark red birthmark
     - calloused hands
     - mismatched eyes
     - weathered face
-    - ringed braid
-    - verse tattoo
+    - braid threaded with metal rings
+    - tattoo of a line of poetry
   style:
-    - threadbare velvet
-    - magistrate's black
+    - worn-out velvet clothes
+    - judge's black robes
     - smells of incense
     - hooded cloak
-    - borrowed finery
+    - borrowed fancy clothes
     - unused sword
-    - soldier's bearing
-    - pilgrim's shell
+    - stands and moves like a soldier
+    - seashell badge worn by pilgrims
     - outdated silks
     - barefoot
     - powdered and perfumed
-    - monk's habit
+    - monk's robe

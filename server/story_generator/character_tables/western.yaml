@@ -85,18 +85,18 @@ motivation:
   - a fresh start
 traits:
   temperament:
-    - laconic
+    - speaks in few words
     - hot-headed
-    - folksy
+    - friendly, plain-spoken country manner
     - gruff
-    - prim
+    - stiffly proper
     - easygoing
-    - haughty
+    - snobbish
     - talkative
-    - fatalistic
+    - believes fate is already decided
     - unforgiving
     - boastful
-    - devout
+    - deeply religious
     - patient
     - wild
     - coldly polite
@@ -104,11 +104,11 @@ traits:
     - chews matchsticks
     - coin tricks
     - quotes Shakespeare
-    - rolls unsmoked cigarettes
+    - rolls cigarettes but never smokes them
     - greets horses
     - spits tobacco
-    - logs poker hands
-    - whittles birds
+    - writes down every poker hand
+    - carves little wooden birds with a knife
     - tips hat to graves
     - sings off-key
     - talks to dead partner
@@ -124,7 +124,7 @@ traits:
     - greedy
     - vengeful
     - lies about past
-    - soft touch
+    - easily talked into favors
     - reckless with money
     - coward
     - bully
@@ -135,9 +135,9 @@ background:
     - cattle ranch
     - saloon
     - covered wagon
-    - fallen eastern family
-    - mission school
-    - struggling homestead
+    - once-rich family from the East Coast
+    - school run by missionaries
+    - struggling settler's farm
     - railroad tent town
     - religious settlement
     - gambling steamboat
@@ -160,7 +160,7 @@ background:
     - stagecoach driver
     - saloon keeper
     - bounty hunter
-    - cattle rustler
+    - cattle thief
     - frontier doctor
     - schoolteacher
     - riverboat gambler
@@ -169,8 +169,8 @@ background:
     - telegraph operator
     - prospector
     - deputy marshal
-    - snake-oil peddler
-    - chuckwagon cook
+    - seller of fake cure-all medicine
+    - cook on a cattle drive's food wagon
     - newspaper printer
     - hired gun
   turning point:
@@ -188,26 +188,26 @@ background:
     - new sheriff
 looks:
   build:
-    - rawhide-lean
-    - squat
+    - lean and tough as leather
+    - short and wide
     - bowlegged
     - nimble
     - big-boned
     - wiry
-    - paunchy
+    - big-bellied
     - long-legged
     - stout
     - skeletal
   features:
     - bullet-scarred hand
-    - squint lines
+    - wrinkles from squinting in the sun
     - gold tooth
     - flattened nose
     - rope burn scar
     - grizzly claw scars
     - pale gray eyes
     - missing earlobe
-    - powder-stained hands
+    - gunpowder-stained hands
     - freckles
     - gap-toothed grin
     - gravelly voice
@@ -217,12 +217,12 @@ looks:
     - duster coat
     - embroidered vest
     - rattlesnake hatband
-    - buckskins
-    - black frock coat
+    - clothes of soft deer leather
+    - long black formal coat
     - jingling spurs
     - pearl-handled revolvers
-    - mourning black
-    - calico and gunbelt
-    - eastern suit
-    - sombrero and serape
+    - wears black for someone who died
+    - flowered cotton clothes and gunbelt
+    - fancy suit from the East Coast
+    - sombrero and woven blanket shawl
     - swagger

@@ -87,7 +87,7 @@ motivation:
 traits:
   temperament:
     - solemn
-    - boisterous
+    - loud and rowdy
     - proud
     - cheerful
     - patient
@@ -95,11 +95,11 @@ traits:
     - stern
     - dreamy
     - fierce
-    - haughty
+    - looks down on others
     - gentle
     - brooding
     - reckless
-    - devout
+    - deeply religious
     - sly
   quirk:
     - talks to animals
@@ -108,10 +108,10 @@ traits:
     - swears by strange gods
     - counts stars
     - collects beast teeth
-    - salts every threshold
+    - puts salt by every door to keep evil out
     - speaks in proverbs
     - bites every coin
-    - tallies lies
+    - keeps count of every lie they hear
     - whistles to the wind
     - never names the dead
     - sniffs every meal
@@ -121,46 +121,46 @@ traits:
     - grudge holder
     - gambler
     - gullible
-    - oathbreaker
+    - breaks their sworn promises
     - superstitious
     - greedy
-    - braggart
+    - brags all the time
     - picks fights
     - indecisive
-    - glory hound
+    - always chasing glory and praise
     - too proud
-    - jealous of mages
+    - jealous of wizards
 background:
   upbringing:
     - mountain monastery
-    - steppe nomads
+    - nomads on the open grasslands
     - crumbling castle
     - smuggler's ship
-    - fae-haunted forest
-    - capital gutters
+    - forest haunted by fairies
+    - slums of the capital city
     - lighthouse
-    - hostage court
+    - raised as a hostage at a foreign king's court
     - mining town
     - wizard's tower
     - border farm
-    - travelling troupe
+    - travelling group of actors
   family:
     - plague orphan
     - duke's bastard
     - raised by grandparent
     - eldest of nine
     - disgraced knight parent
-    - elf foster child
-    - unprophesied twin
-    - fallen noble house
+    - child raised by elves
+    - twin the prophecy never mentioned
+    - noble family that lost everything
     - blacksmith parent
     - burned witch's child
-    - temple foundling
+    - baby left at a temple
     - large loving clan
   occupation:
-    - sellsword
-    - royal cartographer
-    - temple acolyte
+    - soldier who fights for pay
+    - royal mapmaker
+    - trainee priest at a temple
     - dragon-hunter's apprentice
     - court alchemist
     - disgraced knight
@@ -169,24 +169,24 @@ background:
     - castle cook
     - wandering bard
     - falconer
-    - grave-warden
-    - runesmith
+    - graveyard guard
+    - smith who carves magic symbols into weapons
     - border ranger
     - pickpocket
-    - archmage's apprentice
+    - apprentice to the most powerful wizard
   turning point:
     - framed for murder
-    - dragon-marked
+    - carries a mark left by a dragon
     - stolen relic
     - sole expedition survivor
-    - fae bargain
+    - made a deal with a fairy
     - exiled
-    - drew the sword
+    - pulled out the sword no one else could
     - amnesia
     - unwanted heir
     - debt to a wizard
     - sealed letter
-    - betrayed order
+    - betrayed by their order of knights
 looks:
   build:
     - broad-shouldered
@@ -195,7 +195,7 @@ looks:
     - stocky
     - lean
     - heavyset
-    - willowy
+    - tall, slim and graceful
     - muscular
     - gaunt
     - towering
@@ -210,20 +210,20 @@ looks:
     - jagged scar
     - braids with bones
     - weathered skin
-    - rune tattoo
+    - tattoo of magic symbols
     - gap-toothed grin
     - ink-stained fingers
     - crescent birthmark
   style:
     - patched chainmail
     - threadbare velvet
-    - runed staff
+    - staff carved with magic symbols
     - furs and bone charms
-    - soldier's bearing
+    - stands and moves like a soldier
     - jingling amulets
-    - signet ring
+    - ring with the family seal
     - barefoot
-    - court silks
-    - battered helm
+    - silks worn at the royal court
+    - battered helmet
     - hooded
     - regal in rags

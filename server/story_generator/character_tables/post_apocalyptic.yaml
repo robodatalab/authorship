@@ -95,7 +95,7 @@ traits:
     - fearless
     - numb
     - hopeful
-    - cagey
+    - secretive
     - loyal
     - deadpan
     - manic
@@ -105,13 +105,13 @@ traits:
     - names weapons
     - counts bullets
     - hoards bottle caps
-    - sings pre-war jingles
+    - sings old ad jingles from before the war
     - sleeps in boots
     - sniffs the wind
-    - checks Geiger counter
+    - keeps checking the radiation meter
     - eats in silence
     - tells scar stories
-    - counts days in knots
+    - ties a knot in a string each day
     - avoids asphalt cracks
     - salutes billboards
     - whistles birdcalls
@@ -121,7 +121,7 @@ traits:
     - distrustful
     - drunk
     - trigger-happy
-    - never leaves wounded
+    - never leaves the wounded behind
     - thrill-seeker
     - thief
     - stuck in the past
@@ -131,31 +131,31 @@ traits:
     - freezes under fire
 background:
   upbringing:
-    - fallout vault
+    - sealed underground bomb shelter
     - ruined mall
     - oil rig
     - nomad caravan
     - walled commune
     - flooded city
     - subway tunnels
-    - bomb cult
+    - cult that worships nuclear bombs
     - quarantine camp
     - riverboat
     - raider fortress
-    - seed vault
+    - bunker where seeds are stored for the future
   family:
-    - old-world grandfather
+    - grandfather who remembers the world before
     - orphaned by fever
     - adopted by traders
     - tyrant's child
     - raised by sibling
     - born in captivity
     - eldest of many
-    - prepper parent
+    - parent who stockpiled for doomsday
     - separated from parents
     - twin taken by slavers
     - mute veteran guardian
-    - overseer's forgotten child
+    - forgotten child of the bunker's leader
   occupation:
     - scavenger
     - water trader
@@ -164,64 +164,64 @@ background:
     - field medic
     - mechanic
     - radio operator
-    - seed keeper
+    - guards the community's seed supply
     - raider
-    - tunnel rat
+    - explores dangerous tunnels
     - courier
     - preacher
     - gunsmith
     - militia captain
     - salt miner
-    - moonshiner
+    - makes homemade liquor
   turning point:
-    - exiled from vault
+    - kicked out of the underground shelter
     - plague cure
     - stole warlord's fuel
     - ambush survivor
-    - woke from cryosleep
-    - knows clean well
+    - woke up after years frozen in sleep
+    - knows where a clean well is
     - escaped raiders
     - sent for help
     - bunker map
-    - hidden bite
+    - hiding an infected bite
     - new settlement leader
     - kidnapped child
 looks:
   build:
-    - rawboned
+    - big and bony
     - powerful
     - scrawny
     - hollow-cheeked
     - short
-    - sinewy
+    - wiry
     - broad
     - twitchy
-    - rangy
-    - bull-necked
+    - tall with long limbs
+    - thick-necked
   features:
     - radiation burns
     - scrap-metal hand
     - missing fingers
     - stitched scalp
-    - flash-blinded eyes
-    - filed teeth
+    - eyes blinded by a bomb's flash
+    - teeth filed into points
     - face tattoos
     - sun-bleached hair
-    - tracheotomy scar
+    - scar from a hole cut in the throat
     - bloody cough
     - bite scar
     - peeling skin
-    - bolt-pierced ear
+    - ear pierced with a metal bolt
     - glass eye
   style:
-    - hazmat suit
+    - full-body protective suit
     - rags and leather
     - welding goggles
     - hand-carved rifle
     - road-sign armor
     - gas mask
-    - ash-gray wraps
-    - pre-war uniform
+    - ash-gray cloth wrapped around the body
+    - uniform from before the war
     - scavenged silks
     - careful steps
     - dog tag necklace

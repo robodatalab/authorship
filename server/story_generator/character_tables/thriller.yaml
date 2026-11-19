@@ -90,18 +90,18 @@ traits:
     - cocky
     - stoic
     - driven
-    - volatile
+    - unpredictable and explosive
     - methodical
     - idealistic
     - ruthless
     - jittery
     - cynical
     - disciplined
-    - affable
+    - friendly and easygoing
     - hot-headed
     - manipulative
   quirk:
-    - clocks exits
+    - always notes the exits
     - memorises licence plates
     - burner phones
     - sleeps armed
@@ -112,8 +112,8 @@ traits:
     - sketches floor plans
     - cracks knuckles
     - hums pop songs
-    - reads shoes
-    - packed go-bag
+    - judges people by their shoes
+    - keeps a bag packed to flee
     - nicotine gum
     - taps Morse code
   flaw:
@@ -126,7 +126,7 @@ traits:
     - obsessive
     - arrogant
     - control freak
-    - mission first
+    - puts the mission before people
     - falls for wrong people
     - escalates everything
 background:
@@ -134,22 +134,22 @@ background:
     - army bases
     - cartel border town
     - gated suburb
-    - post-Soviet tower block
+    - grim tower block in Eastern Europe
     - refugee camp
-    - hacker squat
-    - rust-belt town
+    - hackers living in an abandoned building
+    - dying old factory town
     - survivalist compound
     - casino city
     - military academy
     - container port
-    - laundered luxury
+    - luxury paid for with dirty money
   family:
     - missing spy parent
     - mob accountant uncle
     - senator's estranged child
     - bomber's sibling
     - witness protection
-    - aged-out foster kid
+    - left foster care at eighteen
     - general's child
     - reluctant crime heir
     - murdered whistleblower parents
@@ -162,7 +162,7 @@ background:
     - defence attorney
     - investigative journalist
     - hacker for hire
-    - corporate fixer
+    - fixes scandals for big companies
     - hostage negotiator
     - getaway driver
     - bodyguard
@@ -170,21 +170,21 @@ background:
     - emergency doctor
     - military contractor
     - crooked art dealer
-    - cryptographer
+    - makes and breaks secret codes
     - homicide detective
     - commercial pilot
   turning point:
-    - framed assassin
+    - assassin who got framed
     - witnessed government murder
     - wrong bag
     - stolen flash drive
     - kidnapped loved one
-    - disavowed
+    - spy agency denies knowing them
     - betrayed by partner
-    - terror-funding employer
-    - sleeper activation
-    - last federal witness
-    - audit conspiracy
+    - employer secretly funds terrorists
+    - secret spy suddenly called into action
+    - last witness in a federal case
+    - audit uncovers a conspiracy
     - owes the wrong people
 looks:
   build:
@@ -195,7 +195,7 @@ looks:
     - powerful
     - catlike
     - hulking
-    - sinewy
+    - lean and wiry
     - deceptively soft
     - light-footed
   features:
@@ -204,7 +204,7 @@ looks:
     - ice-blue eyes
     - shaved head
     - mangled ear
-    - altered face
+    - face changed by surgery
     - calloused knuckles
     - neck burn scar
     - split eyebrow
@@ -214,15 +214,15 @@ looks:
     - prosthetic leg
     - dyed hair
   style:
-    - forgettable grey
+    - plain grey clothes nobody notices
     - sharp suit
     - mirrored sunglasses
     - running shoes
     - tourist disguise
     - no ID
     - expensive watch
-    - shooter's stillness
+    - still and steady like a sniper
     - scuffed leather jacket
     - cargo trousers
-    - chameleon
+    - blends in anywhere
     - low baseball cap
