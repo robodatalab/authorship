@@ -1,5 +1,6 @@
 import unittest
 from collections.abc import AsyncIterator
+from random import Random
 from unittest.mock import Mock
 
 from authordoc.cells.character_cell import CHARACTER, CharacterCell
@@ -90,7 +91,7 @@ class RollCharacterStepCall(unittest.IsolatedAsyncioTestCase):
         varn = CharacterCell("Varn", "She left the fleet.", False, None, "v1", ["k1"])
         document = Document.from_cells([motherhood, varn])
 
-        rolled = await RollCharacterStep("v1", TABLES, StoryGenres(["space opera"]))(document)
+        rolled = await RollCharacterStep("v1", TABLES, StoryGenres(["space opera"]), Random(0))(document)
 
         self.assertEqual(
             rolled.cells,
@@ -116,7 +117,7 @@ class RollCharacterStepCall(unittest.IsolatedAsyncioTestCase):
         unnamed = CharacterCell("", "", False, None, "u1")
         document = Document.from_cells([unnamed])
 
-        rolled = await RollCharacterStep("u1", TABLES, StoryGenres(["romance"]))(document)
+        rolled = await RollCharacterStep("u1", TABLES, StoryGenres(["romance"]), Random(0))(document)
 
         self.assertEqual(
             rolled.cells,
@@ -153,7 +154,7 @@ class CharactersStage(unittest.TestCase):
         varn = CharacterCell("Varn", "", False, None, "v1")
         lia = CharacterCell("Lia", "", False, None, "l1")
 
-        steps = Characters(Mock(), TABLES).run(Document.from_cells([varn, lia]))
+        steps = Characters(Mock(), TABLES, Random(0)).run(Document.from_cells([varn, lia]))
 
         self.assertEqual(
             [type(step) for step in steps],
@@ -161,6 +162,6 @@ class CharactersStage(unittest.TestCase):
         )
 
     def test_is_reviewed_in_the_character_cells(self) -> None:
-        shown = Characters(Mock(), TABLES).shown()
+        shown = Characters(Mock(), TABLES, Random(0)).shown()
 
         self.assertEqual(shown, CellsShown(CHARACTER))

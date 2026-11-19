@@ -15,6 +15,7 @@ choices that end the scenes come after them. Last, the story is played as the
 benchmark plays it, to check that it does what the benchmark needs of it."""
 
 from collections.abc import Callable
+from random import Random
 
 import cortexgrid
 from cortexgrid_infer import CompletingModel
@@ -31,7 +32,8 @@ from server.story_generator.stages.validity import Validity
 
 def _characters(deployment: cortexgrid.Deployment[CompletingModel]) -> Stage:
     tables = CharacterTables.loaded()
-    characters = Characters(deployment, tables)
+    random = Random()
+    characters = Characters(deployment, tables, random)
     return characters
 
 

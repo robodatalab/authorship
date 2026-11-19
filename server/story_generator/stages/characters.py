@@ -50,19 +50,19 @@ class ReadGenresStep(StageStep):
 
 class RollCharacterStep(StageStep):
 
-    def __init__(self, character_id: str, tables: CharacterTables, genres: StoryGenres) -> None:
+    def __init__(self, character_id: str, tables: CharacterTables, genres: StoryGenres, random: Random) -> None:
         self._character_id = character_id
         self._tables = tables
         self._genres = genres
+        self._random = random
 
     async def __call__(self, document: Document) -> Document:
         character = document.cell_with_id(self._character_id)
         assert isinstance(character, CharacterCell)
         concepts = character.concepts(document)
         table = self._tables.pooled(self._genres.names)
-        random = Random(character.unique_id)
         motivations_needed = max(1, len(concepts))
-        rolled = table.roll(random, motivations_needed)
+        rolled = table.roll(self._random, motivations_needed)
         name = character.title or f"{rolled.given_name} {rolled.family_name}"
         motivations = (
             [f"Motivation for {concept.title}: {motivation}" for concept, motivation in zip(concepts, rolled.motivations)]
@@ -92,16 +92,17 @@ class Cast(Stage):
 
 class Characters(Stage):
 
-    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], tables: CharacterTables) -> None:
+    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], tables: CharacterTables, random: Random) -> None:
         self._deployment = deployment
         self._tables = tables
+        self._random = random
 
     def run(self, document: Document) -> list[StageStep]:
         model = self._deployment.client_async()
         genres = StoryGenres(self._tables.genres)
         read_genres_step = ReadGenresStep(model, self._tables, genres)
         characters = [cell for cell in document.cells if isinstance(cell, CharacterCell)]
-        roll_steps = [RollCharacterStep(character.unique_id, self._tables, genres) for character in characters]
+        roll_steps = [RollCharacterStep(character.unique_id, self._tables, genres, self._random) for character in characters]
         characters_steps: list[StageStep] = [read_genres_step, *roll_steps]
         return characters_steps
 

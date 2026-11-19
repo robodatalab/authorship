@@ -173,17 +173,17 @@ export class StoryGenerationWorkflow {
     }
 
     async reject(): Promise<void> {
-        const reviewKept = this.reviewKept();
-        if (reviewKept === undefined) {
-            void vscode.window.showErrorMessage(
-                "The story as it was before this stage is not kept in this workspace: accept it, or quit the generation.",
-            );
-            return;
+        const putBack = await this.putBackTheStoryBeforeTheStage();
+        if (putBack) {
+            this.showWhereItLeftOff();
         }
-        this.session.importDocumentFromText(reviewKept.storyBeforeTheStage);
-        await this.session.writeTheDocumentToItsFile();
-        await this.workspaceState.update(this.keyOfTheReviewKept, undefined);
-        this.showWhereItLeftOff();
+    }
+
+    async restart(): Promise<void> {
+        const putBack = await this.putBackTheStoryBeforeTheStage();
+        if (putBack) {
+            await this.runTheNextStage();
+        }
     }
 
     async quit(): Promise<void> {
@@ -239,6 +239,20 @@ export class StoryGenerationWorkflow {
             this.keyOfTheReviewKept,
         );
         return reviewKept;
+    }
+
+    private async putBackTheStoryBeforeTheStage(): Promise<boolean> {
+        const reviewKept = this.reviewKept();
+        if (reviewKept === undefined) {
+            void vscode.window.showErrorMessage(
+                "The story as it was before this stage is not kept in this workspace: accept it, or quit the generation.",
+            );
+            return false;
+        }
+        this.session.importDocumentFromText(reviewKept.storyBeforeTheStage);
+        await this.session.writeTheDocumentToItsFile();
+        await this.workspaceState.update(this.keyOfTheReviewKept, undefined);
+        return true;
     }
 
     private async keepWhatTheStageAsksForReview(

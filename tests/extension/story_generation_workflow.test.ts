@@ -372,6 +372,48 @@ describe("StoryGenerationWorkflow.reject — the author rejects what a stage lea
     });
 });
 
+describe("StoryGenerationWorkflow.restart — the author has a stage run again", () => {
+    it("saves the story as it was before the stage, and runs the stage again on it", async () => {
+        files.set(STORY_FILE, THE_STORY_AWAITING_REVIEW);
+        const fetched = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ id: STORY_FILE }),
+            })
+            .mockResolvedValueOnce(NO_STAGE_RUNS);
+        vi.stubGlobal("fetch", fetched);
+        keptInTheWorkspace.set(
+            THE_REVIEW_KEPT_FOR_THE_STORY,
+            THE_REVIEW_OF_THE_CONCEPTS_KEPT,
+        );
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
+
+        await session.storyGenerationWorkflow.restart();
+
+        const [startedAt, started] = fetched.mock.calls[0];
+        expect([startedAt, JSON.parse(started.body), files.get(STORY_FILE), keptInTheWorkspace.size]).toEqual([
+            expect.stringContaining("/generate/story"),
+            { path: STORY_FILE, story: LEFT_OFF_AT_THE_CONCEPTS, stage: "concepts" },
+            LEFT_OFF_AT_THE_CONCEPTS,
+            0,
+        ]);
+    });
+
+    it("runs nothing, and says so, when the workspace does not keep the story as it was before the stage", async () => {
+        const fetched = vi.fn();
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
+
+        await session.storyGenerationWorkflow.restart();
+
+        expect(fetched).not.toHaveBeenCalled();
+        expect(shownMessages).toEqual([
+            "The story as it was before this stage is not kept in this workspace: accept it, or quit the generation.",
+        ]);
+    });
+});
+
 describe("StoryGenerationWorkflow.quit — the author quits the generation altogether", () => {
     it("drops the stage awaiting review, and saves the story as it was before it, without the record of the stages", async () => {
         files.set(STORY_FILE, THE_STORY_AWAITING_REVIEW);

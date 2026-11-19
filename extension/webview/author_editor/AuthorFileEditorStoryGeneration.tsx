@@ -40,10 +40,10 @@ interface AuthorFileEditorStoryGenerationProps {
  * it runs. Every stage of the workflow, in order: those finished, the one it is
  * at, and those to come. Under them, what the stage it is at does: while it
  * works, how far along it is; once it is done, what the author is to do, and the
- * answers they can give: accept the story as they leave it, edits included, or
- * reject it. Asked to do something themselves, with a command highlighted, the
- * author continues once done. Whatever the stage is doing, the author can quit
- * the generation altogether.
+ * answers they can give: accept the story as they leave it, edits included,
+ * reject it, or have the stage run again. Asked to do something themselves,
+ * with a command highlighted, the author continues once done. Whatever the
+ * stage is doing, the author can quit the generation altogether.
  */
 export function AuthorFileEditorStoryGeneration({
     storyGeneration,
@@ -193,6 +193,16 @@ export function AuthorFileEditorStoryGeneration({
                             >
                                 Reject
                             </button>
+                            {asked.shown.kind !== "command" && (
+                                <button
+                                    type="button"
+                                    className="author-file-editor-story-generation-answer"
+                                    title="Throw away what this stage made and run it again"
+                                    onClick={() => answer("restart")}
+                                >
+                                    Restart
+                                </button>
+                            )}
                         </>
                     )}
                     <button
