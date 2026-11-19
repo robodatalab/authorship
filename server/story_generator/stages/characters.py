@@ -69,9 +69,9 @@ class RollCharacterStep(StageStep):
             if concepts
             else [f"Motivation: {rolled.motivations[0]}"]
         )
-        traits = "; ".join(rolled.traits)
-        background = "; ".join(rolled.background)
-        looks = "; ".join(rolled.looks)
+        traits = ", ".join(rolled.traits)
+        background = ", ".join(rolled.background)
+        looks = ", ".join(rolled.looks)
         authors_backstory = character.source.strip()
         parts = [authors_backstory, *motivations, f"Traits: {traits}", f"Background: {background}", f"Looks: {looks}"]
         parts_written = [part for part in parts if part]

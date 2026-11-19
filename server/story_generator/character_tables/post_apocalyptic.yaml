@@ -63,166 +63,166 @@ names:
     - Ward
     - Gallagher
 motivation:
-  - was born after the collapse and longs to know what was lost
-  - left a younger sibling behind at the evacuation and never went back
-  - promised a dying friend to reach the coast
-  - once traded a stranger's life for a canteen of water
-  - has outlived every companion and dreads being the last one left
-  - keeps hearing a familiar voice on an old radio frequency
-  - was cast out of the settlement for a crime never committed
-  - suspects the radiation sickness has already begun
-  - remembers the taste of real fruit and would kill to taste it again
-  - watched the bunker doors close from the wrong side
-  - wants the children of the camp to grow up without fear
-  - was raised by raiders and is trying to unlearn it
-  - owes a life to a stranger who never gave a name
-  - believes a rumor of a green valley untouched by the fallout
-  - lost a whole family to a single bad winter
-  - was once the most feared warlord in the wastes and wants to forget
-  - wants a place to call home after years on the road
-  - collects the names of the dead so someone will remember them
-  - helped build the weapon that ended the world
-  - craves the respect the scavenger clans never offered
+  - money
+  - power
+  - ambition
+  - looking good
+  - being loved
+  - loving someone
+  - revenge
+  - freedom
+  - safety
+  - belonging
+  - recognition
+  - curiosity
+  - duty
+  - redemption
+  - pride
+  - jealousy
+  - family
+  - survival
+  - hope
+  - community
 traits:
   temperament:
-    - flinty and silent
-    - jittery and hyper-alert
-    - sunny despite everything
-    - coldly practical
-    - feral and unpredictable
-    - gentle with animals, hard with people
-    - paranoid and meticulous
-    - boisterous and fearless
-    - hollow-eyed and numb
-    - stubbornly hopeful
-    - cagey and sharp-tongued
-    - slow to trust and fierce in loyalty
-    - deadpan and unflappable
-    - manic and inventive
-    - brooding and protective
+    - silent
+    - jittery
+    - sunny
+    - practical
+    - feral
+    - gruff
+    - paranoid
+    - fearless
+    - numb
+    - hopeful
+    - cagey
+    - loyal
+    - deadpan
+    - manic
+    - brooding
   quirk:
-    - talks to a gas mask as if it were a friend
-    - names every weapon ever carried
-    - counts bullets compulsively
-    - hoards bottle caps and buttons
-    - sings pre-war jingles from memory
-    - sleeps sitting up with boots on
-    - sniffs the wind before every step outside
-    - checks a Geiger counter even indoors
-    - eats in total silence, guarding the plate
-    - tells a different story about every scar
-    - ties knots in a string to mark days survived
-    - refuses to step on cracks in old asphalt
-    - salutes every faded billboard along the road
-    - whistles birdcalls to signal companions
-    - keeps a dead stranger's wristwatch wound and ticking
+    - talks to gas mask
+    - names weapons
+    - counts bullets
+    - hoards bottle caps
+    - sings pre-war jingles
+    - sleeps in boots
+    - sniffs the wind
+    - checks Geiger counter
+    - eats in silence
+    - tells scar stories
+    - counts days in knots
+    - avoids asphalt cracks
+    - salutes billboards
+    - whistles birdcalls
+    - winds dead stranger's watch
   flaw:
-    - hoards supplies even when others are starving
-    - trusts no one, not even friends
-    - drinks irradiated moonshine to dull the nightmares
-    - too quick to pull a trigger
-    - cannot leave the wounded behind, even when it gets people killed
-    - takes reckless risks just to feel alive
-    - steals by habit, even from allies
-    - clings to the rules of a dead world
-    - blames others for every loss
-    - addicted to scavenged painkillers
-    - sees every stranger as a threat
-    - freezes when the shooting starts
+    - hoarder
+    - distrustful
+    - drunk
+    - trigger-happy
+    - never leaves wounded
+    - thrill-seeker
+    - thief
+    - stuck in the past
+    - blames others
+    - painkiller addict
+    - hostile to strangers
+    - freezes under fire
 background:
   upbringing:
-    - grew up in a sealed fallout vault
-    - raised in the ruins of a shopping mall
-    - grew up on a rusting oil rig far out at sea
-    - raised by a nomad caravan crossing the dust flats
-    - grew up in a walled farming commune with strict rules
-    - raised among scavengers in a flooded city
-    - grew up in an abandoned subway tunnel network
-    - raised in a cult that worships the bombs
-    - grew up in a quarantine camp behind razor wire
-    - raised on a salvaged riverboat drifting downstream
-    - grew up in a raider fortress built from wrecked cars
-    - raised in a seed vault tended by aging scientists
+    - fallout vault
+    - ruined mall
+    - oil rig
+    - nomad caravan
+    - walled commune
+    - flooded city
+    - subway tunnels
+    - bomb cult
+    - quarantine camp
+    - riverboat
+    - raider fortress
+    - seed vault
   family:
-    - raised by a grandfather who remembered the old world
-    - the only survivor of a family wiped out by fever
-    - adopted by a band of wandering traders
-    - the child of the settlement's tyrant
-    - raised by an older sibling barely out of childhood
-    - born to a captive in a raider camp
-    - the eldest of a large clan that depends on every scrap brought home
-    - raised by a half-mad doomsday prepper
-    - separated from both parents during the evacuation
-    - the surviving twin, the other taken by slavers
-    - raised by a mute veteran who taught only by example
-    - the forgotten child of a vault overseer
+    - old-world grandfather
+    - orphaned by fever
+    - adopted by traders
+    - tyrant's child
+    - raised by sibling
+    - born in captivity
+    - eldest of many
+    - prepper parent
+    - separated from parents
+    - twin taken by slavers
+    - mute veteran guardian
+    - overseer's forgotten child
   occupation:
-    - a scavenger
-    - a water trader
-    - a caravan guard
-    - a convoy driver
-    - a field medic
-    - a mechanic who keeps old engines alive
-    - a radio operator
-    - a seed keeper
-    - a raider
-    - a tunnel rat
-    - a courier between settlements
-    - a preacher of a new faith
-    - a gunsmith
-    - a militia captain
-    - a salt miner
-    - a brewer of rotgut liquor
+    - scavenger
+    - water trader
+    - caravan guard
+    - convoy driver
+    - field medic
+    - mechanic
+    - radio operator
+    - seed keeper
+    - raider
+    - tunnel rat
+    - courier
+    - preacher
+    - gunsmith
+    - militia captain
+    - salt miner
+    - moonshiner
   turning point:
-    - exiled from the vault for breaking quarantine
-    - carrying a vial that might cure the plague
-    - on the run after stealing a warlord's fuel reserves
-    - the sole survivor of a caravan ambush
-    - woke from cryosleep decades too late
-    - hunted for knowing where the last clean well is
-    - sold to raiders and only just escaped
-    - sent out alone to find help before the settlement starves
-    - holding the map to a sealed military bunker
-    - bitten by something infected and hiding the wound
-    - suddenly leading a settlement after its old leader was murdered
-    - tracking the raiders who carried off a child
+    - exiled from vault
+    - plague cure
+    - stole warlord's fuel
+    - ambush survivor
+    - woke from cryosleep
+    - knows clean well
+    - escaped raiders
+    - sent for help
+    - bunker map
+    - hidden bite
+    - new settlement leader
+    - kidnapped child
 looks:
   build:
-    - rawboned and hungry-looking
-    - heavy and powerful
-    - scrawny and wiry
-    - tall and hollow-cheeked
-    - short and solid as a fencepost
-    - sinewy and sun-hardened
-    - broad and scarred
-    - slight and twitchy
-    - long-limbed and rangy
-    - thick-necked and bull-shouldered
+    - rawboned
+    - powerful
+    - scrawny
+    - hollow-cheeked
+    - short
+    - sinewy
+    - broad
+    - twitchy
+    - rangy
+    - bull-necked
   features:
-    - skin mottled with radiation burns
-    - a mechanical hand built from scrap
-    - a missing finger on each hand
-    - a shaved head crisscrossed with stitches
-    - cloudy eyes from a flash blinding
-    - teeth filed to points
-    - ritual tattoos covering a third of the face
-    - hair bleached white by the sun
-    - a tracheotomy scar and a rasping voice
-    - a hacking cough and blood-flecked lips
-    - a vivid bite scar on one forearm
-    - sun-cracked lips and peeling skin
-    - one ear missing, the other pierced with bolts
-    - a pale, glassy prosthetic eye
+    - radiation burns
+    - scrap-metal hand
+    - missing fingers
+    - stitched scalp
+    - flash-blinded eyes
+    - filed teeth
+    - face tattoos
+    - sun-bleached hair
+    - tracheotomy scar
+    - bloody cough
+    - bite scar
+    - peeling skin
+    - bolt-pierced ear
+    - glass eye
   style:
-    - wears a patched hazmat suit
-    - dresses in layered rags and road leather
-    - wears welding goggles pushed up on the forehead
-    - carries a rifle with a hand-carved stock
-    - armored in plates cut from road signs
-    - wears a gas mask around the neck at all times
-    - wrapped head to toe in ash-gray cloth
-    - wears a faded pre-war uniform with pride
-    - dresses in bright scavenged silks to stand out
-    - moves with the careful steps of someone who knows minefields
-    - wears a necklace of dog tags taken from the dead
-    - wears a jacket covered in hand-stitched patches
+    - hazmat suit
+    - rags and leather
+    - welding goggles
+    - hand-carved rifle
+    - road-sign armor
+    - gas mask
+    - ash-gray wraps
+    - pre-war uniform
+    - scavenged silks
+    - careful steps
+    - dog tag necklace
+    - patched jacket

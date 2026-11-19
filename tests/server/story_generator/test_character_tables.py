@@ -5,7 +5,7 @@ from server.story_generator.character_tables import CharacterTable, CharacterTab
 WESTERN = CharacterTable(
     given_names=["Wade"],
     family_names=["Colter"],
-    motivations=["owes a debt that can never be repaid"],
+    motivations=["money"],
     traits={"temperament": ["quiet"], "quirk": ["whittles"], "flaw": ["drinks"]},
     background={"upbringing": ["grew up on a ranch"], "family": ["an orphan"], "occupation": ["a drover"], "turning point": ["on the run"]},
     looks={"build": ["lean"], "features": ["a broken nose"], "style": ["a dusty hat"]},
@@ -14,7 +14,7 @@ WESTERN = CharacterTable(
 HORROR = CharacterTable(
     given_names=["Mara"],
     family_names=["Colter"],
-    motivations=["haunted by a sibling's death"],
+    motivations=["revenge"],
     traits={"temperament": ["quiet"], "quirk": ["counts steps"], "flaw": ["lies"]},
     background={"upbringing": ["grew up in a funeral home"], "family": ["an orphan"], "occupation": ["a nurse"], "turning point": ["inherited a house"]},
     looks={"build": ["gaunt"], "features": ["pale eyes"], "style": ["a black coat"]},
@@ -32,7 +32,7 @@ class CharacterTablesPooled(unittest.TestCase):
             CharacterTable(
                 given_names=["Wade", "Mara"],
                 family_names=["Colter"],
-                motivations=["owes a debt that can never be repaid", "haunted by a sibling's death"],
+                motivations=["money", "revenge"],
                 traits={"temperament": ["quiet"], "quirk": ["whittles", "counts steps"], "flaw": ["drinks", "lies"]},
                 background={
                     "upbringing": ["grew up on a ranch", "grew up in a funeral home"],

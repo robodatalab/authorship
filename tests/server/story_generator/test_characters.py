@@ -21,29 +21,19 @@ from server.story_generator.stages.characters import (
 SPACE_OPERA = CharacterTable(
     given_names=["Ines"],
     family_names=["Okafor"],
-    motivations=["lonely since leaving home"],
-    traits={"temperament": ["shy and watchful"], "quirk": ["hums when nervous"], "flaw": ["holds grudges for years"]},
-    background={
-        "upbringing": ["grew up poor in a mining colony"],
-        "family": ["raised by an alcoholic parent"],
-        "occupation": ["a ship's mechanic"],
-        "turning point": ["signed on to escape a debt collector"],
-    },
-    looks={"build": ["tall and wiry"], "features": ["a burn scar across one cheek"], "style": ["wears a patched flight jacket"]},
+    motivations=["being loved"],
+    traits={"temperament": ["shy"], "quirk": ["hums"], "flaw": ["grudges"]},
+    background={"upbringing": ["mining colony"], "family": ["alcoholic parent"], "occupation": ["mechanic"], "turning point": ["debt"]},
+    looks={"build": ["wiry"], "features": ["burn scar"], "style": ["flight jacket"]},
 )
 
 ROMANCE = CharacterTable(
     given_names=["Clara"],
     family_names=["Bell"],
-    motivations=["remembers the parents' devoted love and wants the same"],
-    traits={"temperament": ["warm and teasing"], "quirk": ["writes letters never sent"], "flaw": ["falls too fast"]},
-    background={
-        "upbringing": ["grew up above a seaside bakery"],
-        "family": ["the neglected child of a rich father"],
-        "occupation": ["a florist"],
-        "turning point": ["came home to sell the family house"],
-    },
-    looks={"build": ["small and quick"], "features": ["freckles and unruly red hair"], "style": ["dresses in thrifted silk"]},
+    motivations=["loving someone"],
+    traits={"temperament": ["warm"], "quirk": ["writes letters"], "flaw": ["jealous"]},
+    background={"upbringing": ["seaside town"], "family": ["rich father"], "occupation": ["florist"], "turning point": ["inheritance"]},
+    looks={"build": ["small"], "features": ["freckles"], "style": ["thrifted silk"]},
 )
 
 TABLES = CharacterTables({"space opera": SPACE_OPERA, "romance": ROMANCE})
@@ -100,11 +90,10 @@ class RollCharacterStepCall(unittest.IsolatedAsyncioTestCase):
                 CharacterCell(
                     "Varn",
                     "She left the fleet.\n\n"
-                    "Motivation for Motherhood: lonely since leaving home\n\n"
-                    "Traits: shy and watchful; hums when nervous; holds grudges for years\n\n"
-                    "Background: grew up poor in a mining colony; raised by an alcoholic parent; "
-                    "a ship's mechanic; signed on to escape a debt collector\n\n"
-                    "Looks: tall and wiry; a burn scar across one cheek; wears a patched flight jacket",
+                    "Motivation for Motherhood: being loved\n\n"
+                    "Traits: shy, hums, grudges\n\n"
+                    "Background: mining colony, alcoholic parent, mechanic, debt\n\n"
+                    "Looks: wiry, burn scar, flight jacket",
                     False,
                     None,
                     "v1",
@@ -124,11 +113,10 @@ class RollCharacterStepCall(unittest.IsolatedAsyncioTestCase):
             [
                 CharacterCell(
                     "Clara Bell",
-                    "Motivation: remembers the parents' devoted love and wants the same\n\n"
-                    "Traits: warm and teasing; writes letters never sent; falls too fast\n\n"
-                    "Background: grew up above a seaside bakery; the neglected child of a rich father; "
-                    "a florist; came home to sell the family house\n\n"
-                    "Looks: small and quick; freckles and unruly red hair; dresses in thrifted silk",
+                    "Motivation: loving someone\n\n"
+                    "Traits: warm, writes letters, jealous\n\n"
+                    "Background: seaside town, rich father, florist, inheritance\n\n"
+                    "Looks: small, freckles, thrifted silk",
                     False,
                     None,
                     "u1",

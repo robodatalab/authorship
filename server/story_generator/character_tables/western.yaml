@@ -63,166 +63,166 @@ names:
     - Haskell
     - Granger
 motivation:
-  - lost the homestead to a land grab and wants it back
-  - promised a dying partner to see the gold delivered
-  - wants to be remembered as more than a name on a wanted poster
-  - ran away from an eastern finishing school and refuses to go back
-  - drifted for twenty years and is tired of sleeping alone
-  - buried a whole family after the fever and has nothing left to lose
-  - was the only one to walk out of a massacre alive
-  - wants a piece of land with a fence and a name on it
-  - once froze in a gunfight and a friend died for it
-  - carries a letter from a stranger promising a new life out west
-  - was raised on a family feud and is sick of the killing
-  - is the child of the town drunk and means to prove everyone wrong
-  - struck it rich once and lost it all overnight
-  - is haunted by the face of the first person ever killed
-  - longs for the ocean after a childhood on the coast
-  - lives by an old code nobody else remembers
-  - took the blame for a sibling's crime and spent years in prison
-  - sees the railroad coming and wants to get rich before it arrives
-  - was cheated out of a mine claim by a smooth-talking banker
-  - was nursed back from death by strangers and swore to repay the kindness
+  - money
+  - power
+  - ambition
+  - looking good
+  - being loved
+  - loving someone
+  - revenge
+  - freedom
+  - safety
+  - belonging
+  - recognition
+  - curiosity
+  - duty
+  - redemption
+  - pride
+  - jealousy
+  - family
+  - land
+  - justice
+  - a fresh start
 traits:
   temperament:
-    - laconic and steady
-    - hotheaded and loud
-    - folksy and sly
-    - gruff with a hidden tender streak
-    - prim and unshakable
-    - easygoing and slow to anger
-    - haughty and refined
-    - cheerful and talkative
-    - weary and fatalistic
-    - hard-eyed and unforgiving
-    - mischievous and boastful
-    - devout and stern
-    - watchful and patient as a hawk
-    - wild and joyful
-    - courteous and cold
+    - laconic
+    - hot-headed
+    - folksy
+    - gruff
+    - prim
+    - easygoing
+    - haughty
+    - talkative
+    - fatalistic
+    - unforgiving
+    - boastful
+    - devout
+    - patient
+    - wild
+    - coldly polite
   quirk:
-    - chews on a matchstick
-    - walks a silver dollar across the knuckles
-    - quotes Shakespeare to the cattle
-    - rolls cigarettes but never smokes them
-    - greets every horse by name
-    - spits tobacco with deadly accuracy
-    - keeps a ledger of every poker hand ever played
-    - whittles little birds when thinking
-    - tips a hat to every grave along the trail
-    - sings hymns off-key while riding
-    - talks to a dead partner by the campfire
-    - tastes the soil before buying any land
-    - never takes off the gloves, even to eat
-    - cannot tell a story without exaggerating
-    - sleeps with a pistol tucked under the saddle
+    - chews matchsticks
+    - coin tricks
+    - quotes Shakespeare
+    - rolls unsmoked cigarettes
+    - greets horses
+    - spits tobacco
+    - logs poker hands
+    - whittles birds
+    - tips hat to graves
+    - sings off-key
+    - talks to dead partner
+    - tastes the soil
+    - never removes gloves
+    - tall tales
+    - sleeps with pistol
   flaw:
-    - cannot walk away from a poker game
-    - drinks whiskey before breakfast
-    - too proud to back down from a challenge
-    - suspicious of every newcomer to town
-    - greedy for gold beyond all sense
-    - vengeful to the point of self-destruction
-    - lies about the past to anyone who asks
-    - falls for every sad story
-    - reckless with other people's money
-    - cowardly when it counts most
-    - bullies anyone weaker
-    - falls in love too fast and too hard
+    - gambler
+    - drunk
+    - too proud
+    - suspicious of strangers
+    - greedy
+    - vengeful
+    - lies about past
+    - soft touch
+    - reckless with money
+    - coward
+    - bully
+    - falls in love easily
 background:
   upbringing:
-    - grew up in a silver mining camp in the mountains
-    - raised on a cattle ranch on the open range
-    - grew up in a saloon, sweeping floors for tips
-    - raised in a covered wagon heading west
-    - grew up in a Boston townhouse before the money ran out
-    - raised in a mission school in New Mexico
-    - grew up on a struggling homestead in Kansas
-    - raised in a railroad tent town that moved with the tracks
-    - grew up in a strict religious settlement in the desert
-    - raised on a gambling steamboat on the Mississippi
-    - grew up in a Texas border town, speaking two languages
-    - raised behind a laundry in San Francisco's Chinatown
+    - mining camp
+    - cattle ranch
+    - saloon
+    - covered wagon
+    - fallen eastern family
+    - mission school
+    - struggling homestead
+    - railroad tent town
+    - religious settlement
+    - gambling steamboat
+    - border town
+    - laundry in Chinatown
   family:
-    - raised by an outlaw uncle
-    - the youngest of seven and always the runt
-    - the child of a preacher with a violent temper
-    - raised by a widowed mother who ran a boarding house
-    - the heir of a cattle baron who never approved
-    - orphaned on the trail and raised by a wagon train
-    - the child of a sheriff killed in the line of duty
-    - raised by a grandfather who never stopped fighting the war
-    - the estranged child of a railroad tycoon
-    - born to a family of horse thieves
-    - taken in by a kindly cook on a cattle drive
-    - has an older sibling who now leads a notorious gang
+    - outlaw uncle
+    - runt of seven
+    - violent preacher parent
+    - widowed mother
+    - cattle baron's heir
+    - wagon train orphan
+    - dead sheriff's child
+    - bitter veteran grandfather
+    - railroad tycoon's child
+    - horse thieves
+    - adopted by trail cook
+    - gang leader sibling
   occupation:
-    - a stagecoach driver
-    - a saloon keeper
-    - a bounty hunter
-    - a cattle rustler
-    - a frontier doctor
-    - a teacher in a one-room schoolhouse
-    - a riverboat gambler
-    - a Pinkerton detective
-    - a blacksmith
-    - a telegraph operator
-    - a prospector
-    - a deputy marshal
-    - a traveling snake-oil peddler
-    - a trail cook
-    - a newspaper printer in a frontier town
-    - a hired gun
+    - stagecoach driver
+    - saloon keeper
+    - bounty hunter
+    - cattle rustler
+    - frontier doctor
+    - schoolteacher
+    - riverboat gambler
+    - private detective
+    - blacksmith
+    - telegraph operator
+    - prospector
+    - deputy marshal
+    - snake-oil peddler
+    - chuckwagon cook
+    - newspaper printer
+    - hired gun
   turning point:
-    - on the run after a train robbery went wrong
-    - just arrived in town with a forged deed to the best land
-    - framed for killing the sheriff
-    - riding to collect a bounty on an old friend
-    - just released from prison with a score to settle
-    - the new owner of a saloon won in a card game
-    - stranded after the stagecoach was robbed
-    - carrying the map to a lost mine everyone wants
-    - hired to protect a town nobody else will defend
-    - hiding from a gang after testifying against its leader
-    - come west to claim an inheritance that turns out to be a debt
-    - sworn in as sheriff the day after the last one was shot
+    - train robbery gone wrong
+    - forged land deed
+    - framed for murder
+    - hunting old friend
+    - released from prison
+    - won a saloon
+    - stagecoach robbery
+    - lost mine map
+    - defending a town
+    - testified against gang
+    - inherited debt
+    - new sheriff
 looks:
   build:
-    - tall and rawhide-lean
-    - squat and powerful
-    - bowlegged from a life in the saddle
-    - slight and nimble
-    - big-boned and heavy-handed
-    - wiry and weathered
-    - paunchy and soft-handed
-    - long-legged and loose-limbed
-    - stout and sturdy
-    - skeletal and sun-dried
+    - rawhide-lean
+    - squat
+    - bowlegged
+    - nimble
+    - big-boned
+    - wiry
+    - paunchy
+    - long-legged
+    - stout
+    - skeletal
   features:
-    - a bullet scar through one hand
-    - sun-bleached eyebrows and deep squint lines
-    - a gold front tooth
-    - a nose flattened in a bare-knuckle fight
-    - a rope burn scar around the neck
-    - claw marks from a grizzly across the back
-    - pale gray eyes that rarely blink
-    - a missing earlobe shot off in a duel
-    - hands stained with gunpowder
-    - a face full of freckles under a sunburn
-    - a crooked grin with two teeth missing
-    - a voice gone gravelly from years of trail dust
-    - a tattoo of a sailing ship from a former life at sea
-    - hair turned white overnight after an ambush
+    - bullet-scarred hand
+    - squint lines
+    - gold tooth
+    - flattened nose
+    - rope burn scar
+    - grizzly claw scars
+    - pale gray eyes
+    - missing earlobe
+    - powder-stained hands
+    - freckles
+    - gap-toothed grin
+    - gravelly voice
+    - ship tattoo
+    - white hair
   style:
-    - wears a long canvas duster caked with trail dust
-    - dresses in an embroidered vest and a silk cravat
-    - wears a hat with a rattlesnake-skin band
-    - wears fringed and patched buckskins
-    - goes everywhere in a black frock coat and a string tie
-    - wears spurs that jingle with every step
-    - carries two pearl-handled revolvers
-    - dresses in mourning black and never says for whom
-    - wears faded calico with a gunbelt slung low
-    - dresses in an eastern suit badly suited to the desert
-    - wears a sombrero and a serape against the sun
-    - moves with the swagger of someone who has never lost a fight
+    - duster coat
+    - embroidered vest
+    - rattlesnake hatband
+    - buckskins
+    - black frock coat
+    - jingling spurs
+    - pearl-handled revolvers
+    - mourning black
+    - calico and gunbelt
+    - eastern suit
+    - sombrero and serape
+    - swagger

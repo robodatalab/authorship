@@ -63,166 +63,166 @@ names:
     - Coldwater
     - Ventris
 motivation:
-  - lost a home world to orbital bombardment and wants it to mean something
-  - owes a life debt to an alien who once saved the whole crew
-  - a clone of a war hero, desperate to be more than a copy
-  - promised a dying captain to bring the ship home
-  - born on a generation ship and aching to stand under an open sky
-  - carries the last blood of a deposed royal line
-  - betrayed by the Fleet and wants the admiralty to answer for it
-  - has outlived three crews and fears being the last one standing
-  - woke from decades of cryosleep to find everyone loved long gone
-  - wants to see the edge of the charted galaxy before dying
-  - haunted by obeying an order that burned a colony
-  - sold into indenture as a child and never stopped counting the days
-  - lost a twin to a wormhole accident and still hears the voice
-  - hopes to buy back the family's repossessed ship
-  - carries a stolen data chip that could end a war
-  - raised on war propaganda and only now seeing the lies
-  - hears the call of a faith nobody else remembers
-  - wants to outshine a decorated admiral parent
-  - exiled for a crime that never happened
-  - dreams of founding a free colony with no masters
+  - money
+  - power
+  - ambition
+  - looking good
+  - being loved
+  - loving someone
+  - revenge
+  - freedom
+  - safety
+  - belonging
+  - recognition
+  - curiosity
+  - duty
+  - redemption
+  - pride
+  - jealousy
+  - family
+  - glory
+  - honor
+  - exploration
 traits:
   temperament:
-    - stoic and disciplined
-    - reckless and grinning
-    - cold and clinical
-    - fiery and honor-bound
-    - serene and unreadable
-    - jittery and brilliant
-    - world-weary and wry
-    - swaggering and boastful
-    - paranoid and meticulous
-    - idealistic to the point of danger
-    - regal and imperious
-    - cheerful in the face of doom
-    - haunted and taciturn
-    - curious about everything
-    - ruthlessly pragmatic
+    - stoic
+    - reckless
+    - clinical
+    - honor-bound
+    - serene
+    - jittery
+    - world-weary
+    - boastful
+    - paranoid
+    - idealistic
+    - imperious
+    - cheerful
+    - haunted
+    - curious
+    - ruthless
   quirk:
-    - talks to the ship's computer like an old friend
-    - taps the hull twice for luck before every launch
-    - collects a soil sample from every planet visited
-    - swears in a dead alien language
-    - never takes off a pair of magnetic boots
-    - hums old fleet anthems while working
-    - keeps a six-legged alien pet in a jacket pocket
-    - insists on cabin gravity set slightly too heavy
-    - eats only ration bars, by choice
-    - tells the time by the positions of distant stars
-    - sleeps in the cockpit instead of quarters
-    - bets on everything, even firefights
-    - recites the names of lost crewmates before every jump
-    - speaks with a thick asteroid-belt drawl
-    - rewires anything left unattended
+    - talks to ship
+    - taps hull for luck
+    - collects soil samples
+    - swears in alien
+    - magnetic boots
+    - hums fleet anthems
+    - alien pet
+    - likes heavy gravity
+    - eats only rations
+    - tells time by stars
+    - sleeps in cockpit
+    - compulsive bettor
+    - recites fallen crew
+    - belter drawl
+    - tinkerer
   flaw:
-    - trusts machines more than people
-    - addicted to combat stims
-    - cannot resist a bad wager
-    - follows orders past the point of conscience
-    - sees every alien as a threat
-    - hoards secrets as leverage
-    - would sell out a crewmate for the right price
-    - too proud to call for help
-    - obsessed with revenge above everything else
-    - reckless with other people's lives
-    - believes in prophecy over evidence
-    - cannot let go of a dead empire's glory
+    - trusts machines
+    - stim addict
+    - gambler
+    - blindly obedient
+    - xenophobe
+    - secret hoarder
+    - mercenary
+    - too proud
+    - vengeful
+    - careless with lives
+    - zealot
+    - imperial nostalgia
 background:
   upbringing:
-    - grew up in the hydroponic decks of a generation ship
-    - raised in the slums along a tidally locked world's twilight band
-    - grew up in a methane-mining outpost on a frozen moon
-    - raised in the gilded court of an imperial capital
-    - grew up as a refugee shuttled between orbital camps
-    - raised by monks in a monastery orbiting a dying star
-    - grew up aboard a cargo hauler, never long in any port
-    - raised in a military academy from the age of six
-    - grew up among the floating cities of a gas giant
-    - raised in a terraforming colony where the air was still thin
-    - grew up in the lawless undercity of a station hub
-    - raised in a quarantine habitat sealed off from the rest of the station
+    - generation ship
+    - twilight slums
+    - mining colony
+    - imperial court
+    - refugee camps
+    - orbital monastery
+    - cargo hauler
+    - military academy
+    - gas giant city
+    - terraforming colony
+    - station undercity
+    - quarantine habitat
   family:
-    - the illegitimate heir of a ruling house
-    - orphaned when pirates raided the family freighter
-    - raised by an android caretaker after the parents vanished
-    - the child of a disgraced admiral
-    - part of a sprawling clan of smugglers
-    - the youngest of a long line of decorated pilots
-    - the spare child of a corporate dynasty
-    - sold to pay off a parent's gambling debts
-    - the designed child of a gene-engineering program
-    - adopted by an alien family with very different customs
-    - the only survivor of a family wiped out in a coup
-    - carries the name of a famous rebel grandparent
+    - illegitimate heir
+    - orphaned by pirates
+    - android caretaker
+    - disgraced admiral parent
+    - smuggler clan
+    - pilot dynasty
+    - spare corporate heir
+    - sold for debt
+    - gene-engineered
+    - alien adoptive family
+    - coup survivor
+    - rebel grandparent
   occupation:
-    - a starship engineer
-    - a freelance smuggler
-    - a jump navigator
-    - an imperial diplomat
-    - a bounty hunter
-    - a fleet marine
-    - a xenobiologist
-    - a salvage diver
-    - a ship's medic
-    - a cargo hauler captain
-    - a court spy
-    - a terraforming surveyor
-    - a jump-gate technician
-    - a rebel courier
-    - a cantina owner on a backwater station
-    - an exiled noble
+    - starship engineer
+    - smuggler
+    - jump navigator
+    - imperial diplomat
+    - bounty hunter
+    - fleet marine
+    - xenobiologist
+    - salvage diver
+    - ship's medic
+    - cargo captain
+    - court spy
+    - terraforming surveyor
+    - jump-gate technician
+    - rebel courier
+    - cantina owner
+    - exiled noble
   turning point:
-    - signed onto a tramp freighter one step ahead of a bounty
-    - the only survivor of an ambush everyone thinks was an inside job
-    - hauling a sealed cargo that nobody will name
-    - woke from cryosleep with orders from a captain long dead
-    - stole a prototype ship and cannot give it back
-    - holds the codes to a doomsday weapon
-    - court-martialed and offered a suicide mission instead of prison
-    - discovered the crew's employer is behind a genocide
-    - stranded on a hostile planet after a crash
-    - betrothed to an enemy house to seal a treaty
-    - picked up a distress beacon from a ship lost a century ago
-    - framed for an assassination and on every wanted list
+    - bounty on head
+    - ambush survivor
+    - mystery cargo
+    - woke from cryosleep
+    - stolen prototype
+    - doomsday codes
+    - suicide mission
+    - employer's genocide
+    - crash-landed
+    - political betrothal
+    - ancient distress beacon
+    - framed assassin
 looks:
   build:
-    - tall and gaunt from low gravity
-    - squat and dense from a heavy-gravity world
-    - lean with the pallor of a lifelong spacer
-    - broad and battle-hardened
-    - delicate with gene-tweaked symmetry
-    - half-cybernetic and heavier than expected
-    - wiry and twitchy-fast
-    - stout and barrel-chested
-    - statuesque and unnervingly still
-    - small and nimble enough for maintenance ducts
+    - gaunt
+    - squat
+    - lean spacer
+    - battle-hardened
+    - gene-perfect
+    - half-cybernetic
+    - wiry
+    - barrel-chested
+    - statuesque
+    - small and nimble
   features:
-    - a chrome cybernetic eye
-    - glowing tattoos under the skin
+    - cybernetic eye
+    - glowing tattoos
     - radiation-white hair
-    - a mechanical hand with exposed pistons
-    - skin tinted faintly blue by a colony's water
-    - a barcode branded on the neck
-    - pupils that widen in the dark like a cat's
-    - a jagged scar from a decompression accident
-    - a neural port at the base of a shaved skull
-    - freckles that glow faintly under ultraviolet
-    - an alien symbiote coiled around one wrist
-    - teeth filed to points in a warrior tradition
-    - frostbitten ears from a winter world
-    - a voice modulator stitched into the throat
+    - mechanical hand
+    - blue-tinted skin
+    - branded barcode
+    - cat-like pupils
+    - decompression scar
+    - neural port
+    - glowing freckles
+    - alien symbiote
+    - filed teeth
+    - frostbitten ears
+    - voice modulator
   style:
-    - wears a flight suit covered in mission patches
-    - dresses in flowing court silks
-    - always in full combat armor, even off duty
-    - wears a long coat with a holster in plain sight
-    - dresses in mismatched salvaged gear
-    - wears the uniform of a navy that no longer exists
-    - hides under a hooded smuggler's cloak
-    - walks with the rolling gait of a zero-g native
-    - covered in ritual jewelry from a dozen worlds
-    - stands at attention even when relaxed
-    - wears a pressure suit like a second skin
-    - carries a ceremonial blade at the hip
+    - patched flight suit
+    - court silks
+    - combat armor
+    - long coat
+    - salvaged gear
+    - defunct navy uniform
+    - smuggler's cloak
+    - zero-g gait
+    - ritual jewelry
+    - military bearing
+    - pressure suit
+    - ceremonial blade

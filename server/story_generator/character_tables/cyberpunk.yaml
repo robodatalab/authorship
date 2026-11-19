@@ -63,166 +63,166 @@ names:
     - Strand
     - Kurosawa
 motivation:
-  - sold a memory to pay rent and wants to know what it was
-  - watched a corporation buy the neighborhood and erase it
-  - still pays monthly installments on borrowed lungs
-  - once loved someone who uploaded and never came back
-  - knows a clone is out there living the life that was stolen
-  - wants to feel something real in a world of simulations
-  - is the last unaugmented member of a crew and refuses to fall behind
-  - was wiped from every database and needs proof of having existed
-  - lost a sibling to a designer drug and blames the maker
-  - was the face of an ad campaign and cannot escape that smile
-  - was once a rising executive and fell in a single afternoon
-  - keeps a dead partner's personality on a chip and talks to it nightly
-  - dreams of seeing real stars above the smog
-  - inherited a mountain of medical debt at the age of nine
-  - was raised in a corporate creche and longs for a real family
-  - sold out a friend to a fixer and has regretted it ever since
-  - wants to own something no one can repossess
-  - has six months left before the neural implant degrades
-  - was promised a better life by a recruiter and got a contract instead
-  - remembers a sky that was blue and wants it back
+  - money
+  - power
+  - ambition
+  - looking good
+  - being loved
+  - loving someone
+  - revenge
+  - freedom
+  - safety
+  - belonging
+  - recognition
+  - curiosity
+  - duty
+  - redemption
+  - pride
+  - jealousy
+  - family
+  - status
+  - escape
+  - survival
 traits:
   temperament:
-    - cool and unreadable
-    - twitchy and wired
-    - charming and mercenary
-    - idealistic and furious
-    - cynical with a buried soft streak
-    - hyper-focused and terse
-    - reckless and grinning
-    - polite to the point of menace
-    - lonely and overly talkative
-    - detached and clinical
-    - playful and irreverent
-    - cold-eyed and vigilant
-    - smooth-talking and restless
-    - quietly obsessive
-    - moody and theatrical
+    - unreadable
+    - wired
+    - mercenary
+    - idealistic
+    - cynical
+    - terse
+    - reckless
+    - menacingly polite
+    - lonely
+    - clinical
+    - irreverent
+    - vigilant
+    - smooth-talking
+    - obsessive
+    - theatrical
   quirk:
-    - narrates life in the third person
-    - taps the data jack behind one ear when thinking
-    - changes eye color to match the mood
-    - eats only real food, never printed
-    - collects paper books in a city that has forgotten them
-    - speaks in fragments of old movie dialogue
-    - constantly runs diagnostics on a cybernetic arm
-    - sleeps only in a bathtub ringed with signal jammers
-    - tips every street vendor absurdly well
-    - refuses to look at advertising, eyes always down
-    - keeps a pet cockroach in a jar
-    - gives every AI a pet name
-    - switches between four languages mid-sentence
-    - counts the exits of every room out loud
-    - laughs at the wrong moments, a glitch from a bad implant
+    - talks in third person
+    - taps data jack
+    - mood-colored eyes
+    - eats real food
+    - collects paper books
+    - quotes old movies
+    - runs self-diagnostics
+    - sleeps in bathtub
+    - overtips vendors
+    - avoids ads
+    - pet cockroach
+    - names every AI
+    - switches languages
+    - counts exits
+    - glitchy laugh
   flaw:
-    - addicted to recorded memories of other people's lives
-    - sells out anyone for the right price
-    - cannot resist hacking anything locked
-    - trusts machines more than people
-    - chases upgrades past the point of sanity
-    - lies so often the truth has gone blurry
-    - burns bridges for the thrill of it
-    - obsessively protective of a street reputation
-    - hooked on combat stims
-    - treats people like code to be debugged
-    - never forgets a slight and never forgives a debt
-    - spends every cred the moment it lands
+    - memory junkie
+    - sellout
+    - compulsive hacker
+    - trusts machines
+    - upgrade addict
+    - liar
+    - bridge burner
+    - reputation-obsessed
+    - stim addict
+    - treats people like code
+    - grudge holder
+    - spendthrift
 background:
   upbringing:
-    - grew up in a megablock stacked two hundred floors high
-    - raised in a corporate arcology without ever seeing the street
-    - grew up among the stilt shacks of a flooded district
-    - raised among the stalls of a black market under a freeway
-    - grew up in a capsule hotel, sleeping in shifts
-    - raised by a street gang in the industrial zone
-    - grew up in a gated suburb behind drone patrols
-    - raised in a data center where the parents worked as cooling techs
-    - grew up on an orbital station and came down as a teenager
-    - raised in a refugee enclave on the city's edge
-    - grew up in a corporate boarding school for future executives
-    - raised in the back room of a cyberclinic
+    - megablock
+    - corporate arcology
+    - flooded stilt district
+    - black market
+    - capsule hotel
+    - street gang
+    - gated suburb
+    - data center
+    - orbital station
+    - refugee enclave
+    - corporate boarding school
+    - cyberclinic back room
   family:
-    - the gene-edited child of ambitious parents
-    - raised by an AI nanny while the parents worked endless shifts
-    - the disowned heir of a corporate dynasty
-    - the child of a famous hacker who vanished
-    - raised by a grandmother running an underground clinic
-    - one of a dozen clones raised in a lab
-    - the child of a cop on the corporate payroll
-    - abandoned at a charity clinic as an infant
-    - raised by a gang boss as a favor to a dead friend
-    - the overlooked sibling of a famous pop idol
-    - the only child of deeply indebted gig workers
-    - adopted by a wealthy couple who wanted a trophy
+    - gene-edited child
+    - raised by AI nanny
+    - disowned corporate heir
+    - vanished hacker parent
+    - street-doc grandmother
+    - clone
+    - corrupt cop parent
+    - abandoned at birth
+    - gang boss guardian
+    - pop idol sibling
+    - indebted gig workers
+    - trophy adoptee
   occupation:
-    - a netrunner for hire
-    - a corporate fixer
-    - a street samurai
-    - a black-market cyber-surgeon
-    - a data courier with a head full of secrets
-    - a security guard at a corporate tower
-    - a drone pilot
-    - a holo-ad designer
-    - a smuggler of synthetic organs
-    - a journalist for a pirate news stream
-    - a debt collector for a megacorp
-    - a noodle-bar cook
-    - a club DJ
-    - a corporate assassin
-    - a memory broker
-    - a maintenance tech in the undercity
+    - netrunner
+    - fixer
+    - street samurai
+    - black-market surgeon
+    - data courier
+    - security guard
+    - drone pilot
+    - holo-ad designer
+    - organ smuggler
+    - pirate journalist
+    - debt collector
+    - noodle-bar cook
+    - club DJ
+    - corporate assassin
+    - memory broker
+    - maintenance tech
   turning point:
-    - just stole a prototype the whole company wants back
-    - woke up with someone else's memories installed
-    - fired and blacklisted after refusing to cover up a death
-    - holding a datachip that could crash the stock exchange
-    - framed by an AI for an executive's murder
-    - hunted after witnessing a corporate black op
-    - locked out of a cyberware subscription, with an arm going dead
-    - just broke out of a corporate labor camp with a tracker still implanted
-    - received a message from a sibling declared dead years ago
-    - owes a crime boss one impossible job
-    - infected by a rogue AI that whispers from inside the skull
-    - suddenly famous after a viral video and hunted because of it
+    - stolen prototype
+    - someone else's memories
+    - blacklisted whistleblower
+    - market-crashing datachip
+    - framed by AI
+    - witnessed black op
+    - lapsed cyberware subscription
+    - labor camp escapee
+    - dead sibling's message
+    - debt to crime boss
+    - rogue AI infection
+    - viral fame
 looks:
   build:
-    - lean and wired with implants
-    - massive and chrome-plated
-    - small and lightning-quick
-    - gaunt from too many all-nighters
-    - sculpted to corporate perfection
-    - hunched and narrow-shouldered
-    - thick-set and bristling with armor
-    - lanky and loose-jointed
-    - delicate and doll-like
-    - heavy and soft from a life indoors
+    - lean
+    - chrome-plated
+    - lightning-quick
+    - gaunt
+    - sculpted
+    - hunched
+    - armored
+    - lanky
+    - doll-like
+    - soft
   features:
-    - a chrome jaw
-    - glowing tattoos that pulse with the heartbeat
-    - eyes replaced with mirrored lenses
-    - a barcode tattooed on the neck
-    - hair dyed electric blue
-    - a ring of data ports along the skull
-    - a ragged scar where an implant was ripped out
-    - fingers lengthened by surgery
-    - skin printed with shifting advertisements
-    - a holographic mask that makes the face subtly flicker
-    - one red cybernetic eye and one natural brown
-    - a cybernetic arm with a hidden blade
-    - a voice modulated by a throat implant
+    - chrome jaw
+    - pulsing tattoos
+    - mirrored eyes
+    - barcode tattoo
+    - electric blue hair
+    - skull data ports
+    - ripped-out implant scar
+    - surgically long fingers
+    - ad-printed skin
+    - holographic mask
+    - red cyber eye
+    - arm blade
+    - modulated voice
     - bioluminescent freckles
   style:
-    - wears a long translucent raincoat
-    - dresses in sleek corporate grays
-    - wears sunglasses even at midnight
-    - wears a jacket studded with blinking LEDs
-    - dresses in faded vintage band shirts
-    - wears a face mask printed with a grinning mouth
-    - moves with the jittery precision of boosted reflexes
-    - wears a hoodie with the hood always up
-    - dresses in armored streetwear in gang colors
-    - always in a pressed suit that costs more than an apartment
-    - wears dozens of cheap rings and bangles
-    - walks surrounded by a small cloud of camera drones
+    - translucent raincoat
+    - corporate grays
+    - sunglasses at night
+    - blinking LED jacket
+    - vintage band shirts
+    - grinning face mask
+    - boosted reflexes
+    - hood always up
+    - gang colors
+    - expensive suit
+    - cheap rings
+    - camera drones
