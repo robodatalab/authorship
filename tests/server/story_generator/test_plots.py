@@ -102,8 +102,16 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
         with_the_second_event = await second_event(with_the_ends)
         with_every_event = await third_event(with_the_second_event)
 
-        _, _, _, varns_house, the_base = with_every_event.cells
-        self.assertEqual((varns_house.title, the_base.title), ("earth, Varn's house", "mars, the base"))
+        _, _, _, earth, varns_house, mars, the_base = with_every_event.cells
+        self.assertEqual(
+            [
+                (earth.title, earth.parent(with_every_event)),
+                (varns_house.title, varns_house.parent(with_every_event)),
+                (mars.title, mars.parent(with_every_event)),
+                (the_base.title, the_base.parent(with_every_event)),
+            ],
+            [("earth", None), ("Varn's house", earth), ("mars", None), ("the base", mars)],
+        )
 
 
 class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):

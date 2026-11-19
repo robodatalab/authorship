@@ -5,7 +5,9 @@ import {
     type AuthorFileEditorSession,
 } from "../../extension/vscode_runtime/author_file_editor_session";
 import { NoteCell } from "authordoc/cells/note_cell";
-import { EventEmitter, Uri, workspaceState } from "./vscode";
+import { AuthorDocDiff } from "authordoc/diff";
+import { Suggestion } from "authordoc/suggestion";
+import { EventEmitter, files, Uri } from "./vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
@@ -34,7 +36,6 @@ function openSession(text: string): OpenSession {
         Uri.file(DOCUMENT_PATH) as never,
         text,
         edited as never,
-        workspaceState as never,
     );
     return {
         session,
@@ -366,5 +367,71 @@ describe("undoing and redoing what the author did", () => {
             "c1:markdown:She saw the door.",
             "c2:markdown:He heard a bell.",
         ]);
+    });
+});
+
+describe("the suggestions the document holds", () => {
+    const SUGGESTED_AT_LAST =
+        '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last" -->\n';
+    const THE_STORY_WITH_A_SUGGESTION =
+        THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST + "\n" + HE_HEARD;
+
+    it("are kept from the file opened", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        const kept = session.document.suggestions.map((suggestion) => suggestion.cellId);
+
+        expect(kept).toEqual(["c1"]);
+    });
+
+    it("are written back to the file with the cells", async () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        await session.writeTheDocumentToItsFile();
+
+        expect(files.get(DOCUMENT_PATH)).toBe(THE_STORY_WITH_A_SUGGESTION);
+    });
+
+    it("stay as they are while the author edits the cells", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        typing(session, "c2", "He heard the bell.", " Twice.");
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST + "\n" +
+                '<!-- cell: markdown id="c2" -->\n\nHe heard the bell. Twice.\n',
+        );
+    });
+
+    it("patch their cell with their diff once accepted, and are dropped", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.acceptTheSuggestion("c1");
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n' + "\n" + HE_HEARD,
+        );
+    });
+
+    it("are dropped once rejected, leaving their cell as it is", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.rejectTheSuggestion("c1");
+
+        expect(session.document.serialize()).toBe(THE_STORY);
+    });
+
+    it("take a change that touches no cell but a suggestion", () => {
+        const { session } = openSession(THE_STORY);
+        const emptyDiff = new AuthorDocDiff([]);
+        const suggestion = new Suggestion("c2", emptyDiff);
+
+        session.changeTheDocument((document) => {
+            const documentWithTheSuggestion = document.withSuggestion(suggestion);
+            return documentWithTheSuggestion;
+        });
+
+        const suggested = session.document.suggestions.map((held) => held.cellId);
+        expect(suggested).toEqual(["c2"]);
     });
 });

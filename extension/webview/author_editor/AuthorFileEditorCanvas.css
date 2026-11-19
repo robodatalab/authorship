@@ -242,6 +242,44 @@ body {
     );
 }
 
+.author-file-editor-suggestion {
+    margin: 6px 0;
+    border: 3px solid var(--vscode-editorWarning-foreground, #cca700);
+    border-radius: 6px;
+}
+
+.author-file-editor-suggestion-heading {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px 2px 8px;
+    color: var(--vscode-editor-background);
+    background: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.author-file-editor-suggestion-says {
+    margin-right: auto;
+    font-size: 0.9em;
+}
+
+.author-file-editor-suggestion-heading button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 20px;
+    padding: 0;
+    color: inherit;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.author-file-editor-suggestion-heading button:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
 .author-file-editor-insert-cell-menu-button-pointed-at {
     position: relative;
     display: inline-flex;

@@ -12,7 +12,8 @@ import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation
 import type { StoryGeneration } from "../vscode_runtime/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
-import { parse } from "authordoc/parser";
+import { parse, parseSuggestions } from "authordoc/parser";
+import type { Suggestion } from "authordoc/suggestion";
 import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -30,6 +31,7 @@ interface WhatTheWebviewDraws {
     wordsInEverySection: Record<string, number>;
     wordsInTheDocument: number;
     storyGeneration: StoryGeneration | null;
+    suggestions: Suggestion[];
 }
 
 function cellsAsTheHostWroteThem(written: string[]): Cell[] {
@@ -93,6 +95,10 @@ function processMessageFromVscode(
     } else if (message.data?.type === "storyGeneration") {
         drawn.storyGeneration = message.data
             .storyGeneration as StoryGeneration | null;
+    } else if (message.data?.type === "suggestions") {
+        drawn.suggestions = parseSuggestions(
+            message.data.suggestions as string,
+        );
     } else {
         return false;
     }
@@ -118,6 +124,7 @@ function openTheAuthorFileEditor(): void {
         wordsInEverySection: {},
         wordsInTheDocument: 0,
         storyGeneration: null,
+        suggestions: [],
     };
 
     function drawTheCanvas(): void {
@@ -144,6 +151,7 @@ function openTheAuthorFileEditor(): void {
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
                 storyGeneration={drawn.storyGeneration}
+                suggestions={drawn.suggestions}
             />,
         );
     }

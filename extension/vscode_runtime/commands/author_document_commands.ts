@@ -10,6 +10,7 @@ import { AssignStoryTextToPlotEventCommand } from "./assign_story_text_to_plot_e
 import { AddEventToPlotCommand } from "./add_event_to_plot";
 import { AnswerTheStoryGenerationCommand } from "./answer_the_story_generation";
 import { QuitTheStoryGenerationCommand } from "./quit_the_story_generation";
+import { ReviewTheSuggestionCommand } from "./review_the_suggestion";
 import { ChangePlotEventCommand } from "./change_plot_event";
 import { RemoveStoryTextFromPlotEventCommand } from "./remove_story_text_from_plot_event";
 import { RedescribePlotCommand } from "./redescribe_plot";
@@ -113,6 +114,7 @@ const AUTHOR_DOCUMENT_COMMANDS: AuthorDocumentCommand[] = [
     new WriteTableOfContentsCommand(),
     new GenerateStoryCommand(),
     new AnswerTheStoryGenerationCommand(),
+    new ReviewTheSuggestionCommand(),
     new QuitTheStoryGenerationCommand(),
 ];
 

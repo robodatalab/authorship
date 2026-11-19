@@ -32,6 +32,7 @@ function rateOfTheSteps(secondsPerStep: number | null): string {
 
 interface AuthorFileEditorStoryGenerationProps {
     storyGeneration: StoryGeneration | null;
+    suggestionsLeft: number;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -39,14 +40,16 @@ interface AuthorFileEditorStoryGenerationProps {
  * The story generation, in a row of its own under the main menu's tools, while
  * it runs. Every stage of the workflow, in order: those finished, the one it is
  * at, and those to come. Under them, what the stage it is at does: while it
- * works, how far along it is; once it is done, what the author is to do, and the
- * answers they can give: accept the story as they leave it, edits included,
- * or reject it and have the stage run again. Asked to do something themselves,
+ * works, how far along it is; once it is done, how many of the suggestions it
+ * made are left for the author to review, where they are drawn, and the answers
+ * they can give about the whole stage: continue once none is left, or reject
+ * them all and have the stage run again. Asked to do something themselves,
  * with a command highlighted, the author continues once done. Whatever the
  * stage is doing, the author can quit the generation altogether.
  */
 export function AuthorFileEditorStoryGeneration({
     storyGeneration,
+    suggestionsLeft,
     sendMessagesToVscode,
 }: AuthorFileEditorStoryGenerationProps) {
     if (storyGeneration === null) {
@@ -100,7 +103,12 @@ export function AuthorFileEditorStoryGeneration({
         if (asked.shown.kind === "command") {
             return null;
         }
-        return "review it, edit what you like, then accept";
+        if (suggestionsLeft === 0) {
+            return "nothing left to review";
+        }
+        return suggestionsLeft === 1
+            ? "1 suggestion left to review"
+            : `${suggestionsLeft} suggestions left to review`;
     }
 
     const stageDoes = whatTheStageDoes();
@@ -180,11 +188,15 @@ export function AuthorFileEditorStoryGeneration({
                             <button
                                 type="button"
                                 className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
+                                title={
+                                    suggestionsLeft > 0
+                                        ? "Accept or reject every suggestion first"
+                                        : undefined
+                                }
+                                disabled={suggestionsLeft > 0}
                                 onClick={() => answer("accept")}
                             >
-                                {asked.shown.kind === "command"
-                                    ? "Continue"
-                                    : "Accept"}
+                                Continue
                             </button>
                             <button
                                 type="button"

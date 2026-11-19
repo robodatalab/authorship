@@ -135,6 +135,7 @@ describe("the story generation under the main menu's tools", () => {
 
     async function mountTheStoryGeneration(
         storyGeneration: StoryGeneration | null,
+        suggestionsLeft = 0,
     ): Promise<void> {
         posted = [];
         document.body.innerHTML = "";
@@ -145,6 +146,7 @@ describe("the story generation under the main menu's tools", () => {
             root.render(
                 <AuthorFileEditorStoryGeneration
                     storyGeneration={storyGeneration}
+                    suggestionsLeft={suggestionsLeft}
                     sendMessagesToVscode={(message) => posted.push(message)}
                 />,
             );
@@ -286,15 +288,34 @@ describe("the story generation under the main menu's tools", () => {
         );
     });
 
-    it("asks the author to review the story the stage leaves, then accept or reject", async () => {
-        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
+    it("says how many suggestions the stage made are left to review, greying out continuing until none is", async () => {
+        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW, 3);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe(
-            "concepts: review it, edit what you like, then acceptAcceptRejectQuit",
-        );
+        const continueButton = [...status.querySelectorAll("button")].find(
+            (button) => button.textContent === "Continue",
+        )!;
+        expect([status.textContent, continueButton.disabled]).toEqual([
+            "concepts: 3 suggestions left to reviewContinueRejectQuit",
+            true,
+        ]);
+    });
+
+    it("lets the author continue once nothing is left to review", async () => {
+        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW, 0);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        const continueButton = [...status.querySelectorAll("button")].find(
+            (button) => button.textContent === "Continue",
+        )!;
+        expect([status.textContent, continueButton.disabled]).toEqual([
+            "concepts: nothing left to reviewContinueRejectQuit",
+            false,
+        ]);
     });
 
     it("continuing answers with an accept", async () => {
@@ -314,7 +335,9 @@ describe("the story generation under the main menu's tools", () => {
 
     it("rejecting answers with a reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
-        const [, rejectButton] = document.querySelectorAll("button");
+        const rejectButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent === "Reject",
+        )!;
 
         await act(async () => rejectButton.click());
 

@@ -1,0 +1,16 @@
+.author-file-editor-suggestion-navigator {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 6px;
+    padding: 0 4px;
+    border: 1px solid var(--vscode-editorWarning-foreground, #cca700);
+    border-radius: 4px;
+}
+
+.author-file-editor-suggestion-navigator-count {
+    padding: 0 4px;
+    font-size: calc(var(--vscode-font-size) - 1px);
+    color: var(--vscode-editorWarning-foreground, #cca700);
+    white-space: nowrap;
+}

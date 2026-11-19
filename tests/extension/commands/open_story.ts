@@ -4,10 +4,8 @@ import {
     dialogs,
     files,
     executedCommands,
-    keptInTheWorkspace,
     settings,
     shownMessages,
-    workspaceState,
 } from "../vscode";
 import {
     openAuthorFileEditorSession,
@@ -25,7 +23,6 @@ export function openStory(text: string): AuthorFileEditorSession {
         vscode.Uri.file(STORY_FILE) as never,
         text.replace(/^\n/, ""),
         new vscode.EventEmitter() as never,
-        workspaceState as never,
     );
     let closed = false;
     session.showOn({
@@ -77,5 +74,4 @@ export function forgetWhatTheEditorDid(): void {
     dialogs.filesTheAuthorChose = [];
     dialogs.answerToTheWarning = undefined;
     settings.clear();
-    keptInTheWorkspace.clear();
 }

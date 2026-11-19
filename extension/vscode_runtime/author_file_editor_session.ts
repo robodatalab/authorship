@@ -16,6 +16,7 @@ import type { CellTextChanged } from "authordoc/changes/cell_text_changed";
 import type { CellsMoved } from "authordoc/changes/cells_moved";
 import { AuthorDocDiff } from "authordoc/diff";
 import { Document } from "authordoc/storydoc";
+import { serialize } from "authordoc/parser";
 import type { Cell } from "authordoc/cells/cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
@@ -59,7 +60,7 @@ export class AuthorFileEditorSession
 
     private storyGeneration: StoryGeneration | null = null;
 
-    readonly storyGenerationWorkflow: StoryGenerationWorkflow;
+    readonly storyGenerationWorkflow = new StoryGenerationWorkflow(this);
 
     constructor(
         readonly uri: vscode.Uri,
@@ -67,12 +68,7 @@ export class AuthorFileEditorSession
         private readonly edited: vscode.EventEmitter<
             vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
         >,
-        workspaceState: vscode.Memento,
     ) {
-        this.storyGenerationWorkflow = new StoryGenerationWorkflow(
-            this,
-            workspaceState,
-        );
         const proseErrorsSynchronizer = new CharacterRangeSynchronizer(
             this.proseErrors,
         );
@@ -90,6 +86,7 @@ export class AuthorFileEditorSession
             documentOpened,
         );
         this.makeTheChange(opening);
+        this.takeTheSuggestionsOf(documentOpened);
     }
 
     dispose(): void {}
@@ -236,6 +233,7 @@ export class AuthorFileEditorSession
             documentImported,
         );
         this.makeTheChange(fileChange);
+        this.takeTheSuggestionsOf(documentImported);
     }
 
     importDocumentFromText(text: string): void {
@@ -245,15 +243,70 @@ export class AuthorFileEditorSession
             documentImported,
         );
         this.makeTheChange(importChange);
+        this.takeTheSuggestionsOf(documentImported);
     }
 
     changeTheDocument(change: (document: Document) => Document): void {
-        const documentChange = this.theChangeThisWouldMake(change);
-        if (documentChange.empty()) {
+        const documentChanged = change(this.documentAsItStands);
+        const documentChange = AuthorDocDiff.diff(
+            this.documentAsItStands,
+            documentChanged,
+        );
+        if (!documentChange.empty()) {
+            this.makeTheChange(documentChange);
+            this.recordAnEdit({ theChange: documentChange });
+        }
+        this.takeTheSuggestionsOf(documentChanged);
+    }
+
+    acceptTheSuggestion(cellId: string): void {
+        this.changeTheDocument((document) => {
+            const suggestion = document.suggestionFor(cellId);
+            if (suggestion === undefined) {
+                return document;
+            }
+            const diff = suggestion.diff();
+            const documentPatched = diff.applyTheDiff(document);
+            const documentWithThePatch = document.withCells(
+                documentPatched.cells,
+            );
+            const documentWithoutTheSuggestion =
+                documentWithThePatch.withoutSuggestion(cellId);
+            return documentWithoutTheSuggestion;
+        });
+    }
+
+    rejectTheSuggestion(cellId: string): void {
+        this.changeTheDocument((document) => {
+            const documentWithoutTheSuggestion =
+                document.withoutSuggestion(cellId);
+            return documentWithoutTheSuggestion;
+        });
+    }
+
+    private takeTheSuggestionsOf(document: Document): void {
+        const suggestionsHeld = serialize(
+            [],
+            this.documentAsItStands.suggestions,
+        );
+        const suggestionsTaken = serialize([], document.suggestions);
+        if (suggestionsHeld === suggestionsTaken) {
             return;
         }
-        this.makeTheChange(documentChange);
-        this.recordAnEdit({ theChange: documentChange });
+        this.documentAsItStands = Document.fromCells(
+            this.documentAsItStands.cells,
+            this.documentAsItStands.path,
+            document.suggestions,
+        );
+        this.sendSuggestions();
+    }
+
+    private sendSuggestions(): void {
+        const suggestions = serialize([], this.documentAsItStands.suggestions);
+        void this.panel?.webview.postMessage({
+            type: "suggestions",
+            suggestions,
+        });
     }
 
     private theChangeThisWouldMake(
@@ -301,10 +354,9 @@ export class AuthorFileEditorSession
 
     async writeTheDocumentTo(destination: vscode.Uri): Promise<void> {
         this.burstBeingTyped = null;
-        await vscode.workspace.fs.writeFile(
-            destination,
-            new TextEncoder().encode(this.documentAsItStands.text),
-        );
+        const serialized = this.documentAsItStands.serialize();
+        const bytes = new TextEncoder().encode(serialized);
+        await vscode.workspace.fs.writeFile(destination, bytes);
     }
 
     async readTheDocumentBackFromItsFile(): Promise<void> {
@@ -382,6 +434,7 @@ export class AuthorFileEditorSession
             type: "document",
             cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
         });
+        this.sendSuggestions();
         this.sendProseErrors();
         this.sendStoryAnnotationsSelected();
         this.sendStoryTextSelected();
@@ -504,14 +557,8 @@ export function openAuthorFileEditorSession(
     edited: vscode.EventEmitter<
         vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
     >,
-    workspaceState: vscode.Memento,
 ): AuthorFileEditorSession {
     const document = new Document(text, uri.fsPath);
-    const session = new AuthorFileEditorSession(
-        uri,
-        document,
-        edited,
-        workspaceState,
-    );
+    const session = new AuthorFileEditorSession(uri, document, edited);
     return session;
 }

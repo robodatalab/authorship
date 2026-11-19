@@ -6,7 +6,6 @@ import { RemoveNodeFromPlotCommand } from "../../../extension/vscode_runtime/com
 import { PlotEdge, PlotNode, type PlotCell } from "authordoc/cells/plot_cell";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { STORY_FILE, openStory } from "./open_story";
-import { workspaceState } from "../vscode";
 
 describe("RemoveNodeFromPlotCommand — takes a node out of a plot's trajectory", () => {
     it("removes the node it was asked to, and the lines that reach it", () => {
@@ -70,7 +69,6 @@ She saw the door. He heard the bell.
 She finds the door.
 `,
             edited as never,
-            workspaceState as never,
         );
         session.selectTheStoryAnnotation("plot", "p1");
         session.selectThePassage("plot", "n2");

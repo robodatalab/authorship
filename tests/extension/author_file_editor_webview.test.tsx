@@ -106,3 +106,27 @@ describe("refreshing the document", () => {
         expect(renderedCellText()).toEqual(["kept"]);
     });
 });
+
+describe("the suggestions the host sends", () => {
+    it("draws the cell a suggestion is on as the suggestion makes it, in its frame", async () => {
+        await openWebview();
+        await hostSends([markdownCell("m1", "one")]);
+
+        await act(async () => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data: {
+                        type: "suggestions",
+                        suggestions:
+                            '<!-- suggestion: id="m1" -->\n<!-- change: text from="3" removed="" written=" more" -->\n',
+                    },
+                }),
+            );
+        });
+
+        const proposed = document.querySelector(
+            '[data-suggestion-id="m1"] .author-file-editor-suggestion-proposed',
+        );
+        expect(proposed?.textContent).toContain("one more");
+    });
+});

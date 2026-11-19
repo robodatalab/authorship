@@ -128,3 +128,8 @@
 .author-file-editor-story-generation-answer-default:hover {
     background: var(--vscode-button-hoverBackground);
 }
+
+.author-file-editor-story-generation-answer:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
