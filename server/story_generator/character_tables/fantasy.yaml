@@ -1,0 +1,228 @@
+genre: fantasy
+names:
+  given:
+    - Aldren
+    - Isolde
+    - Corvin
+    - Maelis
+    - Tamsin
+    - Edric
+    - Seraphine
+    - Bram
+    - Wynne
+    - Oswin
+    - Liriel
+    - Garrick
+    - Rhosyn
+    - Theron
+    - Elowen
+    - Kestrel
+    - Fennick
+    - Aveline
+    - Rook
+    - Morwenna
+    - Cadoc
+    - Sabeth
+    - Jory
+    - Elspeth
+    - Halvard
+    - Niamh
+    - Varis
+    - Ilsabet
+    - Dunstan
+    - Sorrel
+  family:
+    - Blackthorn
+    - Ashdown
+    - Vell
+    - Mournhollow
+    - Stormwright
+    - Greymantle
+    - Ravensmoor
+    - Oakhart
+    - Thistlewood
+    - Dunmere
+    - Ironvale
+    - Fairweather
+    - Hollowell
+    - Wyrmbane
+    - Caldris
+    - Marrowind
+    - Brackenridge
+    - Silverleaf
+    - Durnhelm
+    - Ambervane
+    - Kettleburn
+    - Rosswater
+    - Hawkridge
+    - Talgarth
+    - Emberfall
+    - Corbel
+    - Winterbourne
+    - Valdane
+    - Mossgrove
+    - Harrowgate
+motivation:
+  - promised a dying mentor to see the last great task through
+  - was born under an omen the whole village still whispers about
+  - lost a twin to the red fever and now lives for two
+  - carries a family oath sworn three generations ago and never kept
+  - was cast out of the home village and means to prove everyone wrong
+  - was promised greatness by a seer and dreads dying ordinary
+  - grew up on tales of heroes and aches to live inside one
+  - bears a curse due to take hold at the next blood moon
+  - was the youngest of seven and never once chosen first
+  - owes a life to a stranger who vanished without giving a name
+  - remembers a golden childhood in a kingdom that no longer exists
+  - has heard the gods fall silent and demands an answer
+  - was spared by a monster and needs to know why
+  - is the last speaker of a dying tongue and feels its weight
+  - was sold as a child and has never owned anything since
+  - dreams every night of a door that must be opened
+  - was left at a temple door and never learned the reason
+  - once failed to save a village and still hears its bells
+  - has outlived three companions and refuses to bury another
+  - longs for a hearth that does not move with the seasons
+traits:
+  temperament:
+    - solemn and soft-spoken
+    - boisterous and generous
+    - proud and prickly
+    - cheerful in the face of doom
+    - patient as a mountain
+    - restless and wide-eyed
+    - stern but fair
+    - dreamy and distractible
+    - fierce and loyal
+    - haughty and sharp-tongued
+    - gentle and slow to anger
+    - brooding and secretive
+    - reckless and laughing
+    - devout and earnest
+    - sly and charming
+  quirk:
+    - talks to animals as if to old friends
+    - hums old battle hymns when nervous
+    - carves tiny wooden birds and leaves them behind
+    - swears by gods nobody else has heard of
+    - counts the stars aloud before sleeping
+    - keeps a tooth from every beast ever slain
+    - sprinkles salt across every threshold before sleeping
+    - speaks in old proverbs that rarely fit the moment
+    - bites every coin to test it, even gifts
+    - keeps a tally of every lie ever heard
+    - whistles to the wind before setting out on any road
+    - refuses to speak the names of the dead
+    - sniffs every meal suspiciously before the first bite
+    - answers questions with riddles when bored
+    - names every weapon and talks to it
+  flaw:
+    - never forgives a slight, however small
+    - cannot resist a wager
+    - trusts any stranger with a sad story
+    - makes oaths too quickly and breaks them too easily
+    - believes prophecy over plain evidence
+    - hoards gold while companions go hungry
+    - tells tall tales of courage never shown
+    - picks fights with anyone of higher rank
+    - freezes when lives hang on a quick choice
+    - craves glory more than the safety of friends
+    - too proud to ask for help, even when dying
+    - bitterly jealous of anyone more gifted with magic
+background:
+  upbringing:
+    - grew up in a mountain monastery among silent monks
+    - raised among nomadic horse clans of the steppe
+    - grew up in the shadow of a crumbling castle
+    - spent childhood on a smuggler's ship between island kingdoms
+    - grew up in a forest village that paid tribute to the fae
+    - raised in the gutters of a sprawling capital
+    - grew up at a lonely lighthouse on the edge of the known sea
+    - raised as a hostage-ward in a rival lord's court
+    - grew up in a mining town deep under the hills
+    - raised in a wizard's tower among the servants
+    - grew up on a border farm where raiders came every harvest
+    - raised by a travelling troupe of players and fire-eaters
+  family:
+    - orphaned by plague and raised by the village priest
+    - the bastard child of a powerful duke
+    - raised by a grandparent who taught the old ways
+    - the eldest of nine with a sickly mother
+    - the only child of a disgraced knight
+    - fostered by elves and never quite belonged
+    - one of twins, the one the prophecy did not name
+    - heir to a house that lost everything in a civil war
+    - raised by a stern blacksmith parent after the other walked out
+    - the child of a witch burned by the villagers
+    - a foundling raised by temple sisters
+    - the youngest of a large, loud and loving clan
+  occupation:
+    - a sellsword
+    - a royal cartographer
+    - a temple acolyte
+    - a dragon-hunter's apprentice
+    - a court alchemist
+    - a disgraced knight
+    - a village herbalist
+    - a river smuggler
+    - a castle cook
+    - a wandering bard
+    - a falconer to a minor lord
+    - a grave-warden
+    - a runesmith
+    - a border ranger
+    - a pickpocket in the royal market
+    - an apprentice to a dying archmage
+  turning point:
+    - framed for the murder of a prince and running from the crown
+    - marked by a dragon that will return to claim its due
+    - holds a stolen relic every temple in the land wants back
+    - the only survivor of an expedition beyond the northern wall
+    - bound by a fae bargain that comes due at midwinter
+    - exiled with a price on the family name and nowhere left to go
+    - drew a sword nobody else could lift and is hunted for it
+    - woke in a crypt with no memory and a crown on the brow
+    - heir to a throne by a technicality no one wants to honour
+    - caught stealing from a wizard and working off the debt in service
+    - carries a sealed letter that will start a war if opened
+    - the last knight of a betrayed order, hunted by former comrades
+looks:
+  build:
+    - broad-shouldered and barrel-chested
+    - small and quick
+    - long-limbed and gangly
+    - stocky and strong as an ox
+    - lean as a hunting hound
+    - heavyset yet light on the feet
+    - tall and willowy
+    - compact and muscular
+    - gaunt and bony
+    - towering and slow-moving
+  features:
+    - one eye milky-white from an old curse
+    - silver hair despite a young face
+    - a serpent tattoo coiled around one wrist
+    - pointed ears kept hidden under a hood
+    - a missing finger on the sword hand
+    - freckles and a nose broken twice
+    - mismatched eyes, one green and one gold
+    - a jagged scar from brow to jaw
+    - long braids threaded with tiny bones
+    - skin weathered dark by years of wind
+    - a ring of runes tattooed around the neck
+    - a chipped front tooth and a gap-toothed grin
+    - ink-stained fingers that never come clean
+    - a birthmark shaped like a crescent moon
+  style:
+    - wears patched chainmail over a faded tabard
+    - dresses in once-fine velvet gone threadbare
+    - carries a staff carved with forgotten runes
+    - wears furs and bone charms like a northern raider
+    - walks with the straight back of a soldier
+    - jingles with charms, bells and amulets
+    - wears the signet ring of a house that no longer exists
+    - moves barefoot and silent over any ground
+    - dresses in court silks wherever the road leads
+    - never removes a battered helm, even to eat
+    - keeps a hood up and the face half-hidden
+    - strides like royalty in rags

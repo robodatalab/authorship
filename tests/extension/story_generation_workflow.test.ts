@@ -28,6 +28,7 @@ She saw the door.
 
 stage: concept titles: True
 stage: concepts: False
+stage: cast: False
 stage: characters: False
 stage: plots: False
 stage: mesh: False
@@ -44,6 +45,7 @@ She saw the door.
 
 stage: concept titles: True
 stage: concepts: True
+stage: cast: True
 stage: characters: True
 stage: plots: True
 stage: mesh: True
@@ -60,6 +62,7 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: False
+stage: cast: False
 stage: characters: False
 stage: plots: False
 stage: mesh: False
@@ -76,6 +79,7 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: Review
+stage: cast: False
 stage: characters: False
 stage: plots: False
 stage: mesh: False
@@ -94,6 +98,7 @@ const THE_REVIEW_OF_THE_CONCEPTS_KEPT = {
 const STAGES_LEFT_OFF_AT_THE_CONCEPTS = [
     { name: "concept titles", done: true },
     { name: "concepts", done: false },
+    { name: "cast", done: false },
     { name: "characters", done: false },
     { name: "plots", done: false },
     { name: "mesh", done: false },
@@ -140,6 +145,7 @@ const REVIEWS_THE_CONCEPTS = {
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: false },
+        { name: "cast", done: false },
         { name: "characters", done: false },
         { name: "plots", done: false },
         { name: "mesh", done: false },
@@ -316,6 +322,7 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: True
+stage: cast: False
 stage: characters: False
 stage: plots: False
 stage: mesh: False
@@ -323,7 +330,7 @@ stage: scenes: False
 stage: choices: False
 stage: validity: False
 `);
-        expect(JSON.parse(started.body).stage).toBe("characters");
+        expect(JSON.parse(started.body).stage).toBe("cast");
     });
 });
 

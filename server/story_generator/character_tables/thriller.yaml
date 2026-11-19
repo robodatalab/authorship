@@ -1,0 +1,228 @@
+genre: thriller
+names:
+  given:
+    - Alex
+    - Nadia
+    - Marcus
+    - Simone
+    - Dmitri
+    - Lena
+    - Ryan
+    - Yasmin
+    - Viktor
+    - Claire
+    - Kai
+    - Ingrid
+    - Mateo
+    - Zara
+    - Nikolai
+    - Jordan
+    - Anya
+    - Reid
+    - Mei
+    - Sasha
+    - Omar
+    - Elena
+    - Cole
+    - Tessa
+    - Luca
+    - Rina
+    - Hassan
+    - Brooke
+    - Tobias
+    - Petra
+  family:
+    - Kovac
+    - Reyes
+    - Hartmann
+    - Okafor
+    - Volkov
+    - Calder
+    - Nakamura
+    - Brandt
+    - Sinclair
+    - Moreno
+    - Larsen
+    - Kessler
+    - Navarro
+    - Quinn
+    - Abbasi
+    - Drake
+    - Petrov
+    - Mercer
+    - Delacroix
+    - Lindgren
+    - Shaw
+    - Haddad
+    - Cruz
+    - Fischer
+    - Novak
+    - Okonkwo
+    - Vance
+    - Sato
+    - Wolfe
+    - Castellano
+motivation:
+  - watched a partner die on a mission that went wrong
+  - needs money fast to pay for a child's surgery
+  - was burned by the agency and wants the truth
+  - has one last chance to win back an estranged child
+  - is running from a past identity that keeps catching up
+  - cannot stand feeling powerless after a childhood of it
+  - is being blackmailed over a single terrible night
+  - swore revenge on whoever ordered the family killed
+  - wants out of the business while still alive
+  - is addicted to the rush of danger
+  - believes in a cause enough to die for it
+  - has a sibling on death row and days left to act
+  - knows a secret that would topple a government
+  - was promised a clean slate for one last job
+  - has nothing left to lose since the diagnosis
+  - owes a life to a handler who now wants it repaid
+  - cannot forgive a government that left soldiers behind
+  - craves the respect a lifetime of service never earned
+  - is terrified of losing a comfortable life built on lies
+  - was trained since childhood to obey and is starting to question it
+traits:
+  temperament:
+    - cool under pressure
+    - paranoid and meticulous
+    - cocky and fast-talking
+    - stoic and sparing with words
+    - intense and relentlessly driven
+    - volatile and dangerous when cornered
+    - methodical and patient
+    - idealistic and stubborn
+    - ruthless and charming
+    - jittery and quick-thinking
+    - cynical and darkly funny
+    - disciplined and humourless
+    - affable and hard to read
+    - hot-headed and impulsive
+    - smooth and manipulative
+  quirk:
+    - clocks every exit on entering a room
+    - memorises licence plates without trying
+    - changes phones every week
+    - sleeps with a pistol within reach
+    - speaks five languages and switches mid-sentence
+    - never gives a real name at a hotel
+    - runs ten miles every morning in any weather
+    - drinks only from bottles opened in sight
+    - sketches floor plans on napkins
+    - cracks knuckles before every decision
+    - hums the same pop song when focused
+    - reads people's shoes before their faces
+    - keeps a go-bag packed by the door
+    - chews nicotine gum constantly
+    - taps out messages in Morse on any table
+  flaw:
+    - trusts no one, not even allies
+    - kills too easily
+    - cannot walk away from a fight
+    - hooked on painkillers since an old injury
+    - follows orders without asking why
+    - lies to loved ones as easily as to enemies
+    - obsessive to the point of self-destruction
+    - underestimates anyone who seems ordinary
+    - craves control over every detail
+    - puts the mission above every person
+    - falls for the wrong people at the worst times
+    - escalates every confrontation
+background:
+  upbringing:
+    - grew up on army bases across three continents
+    - raised in a border town run by cartels
+    - grew up in a gated suburb behind a picture-perfect facade
+    - grew up in a grey apartment block in a former Soviet city
+    - spent childhood in a refugee camp
+    - raised in a hacker squat above a nightclub
+    - grew up in a rust-belt town where the factory closed overnight
+    - raised on a survivalist compound in the mountains
+    - grew up in a casino city where everyone worked an angle
+    - trained at a strict military academy from the age of ten
+    - grew up among the container yards of a busy port
+    - raised in luxury on money no one asked about
+  family:
+    - the child of a spy who never came home
+    - raised by an uncle who kept books for the mob
+    - the estranged child of a senator
+    - the sibling of a bomber who made the headlines
+    - part of a family living in witness protection
+    - a foster kid who aged out with nothing
+    - the child of a decorated general who demanded greatness
+    - the reluctant heir of a crime family
+    - the child of whistleblowers who died in a convenient car crash
+    - the eldest of four, raising the rest since fifteen
+    - the child of a cop on the take
+    - raised by grandparents after both parents went to prison
+  occupation:
+    - a former special forces operator
+    - an intelligence analyst
+    - a defence attorney
+    - an investigative journalist
+    - a hacker for hire
+    - a corporate fixer
+    - a hostage negotiator
+    - a getaway driver
+    - a bodyguard to a billionaire
+    - an FBI field agent
+    - an ER doctor
+    - a private military contractor
+    - an art dealer who launders money
+    - a cryptographer
+    - a homicide detective
+    - a commercial pilot
+  turning point:
+    - framed for an assassination and on the run
+    - witnessed a murder at the top of the government
+    - picked up the wrong bag at an airport
+    - holds a flash drive everyone is willing to kill for
+    - has 48 hours to pay a ransom for a kidnapped loved one
+    - disavowed by the agency in the middle of a mission
+    - betrayed by a partner and left for dead
+    - discovered the employer launders money for terrorists
+    - just received the code word that wakes a long-dormant cover
+    - the last living witness in a federal case
+    - stumbled onto a conspiracy during a routine audit
+    - released from prison owing the wrong people
+looks:
+  build:
+    - lean and athletic
+    - built like a boxer
+    - average in every way and easy to forget
+    - tall and long-legged
+    - heavy-shouldered and powerful
+    - slim and catlike
+    - hulking and quiet
+    - sinewy and tense
+    - soft around the middle and deceptively strong
+    - fit and light-footed
+  features:
+    - a bullet scar on one shoulder
+    - a tattoo hastily covered by another
+    - ice-blue eyes that rarely blink
+    - a shaved head
+    - a mangled ear from an old fight
+    - a surgically altered face that still feels unfamiliar
+    - heavily calloused knuckles
+    - a burn scar along the neck
+    - a jagged scar through one eyebrow
+    - a perfect smile that looks rehearsed
+    - sun-damaged skin from years in the desert
+    - a missing fingertip
+    - a prosthetic leg from a roadside bomb
+    - hair dyed a different colour every few weeks
+  style:
+    - dresses in forgettable grey to blend in anywhere
+    - wears a sharp suit that hides a holster
+    - never takes off mirrored sunglasses
+    - wears running shoes with everything
+    - dresses like a tourist on purpose
+    - carries no wallet, no ID and no photos
+    - wears an expensive watch and nothing else of value
+    - moves with the stillness of a trained shooter
+    - wears a leather jacket scuffed from a motorcycle crash
+    - wears cargo trousers with every pocket full
+    - changes appearance to suit every room
+    - wears a baseball cap pulled low against cameras

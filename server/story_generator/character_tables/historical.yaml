@@ -1,0 +1,228 @@
+genre: historical
+names:
+  given:
+    - Aurelia
+    - Lucius
+    - Eleanor
+    - Tomas
+    - Isabeau
+    - Leif
+    - Astrid
+    - Matteo
+    - Lucrezia
+    - Edmund
+    - Hild
+    - Kenji
+    - Sayo
+    - Mei
+    - Wen
+    - Rustam
+    - Leyla
+    - Cosimo
+    - Beatrice
+    - Ambrose
+    - Philippa
+    - Ottilie
+    - Gaspard
+    - Margery
+    - Tiberius
+    - Septima
+    - Ingrid
+    - Anselm
+    - Catalina
+    - Bartholomew
+  family:
+    - Ashcombe
+    - Varro
+    - Montague
+    - Sforza
+    - Blackwood
+    - Fairfax
+    - Halloran
+    - Valcourt
+    - Ironside
+    - Thorvaldsen
+    - Castellane
+    - Pembroke
+    - Moreau
+    - Hargreave
+    - Albescu
+    - Wycliffe
+    - Delacroix
+    - Gallo
+    - Rourke
+    - Mendoza
+    - Szabo
+    - Kowalczyk
+    - Thatcher
+    - Fletcher
+    - Petrakis
+    - Orsini
+    - Bellamy
+    - Crane
+    - Ravensworth
+    - Tanaka
+motivation:
+  - promised a dying mother to restore the family's lost estate
+  - survived the plague that took the whole village and needs it to mean something
+  - was promised in marriage as a child and longs to choose for once
+  - carries a forged letter of nobility and lives in dread of discovery
+  - watched a beloved sibling hang for a crime someone else committed
+  - was taught to read in secret and hungers for a life beyond the fields
+  - swore an oath before the altar and cannot bear to be forsworn
+  - gambled away the family lands in one night and must win them back
+  - was born the bastard of a lord and craves the name withheld at birth
+  - was told by a fortune teller of an early death
+  - came home from the wars to find no one waiting
+  - was raised on tales of a heroic grandfather and fears being ordinary
+  - betrayed a friend to the Inquisition long ago and seeks to atone
+  - spent seven years as a galley slave and treasures every free breath
+  - inherited a debt to the moneylenders that grows with every season
+  - believes God spoke once in a dream and is still waiting for the second word
+  - was shamed before the whole court and has never stopped replaying it
+  - envies a rival who was given every advantage by birth
+  - buried three children and clings fiercely to whatever life remains
+  - was spared by an enemy soldier and has never understood why
+traits:
+  temperament:
+    - grave and soft-spoken
+    - hot-blooded and proud
+    - pious and gentle
+    - sly and charming
+    - melancholy and bookish
+    - cheerful to the point of recklessness
+    - stern and unbending
+    - restless and curious
+    - courtly and guarded
+    - blunt as a hammer
+    - dreamy and absent-minded
+    - calculating and patient
+    - warm but quick to bristle
+    - sardonic and world-weary
+    - earnest and easily moved
+  quirk:
+    - quotes scripture at the least fitting moments
+    - counts rosary beads when thinking
+    - bows a little too deeply to everyone
+    - keeps a diary in a homemade cipher
+    - spits over one shoulder to ward off bad luck
+    - carries a saint's knucklebone in a velvet pouch
+    - sniffs every cup before drinking, fearing poison
+    - swears in Latin when angry
+    - hums old battle hymns while working
+    - always sits facing the door
+    - feeds every stray dog in the street
+    - laughs at funerals and weeps at weddings
+    - snuffs candles with bare fingers
+    - keeps a tooth from every opponent ever beaten
+    - addresses horses more politely than people
+  flaw:
+    - cannot resist a wager
+    - drinks to forget and forgets too much
+    - trusts anyone with a title
+    - vain about a fading beauty
+    - lies by reflex, even when the truth would serve better
+    - treats every slight as a matter of honor
+    - too proud to beg for help
+    - superstitious to the point of paralysis
+    - jealous of anyone more favored
+    - spends money as though it grows on vines
+    - obeys orders without asking questions
+    - turns cruel when frightened
+background:
+  upbringing:
+    - grew up in the shadow of a crumbling castle
+    - raised in a convent orphanage
+    - grew up among the tanneries on the river's stinking edge
+    - raised among the courtiers of Heian Kyoto
+    - grew up aboard a Viking longship, following the raids
+    - grew up in a Venetian merchant house full of foreign goods
+    - raised in a Roman legion camp on the Rhine frontier
+    - grew up picking pockets in a London rookery
+    - grew up on a sugar plantation in the Caribbean
+    - grew up in a caravanserai on the Silk Road
+    - raised in a Paris garret during the Revolution
+    - grew up in a fishing village swept by plague
+  family:
+    - raised by a grandmother who sold herbs and secrets
+    - the youngest of eleven, mostly ignored
+    - the only heir of a bankrupt noble house
+    - orphaned by war and taken in by monks
+    - the child of a hangman, shunned by the neighbors
+    - the favorite of a tyrannical father
+    - born to a family of disgraced heretics
+    - raised by a widowed father who kept a tavern
+    - has a twin who inherited everything by being born first
+    - the child of a courtesan and an unnamed patron
+    - sold into apprenticeship by desperate parents
+    - raised by a stepmother who resented every mouthful
+  occupation:
+    - a scribe in a monastery
+    - a gladiator
+    - a court physician
+    - a pirate quartermaster
+    - a spice merchant
+    - a royal courtier
+    - a mapmaker for the crown
+    - a ronin
+    - a plague doctor
+    - a glassblower in Murano
+    - a tax collector
+    - an actor in a traveling troupe
+    - a smuggler of forbidden books
+    - a falconer to a sultan
+    - a gravedigger
+    - an alchemist's apprentice
+  turning point:
+    - fled the city after being accused of witchcraft
+    - just inherited a title along with all its enemies
+    - shipwrecked on a foreign shore with nothing but a sealed letter
+    - hiding a stolen relic that half the Church is hunting
+    - discharged from the army with a pension that never arrived
+    - sent as a hostage to a rival court to guarantee a peace
+    - framed for the murder of a guild master
+    - returning home after twenty years in captivity
+    - carrying a message that could start a war
+    - in disguise after escaping an arranged marriage
+    - newly freed from a debtors' prison and owing more than ever
+    - the only witness to a royal poisoning
+looks:
+  build:
+    - tall and gaunt
+    - stocky and broad-shouldered
+    - small and quick
+    - heavyset and slow-moving
+    - lean from years of hunger
+    - barrel-chested and bandy-legged
+    - willowy and graceful
+    - compact and muscular
+    - round-faced and soft
+    - stooped and long-limbed
+  features:
+    - a pox-scarred face
+    - one milky, blind eye
+    - a missing ear, cropped as punishment
+    - a branded thumb from an old conviction
+    - a shock of prematurely white hair
+    - ink-stained fingers
+    - a crooked nose broken more than once
+    - teeth blackened by sugar
+    - a wine-colored birthmark across the throat
+    - hands calloused from rope and oars
+    - eyes of two different colors
+    - a sunburnt face lined like old leather
+    - a long braid threaded with silver rings
+    - a line of verse tattooed around one wrist
+  style:
+    - wears a threadbare velvet doublet with pride
+    - dresses in somber black like a magistrate
+    - smells of incense and candle wax
+    - goes everywhere in a hooded traveling cloak
+    - wears borrowed finery that never quite fits
+    - carries a sword never once drawn
+    - moves with the stiff bearing of an old soldier
+    - wears a pilgrim's scallop shell on a cord
+    - dresses in silks two seasons out of fashion
+    - walks barefoot by choice
+    - powdered and perfumed to hide the smell of poverty
+    - wears a monk's coarse habit, belted with rope
