@@ -16,7 +16,6 @@ const STAGES_IN_ORDER = [
     "concept titles",
     "concepts",
     "cast",
-    "characters",
     "plots",
     "mesh",
     "scenes",
