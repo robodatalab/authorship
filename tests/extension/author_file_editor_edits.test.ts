@@ -421,6 +421,43 @@ describe("the suggestions the document holds", () => {
         expect(session.document.serialize()).toBe(THE_STORY);
     });
 
+    it("take what the author types in a cell with a suggestion into its diff, leaving the cell as it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.theAuthorTypedInTheCell("c1", "She saw the door at last, slowly.");
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" +
+                '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, slowly" -->\n' +
+                "\n" + HE_HEARD,
+        );
+    });
+
+    it("take a change to a cell with a suggestion into its diff, leaving the cell as it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.changeTheDocument((document) => {
+            const cellShown = document.cellWithId("c1")!;
+            const cellChanged = cellShown.withSource("She saw the door at last, once.");
+            const documentChanged = document.withCell(cellChanged);
+            return documentChanged;
+        });
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" +
+                '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, once" -->\n' +
+                "\n" + HE_HEARD,
+        );
+    });
+
+    it("are dropped once the author changes the cell back to how it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.theAuthorTypedInTheCell("c1", "She saw the door.");
+
+        expect(session.document.serialize()).toBe(THE_STORY);
+    });
+
     it("take a change that touches no cell but a suggestion", () => {
         const { session } = openSession(THE_STORY);
         const emptyDiff = new AuthorDocDiff([]);

@@ -9,7 +9,7 @@ import type {
 import { CharacterRangeSynchronizer } from "authordoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
 import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";
-import type { CellAdded } from "authordoc/changes/cell_added";
+import { CellAdded } from "authordoc/changes/cell_added";
 import type { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
 import type { CellRemoved } from "authordoc/changes/cell_removed";
 import type { CellTextChanged } from "authordoc/changes/cell_text_changed";
@@ -17,6 +17,7 @@ import type { CellsMoved } from "authordoc/changes/cells_moved";
 import { AuthorDocDiff } from "authordoc/diff";
 import { Document } from "authordoc/storydoc";
 import { serialize } from "authordoc/parser";
+import type { Suggestion } from "authordoc/suggestion";
 import type { Cell } from "authordoc/cells/cell";
 import {
     NO_STORY_ANNOTATION_SELECTED,
@@ -176,6 +177,18 @@ export class AuthorFileEditorSession
     }
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
+        if (this.documentAsItStands.suggestionFor(cellId) !== undefined) {
+            this.changeTheDocument((story) => {
+                const cell = story.cellWithId(cellId);
+                if (!cell) {
+                    return story;
+                }
+                const cellTyped = cell.withSource(markdown);
+                const storyTyped = story.withCell(cellTyped);
+                return storyTyped;
+            });
+            return;
+        }
         this.whatThePageJustTyped = { cellId, markdown };
         const documentChange = this.theChangeThisWouldMake((story) => {
             const cell = story.cellWithId(cellId);
@@ -247,20 +260,20 @@ export class AuthorFileEditorSession
     }
 
     changeTheDocument(change: (document: Document) => Document): void {
-        const documentChanged = change(this.documentAsItStands);
-        const documentChange = AuthorDocDiff.diff(
+        const documentAsSeen = withEverySuggestionApplied(
             this.documentAsItStands,
-            documentChanged,
         );
-        if (!documentChange.empty()) {
-            this.makeTheChange(documentChange);
-            this.recordAnEdit({ theChange: documentChange });
-        }
-        this.takeTheSuggestionsOf(documentChanged);
+        const documentEdited = change(documentAsSeen);
+        const documentChanged = withTheEditsOfTheSuggestedCells(
+            this.documentAsItStands,
+            documentAsSeen,
+            documentEdited,
+        );
+        this.changeTheDocumentAsItStands(() => documentChanged);
     }
 
     acceptTheSuggestion(cellId: string): void {
-        this.changeTheDocument((document) => {
+        this.changeTheDocumentAsItStands((document) => {
             const suggestion = document.suggestionFor(cellId);
             if (suggestion === undefined) {
                 return document;
@@ -277,11 +290,26 @@ export class AuthorFileEditorSession
     }
 
     rejectTheSuggestion(cellId: string): void {
-        this.changeTheDocument((document) => {
+        this.changeTheDocumentAsItStands((document) => {
             const documentWithoutTheSuggestion =
                 document.withoutSuggestion(cellId);
             return documentWithoutTheSuggestion;
         });
+    }
+
+    private changeTheDocumentAsItStands(
+        change: (document: Document) => Document,
+    ): void {
+        const documentChanged = change(this.documentAsItStands);
+        const documentChange = AuthorDocDiff.diff(
+            this.documentAsItStands,
+            documentChanged,
+        );
+        if (!documentChange.empty()) {
+            this.makeTheChange(documentChange);
+            this.recordAnEdit({ theChange: documentChange });
+        }
+        this.takeTheSuggestionsOf(documentChanged);
     }
 
     private takeTheSuggestionsOf(document: Document): void {
@@ -544,6 +572,110 @@ class TypingBurst implements AuthorDocChangeVisitor<boolean> {
         this.documentAsItLastStood = documentAsItStands;
         this.charactersTyped += 1;
     }
+}
+
+function withTheSuggestionApplied(
+    document: Document,
+    suggestion: Suggestion,
+): Document {
+    const diff = suggestion.diff();
+    const documentSuggested = diff.applyTheDiff(document);
+    return documentSuggested;
+}
+
+function withEverySuggestionApplied(document: Document): Document {
+    const documentSuggested = document.suggestions.reduce(
+        withTheSuggestionApplied,
+        document,
+    );
+    return documentSuggested;
+}
+
+function writtenAlike(cell: Cell, other: Cell): boolean {
+    const written = asThePageDrawsIt(cell);
+    const otherWritten = asThePageDrawsIt(other);
+    return written === otherWritten;
+}
+
+function suggestedAlike(suggestion: Suggestion, other: Suggestion): boolean {
+    const written = serialize([], [suggestion]);
+    const otherWritten = serialize([], [other]);
+    return written === otherWritten;
+}
+
+function suggestionOfTheEdit(
+    documentAsItStands: Document,
+    documentEdited: Document,
+    cellEdited: Cell,
+    suggestion: Suggestion,
+): Suggestion | null {
+    const cellAsItStands = documentAsItStands.cellWithId(cellEdited.uniqueId);
+    if (cellAsItStands === undefined) {
+        const cellIndex = documentEdited.cells.findIndex(
+            (cell) => cell.uniqueId === cellEdited.uniqueId,
+        );
+        const cellAdded = new CellAdded(cellIndex, cellEdited);
+        const diffAdding = new AuthorDocDiff([cellAdded]);
+        const suggestionAdding = suggestion.withTheDiff(diffAdding);
+        return suggestionAdding;
+    }
+    const documentOfTheCell = Document.fromCells([cellAsItStands]);
+    const documentOfTheCellEdited = Document.fromCells([cellEdited]);
+    const diff = AuthorDocDiff.diff(documentOfTheCell, documentOfTheCellEdited);
+    if (diff.empty()) {
+        return null;
+    }
+    const suggestionEdited = suggestion.withTheDiff(diff);
+    return suggestionEdited;
+}
+
+function withTheEditsOfTheSuggestedCells(
+    documentAsItStands: Document,
+    documentAsSeen: Document,
+    documentEdited: Document,
+): Document {
+    const suggestionsLeft = documentEdited.suggestions.flatMap(
+        (suggestion) => {
+            const suggestionAsItStands = documentAsItStands.suggestionFor(
+                suggestion.cellId,
+            );
+            const theChangeSuggestedIt =
+                suggestionAsItStands === undefined ||
+                !suggestedAlike(suggestionAsItStands, suggestion);
+            if (theChangeSuggestedIt) {
+                return [suggestion];
+            }
+            const cellSeen = documentAsSeen.cellWithId(suggestion.cellId);
+            const cellEdited = documentEdited.cellWithId(suggestion.cellId);
+            if (cellEdited === undefined) {
+                return [];
+            }
+            if (cellSeen !== undefined && writtenAlike(cellSeen, cellEdited)) {
+                return [suggestionAsItStands];
+            }
+            const suggestionEdited = suggestionOfTheEdit(
+                documentAsItStands,
+                documentEdited,
+                cellEdited,
+                suggestionAsItStands,
+            );
+            return suggestionEdited === null ? [] : [suggestionEdited];
+        },
+    );
+    const cells = documentEdited.cells.flatMap((cell) => {
+        if (documentAsItStands.suggestionFor(cell.uniqueId) === undefined) {
+            return [cell];
+        }
+        const cellAsItStands = documentAsItStands.cellWithId(cell.uniqueId);
+        return cellAsItStands === undefined ? [] : [cellAsItStands];
+    });
+    const documentWithTheCells = documentAsItStands.withCells(cells);
+    const documentWithTheSuggestions = Document.fromCells(
+        documentWithTheCells.cells,
+        documentWithTheCells.path,
+        suggestionsLeft,
+    );
+    return documentWithTheSuggestions;
 }
 
 function asThePageDrawsIt(cell: Cell): string {

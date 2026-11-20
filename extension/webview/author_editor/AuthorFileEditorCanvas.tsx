@@ -822,7 +822,7 @@ export function AuthorFileEditorCanvas({
                         <i className="codicon codicon-close" />
                     </button>
                 </div>
-                <div className="author-file-editor-suggestion-proposed" inert>
+                <div className="author-file-editor-suggestion-proposed">
                     {suggestedShown}
                 </div>
             </div>
