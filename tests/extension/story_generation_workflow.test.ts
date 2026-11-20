@@ -339,6 +339,112 @@ review shows: {"kind":"cells","cellKind":"salient-concept"}
     });
 });
 
+describe("StoryGenerationWorkflow.accept — the author continues past the cast stage", () => {
+    const THE_CAST_AWAITING_REVIEW = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother's care.
+
+<!-- cell: character id="v1" title="Varn" concepts="k1" -->
+
+A captain.
+
+<!-- cell: character id="d1" title="Dax" -->
+
+A thief.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: True
+stage: concepts: True
+stage: cast: Review
+stage: plots: False
+stage: mesh: False
+stage: scenes: False
+stage: choices: False
+stage: validity: False
+review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
+`;
+
+    it("flags as an error every character the author tied to no concept, and stays at the cast stage", async () => {
+        const fetched = vi.fn();
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(THE_CAST_AWAITING_REVIEW);
+
+        await session.storyGenerationWorkflow.accept();
+
+        expect([shownMessages, fetched.mock.calls.length, session.document.serialize()]).toEqual([
+            ["Tie every character to the concepts it supports before continuing: Dax supports none."],
+            0,
+            THE_CAST_AWAITING_REVIEW,
+        ]);
+    });
+
+    it("flags as an error a cast with no characters, and stays at the cast stage", async () => {
+        const fetched = vi.fn();
+        vi.stubGlobal("fetch", fetched);
+        const noCast = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother's care.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: True
+stage: concepts: True
+stage: cast: Review
+review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
+`;
+        const session = openStory(noCast);
+
+        await session.storyGenerationWorkflow.accept();
+
+        expect([shownMessages, fetched.mock.calls.length]).toEqual([
+            ["Add the characters of the story before continuing: the cast has none."],
+            0,
+        ]);
+    });
+
+    it("continues to the plots once every character supports a concept", async () => {
+        const fetched = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ id: STORY_FILE }),
+            })
+            .mockResolvedValueOnce(NO_STAGE_RUNS);
+        vi.stubGlobal("fetch", fetched);
+        const everyoneTied = `<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother's care.
+
+<!-- cell: character id="v1" title="Varn" concepts="k1" -->
+
+A captain.
+
+<!-- cell: character id="d1" title="Dax" concepts="k1" -->
+
+A thief.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: True
+stage: concepts: True
+stage: cast: Review
+stage: plots: False
+stage: mesh: False
+stage: scenes: False
+stage: choices: False
+stage: validity: False
+review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
+`;
+        const session = openStory(everyoneTied);
+
+        await session.storyGenerationWorkflow.accept();
+
+        const [, started] = fetched.mock.calls[0];
+        expect([shownMessages, JSON.parse(started.body).stage]).toEqual([[], "plots"]);
+    });
+});
+
 describe("StoryGenerationWorkflow.reject — the author rejects what a stage leaves, and has it run again", () => {
     it("drops every suggestion, and runs the stage again on the story as it was before it", async () => {
         const fetched = vi
