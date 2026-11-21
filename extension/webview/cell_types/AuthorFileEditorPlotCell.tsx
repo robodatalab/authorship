@@ -186,16 +186,19 @@ export function AuthorFileEditorPlotCell({
     }
 
     return (
-        <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>
-                Plot
-                <AuthorFileEditorCellHeaderTitle title={cell.title} />
+        <AuthorFileEditorCell
+            actions={
                 <AuthorFileEditorStoryAnnotationShownInTheManuscript
                     cellKind={PLOT}
                     annotationCellId={cell.uniqueId}
                     isShown={isShownInTheManuscript}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
+            }
+        >
+            <AuthorFileEditorCellHeader>
+                Plot
+                <AuthorFileEditorCellHeaderTitle title={cell.title} />
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>

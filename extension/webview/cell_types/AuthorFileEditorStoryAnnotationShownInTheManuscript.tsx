@@ -22,7 +22,7 @@ export function AuthorFileEditorStoryAnnotationShownInTheManuscript({
     return (
         <button
             type="button"
-            className="author-file-editor-story-annotation-shown-in-the-manuscript"
+            className="author-file-editor-cell-actions-button author-file-editor-story-annotation-shown-in-the-manuscript"
             title={said}
             aria-label={said}
             aria-pressed={isShown}

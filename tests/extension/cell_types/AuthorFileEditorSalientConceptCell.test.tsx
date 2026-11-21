@@ -327,6 +327,21 @@ describe("a salient concept cell", () => {
         ]);
     });
 
+    it("draws the button that highlights its words in the cell's menu, not next to its title", async () => {
+        await mountSalientConcepts({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            isShownInTheManuscript: false,
+        });
+
+        const inTheMenu = document.querySelectorAll(
+            ".author-file-editor-cell-actions [aria-label='Highlight its words in the manuscript']",
+        ).length;
+        const nextToTheTitle = document.querySelectorAll(
+            ".author-file-editor-cell-header [aria-label='Highlight its words in the manuscript']",
+        ).length;
+        expect([inTheMenu, nextToTheTitle]).toEqual([1, 0]);
+    });
+
     it("asks for its words to be highlighted before a reference of it is selected, while they are not", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
