@@ -82,7 +82,7 @@
     visibility: hidden;
 }
 
-.author-file-editor-cell:hover .author-file-editor-cell-actions {
+.author-file-editor-cell:hover > .author-file-editor-cell-actions {
     visibility: visible;
 }
 

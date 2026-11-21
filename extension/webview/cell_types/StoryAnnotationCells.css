@@ -49,10 +49,12 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.author-file-editor-plot-event-place,
-.author-file-editor-plot-event-characters,
-.author-file-editor-plot-event-story-text {
-    margin-top: 10px;
+.author-file-editor-plot-event {
+    padding: 4px 0;
+}
+
+.author-file-editor-plot-event-selected > .author-file-editor-cell {
+    border-color: var(--vscode-focusBorder);
 }
 
 .author-file-editor-story-annotation-passages {
@@ -97,20 +99,21 @@
     cursor: default;
 }
 
-.author-file-editor-plot-trajectory {
-    position: relative;
-}
-
-.author-file-editor-plot-trajectory-dragging
+.author-file-editor-reorderable-list-dragging
     .author-file-editor-story-annotation-passage-shown:hover,
-.author-file-editor-plot-trajectory-dragging
+.author-file-editor-reorderable-list-dragging
     .author-file-editor-story-annotation-passage-removed:hover {
     background: none;
 }
 
-.author-file-editor-plot-trajectory-row-dragged {
-    outline: 1px dashed var(--vscode-focusBorder);
-    outline-offset: -1px;
+.author-file-editor-plot-trajectory-lanes-gutter {
+    flex: 0 0 auto;
+}
+
+.author-file-editor-plot-trajectory-row-let-go-on {
+    fill: transparent;
+    pointer-events: all;
+    cursor: crosshair;
 }
 
 .author-file-editor-plot-trajectory-lanes {

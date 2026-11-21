@@ -1,0 +1,17 @@
+.author-file-editor-reorderable-list {
+    position: relative;
+    display: flex;
+}
+
+.author-file-editor-reorderable-list-items {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.author-file-editor-reorderable-list-item-dragged {
+    outline: 1px dashed var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
