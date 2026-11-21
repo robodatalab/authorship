@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import type { Cell } from "authordoc/cells/cell";
+import { CharacterCell } from "authordoc/cells/character_cell";
 import { UnknownCell } from "authordoc/cells/unknown_cell";
 import { CellAdded } from "authordoc/changes/cell_added";
 import { AuthorDocDiff } from "authordoc/diff";
@@ -42,6 +43,28 @@ const REVIEW_SHOWS = "review shows: ";
 const SHOWN_WHEN_THE_CHECKPOINT_SAYS_NOTHING: StoryGenerationShown = {
     kind: "editor",
 };
+
+function whatTheCastLeavesUndone(document: Document): string | null {
+    const characters = document.cells.filter(
+        (cell): cell is CharacterCell => cell instanceof CharacterCell,
+    );
+    if (characters.length === 0) {
+        return "Add the characters of the story before continuing: the cast has none.";
+    }
+    const untied = characters.filter(
+        (character) => character.concepts(document).length === 0,
+    );
+    if (untied.length === 0) {
+        return null;
+    }
+    const namesOfTheUntied = untied.map((character) => character.title).join(", ");
+    return `Tie every character to the concepts it supports before continuing: ${namesOfTheUntied} supports none.`;
+}
+
+const LEFT_UNDONE_BY_THE_STAGE: ReadonlyMap<
+    string,
+    (document: Document) => string | null
+> = new Map([["cast", whatTheCastLeavesUndone]]);
 
 function suggestionOfTheStage(
     storyBeforeTheStage: Document,
@@ -252,6 +275,16 @@ export class StoryGenerationWorkflow {
         const stageAwaiting = stageAwaitingReview(this.session.document);
         const suggestionsLeft = this.session.document.suggestions;
         if (stageAwaiting === undefined || suggestionsLeft.length > 0) {
+            return;
+        }
+        const whatTheStageLeavesUndone =
+            LEFT_UNDONE_BY_THE_STAGE.get(stageAwaiting);
+        const leftUndone =
+            whatTheStageLeavesUndone === undefined
+                ? null
+                : whatTheStageLeavesUndone(this.session.document);
+        if (leftUndone !== null) {
+            void vscode.window.showErrorMessage(leftUndone);
             return;
         }
         this.session.changeTheDocument((document) => {

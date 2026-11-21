@@ -77,10 +77,12 @@ def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, list
 
 async def _with_the_event_told(
     story: InteractiveAuthorStory,
+    plot: PlotCell,
+    concept: SalientConceptCell,
     node_id: str,
     event_written: tuple[str, str, list[str], str],
     model: CompletingModel,
-) -> tuple[InteractiveAuthorStory, PlotNode]:
+) -> tuple[InteractiveAuthorStory, PlotCell]:
     moment, place_name, names, summary = event_written
     story_with_the_place, place = story.with_place_named(place_name)
     story_with_the_characters, characters = await with_the_characters_named(story_with_the_place, names, f"The event:\n{summary}", model)
@@ -93,7 +95,16 @@ async def _with_the_event_told(
         character_ids=character_ids,
         summary=summary,
     )
-    return story_with_the_characters, event
+    generated = [character for character in characters if story_with_the_place.document.cell_with_id(character.unique_id) is None]
+    tied = [character.with_concepts([concept]) for character in generated]
+    document_with_them_tied = story_with_the_characters.document
+    for character in tied:
+        document_with_them_tied = document_with_them_tied.with_cell(character)
+    main_characters = plot.characters(document_with_them_tied)
+    plot_following_them = plot.with_characters([*main_characters, *tied])
+    plot_with_the_event = plot_following_them.with_node(event)
+    story_with_them_tied = InteractiveAuthorStory(document_with_them_tied)
+    return story_with_them_tied, plot_with_the_event
 
 
 class LayOutPlotsStep(StageStep):
@@ -129,10 +140,10 @@ class PlotEndsStep(StageStep):
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
         story = InteractiveAuthorStory(document)
-        story_with_the_start, start_event = await _with_the_event_told(story, self._first.node_id, start, self._model)
-        story_with_both_ends, end_event = await _with_the_event_told(story_with_the_start, self._last.node_id, end, self._model)
-        plot_with_the_start = plot.with_node(start_event)
-        plot_with_the_ends = plot_with_the_start.with_node(end_event)
+        story_with_the_start, plot_with_the_start = await _with_the_event_told(story, plot, self._concept, self._first.node_id, start, self._model)
+        story_with_both_ends, plot_with_the_ends = await _with_the_event_told(
+            story_with_the_start, plot_with_the_start, self._concept, self._last.node_id, end, self._model
+        )
         document_with_the_ends = story_with_both_ends.document.with_cell(plot_with_the_ends)
         return document_with_the_ends
 
@@ -168,8 +179,7 @@ class InBetweenStep(StageStep):
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         (event_written,) = _parse_events_table_returned_by_llm(written)
-        story_with_the_event, event = await _with_the_event_told(story, self._at.node_id, event_written, self._model)
-        plot_with_the_event = plot.with_node(event)
+        story_with_the_event, plot_with_the_event = await _with_the_event_told(story, plot, self._concept, self._at.node_id, event_written, self._model)
         document_with_the_event = story_with_the_event.document.with_cell(plot_with_the_event)
         return document_with_the_event
 
