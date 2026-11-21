@@ -1932,10 +1932,9 @@ describe("the metadata and the manuscript panes", () => {
             cellDrawings: DRAWN_BY_THEIR_IDS,
             storyGeneration: {
                 running: false,
-                error: null,
                 progress: { steps: [] },
                 stages: [{ name: "concept titles", done: false }],
-                asked: { stage: "concept titles", story: "", shown },
+                asked: { stage: "concept titles", shown },
             },
         });
 
@@ -1959,12 +1958,10 @@ describe("the metadata and the manuscript panes", () => {
             cellTypes: [cellType("salient-concept", "primary")],
             storyGeneration: {
                 running: false,
-                error: null,
                 progress: { steps: [] },
                 stages: [{ name: "concept titles", done: false }],
                 asked: {
                     stage: "concept titles",
-                    story: "",
                     shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
                 },
             },
@@ -2103,10 +2100,9 @@ describe("the metadata and the manuscript panes", () => {
                 cellDrawings: DRAWN_BY_THEIR_IDS,
                 storyGeneration: {
                     running: false,
-                    error: null,
                     progress: { steps: [] },
                     stages: [{ name: "plots", done: false }],
-                    asked: { stage: "plots", story: "", shown },
+                    asked: { stage: "plots", shown },
                 },
             });
 

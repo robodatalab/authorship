@@ -30,8 +30,14 @@ import {
 } from "authordoc/iterators/story_words_iterator";
 import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import { WordCounter } from "authordoc/synchronizers/word_counter";
-import type { StoryGeneration } from "./story_generation";
-import { StoryGenerationWorkflow } from "./story_generation_workflow";
+import type {
+    StoryGeneration,
+    StoryGenerationStageJob,
+} from "./story_generation";
+import {
+    StoryGenerationWorkflow,
+    storyGenerationOf,
+} from "./story_generation_workflow";
 import { withEverySuggestionApplied } from "./suggestions_applied";
 
 export class AuthorFileEditorSession
@@ -60,7 +66,8 @@ export class AuthorFileEditorSession
 
     private storyTextSelected: StoryTextSpan | null = null;
 
-    private storyGeneration: StoryGeneration | null = null;
+    private progressOfTheStageRunning: StoryGenerationStageJob["progress"] | null =
+        null;
 
     readonly storyGenerationWorkflow = new StoryGenerationWorkflow(this);
 
@@ -131,18 +138,28 @@ export class AuthorFileEditorSession
     }
 
     get theStoryGeneration(): StoryGeneration | null {
-        return this.storyGeneration;
+        const storyGeneration = storyGenerationOf(
+            this.documentAsItStands,
+            this.progressOfTheStageRunning,
+        );
+        return storyGeneration;
     }
 
-    showTheStoryGeneration(storyGeneration: StoryGeneration | null): void {
-        this.storyGeneration = storyGeneration;
+    showTheStageRunning(progress: StoryGenerationStageJob["progress"]): void {
+        this.progressOfTheStageRunning = progress;
+        this.sendTheStoryGeneration();
+    }
+
+    showNoStageRunning(): void {
+        this.progressOfTheStageRunning = null;
         this.sendTheStoryGeneration();
     }
 
     private sendTheStoryGeneration(): void {
+        const storyGeneration = this.theStoryGeneration;
         void this.panel?.webview.postMessage({
             type: "storyGeneration",
-            storyGeneration: this.storyGeneration,
+            storyGeneration,
         });
     }
 
@@ -522,6 +539,7 @@ export class AuthorFileEditorSession
         this.sendProseErrors();
         this.sendFindMatches();
         this.sendWordCounts();
+        this.sendTheStoryGeneration();
     }
 }
 

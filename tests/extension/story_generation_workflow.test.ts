@@ -143,7 +143,6 @@ const STOPPED_IN_THE_CONCEPTS: StoryGenerationStageJob = {
 
 const REVIEWS_THE_CONCEPTS = {
     running: false,
-    error: null,
     progress: { steps: [] },
     stages: [
         { name: "concept titles", done: true },
@@ -157,7 +156,6 @@ const REVIEWS_THE_CONCEPTS = {
     ],
     asked: {
         stage: "concepts",
-        story: THE_STORY_AWAITING_REVIEW,
         shown: { kind: "cells", cellKind: "salient-concept" },
     },
 };
@@ -254,8 +252,10 @@ describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not d
         expect(sentToThePage).toContainEqual({
             type: "storyGeneration",
             storyGeneration: {
-                ...DESCRIBES_THE_CONCEPTS,
+                running: true,
+                progress: DESCRIBES_THE_CONCEPTS.progress,
                 stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
+                asked: null,
             },
         });
         expect([
@@ -466,6 +466,27 @@ describe("StoryGenerationWorkflow.reject — the author rejects what a stage lea
             LEFT_OFF_AT_THE_CONCEPTS,
         ]);
     });
+
+    it("shows the stage it left off at, for the author to resume, when the stage cannot be run again", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi
+                .fn()
+                .mockResolvedValueOnce(NO_STAGE_RUNS)
+                .mockRejectedValueOnce(new Error("The models are still being deployed")),
+        );
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
+        await session.storyGenerationWorkflow.showWhereItStands();
+
+        await session.storyGenerationWorkflow.reject();
+
+        expect(session.theStoryGeneration).toEqual({
+            running: false,
+            progress: { steps: [] },
+            stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
+            asked: null,
+        });
+    });
 });
 
 describe("StoryGenerationWorkflow.quit — the author quits the generation altogether", () => {
@@ -525,7 +546,6 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
 
         expect(session.theStoryGeneration).toEqual({
             running: false,
-            error: null,
             progress: { steps: [] },
             stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
             asked: null,
@@ -687,7 +707,6 @@ stage: concepts: Review
 
         expect(session.theStoryGeneration?.asked).toEqual({
             stage: "concepts",
-            story: awaitingReviewWithNothingShown,
             shown: { kind: "editor" },
         });
     });
@@ -740,8 +759,10 @@ stage: concepts: Review
         expect(sentToThePage).toContainEqual({
             type: "storyGeneration",
             storyGeneration: {
-                ...DESCRIBES_THE_CONCEPTS,
+                running: true,
+                progress: DESCRIBES_THE_CONCEPTS.progress,
                 stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
+                asked: null,
             },
         });
         expect(session.theStoryGeneration?.asked).toBeNull();

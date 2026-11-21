@@ -20,6 +20,7 @@ the plots in the metadata pane:
 
 from __future__ import annotations
 
+import re
 from uuid import uuid4
 
 from authordoc.cells.character_cell import CharacterCell
@@ -75,6 +76,13 @@ def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, list
     return events
 
 
+def _is_named_in(what_happens: str, name: str) -> bool:
+    words_of_what_happens = set(re.findall(r"\w+", what_happens))
+    words_of_the_name = re.findall(r"\w+", name)
+    named = any(word in words_of_what_happens for word in words_of_the_name)
+    return named
+
+
 async def _with_the_event_told(
     story: InteractiveAuthorStory,
     plot: PlotCell,
@@ -84,8 +92,11 @@ async def _with_the_event_told(
     model: CompletingModel,
 ) -> tuple[InteractiveAuthorStory, PlotCell]:
     moment, place_name, names, summary = event_written
+    names_in_what_happens = [name for name in names if _is_named_in(summary, name)]
     story_with_the_place, place = story.with_place_named(place_name)
-    story_with_the_characters, characters = await with_the_characters_named(story_with_the_place, names, f"The event:\n{summary}", model)
+    story_with_the_characters, characters = await with_the_characters_named(
+        story_with_the_place, names_in_what_happens, f"The event:\n{summary}", model
+    )
     character_ids = [character.unique_id for character in characters]
     event = PlotNode(
         node_id=node_id,

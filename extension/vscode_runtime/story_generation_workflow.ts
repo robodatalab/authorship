@@ -11,6 +11,7 @@ import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import { fetchFromServer } from "./server/fetch";
 import { awaitServerJob, startServerJob } from "./server/jobs";
 import type {
+    StoryGeneration,
     StoryGenerationAsked,
     StoryGenerationShown,
     StoryGenerationStageJob,
@@ -237,6 +238,43 @@ function withoutTheCheckpoint(document: Document): Document {
     return documentWithoutTheCheckpoint;
 }
 
+export function storyGenerationOf(
+    document: Document,
+    progressOfTheStageRunning: StoryGenerationStageJob["progress"] | null,
+): StoryGeneration | null {
+    const stages = stagesOf(document);
+    if (progressOfTheStageRunning !== null) {
+        return {
+            running: true,
+            progress: progressOfTheStageRunning,
+            stages,
+            asked: null,
+        };
+    }
+    const stageAwaiting = stageAwaitingReview(document);
+    if (stageAwaiting !== undefined) {
+        const shown = shownInTheCheckpoint(document);
+        return {
+            running: false,
+            progress: { steps: [] },
+            stages,
+            asked: { stage: stageAwaiting, shown },
+        };
+    }
+    const stagesDone = stages.filter((stage) => stage.done);
+    const someStagesDoneAndSomeNot =
+        stagesDone.length > 0 && stagesDone.length < stages.length;
+    if (!someStagesDoneAndSomeNot) {
+        return null;
+    }
+    return {
+        running: false,
+        progress: { steps: [] },
+        stages,
+        asked: null,
+    };
+}
+
 function showTheFailureToGenerate(failure: unknown): void {
     void vscode.window.showErrorMessage(
         `Cannot generate the story — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
@@ -249,13 +287,8 @@ export class StoryGenerationWorkflow {
     async runTheNextStage(): Promise<void> {
         const stages = stagesOf(this.session.document);
         const nextStage = stages.find((stage) => !stage.done);
-        if (nextStage === undefined) {
-            this.session.showTheStoryGeneration(null);
-            return;
-        }
         const stageAwaiting = stageAwaitingReview(this.session.document);
-        if (stageAwaiting !== undefined) {
-            this.showWhereItLeftOff();
+        if (nextStage === undefined || stageAwaiting !== undefined) {
             return;
         }
         try {
@@ -325,8 +358,8 @@ export class StoryGenerationWorkflow {
             this.session.rejectTheSuggestion(suggestion.cellId);
         }
         this.session.changeTheDocument(withoutTheCheckpoint);
+        this.session.showNoStageRunning();
         await this.session.writeTheDocumentToItsFile();
-        this.session.showTheStoryGeneration(null);
     }
 
     async showWhereItStands(): Promise<void> {
@@ -337,10 +370,10 @@ export class StoryGenerationWorkflow {
                 `/generate/story/status?id=${encodeURIComponent(path)}`,
             );
         } catch {
-            this.showWhereItLeftOff();
             return;
         }
         if (stageJob.running) {
+            this.session.showTheStageRunning(stageJob.progress);
             await this.followTheStage(path);
             if (this.session.isShownInItsEditor) {
                 await this.showWhereItStands();
@@ -356,10 +389,8 @@ export class StoryGenerationWorkflow {
                 asked.shown.kind !== "command" && suggestionsMade === 0;
             if (nothingToReview) {
                 await this.accept();
-                return;
             }
         }
-        this.showWhereItLeftOff();
     }
 
     private async keepWhatTheStageAsksForReview(
@@ -395,11 +426,12 @@ export class StoryGenerationWorkflow {
             await awaitServerJob<StoryGenerationStageJob>(
                 "/generate/story/status",
                 path,
-                (stageJob) => this.showTheStageJob(stageJob),
+                (stageJob) => this.session.showTheStageRunning(stageJob.progress),
             );
         } catch (failure) {
             showTheFailureToGenerate(failure);
         }
+        this.session.showNoStageRunning();
     }
 
     private async dropWhatTheStageAsks(): Promise<void> {
@@ -416,44 +448,5 @@ export class StoryGenerationWorkflow {
     private showWhatTheStageAsks(storyAwaitingReview: Document): void {
         const serialized = storyAwaitingReview.serialize();
         this.session.importDocumentFromText(serialized);
-    }
-
-    private showTheStageJob(stageJob: StoryGenerationStageJob): void {
-        const stages = stagesOf(this.session.document);
-        this.session.showTheStoryGeneration({ ...stageJob, stages });
-    }
-
-    private showWhereItLeftOff(): void {
-        const stages = stagesOf(this.session.document);
-        const stageAwaiting = stageAwaitingReview(this.session.document);
-        if (stageAwaiting !== undefined) {
-            const shown = shownInTheCheckpoint(this.session.document);
-            this.session.showTheStoryGeneration({
-                running: false,
-                error: null,
-                progress: { steps: [] },
-                stages,
-                asked: {
-                    stage: stageAwaiting,
-                    story: this.session.document.text,
-                    shown,
-                },
-            });
-            return;
-        }
-        const stagesDone = stages.filter((stage) => stage.done);
-        const someStagesDoneAndSomeNot =
-            stagesDone.length > 0 && stagesDone.length < stages.length;
-        if (!someStagesDoneAndSomeNot) {
-            this.session.showTheStoryGeneration(null);
-            return;
-        }
-        this.session.showTheStoryGeneration({
-            running: false,
-            error: null,
-            progress: { steps: [] },
-            stages,
-            asked: null,
-        });
     }
 }

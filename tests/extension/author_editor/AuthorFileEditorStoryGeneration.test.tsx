@@ -9,7 +9,6 @@ import type { StoryGeneration } from "../../../extension/vscode_runtime/story_ge
 
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: false,
-    error: null,
     progress: { steps: [{ doing: "concept titles", done: 0, of: 0, seconds: 2, secondsPerItem: null, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: false },
@@ -18,7 +17,6 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     ],
     asked: {
         stage: "concept titles",
-        story: "",
         shown: {
             kind: "command",
             cellKind: "salient-concept",
@@ -29,7 +27,6 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 
 const ASKS_FOR_A_REVIEW: StoryGeneration = {
     running: false,
-    error: null,
     progress: { steps: [{ doing: "concepts", done: 1, of: 1, seconds: 9, secondsPerItem: 9, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: true },
@@ -38,14 +35,12 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
     ],
     asked: {
         stage: "concepts",
-        story: '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
         shown: { kind: "cells", cellKind: "salient-concept" },
     },
 };
 
 const WRITES: StoryGeneration = {
     running: true,
-    error: null,
     progress: {
         steps: [{ doing: "plots", done: 3, of: 15, seconds: 12, secondsPerItem: 4, state: "running", steps: [] }],
     },
@@ -60,7 +55,6 @@ const WRITES: StoryGeneration = {
 
 const WRITES_THE_FIRST_STEP: StoryGeneration = {
     running: true,
-    error: null,
     progress: {
         steps: [{ doing: "plots", done: 0, of: 15, seconds: 3, secondsPerItem: null, state: "running", steps: [] }],
     },
@@ -75,7 +69,6 @@ const WRITES_THE_FIRST_STEP: StoryGeneration = {
 
 const WRITES_QUICK_STEPS: StoryGeneration = {
     running: true,
-    error: null,
     progress: {
         steps: [{ doing: "plots", done: 3, of: 15, seconds: 1, secondsPerItem: 0.25, state: "running", steps: [] }],
     },
@@ -90,7 +83,6 @@ const WRITES_QUICK_STEPS: StoryGeneration = {
 
 const PLAYS_THE_STORY: StoryGeneration = {
     running: true,
-    error: null,
     progress: {
         steps: [
             {
@@ -116,7 +108,6 @@ const PLAYS_THE_STORY: StoryGeneration = {
 
 const LEFT_OFF: StoryGeneration = {
     running: false,
-    error: null,
     progress: { steps: [] },
     stages: [
         { name: "concept titles", done: true },
