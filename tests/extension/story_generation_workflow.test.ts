@@ -61,6 +61,10 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
+
+<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother's care.
 `;
 
 const THE_STORY_AWAITING_REVIEW = `<!-- cell: markdown id="c1" -->
@@ -69,6 +73,12 @@ She saw the door.
 
 <!-- suggestion: id="c1" -->
 <!-- change: text from="16" removed="" written=" at last" -->
+
+<!-- cell: salient-concept id="k1" -->
+
+<!-- suggestion: id="k1" -->
+<!-- change: header kind="salient-concept" after-title="Motherhood" -->
+<!-- change: text from="0" removed="" written="A mother's care." -->
 
 <!-- cell: GeneratedDocumentCheckpoint id="g1" -->
 
@@ -81,6 +91,7 @@ stage: scenes: False
 stage: choices: False
 stage: validity: False
 review shows: {"kind":"cells","cellKind":"salient-concept"}
+proposed by the stage: k1
 `;
 
 const THE_STORY_ACCEPTED = `<!-- cell: markdown id="c1" -->
@@ -518,7 +529,8 @@ describe("StoryGenerationWorkflow.quit — the author quits the generation altog
         await session.storyGenerationWorkflow.quit();
 
         expect([files.get(STORY_FILE), session.theStoryGeneration]).toEqual([
-            '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n',
+            '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n\n' +
+                '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
             null,
         ]);
     });

@@ -403,14 +403,15 @@ describe("the suggestions the document holds", () => {
         );
     });
 
-    it("patch their cell with their diff once accepted, and are dropped", () => {
+    it("patch their cell with their diff once accepted, leaving every cell where it stood, and are dropped", () => {
         const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
 
         session.acceptTheSuggestion("c1");
 
-        expect(session.document.serialize()).toBe(
-            THE_CHAPTER + "\n" + '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n' + "\n" + HE_HEARD,
-        );
+        expect([cellsOf(session), session.document.suggestions]).toEqual([
+            ["c0:chapter:", "c1:markdown:She saw the door at last.", "c2:markdown:He heard the bell."],
+            [],
+        ]);
     });
 
     it("are dropped once rejected, leaving their cell as it is", () => {

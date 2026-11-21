@@ -3,8 +3,8 @@ import * as vscode from "vscode";
 import type { Cell } from "authordoc/cells/cell";
 import { CharacterCell } from "authordoc/cells/character_cell";
 import { UnknownCell } from "authordoc/cells/unknown_cell";
-import { CellAdded } from "authordoc/changes/cell_added";
 import { AuthorDocDiff } from "authordoc/diff";
+import { parse } from "authordoc/parser";
 import { Document } from "authordoc/storydoc";
 import { Suggestion } from "authordoc/suggestion";
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
@@ -41,6 +41,8 @@ const STAGE_NOT_DONE = "False";
 
 const REVIEW_SHOWS = "review shows: ";
 
+const PROPOSED_BY_THE_STAGE = "proposed by the stage: ";
+
 const SHOWN_WHEN_THE_CHECKPOINT_SAYS_NOTHING: StoryGenerationShown = {
     kind: "editor",
 };
@@ -67,21 +69,49 @@ const LEFT_UNDONE_BY_THE_STAGE: ReadonlyMap<
     (document: Document) => string | null
 > = new Map([["cast", whatTheCastLeavesUndone]]);
 
-function suggestionOfTheStage(
+function emptyCellWithTheIdOf(cell: Cell): Cell {
+    const marker = `<!-- cell: ${cell.kind} id="${cell.uniqueId}" -->\n`;
+    const [emptyCell] = parse(marker);
+    return emptyCell;
+}
+
+function cellsProposedByTheStage(
     storyBeforeTheStage: Document,
-    cell: Cell,
-    cellIndex: number,
-): Suggestion | null {
-    if (cell.kind === CHECKPOINT) {
-        return null;
+    storyTheStageLeaves: Document,
+): Cell[] {
+    const cellsProposed = storyTheStageLeaves.cells.filter(
+        (cell) =>
+            cell.kind !== CHECKPOINT &&
+            storyBeforeTheStage.cellWithId(cell.uniqueId) === undefined,
+    );
+    return cellsProposed;
+}
+
+function withTheCellsProposedEmpty(
+    storyBeforeTheStage: Document,
+    storyTheStageLeaves: Document,
+): Cell[] {
+    const cells = [...storyBeforeTheStage.cells];
+    let whereTheNextCellProposedGoes = 0;
+    for (const cell of storyTheStageLeaves.cells) {
+        if (cell.kind === CHECKPOINT) {
+            continue;
+        }
+        const standing = cells.findIndex(
+            (held) => held.uniqueId === cell.uniqueId,
+        );
+        if (standing !== -1) {
+            whereTheNextCellProposedGoes = standing + 1;
+            continue;
+        }
+        const emptyCell = emptyCellWithTheIdOf(cell);
+        cells.splice(whereTheNextCellProposedGoes, 0, emptyCell);
+        whereTheNextCellProposedGoes += 1;
     }
-    const cellBefore = storyBeforeTheStage.cellWithId(cell.uniqueId);
-    if (cellBefore === undefined) {
-        const cellAdded = new CellAdded(cellIndex, cell);
-        const diffAdding = new AuthorDocDiff([cellAdded]);
-        const suggestionAdding = new Suggestion(cell.uniqueId, diffAdding);
-        return suggestionAdding;
-    }
+    return cells;
+}
+
+function suggestionOfTheStage(cellBefore: Cell, cell: Cell): Suggestion | null {
     const documentBefore = Document.fromCells([cellBefore]);
     const documentAfter = Document.fromCells([cell]);
     const diff = AuthorDocDiff.diff(documentBefore, documentAfter);
@@ -96,20 +126,47 @@ function withTheSuggestionsOfTheStage(
     storyBeforeTheStage: Document,
     storyTheStageLeaves: Document,
 ): Document {
-    const suggestions = storyTheStageLeaves.cells.flatMap((cell, cellIndex) => {
-        const suggestion = suggestionOfTheStage(
-            storyBeforeTheStage,
-            cell,
-            cellIndex,
-        );
+    const cells = withTheCellsProposedEmpty(
+        storyBeforeTheStage,
+        storyTheStageLeaves,
+    );
+    const suggestions = cells.flatMap((cellBefore) => {
+        const cell = storyTheStageLeaves.cellWithId(cellBefore.uniqueId);
+        if (cell === undefined || cell.kind === CHECKPOINT) {
+            return [];
+        }
+        const suggestion = suggestionOfTheStage(cellBefore, cell);
         return suggestion === null ? [] : [suggestion];
     });
     const documentWithTheSuggestions = Document.fromCells(
-        storyBeforeTheStage.cells,
+        cells,
         storyBeforeTheStage.path,
         suggestions,
     );
     return documentWithTheSuggestions;
+}
+
+function idsProposedInTheCheckpoint(document: Document): string[] {
+    const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
+    const lines = checkpoint?.source.split("\n") ?? [];
+    const line = lines.find((written) =>
+        written.startsWith(PROPOSED_BY_THE_STAGE),
+    );
+    if (line === undefined) {
+        return [];
+    }
+    const idsWritten = line.slice(PROPOSED_BY_THE_STAGE.length);
+    const idsProposed = idsWritten.split(", ");
+    return idsProposed;
+}
+
+function withoutTheCellsProposed(document: Document): Document {
+    const idsProposed = idsProposedInTheCheckpoint(document);
+    const cellsKept = document.cells.filter(
+        (cell) => !idsProposed.includes(cell.uniqueId),
+    );
+    const documentWithoutThem = document.withCells(cellsKept);
+    return documentWithoutThem;
 }
 
 function shownInTheCheckpoint(document: Document): StoryGenerationShown {
@@ -181,6 +238,7 @@ function withTheStageAwaitingReview(
     document: Document,
     stageAwaiting: string,
     shown: StoryGenerationShown,
+    cellsProposed: Cell[],
 ): Document {
     const stageLines = stageLinesWithTheStageIn(
         document,
@@ -188,7 +246,13 @@ function withTheStageAwaitingReview(
         STAGE_AWAITING_REVIEW,
     );
     const shownWritten = JSON.stringify(shown);
-    const lines = [...stageLines, `${REVIEW_SHOWS}${shownWritten}`];
+    const reviewLines = [...stageLines, `${REVIEW_SHOWS}${shownWritten}`];
+    const idsProposed = cellsProposed.map((cell) => cell.uniqueId);
+    const idsProposedWritten = idsProposed.join(", ");
+    const lines =
+        idsProposed.length === 0
+            ? reviewLines
+            : [...reviewLines, `${PROPOSED_BY_THE_STAGE}${idsProposedWritten}`];
     const documentWithTheStageAwaitingReview = withTheCheckpointWritten(
         document,
         lines,
@@ -341,8 +405,10 @@ export class StoryGenerationWorkflow {
             this.session.rejectTheSuggestion(suggestion.cellId);
         }
         this.session.changeTheDocument((document) => {
+            const documentWithoutTheCellsProposed =
+                withoutTheCellsProposed(document);
             const documentWithTheStageNotDone = withTheStageIn(
-                document,
+                documentWithoutTheCellsProposed,
                 stageAwaiting,
                 STAGE_NOT_DONE,
             );
@@ -357,7 +423,14 @@ export class StoryGenerationWorkflow {
         for (const suggestion of this.session.document.suggestions) {
             this.session.rejectTheSuggestion(suggestion.cellId);
         }
-        this.session.changeTheDocument(withoutTheCheckpoint);
+        this.session.changeTheDocument((document) => {
+            const documentWithoutTheCellsProposed =
+                withoutTheCellsProposed(document);
+            const documentWithoutTheCheckpoint = withoutTheCheckpoint(
+                documentWithoutTheCellsProposed,
+            );
+            return documentWithoutTheCheckpoint;
+        });
         this.session.showNoStageRunning();
         await this.session.writeTheDocumentToItsFile();
     }
@@ -410,10 +483,15 @@ export class StoryGenerationWorkflow {
             documentBeforeTheStage,
             documentTheStageLeaves,
         );
+        const cellsProposed = cellsProposedByTheStage(
+            documentBeforeTheStage,
+            documentTheStageLeaves,
+        );
         const storyAwaitingReview = withTheStageAwaitingReview(
             documentWithTheSuggestions,
             asked.stage,
             asked.shown,
+            cellsProposed,
         );
         this.showWhatTheStageAsks(storyAwaitingReview);
         await this.session.writeTheDocumentToItsFile();
