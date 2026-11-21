@@ -10,6 +10,7 @@ import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
 import type { StoryGeneration } from "../vscode_runtime/story_generation";
+import { withEverySuggestionApplied } from "../vscode_runtime/suggestions_applied";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import { parse, parseSuggestions } from "authordoc/parser";
@@ -128,10 +129,17 @@ function openTheAuthorFileEditor(): void {
     };
 
     function drawTheCanvas(): void {
-        const story = Document.fromCells(drawn.cells);
+        const storyWithTheSuggestions = Document.fromCells(
+            drawn.cells,
+            null,
+            drawn.suggestions,
+        );
+        const storyAsSuggested = withEverySuggestionApplied(
+            storyWithTheSuggestions,
+        );
         const cellRenderer = new AuthorFileEditorCellRenderer(
             sendMessagesToVscode,
-            story,
+            storyAsSuggested,
             drawn.storyAnnotationsSelected,
             drawn.storyTextSelected,
         );

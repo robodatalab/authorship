@@ -129,4 +129,58 @@ describe("the suggestions the host sends", () => {
         );
         expect(proposed?.textContent).toContain("one more");
     });
+
+    describe("drawing every cell in the story as the suggestions make it", () => {
+        const MARKUS = '<!-- cell: character id="mv" title="Markus Vader" -->\n';
+        const SUGGESTED_PLACES_CHARACTER_AND_PLOT =
+            '<!-- suggestion: id="ms" -->\n<!-- change: added at="1" kind="place" text="" after-title="Mars" -->\n\n' +
+            '<!-- suggestion: id="hb" -->\n<!-- change: added at="2" kind="place" text="" after-title="Hellas Basin" after-parent="ms" -->\n\n' +
+            '<!-- suggestion: id="tl" -->\n<!-- change: added at="3" kind="character" text="A drill operator in debt to the company." after-title="Teodor Lin" -->\n\n' +
+            '<!-- suggestion: id="dd" -->\n<!-- change: added at="4" kind="plot" text="<ol>\\n<li id=\\"e1\\" timestamp=\\"2.4\\" place=\\"hb\\" characters=\\"mv, tl\\">They drive the drill deeper.</li>\\n</ol>" after-title="Drilling deeper" -->\n';
+
+        async function hostSendsMarkusAndTheSuggestions(): Promise<void> {
+            await openWebview();
+            await hostSends([MARKUS]);
+            await act(async () => {
+                window.dispatchEvent(
+                    new MessageEvent("message", {
+                        data: {
+                            type: "suggestions",
+                            suggestions: SUGGESTED_PLACES_CHARACTER_AND_PLOT,
+                        },
+                    }),
+                );
+            });
+        }
+
+        it.each([
+            ["the suggested place it happens in", ".author-file-editor-plot-event-place", ["Hellas Basin"]],
+            ["the suggested characters in it beside the ones the story has", ".author-file-editor-plot-event-characters", ["Markus Vader", "Teodor Lin"]],
+        ])("names, in a suggested event, %s", async (_, referencesShown, expected) => {
+            await hostSendsMarkusAndTheSuggestions();
+
+            const named = [
+                ...document.querySelectorAll(
+                    `[data-suggestion-id="dd"] ${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
+                ),
+            ].map((reference) => reference.textContent);
+
+            expect(named).toEqual(expected);
+        });
+
+        it("draws a suggested place under the suggested place it lies within", async () => {
+            await hostSendsMarkusAndTheSuggestions();
+
+            const nestedUnder = [
+                ...document.querySelectorAll(".author-file-editor-place-scope"),
+            ].map((scope) => [
+                scope.parentElement!.getAttribute("data-cell-id"),
+                [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
+                    nested.getAttribute("data-cell-id"),
+                ),
+            ]);
+
+            expect(nestedUnder).toEqual([["ms", ["hb"]]]);
+        });
+    });
 });

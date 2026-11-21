@@ -11,7 +11,7 @@ import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
 import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";
 import { CellAdded } from "authordoc/changes/cell_added";
 import type { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
-import type { CellRemoved } from "authordoc/changes/cell_removed";
+import { CellRemoved } from "authordoc/changes/cell_removed";
 import type { CellTextChanged } from "authordoc/changes/cell_text_changed";
 import type { CellsMoved } from "authordoc/changes/cells_moved";
 import { AuthorDocDiff } from "authordoc/diff";
@@ -32,6 +32,7 @@ import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import { WordCounter } from "authordoc/synchronizers/word_counter";
 import type { StoryGeneration } from "./story_generation";
 import { StoryGenerationWorkflow } from "./story_generation_workflow";
+import { withEverySuggestionApplied } from "./suggestions_applied";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
@@ -87,7 +88,7 @@ export class AuthorFileEditorSession
             documentOpened,
         );
         this.makeTheChange(opening);
-        this.takeTheSuggestionsOf(documentOpened);
+        this.takeTheSuggestions(documentOpened.suggestions);
     }
 
     dispose(): void {}
@@ -111,6 +112,13 @@ export class AuthorFileEditorSession
 
     get document(): Document {
         return this.documentAsItStands;
+    }
+
+    get documentAsSuggested(): Document {
+        const documentAsSuggested = withEverySuggestionApplied(
+            this.documentAsItStands,
+        );
+        return documentAsSuggested;
     }
 
     get theStoryAnnotationsSelected(): Record<string, StoryAnnotationSelected> {
@@ -177,20 +185,7 @@ export class AuthorFileEditorSession
     }
 
     theAuthorTypedInTheCell(cellId: string, markdown: string): void {
-        if (this.documentAsItStands.suggestionFor(cellId) !== undefined) {
-            this.changeTheDocument((story) => {
-                const cell = story.cellWithId(cellId);
-                if (!cell) {
-                    return story;
-                }
-                const cellTyped = cell.withSource(markdown);
-                const storyTyped = story.withCell(cellTyped);
-                return storyTyped;
-            });
-            return;
-        }
-        this.whatThePageJustTyped = { cellId, markdown };
-        const documentChange = this.theChangeThisWouldMake((story) => {
+        const typeIt = (story: Document): Document => {
             const cell = story.cellWithId(cellId);
             if (!cell) {
                 return story;
@@ -198,19 +193,37 @@ export class AuthorFileEditorSession
             const cellTyped = cell.withSource(markdown);
             const storyTyped = story.withCell(cellTyped);
             return storyTyped;
-        });
-        if (documentChange.empty()) {
+        };
+        const cellIsSuggested =
+            this.documentAsItStands.suggestionFor(cellId) !== undefined;
+        if (!cellIsSuggested) {
+            this.whatThePageJustTyped = { cellId, markdown };
+        }
+        const documentTyped = cellIsSuggested
+            ? this.documentChangedAsSuggested(typeIt)
+            : typeIt(this.documentAsItStands);
+        const edit = AuthorFileEditorEdit.between(
+            this.documentAsItStands,
+            documentTyped,
+        );
+        if (edit.empty()) {
             return;
         }
+        const documentTypedAsSuggested =
+            withEverySuggestionApplied(documentTyped);
+        const keystroke = AuthorDocDiff.diff(
+            this.documentAsSuggested,
+            documentTypedAsSuggested,
+        );
         const burst = this.burstBeingTyped;
-        if (burst?.carriesOn(this.documentAsItStands, documentChange)) {
-            this.makeTheChange(documentChange);
+        if (burst?.carriesOn(this.documentAsItStands, keystroke)) {
+            this.makeTheEdit(edit);
             burst.nowReaches(this.documentAsItStands);
             return;
         }
         const documentWhenItBegan = this.documentAsItStands;
-        this.makeTheChange(documentChange);
-        const everythingTyped = { theChange: documentChange };
+        this.makeTheEdit(edit);
+        const everythingTyped = { theEdit: edit };
         this.burstBeingTyped = new TypingBurst(
             cellId,
             documentWhenItBegan,
@@ -246,7 +259,7 @@ export class AuthorFileEditorSession
             documentImported,
         );
         this.makeTheChange(fileChange);
-        this.takeTheSuggestionsOf(documentImported);
+        this.takeTheSuggestions(documentImported.suggestions);
     }
 
     importDocumentFromText(text: string): void {
@@ -256,75 +269,82 @@ export class AuthorFileEditorSession
             documentImported,
         );
         this.makeTheChange(importChange);
-        this.takeTheSuggestionsOf(documentImported);
+        this.takeTheSuggestions(documentImported.suggestions);
     }
 
     changeTheDocument(change: (document: Document) => Document): void {
-        const documentAsSeen = withEverySuggestionApplied(
-            this.documentAsItStands,
-        );
-        const documentEdited = change(documentAsSeen);
-        const documentChanged = withTheEditsOfTheSuggestedCells(
-            this.documentAsItStands,
-            documentAsSeen,
-            documentEdited,
-        );
-        this.changeTheDocumentAsItStands(() => documentChanged);
+        const documentChanged = this.documentChangedAsSuggested(change);
+        this.changeTheDocumentInto(documentChanged);
     }
 
     acceptTheSuggestion(cellId: string): void {
-        this.changeTheDocumentAsItStands((document) => {
-            const suggestion = document.suggestionFor(cellId);
-            if (suggestion === undefined) {
-                return document;
-            }
-            const diff = suggestion.diff();
-            const documentPatched = diff.applyTheDiff(document);
-            const documentWithThePatch = document.withCells(
-                documentPatched.cells,
-            );
-            const documentWithoutTheSuggestion =
-                documentWithThePatch.withoutSuggestion(cellId);
-            return documentWithoutTheSuggestion;
-        });
+        const document = this.documentAsItStands;
+        const suggestion = document.suggestionFor(cellId);
+        if (suggestion === undefined) {
+            return;
+        }
+        const diff = suggestion.diff();
+        const documentPatched = diff.applyTheDiff(document);
+        const documentWithThePatch = document.withCells(documentPatched.cells);
+        const documentWithoutTheSuggestion =
+            documentWithThePatch.withoutSuggestion(cellId);
+        this.changeTheDocumentInto(documentWithoutTheSuggestion);
     }
 
     rejectTheSuggestion(cellId: string): void {
-        this.changeTheDocumentAsItStands((document) => {
-            const documentWithoutTheSuggestion =
-                document.withoutSuggestion(cellId);
-            return documentWithoutTheSuggestion;
-        });
+        const documentWithoutTheSuggestion =
+            this.documentAsItStands.withoutSuggestion(cellId);
+        this.changeTheDocumentInto(documentWithoutTheSuggestion);
     }
 
-    private changeTheDocumentAsItStands(
+    private documentChangedAsSuggested(
         change: (document: Document) => Document,
-    ): void {
-        const documentChanged = change(this.documentAsItStands);
-        const documentChange = AuthorDocDiff.diff(
+    ): Document {
+        const documentAsSuggested = this.documentAsSuggested;
+        const documentEdited = change(documentAsSuggested);
+        const documentChanged = withTheEditsOfTheSuggestedCells(
+            this.documentAsItStands,
+            documentAsSuggested,
+            documentEdited,
+        );
+        return documentChanged;
+    }
+
+    private changeTheDocumentInto(documentChanged: Document): void {
+        const edit = AuthorFileEditorEdit.between(
             this.documentAsItStands,
             documentChanged,
         );
-        if (!documentChange.empty()) {
-            this.makeTheChange(documentChange);
-            this.recordAnEdit({ theChange: documentChange });
+        if (edit.empty()) {
+            return;
         }
-        this.takeTheSuggestionsOf(documentChanged);
+        this.makeTheEdit(edit);
+        this.recordAnEdit({ theEdit: edit });
     }
 
-    private takeTheSuggestionsOf(document: Document): void {
+    private makeTheEdit(edit: AuthorFileEditorEdit): void {
+        if (!edit.theChange.empty()) {
+            this.makeTheChange(edit.theChange);
+        }
+        const suggestionsLeft = edit.suggestionsItLeaves(
+            this.documentAsItStands.suggestions,
+        );
+        this.takeTheSuggestions(suggestionsLeft);
+    }
+
+    private takeTheSuggestions(suggestions: readonly Suggestion[]): void {
         const suggestionsHeld = serialize(
             [],
             this.documentAsItStands.suggestions,
         );
-        const suggestionsTaken = serialize([], document.suggestions);
+        const suggestionsTaken = serialize([], suggestions);
         if (suggestionsHeld === suggestionsTaken) {
             return;
         }
         this.documentAsItStands = Document.fromCells(
             this.documentAsItStands.cells,
             this.documentAsItStands.path,
-            document.suggestions,
+            suggestions,
         );
         this.sendSuggestions();
     }
@@ -337,29 +357,18 @@ export class AuthorFileEditorSession
         });
     }
 
-    private theChangeThisWouldMake(
-        change: (document: Document) => Document,
-    ): AuthorDocDiff {
-        const documentChanged = change(this.documentAsItStands);
-        const documentChange = AuthorDocDiff.diff(
-            this.documentAsItStands,
-            documentChanged,
-        );
-        return documentChange;
-    }
-
     private recordAnEdit(everythingItChanged: {
-        theChange: AuthorDocDiff;
+        theEdit: AuthorFileEditorEdit;
     }): void {
         this.edited.fire({
             document: this,
             label: "Edit",
             undo: () => {
-                const undoing = everythingItChanged.theChange.invert();
-                this.makeTheChange(undoing);
+                const undoing = everythingItChanged.theEdit.inverted();
+                this.makeTheEdit(undoing);
             },
             redo: () => {
-                this.makeTheChange(everythingItChanged.theChange);
+                this.makeTheEdit(everythingItChanged.theEdit);
             },
         });
     }
@@ -525,7 +534,7 @@ class TypingBurst implements AuthorDocChangeVisitor<boolean> {
         private readonly cellId: string,
         private readonly documentWhenItBegan: Document,
         private documentAsItLastStood: Document,
-        private readonly everythingTyped: { theChange: AuthorDocDiff },
+        private readonly everythingTyped: { theEdit: AuthorFileEditorEdit },
     ) {}
 
     carriesOn(
@@ -565,7 +574,7 @@ class TypingBurst implements AuthorDocChangeVisitor<boolean> {
     }
 
     nowReaches(documentAsItStands: Document): void {
-        this.everythingTyped.theChange = AuthorDocDiff.diff(
+        this.everythingTyped.theEdit = AuthorFileEditorEdit.between(
             this.documentWhenItBegan,
             documentAsItStands,
         );
@@ -574,26 +583,103 @@ class TypingBurst implements AuthorDocChangeVisitor<boolean> {
     }
 }
 
-function withTheSuggestionApplied(
-    document: Document,
-    suggestion: Suggestion,
-): Document {
-    const diff = suggestion.diff();
-    const documentSuggested = diff.applyTheDiff(document);
-    return documentSuggested;
+interface SuggestionOfACellChanged {
+    cellId: string;
+    before: Suggestion | undefined;
+    standingBefore: number;
+    after: Suggestion | undefined;
+    standingAfter: number;
 }
 
-function withEverySuggestionApplied(document: Document): Document {
-    const documentSuggested = document.suggestions.reduce(
-        withTheSuggestionApplied,
-        document,
-    );
-    return documentSuggested;
+class AuthorFileEditorEdit {
+    constructor(
+        readonly theChange: AuthorDocDiff,
+        private readonly suggestionsChanged: readonly SuggestionOfACellChanged[],
+    ) {}
+
+    static between(
+        documentBefore: Document,
+        documentAfter: Document,
+    ): AuthorFileEditorEdit {
+        const theChange = AuthorDocDiff.diff(documentBefore, documentAfter);
+        const suggestionsBefore = documentBefore.suggestions;
+        const suggestionsAfter = documentAfter.suggestions;
+        const everySuggestion = [...suggestionsBefore, ...suggestionsAfter];
+        const cellIdsSuggested = new Set(
+            everySuggestion.map((suggestion) => suggestion.cellId),
+        );
+        const suggestionsChanged = [...cellIdsSuggested].flatMap((cellId) => {
+            const standingBefore = suggestionsBefore.findIndex(
+                (suggestion) => suggestion.cellId === cellId,
+            );
+            const standingAfter = suggestionsAfter.findIndex(
+                (suggestion) => suggestion.cellId === cellId,
+            );
+            const before = suggestionsBefore[standingBefore];
+            const after = suggestionsAfter[standingAfter];
+            const unchanged =
+                before !== undefined &&
+                after !== undefined &&
+                suggestedAlike(before, after);
+            if (unchanged) {
+                return [];
+            }
+            return [{ cellId, before, standingBefore, after, standingAfter }];
+        });
+        const edit = new AuthorFileEditorEdit(theChange, suggestionsChanged);
+        return edit;
+    }
+
+    empty(): boolean {
+        return this.theChange.empty() && this.suggestionsChanged.length === 0;
+    }
+
+    inverted(): AuthorFileEditorEdit {
+        const theChangeInverted = this.theChange.invert();
+        const suggestionsChangedBack = this.suggestionsChanged.map(
+            (changed) => ({
+                cellId: changed.cellId,
+                before: changed.after,
+                standingBefore: changed.standingAfter,
+                after: changed.before,
+                standingAfter: changed.standingBefore,
+            }),
+        );
+        const editInverted = new AuthorFileEditorEdit(
+            theChangeInverted,
+            suggestionsChangedBack,
+        );
+        return editInverted;
+    }
+
+    suggestionsItLeaves(
+        suggestions: readonly Suggestion[],
+    ): readonly Suggestion[] {
+        const inTheOrderTheyStandAfter = [...this.suggestionsChanged].sort(
+            (changed, other) => changed.standingAfter - other.standingAfter,
+        );
+        let suggestionsLeft = suggestions;
+        for (const changed of inTheOrderTheyStandAfter) {
+            const others = suggestionsLeft.filter(
+                (suggestion) => suggestion.cellId !== changed.cellId,
+            );
+            if (changed.after === undefined) {
+                suggestionsLeft = others;
+                continue;
+            }
+            const standing = Math.min(changed.standingAfter, others.length);
+            const othersBefore = others.slice(0, standing);
+            const othersAfter = others.slice(standing);
+            suggestionsLeft = [...othersBefore, changed.after, ...othersAfter];
+        }
+        return suggestionsLeft;
+    }
 }
 
-function writtenAlike(cell: Cell, other: Cell): boolean {
-    const written = asThePageDrawsIt(cell);
-    const otherWritten = asThePageDrawsIt(other);
+function writtenAlike(cell: Cell | undefined, other: Cell | undefined): boolean {
+    const written = cell === undefined ? undefined : asThePageDrawsIt(cell);
+    const otherWritten =
+        other === undefined ? undefined : asThePageDrawsIt(other);
     return written === otherWritten;
 }
 
@@ -606,13 +692,26 @@ function suggestedAlike(suggestion: Suggestion, other: Suggestion): boolean {
 function suggestionOfTheEdit(
     documentAsItStands: Document,
     documentEdited: Document,
-    cellEdited: Cell,
+    cellId: string,
     suggestion: Suggestion,
 ): Suggestion | null {
-    const cellAsItStands = documentAsItStands.cellWithId(cellEdited.uniqueId);
+    const cellAsItStands = documentAsItStands.cellWithId(cellId);
+    const cellEdited = documentEdited.cellWithId(cellId);
+    if (cellEdited === undefined) {
+        if (cellAsItStands === undefined) {
+            return null;
+        }
+        const cellIndex = documentAsItStands.cells.findIndex(
+            (cell) => cell.uniqueId === cellId,
+        );
+        const cellRemoved = new CellRemoved(cellIndex, cellAsItStands);
+        const diffRemoving = new AuthorDocDiff([cellRemoved]);
+        const suggestionRemoving = suggestion.withTheDiff(diffRemoving);
+        return suggestionRemoving;
+    }
     if (cellAsItStands === undefined) {
         const cellIndex = documentEdited.cells.findIndex(
-            (cell) => cell.uniqueId === cellEdited.uniqueId,
+            (cell) => cell.uniqueId === cellId,
         );
         const cellAdded = new CellAdded(cellIndex, cellEdited);
         const diffAdding = new AuthorDocDiff([cellAdded]);
@@ -629,9 +728,40 @@ function suggestionOfTheEdit(
     return suggestionEdited;
 }
 
+function withTheSuggestedCellsAsTheyStand(
+    cellsEdited: readonly Cell[],
+    documentAsItStands: Document,
+): Cell[] {
+    const cells = [...cellsEdited];
+    documentAsItStands.cells.forEach((cellAsItStands, standing) => {
+        const kept = cells.some(
+            (cell) => cell.uniqueId === cellAsItStands.uniqueId,
+        );
+        const suggested =
+            documentAsItStands.suggestionFor(cellAsItStands.uniqueId) !==
+            undefined;
+        if (kept || !suggested) {
+            return;
+        }
+        const cellsStandingBefore = documentAsItStands.cells.slice(0, standing);
+        const cellsStandingBeforeNearestFirst = cellsStandingBefore.reverse();
+        const nearestKeptBefore = cellsStandingBeforeNearestFirst.find(
+            (before) => cells.some((cell) => cell.uniqueId === before.uniqueId),
+        );
+        const keptBeforeAt =
+            nearestKeptBefore === undefined
+                ? -1
+                : cells.findIndex(
+                      (cell) => cell.uniqueId === nearestKeptBefore.uniqueId,
+                  );
+        cells.splice(keptBeforeAt + 1, 0, cellAsItStands);
+    });
+    return cells;
+}
+
 function withTheEditsOfTheSuggestedCells(
     documentAsItStands: Document,
-    documentAsSeen: Document,
+    documentAsSuggested: Document,
     documentEdited: Document,
 ): Document {
     const suggestionsLeft = documentEdited.suggestions.flatMap(
@@ -645,30 +775,33 @@ function withTheEditsOfTheSuggestedCells(
             if (theChangeSuggestedIt) {
                 return [suggestion];
             }
-            const cellSeen = documentAsSeen.cellWithId(suggestion.cellId);
+            const cellSuggested = documentAsSuggested.cellWithId(
+                suggestion.cellId,
+            );
             const cellEdited = documentEdited.cellWithId(suggestion.cellId);
-            if (cellEdited === undefined) {
-                return [];
-            }
-            if (cellSeen !== undefined && writtenAlike(cellSeen, cellEdited)) {
+            if (writtenAlike(cellSuggested, cellEdited)) {
                 return [suggestionAsItStands];
             }
             const suggestionEdited = suggestionOfTheEdit(
                 documentAsItStands,
                 documentEdited,
-                cellEdited,
+                suggestion.cellId,
                 suggestionAsItStands,
             );
             return suggestionEdited === null ? [] : [suggestionEdited];
         },
     );
-    const cells = documentEdited.cells.flatMap((cell) => {
+    const cellsEdited = documentEdited.cells.flatMap((cell) => {
         if (documentAsItStands.suggestionFor(cell.uniqueId) === undefined) {
             return [cell];
         }
         const cellAsItStands = documentAsItStands.cellWithId(cell.uniqueId);
         return cellAsItStands === undefined ? [] : [cellAsItStands];
     });
+    const cells = withTheSuggestedCellsAsTheyStand(
+        cellsEdited,
+        documentAsItStands,
+    );
     const documentWithTheCells = documentAsItStands.withCells(cells);
     const documentWithTheSuggestions = Document.fromCells(
         documentWithTheCells.cells,

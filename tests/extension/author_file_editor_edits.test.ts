@@ -471,4 +471,146 @@ describe("the suggestions the document holds", () => {
         const suggested = session.document.suggestions.map((held) => held.cellId);
         expect(suggested).toEqual(["c2"]);
     });
+
+    describe("undone and redone", () => {
+        const SUGGESTED_AT_LAST_ONCE =
+            '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, once" -->\n';
+        const A_NEW_SECTION_SUGGESTED =
+            '<!-- suggestion: id="c3" -->\n<!-- change: added at="3" kind="markdown" text="It rang." -->\n';
+
+        it("record one edit for a run of keystrokes typed into a suggestion", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            typing(session, "c1", "She saw the door at last.", "!!!");
+
+            expect(editsRecorded).toHaveLength(1);
+        });
+
+        it("take back what the author typed into a suggestion, and type it again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c1", "She saw the door at last, once.");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" + HE_HEARD,
+            );
+        });
+
+        it("take back a change a command made to a suggestion, and make it again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.changeTheDocument((document) => {
+                const cellShown = document.cellWithId("c1")!;
+                const cellChanged = cellShown.withSource("She saw the door at last, once.");
+                const documentChanged = document.withCell(cellChanged);
+                return documentChanged;
+            });
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" + HE_HEARD,
+            );
+        });
+
+        it("take back, as one edit, a change to a cell with a suggestion and to a cell without one", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.changeTheDocument((document) => {
+                const sheSaw = document.cellWithId("c1")!;
+                const heHeard = document.cellWithId("c2")!;
+                const sheSawChanged = sheSaw.withSource("She saw the door at last, once.");
+                const heHeardChanged = heHeard.withSource("He heard the bell twice.");
+                const documentWithSheSawChanged = document.withCell(sheSawChanged);
+                const documentChanged = documentWithSheSawChanged.withCell(heHeardChanged);
+                return documentChanged;
+            });
+
+            expect(editsRecorded).toHaveLength(1);
+
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" +
+                    '<!-- cell: markdown id="c2" -->\n\nHe heard the bell twice.\n',
+            );
+        });
+
+        it("come back as they stood when the author takes back accepting one, and are accepted again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.acceptTheSuggestion("c1");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n' + "\n" + HE_HEARD,
+            );
+        });
+
+        it("come back when the author takes back rejecting one, and are rejected again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.rejectTheSuggestion("c1");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(THE_STORY);
+        });
+
+        it("come back when the author takes back changing the cell back to how it stands", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c1", "She saw the door.");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(THE_STORY);
+        });
+
+        it("take what the author types in a suggested new section into its suggestion, and take it back", () => {
+            const { session, editsRecorded } = openSession(THE_STORY + "\n" + A_NEW_SECTION_SUGGESTED);
+
+            session.theAuthorTypedInTheCell("c3", "It rang twice.");
+
+            expect(session.document.serialize()).toBe(
+                THE_STORY + "\n" +
+                    '<!-- suggestion: id="c3" -->\n<!-- change: added at="3" kind="markdown" text="It rang twice." -->\n',
+            );
+
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY + "\n" + A_NEW_SECTION_SUGGESTED);
+        });
+
+        it("stay as they are when the author takes back an edit of a cell without one", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c2", "He heard the bell!");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+        });
+    });
 });

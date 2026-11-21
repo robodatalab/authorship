@@ -49,7 +49,7 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
     ): Promise<void> {
         const cellId = commandArguments.cellId as string;
         const standing = whereACellStands(
-            cellsBySection(session.document.cells),
+            cellsBySection(session.documentAsSuggested.cells),
             cellId,
         );
         if (!standing) {
