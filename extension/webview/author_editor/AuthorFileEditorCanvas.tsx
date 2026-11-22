@@ -222,14 +222,6 @@ export function AuthorFileEditorCanvas({
         () => cellsBySection(cellsAsSuggested),
         [cellsAsSuggested],
     );
-    const suggestionsInTheirOrder = useMemo(
-        () =>
-            cellsAsSuggested.flatMap((cell) => {
-                const suggestion = suggestionForEachCell.get(cell.uniqueId);
-                return suggestion === undefined ? [] : [suggestion];
-            }),
-        [cellsAsSuggested, suggestionForEachCell],
-    );
     const placesNestedInEachPlace = useMemo(
         () => placesNestedIn(storyAsSuggested),
         [storyAsSuggested],
@@ -382,7 +374,7 @@ export function AuthorFileEditorCanvas({
             ? undefined
             : storyAsSuggested.cellWithId(cellIdDragged);
     const canvasDrawn = useRef<HTMLDivElement>(null);
-    const suggestionShown = useRef<number | null>(null);
+    const suggestionShown = useRef<string | null>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<
         number | null
     >(null);
@@ -733,18 +725,31 @@ export function AuthorFileEditorCanvas({
     }
 
     function bringTheSuggestionIntoView(step: number): void {
-        const count = suggestionsInTheirOrder.length;
+        const framesFound =
+            canvasDrawn.current?.querySelectorAll("[data-suggestion-id]") ?? [];
+        const framesOnThePage = [...framesFound];
+        const count = framesOnThePage.length;
         if (count === 0) {
             return;
         }
-        const from = suggestionShown.current ?? (step > 0 ? -1 : 0);
-        const shown = (from + step + count) % count;
-        suggestionShown.current = shown;
-        const suggestion = suggestionsInTheirOrder[shown];
-        const drawn = canvasDrawn.current?.querySelector(
-            `[data-suggestion-id="${suggestion.cellId}"]`,
+        const idsOnThePage = framesOnThePage.map((frame) =>
+            frame.getAttribute("data-suggestion-id"),
         );
-        drawn?.scrollIntoView({ block: "center", behavior: "smooth" });
+        const standingOfTheOneShown = idsOnThePage.indexOf(
+            suggestionShown.current,
+        );
+        const from =
+            standingOfTheOneShown === -1
+                ? step > 0
+                    ? -1
+                    : 0
+                : standingOfTheOneShown;
+        const shown = (from + step + count) % count;
+        suggestionShown.current = idsOnThePage[shown];
+        framesOnThePage[shown].scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+        });
     }
 
     function reviewTheSuggestion(cellId: string, verdict: string): void {

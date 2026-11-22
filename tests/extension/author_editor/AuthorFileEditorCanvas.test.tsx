@@ -2055,19 +2055,35 @@ describe("the metadata and the manuscript panes", () => {
         });
 
         it.each([
-            ["next", "Next suggestion", ["one", "two", "one"]],
-            ["previous", "Previous suggestion", ["two", "one", "two"]],
-        ])("brings the %s suggestion into view from the main menu, going round", async (_, label, expected) => {
+            ["next", "Next suggestion", ["m", "h", "e", "m"]],
+            ["previous", "Previous suggestion", ["e", "h", "m", "e"]],
+        ])("the %s suggestion button goes through the suggestions in the order they appear on the page, starting over after the last", async (_, label, expected) => {
             const scrollIntoView = vi.fn();
             Element.prototype.scrollIntoView = scrollIntoView;
+            const marsDescribed = new CellTextChanged("m", 0, "", "red");
+            const earthDescribed = new CellTextChanged("e", 0, "", "blue");
+            const hellasBasinDescribed = new CellTextChanged("h", 0, "", "dusty");
+            const marsDiff = new AuthorDocDiff([marsDescribed]);
+            const earthDiff = new AuthorDocDiff([earthDescribed]);
+            const hellasBasinDiff = new AuthorDocDiff([hellasBasinDescribed]);
             await mountCanvas({
-                cells: [markdownCell("one"), markdownCell("two")],
-                suggestions: [ONE_CHANGED, TWO_CHANGED],
+                cells: [
+                    new PlaceCell("mars", "", false, null, "m"),
+                    new PlaceCell("earth", "", false, null, "e"),
+                    new PlaceCell("Hellas Basin", "", false, null, "h", "m"),
+                ],
+                cellDrawings: { place: () => <AuthorFileEditorCell /> },
+                suggestions: [
+                    new Suggestion("m", marsDiff),
+                    new Suggestion("e", earthDiff),
+                    new Suggestion("h", hellasBasinDiff),
+                ],
             });
             const button = document.querySelector(
                 `.author-file-editor-main-menu [aria-label="${label}"]`,
             ) as HTMLButtonElement;
 
+            await act(async () => button.click());
             await act(async () => button.click());
             await act(async () => button.click());
             await act(async () => button.click());
