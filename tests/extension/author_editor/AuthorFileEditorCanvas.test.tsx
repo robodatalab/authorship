@@ -2000,7 +2000,7 @@ describe("the metadata and the manuscript panes", () => {
 
         afterEach(() => vi.restoreAllMocks());
 
-        it("draws every cell with a suggestion as the suggestion makes it, in a frame with buttons to accept and reject it", async () => {
+        it("draws every cell with a suggestion as the suggestion makes it, in a frame with buttons to accept and reject it in its footer", async () => {
             await mountCanvas({
                 cells: [markdownCell("one"), markdownCell("two")],
                 suggestions: [ONE_CHANGED],
@@ -2013,13 +2013,15 @@ describe("the metadata and the manuscript panes", () => {
                 (drawnSuggestion) => [
                     drawnSuggestion.getAttribute("data-suggestion-id"),
                     drawnSuggestion.querySelector(".author-file-editor-suggestion-says")!.textContent,
-                    [...drawnSuggestion.querySelectorAll("button")].map((button) => button.getAttribute("aria-label")),
                     drawnSuggestion.querySelector(".author-file-editor-suggestion-proposed")!.textContent,
+                    [...drawnSuggestion.querySelectorAll(".author-file-editor-suggestion-footer button")].map((button) =>
+                        button.getAttribute("aria-label"),
+                    ),
                 ],
             );
             expect([drawn, suggestionsDrawn]).toEqual([
                 ["one, changed", "two"],
-                [["one", "Suggested change", ["Accept the suggestion", "Reject the suggestion"], "one, changed"]],
+                [["one", "Suggested change", "one, changed", ["Accept the suggestion", "Reject the suggestion"]]],
             ]);
         });
 
@@ -2084,6 +2086,22 @@ describe("the metadata and the manuscript panes", () => {
                 (drawn as Element).getAttribute("data-suggestion-id"),
             );
             expect(broughtIntoView).toEqual(expected);
+        });
+
+        it("brings the next suggestion in with the top of its frame at the top of the pane", async () => {
+            const scrollIntoView = vi.fn();
+            Element.prototype.scrollIntoView = scrollIntoView;
+            await mountCanvas({
+                cells: [markdownCell("one")],
+                suggestions: [ONE_CHANGED],
+            });
+            const button = document.querySelector(
+                '.author-file-editor-main-menu [aria-label="Next suggestion"]',
+            ) as HTMLButtonElement;
+
+            await act(async () => button.click());
+
+            expect(scrollIntoView.mock.calls).toEqual([[{ block: "start", behavior: "smooth" }]]);
         });
 
         it("counts the suggestions in the main menu", async () => {

@@ -747,7 +747,7 @@ export function AuthorFileEditorCanvas({
         const shown = (from + step + count) % count;
         suggestionShown.current = idsOnThePage[shown];
         framesOnThePage[shown].scrollIntoView({
-            block: "center",
+            block: "start",
             behavior: "smooth",
         });
     }
@@ -777,6 +777,11 @@ export function AuthorFileEditorCanvas({
                     <span className="author-file-editor-suggestion-says">
                         Suggested change
                     </span>
+                </div>
+                <div className="author-file-editor-suggestion-proposed">
+                    {cellShown}
+                </div>
+                <div className="author-file-editor-suggestion-footer">
                     <button
                         type="button"
                         className="author-file-editor-suggestion-accept"
@@ -799,9 +804,6 @@ export function AuthorFileEditorCanvas({
                     >
                         <i className="codicon codicon-close" />
                     </button>
-                </div>
-                <div className="author-file-editor-suggestion-proposed">
-                    {cellShown}
                 </div>
             </div>
         );

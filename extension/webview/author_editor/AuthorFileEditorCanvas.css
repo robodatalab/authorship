@@ -249,20 +249,25 @@ body {
 }
 
 .author-file-editor-suggestion-heading {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px 4px 2px 8px;
+    padding: 2px 8px;
     color: var(--vscode-editor-background);
     background: var(--vscode-editorWarning-foreground, #cca700);
 }
 
 .author-file-editor-suggestion-says {
-    margin-right: auto;
     font-size: 0.9em;
 }
 
-.author-file-editor-suggestion-heading button {
+.author-file-editor-suggestion-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 2px 4px;
+    color: var(--vscode-editor-background);
+    background: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.author-file-editor-suggestion-footer button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -276,7 +281,7 @@ body {
     cursor: pointer;
 }
 
-.author-file-editor-suggestion-heading button:hover {
+.author-file-editor-suggestion-footer button:hover {
     background: rgba(0, 0, 0, 0.15);
 }
 
