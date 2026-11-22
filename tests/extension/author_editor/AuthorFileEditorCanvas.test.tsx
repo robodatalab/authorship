@@ -45,6 +45,7 @@ import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell
 import type { TitlePageCell } from "authordoc/cells/title_page_cell";
 import type { UnknownCell } from "authordoc/cells/unknown_cell";
 import { CellAdded } from "authordoc/changes/cell_added";
+import { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
 import { CellTextChanged } from "authordoc/changes/cell_text_changed";
 import { AuthorDocDiff } from "authordoc/diff";
 import { Suggestion } from "authordoc/suggestion";
@@ -61,6 +62,15 @@ let posted: Invocation[] = [];
 
 function markdownCell(source: string, id = source): MarkdownCell {
     return new MarkdownCell(source, false, null, id);
+}
+
+function suggestionThatFolds(source: string): Suggestion {
+    const unfolded = markdownCell(source);
+    const folded = new MarkdownCell(source, true, null, source);
+    const headerChanged = new CellHeaderChanged(unfolded, folded);
+    const diff = new AuthorDocDiff([headerChanged]);
+    const suggestion = new Suggestion(source, diff);
+    return suggestion;
 }
 
 type CellDrawings = Partial<Record<string, (cell: Cell) => ReactNode>>;
@@ -405,7 +415,7 @@ describe("invoking a main menu command", () => {
         ).toHaveLength(1);
     });
 
-    it("draws the one of a pair that the folding of the document calls for", async () => {
+    it("shows Unfold all when every cell is folded, counting a cell folded by its suggestion, and Fold all otherwise", async () => {
         const foldAll = {
             ...command("foldAll", "fold"),
             drawnWhenTheCellIsFolded: false,
@@ -428,8 +438,9 @@ describe("invoking a main menu command", () => {
         await mountCanvas({
             cells: [
                 new MarkdownCell("one", true, null, "one"),
-                new MarkdownCell("two", true, null, "two"),
+                markdownCell("two"),
             ],
+            suggestions: [suggestionThatFolds("two")],
             commands: [foldAll, unfoldAll],
         });
         expect(
@@ -941,19 +952,21 @@ describe("the scope of a part and of a chapter", () => {
 });
 
 describe("a folded cell", () => {
-    it("is marked as folded on the page", async () => {
+    it("is drawn folded, also when its suggestion folds it", async () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
                 new MarkdownCell("two", true, null, "two"),
+                markdownCell("three"),
             ],
+            suggestions: [suggestionThatFolds("three")],
         });
 
         expect(
             listItems().map((item) =>
                 item.classList.contains("author-file-editor-cell-folded"),
             ),
-        ).toEqual([false, false, true]);
+        ).toEqual([false, false, true, true]);
     });
 });
 
