@@ -74,10 +74,15 @@
     z-index: 1;
     display: flex;
     gap: 1px;
+    padding: 1px;
+    background: var(--vscode-menu-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border));
+    border-radius: 5px;
+    box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
     visibility: hidden;
 }
 
-.author-file-editor-cell:hover .author-file-editor-cell-actions {
+.author-file-editor-cell:hover > .author-file-editor-cell-actions {
     visibility: visible;
 }
 

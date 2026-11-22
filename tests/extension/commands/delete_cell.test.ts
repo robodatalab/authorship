@@ -97,3 +97,19 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
         expect(cellIds(session)).toEqual(["p1", "c1", "m1", "c2"]);
     });
 });
+
+describe("DeleteCellCommand — deletes a cell with a suggestion", () => {
+    it("deletes the cell together with its suggestion", async () => {
+        const session = openStory(
+            '<!-- cell: chapter id="c1" title="One" -->\n\n' +
+                '<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n\n' +
+                '<!-- suggestion: id="c2" -->\n<!-- change: text from="16" removed="" written=" at last" -->\n',
+        );
+
+        await new DeleteCellCommand().invoke(session, { cellId: "c2" });
+
+        expect(session.document.serialize()).toBe(
+            '<!-- cell: chapter id="c1" title="One" -->\n',
+        );
+    });
+});

@@ -95,16 +95,19 @@ export function AuthorFileEditorSalientConceptCell({
     }
 
     return (
-        <AuthorFileEditorCell>
-            <AuthorFileEditorCellHeader>
-                Salient concept
-                <AuthorFileEditorCellHeaderTitle title={cell.title} />
+        <AuthorFileEditorCell
+            actions={
                 <AuthorFileEditorStoryAnnotationShownInTheManuscript
                     cellKind={SALIENT_CONCEPT}
                     annotationCellId={cell.uniqueId}
                     isShown={isShownInTheManuscript}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
+            }
+        >
+            <AuthorFileEditorCellHeader>
+                Salient concept
+                <AuthorFileEditorCellHeaderTitle title={cell.title} />
             </AuthorFileEditorCellHeader>
             <AuthorFileEditorCellBody>
                 <AuthorFileEditorCellCard>

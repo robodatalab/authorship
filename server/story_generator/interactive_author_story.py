@@ -3,8 +3,8 @@ and the story generator read from the document, or write into it, beyond its
 storydoc format.
 
 Every plot event has a timestamp and a place: the timestamp is a clock shared by
-all the plots, and the place is a place cell, named from the broadest place to the
-most specific, as in "earth, Varn's house". Events at the same moment and in the
+all the plots, and the place is a place cell, nested in the places around it and
+written from the broadest place to the most specific, as in "earth, Varn's house". Events at the same moment and in the
 same place form one scene.
 
 Every scene is told by a markdown cell, which every event of the scene points at.
@@ -49,6 +49,8 @@ _EDGE = "edge"
 # Parts the moment, the place, the characters and what happens of an event written
 # out for the model.
 SEPARATOR = " | "
+
+PLACE_SEPARATOR = ", "
 
 
 class InteractiveScene:
@@ -224,15 +226,39 @@ class InteractiveAuthorStory:
 
     def place_name_of(self, event: PlotNode) -> str:
         place = event.place(self.document)
-        place_name = "" if place is None else place.title
+        titles_inwards: list[str] = []
+        places_seen: set[str] = set()
+        while place is not None and place.unique_id not in places_seen:
+            titles_inwards.insert(0, place.title)
+            places_seen.add(place.unique_id)
+            place = place.parent(self.document)
+        place_name = PLACE_SEPARATOR.join(titles_inwards)
         return place_name
 
     def with_place_named(self, name: str) -> tuple[InteractiveAuthorStory, PlaceCell]:
+        titles = [title.strip() for title in name.split(",") if title.strip()] or [name]
+        story = self
+        place: PlaceCell | None = None
+        for title in titles:
+            story, place = story._with_place_within(title, place)
+        assert place is not None
+        return story, place
+
+    def _with_place_within(self, title: str, around: PlaceCell | None) -> tuple[InteractiveAuthorStory, PlaceCell]:
+        around_id = None if around is None else around.unique_id
         places = [cell for cell in self.document.cells if isinstance(cell, PlaceCell)]
-        named = next((place for place in places if place.title == name), None)
+        named = next(
+            (
+                place
+                for place in places
+                if place.title.casefold() == title.casefold() and _id_of_the_place_around(place, self.document) == around_id
+            ),
+            None,
+        )
         if named is not None:
             return self, named
-        place = PlaceCell(name)
+        unplaced = PlaceCell(title)
+        place = unplaced.with_parent(around)
         document = self.document.with_cells([*self.document.cells, place])
         story = InteractiveAuthorStory(document)
         return story, place
@@ -267,6 +293,12 @@ class InteractiveAuthorStory:
         characters = event.characters(self.document)
         names = ", ".join(character.title for character in characters)
         return names
+
+
+def _id_of_the_place_around(place: PlaceCell, document: Document) -> str | None:
+    around = place.parent(document)
+    around_id = None if around is None else around.unique_id
+    return around_id
 
 
 def written_under_their_titles(cells: Sequence[SalientConceptCell | CharacterCell]) -> str:

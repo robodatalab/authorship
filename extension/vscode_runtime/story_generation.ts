@@ -39,6 +39,8 @@ export interface StoryGenerationStage {
     doing: string;
     done: number;
     of: number | null;
+    seconds: number;
+    secondsPerItem: number | null;
     state: "waiting" | "running" | "done";
     steps: StoryGenerationStage[];
 }
@@ -54,7 +56,10 @@ export interface StoryGenerationStageJob extends ServerJob {
     asked: StoryGenerationAsked | null;
 }
 
-export interface StoryGeneration extends StoryGenerationStageJob {
+export interface StoryGeneration {
+    running: boolean;
+    progress: StoryGenerationStageJob["progress"];
     // Every stage, in the order they run.
     stages: StoryGenerationWorkflowStage[];
+    asked: Pick<StoryGenerationAsked, "stage" | "shown"> | null;
 }

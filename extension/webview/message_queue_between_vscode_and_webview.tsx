@@ -10,9 +10,11 @@ import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
 import type { StoryGeneration } from "../vscode_runtime/story_generation";
+import { withEverySuggestionApplied } from "../vscode_runtime/suggestions_applied";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
-import { parse } from "authordoc/parser";
+import { parse, parseSuggestions } from "authordoc/parser";
+import type { Suggestion } from "authordoc/suggestion";
 import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
@@ -30,6 +32,7 @@ interface WhatTheWebviewDraws {
     wordsInEverySection: Record<string, number>;
     wordsInTheDocument: number;
     storyGeneration: StoryGeneration | null;
+    suggestions: Suggestion[];
 }
 
 function cellsAsTheHostWroteThem(written: string[]): Cell[] {
@@ -93,6 +96,10 @@ function processMessageFromVscode(
     } else if (message.data?.type === "storyGeneration") {
         drawn.storyGeneration = message.data
             .storyGeneration as StoryGeneration | null;
+    } else if (message.data?.type === "suggestions") {
+        drawn.suggestions = parseSuggestions(
+            message.data.suggestions as string,
+        );
     } else {
         return false;
     }
@@ -118,13 +125,25 @@ function openTheAuthorFileEditor(): void {
         wordsInEverySection: {},
         wordsInTheDocument: 0,
         storyGeneration: null,
+        suggestions: [],
     };
 
     function drawTheCanvas(): void {
-        const story = Document.fromCells(drawn.cells);
+        const suggestionsOfTheCellsDrawn = drawn.suggestions.filter(
+            (suggestion) =>
+                drawn.cells.some((cell) => cell.uniqueId === suggestion.cellId),
+        );
+        const storyWithTheSuggestions = Document.fromCells(
+            drawn.cells,
+            null,
+            suggestionsOfTheCellsDrawn,
+        );
+        const storyAsSuggested = withEverySuggestionApplied(
+            storyWithTheSuggestions,
+        );
         const cellRenderer = new AuthorFileEditorCellRenderer(
             sendMessagesToVscode,
-            story,
+            storyAsSuggested,
             drawn.storyAnnotationsSelected,
             drawn.storyTextSelected,
         );
@@ -144,6 +163,7 @@ function openTheAuthorFileEditor(): void {
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
                 storyGeneration={drawn.storyGeneration}
+                suggestions={suggestionsOfTheCellsDrawn}
             />,
         );
     }

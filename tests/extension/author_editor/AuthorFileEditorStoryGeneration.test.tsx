@@ -9,8 +9,7 @@ import type { StoryGeneration } from "../../../extension/vscode_runtime/story_ge
 
 const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     running: false,
-    error: null,
-    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, state: "done", steps: [] }] },
+    progress: { steps: [{ doing: "concept titles", done: 0, of: 0, seconds: 2, secondsPerItem: null, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: false },
         { name: "concepts", done: false },
@@ -18,7 +17,6 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
     ],
     asked: {
         stage: "concept titles",
-        story: "",
         shown: {
             kind: "command",
             cellKind: "salient-concept",
@@ -29,8 +27,7 @@ const ASKS_FOR_THE_CONCEPTS: StoryGeneration = {
 
 const ASKS_FOR_A_REVIEW: StoryGeneration = {
     running: false,
-    error: null,
-    progress: { steps: [{ doing: "concepts", done: 1, of: 1, state: "done", steps: [] }] },
+    progress: { steps: [{ doing: "concepts", done: 1, of: 1, seconds: 9, secondsPerItem: 9, state: "done", steps: [] }] },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: false },
@@ -38,15 +35,43 @@ const ASKS_FOR_A_REVIEW: StoryGeneration = {
     ],
     asked: {
         stage: "concepts",
-        story: '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
         shown: { kind: "cells", cellKind: "salient-concept" },
     },
 };
 
 const WRITES: StoryGeneration = {
     running: true,
-    error: null,
-    progress: { steps: [{ doing: "plots", done: 3, of: 15, state: "running", steps: [] }] },
+    progress: {
+        steps: [{ doing: "plots", done: 3, of: 15, seconds: 12, secondsPerItem: 4, state: "running", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+        { name: "mesh", done: false },
+    ],
+    asked: null,
+};
+
+const WRITES_THE_FIRST_STEP: StoryGeneration = {
+    running: true,
+    progress: {
+        steps: [{ doing: "plots", done: 0, of: 15, seconds: 3, secondsPerItem: null, state: "running", steps: [] }],
+    },
+    stages: [
+        { name: "concept titles", done: true },
+        { name: "concepts", done: true },
+        { name: "plots", done: false },
+        { name: "mesh", done: false },
+    ],
+    asked: null,
+};
+
+const WRITES_QUICK_STEPS: StoryGeneration = {
+    running: true,
+    progress: {
+        steps: [{ doing: "plots", done: 3, of: 15, seconds: 1, secondsPerItem: 0.25, state: "running", steps: [] }],
+    },
     stages: [
         { name: "concept titles", done: true },
         { name: "concepts", done: true },
@@ -58,17 +83,18 @@ const WRITES: StoryGeneration = {
 
 const PLAYS_THE_STORY: StoryGeneration = {
     running: true,
-    error: null,
     progress: {
         steps: [
             {
                 doing: "validity",
                 done: 1,
                 of: 4,
+                seconds: 80,
+                secondsPerItem: 80,
                 state: "running",
                 steps: [
-                    { doing: "Motherhood", done: 200, of: 200, state: "done", steps: [] },
-                    { doing: "War", done: 100, of: 200, state: "running", steps: [] },
+                    { doing: "Motherhood", done: 200, of: 200, seconds: 80, secondsPerItem: 0.4, state: "done", steps: [] },
+                    { doing: "War", done: 100, of: 200, seconds: 40, secondsPerItem: 0.4, state: "running", steps: [] },
                 ],
             },
         ],
@@ -82,7 +108,6 @@ const PLAYS_THE_STORY: StoryGeneration = {
 
 const LEFT_OFF: StoryGeneration = {
     running: false,
-    error: null,
     progress: { steps: [] },
     stages: [
         { name: "concept titles", done: true },
@@ -101,6 +126,7 @@ describe("the story generation under the main menu's tools", () => {
 
     async function mountTheStoryGeneration(
         storyGeneration: StoryGeneration | null,
+        suggestionsLeft = 0,
     ): Promise<void> {
         posted = [];
         document.body.innerHTML = "";
@@ -111,6 +137,7 @@ describe("the story generation under the main menu's tools", () => {
             root.render(
                 <AuthorFileEditorStoryGeneration
                     storyGeneration={storyGeneration}
+                    suggestionsLeft={suggestionsLeft}
                     sendMessagesToVscode={(message) => posted.push(message)}
                 />,
             );
@@ -166,7 +193,7 @@ describe("the story generation under the main menu's tools", () => {
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe("plots: left off hereResumeCancel");
+        expect(status.textContent).toBe("plots: left off hereResumeQuit");
     });
 
     it("resuming generates the story again, from where it left off", async () => {
@@ -192,9 +219,35 @@ describe("the story generation under the main menu's tools", () => {
         )!;
         const bar = status.querySelector('[role="progressbar"]')!;
         const filled = bar.firstElementChild as HTMLElement;
-        expect(status.textContent).toBe("plotsCancel");
         expect(bar.getAttribute("aria-valuenow")).toBe("20");
         expect(filled.style.width).toBe("20%");
+    });
+
+    it("says, like tqdm, the steps done, the time taken and left, and the time a step takes", async () => {
+        await mountTheStoryGeneration(WRITES);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots20%3/15 [00:12<00:48, 4.00s/it]Quit");
+    });
+
+    it("says the time left and the rate are unknown before the first step is done", async () => {
+        await mountTheStoryGeneration(WRITES_THE_FIRST_STEP);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots0%0/15 [00:03<?, ?it/s]Quit");
+    });
+
+    it("says the rate in steps a second for steps quicker than a second", async () => {
+        await mountTheStoryGeneration(WRITES_QUICK_STEPS);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("plots20%3/15 [00:01<00:03, 4.00it/s]Quit");
     });
 
     it("fills the bar with the work done in the step it is at, too", async () => {
@@ -206,26 +259,54 @@ describe("the story generation under the main menu's tools", () => {
         expect(filled.style.width).toBe("37.5%");
     });
 
-    it("asks the author to use the command shown, then continue or stop", async () => {
+    it("leaves the work done in the step it is at out of the time left", async () => {
+        await mountTheStoryGeneration(PLAYS_THE_STORY);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        expect(status.textContent).toBe("validity38%1/4 [01:20<03:20, 80.00s/it]Quit");
+    });
+
+    it("names the stage that asks the author to use the command shown, then continue or reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_THE_CONCEPTS);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
         expect(status.textContent).toBe(
-            "concept titles: use the highlighted button, then continueContinueStopCancel",
+            "concept titlesContinueRejectQuit",
         );
     });
 
-    it("asks the author to review the story the stage leaves, then accept or stop", async () => {
-        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
+    it("says how many suggestions the stage made are left to review, greying out continuing until none is", async () => {
+        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW, 3);
 
         const status = document.querySelector(
             ".author-file-editor-story-generation-status",
         )!;
-        expect(status.textContent).toBe(
-            "concepts: review it, edit what you like, then acceptAcceptStopCancel",
-        );
+        const continueButton = [...status.querySelectorAll("button")].find(
+            (button) => button.textContent === "Continue",
+        )!;
+        expect([status.textContent, continueButton.disabled]).toEqual([
+            "concepts: 3 suggestions left to reviewContinueRejectQuit",
+            true,
+        ]);
+    });
+
+    it("lets the author continue once nothing is left to review", async () => {
+        await mountTheStoryGeneration(ASKS_FOR_A_REVIEW, 0);
+
+        const status = document.querySelector(
+            ".author-file-editor-story-generation-status",
+        )!;
+        const continueButton = [...status.querySelectorAll("button")].find(
+            (button) => button.textContent === "Continue",
+        )!;
+        expect([status.textContent, continueButton.disabled]).toEqual([
+            "concepts: nothing left to reviewContinueRejectQuit",
+            false,
+        ]);
     });
 
     it("continuing answers with an accept", async () => {
@@ -243,17 +324,19 @@ describe("the story generation under the main menu's tools", () => {
         ]);
     });
 
-    it("stopping answers with a stop", async () => {
+    it("rejecting answers with a reject", async () => {
         await mountTheStoryGeneration(ASKS_FOR_A_REVIEW);
-        const [, stopButton] = document.querySelectorAll("button");
+        const rejectButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent === "Reject",
+        )!;
 
-        await act(async () => stopButton.click());
+        await act(async () => rejectButton.click());
 
         expect(posted).toEqual([
             {
                 type: "invoke",
                 commandName: "answerTheStoryGeneration",
-                commandArguments: { verdict: "stop" },
+                commandArguments: { verdict: "reject" },
             },
         ]);
     });
@@ -262,18 +345,18 @@ describe("the story generation under the main menu's tools", () => {
         ["while a stage works", WRITES],
         ["while a stage asks for a review", ASKS_FOR_A_REVIEW],
         ["once it has left off", LEFT_OFF],
-    ])("cancels the generation altogether %s", async (_, storyGeneration) => {
+    ])("quits the generation altogether %s", async (_, storyGeneration) => {
         await mountTheStoryGeneration(storyGeneration);
-        const cancelButton = [...document.querySelectorAll("button")].find(
-            (button) => button.textContent === "Cancel",
+        const quitButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent === "Quit",
         )!;
 
-        await act(async () => cancelButton.click());
+        await act(async () => quitButton.click());
 
         expect(posted).toEqual([
             {
                 type: "invoke",
-                commandName: "cancelTheStoryGeneration",
+                commandName: "quitTheStoryGeneration",
                 commandArguments: {},
             },
         ]);

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "./StoryAnnotationCells.css";
 
+const STOP_CHOOSING = "Close the list without choosing";
+
 interface AuthorFileEditorReferencedCell {
     readonly uniqueId: string;
     readonly title: string;
@@ -47,13 +49,19 @@ export function AuthorFileEditorCellReferences({
                 <button
                     type="button"
                     className="author-file-editor-cell-reference-chosen"
-                    title={wording.referenceOne}
-                    aria-label={wording.referenceOne}
+                    title={choosing ? STOP_CHOOSING : wording.referenceOne}
+                    aria-label={choosing ? STOP_CHOOSING : wording.referenceOne}
                     aria-expanded={choosing}
                     disabled={cellsToChoose.length === 0}
                     onClick={() => setChoosing(!choosing)}
                 >
-                    <i className="codicon codicon-add" />
+                    <i
+                        className={
+                            choosing
+                                ? "codicon codicon-close"
+                                : "codicon codicon-add"
+                        }
+                    />
                 </button>
             </div>
             {choosing && cellsToChoose.length > 0 ? (

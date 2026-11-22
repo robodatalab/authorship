@@ -5,7 +5,9 @@ import {
     type AuthorFileEditorSession,
 } from "../../extension/vscode_runtime/author_file_editor_session";
 import { NoteCell } from "authordoc/cells/note_cell";
-import { EventEmitter, Uri } from "./vscode";
+import { AuthorDocDiff } from "authordoc/diff";
+import { Suggestion } from "authordoc/suggestion";
+import { EventEmitter, files, Uri } from "./vscode";
 
 const DOCUMENT_PATH = "/stories/expat_pet.author";
 
@@ -365,5 +367,234 @@ describe("undoing and redoing what the author did", () => {
             "c1:markdown:She saw the door.",
             "c2:markdown:He heard a bell.",
         ]);
+    });
+});
+
+describe("the suggestions the document holds", () => {
+    const SUGGESTED_AT_LAST =
+        '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last" -->\n';
+    const THE_STORY_WITH_A_SUGGESTION =
+        THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST + "\n" + HE_HEARD;
+
+    it("are kept from the file opened", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        const kept = session.document.suggestions.map((suggestion) => suggestion.cellId);
+
+        expect(kept).toEqual(["c1"]);
+    });
+
+    it("are written back to the file with the cells", async () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        await session.writeTheDocumentToItsFile();
+
+        expect(files.get(DOCUMENT_PATH)).toBe(THE_STORY_WITH_A_SUGGESTION);
+    });
+
+    it("stay as they are while the author edits the cells", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        typing(session, "c2", "He heard the bell.", " Twice.");
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST + "\n" +
+                '<!-- cell: markdown id="c2" -->\n\nHe heard the bell. Twice.\n',
+        );
+    });
+
+    it("patch their cell with their diff once accepted, leaving every cell where it stood, and are dropped", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.acceptTheSuggestion("c1");
+
+        expect([cellsOf(session), session.document.suggestions]).toEqual([
+            ["c0:chapter:", "c1:markdown:She saw the door at last.", "c2:markdown:He heard the bell."],
+            [],
+        ]);
+    });
+
+    it("are dropped once rejected, leaving their cell as it is", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.rejectTheSuggestion("c1");
+
+        expect(session.document.serialize()).toBe(THE_STORY);
+    });
+
+    it("take what the author types in a cell with a suggestion into its diff, leaving the cell as it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.theAuthorTypedInTheCell("c1", "She saw the door at last, slowly.");
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" +
+                '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, slowly" -->\n' +
+                "\n" + HE_HEARD,
+        );
+    });
+
+    it("take a change to a cell with a suggestion into its diff, leaving the cell as it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.changeTheDocument((document) => {
+            const cellShown = document.cellWithId("c1")!;
+            const cellChanged = cellShown.withSource("She saw the door at last, once.");
+            const documentChanged = document.withCell(cellChanged);
+            return documentChanged;
+        });
+
+        expect(session.document.serialize()).toBe(
+            THE_CHAPTER + "\n" + SHE_SAW + "\n" +
+                '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, once" -->\n' +
+                "\n" + HE_HEARD,
+        );
+    });
+
+    it("are dropped once the author changes the cell back to how it stands", () => {
+        const { session } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+        session.theAuthorTypedInTheCell("c1", "She saw the door.");
+
+        expect(session.document.serialize()).toBe(THE_STORY);
+    });
+
+    it("take a change that touches no cell but a suggestion", () => {
+        const { session } = openSession(THE_STORY);
+        const emptyDiff = new AuthorDocDiff([]);
+        const suggestion = new Suggestion("c2", emptyDiff);
+
+        session.changeTheDocument((document) => {
+            const documentWithTheSuggestion = document.withSuggestion(suggestion);
+            return documentWithTheSuggestion;
+        });
+
+        const suggested = session.document.suggestions.map((held) => held.cellId);
+        expect(suggested).toEqual(["c2"]);
+    });
+
+    describe("undone and redone", () => {
+        const SUGGESTED_AT_LAST_ONCE =
+            '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, once" -->\n';
+
+        it("record one edit for a run of keystrokes typed into a suggestion", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            typing(session, "c1", "She saw the door at last.", "!!!");
+
+            expect(editsRecorded).toHaveLength(1);
+        });
+
+        it("take back what the author typed into a suggestion, and type it again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c1", "She saw the door at last, once.");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" + HE_HEARD,
+            );
+        });
+
+        it("take back a change a command made to a suggestion, and make it again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.changeTheDocument((document) => {
+                const cellShown = document.cellWithId("c1")!;
+                const cellChanged = cellShown.withSource("She saw the door at last, once.");
+                const documentChanged = document.withCell(cellChanged);
+                return documentChanged;
+            });
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" + HE_HEARD,
+            );
+        });
+
+        it("take back, as one edit, a change to a cell with a suggestion and to a cell without one", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.changeTheDocument((document) => {
+                const sheSaw = document.cellWithId("c1")!;
+                const heHeard = document.cellWithId("c2")!;
+                const sheSawChanged = sheSaw.withSource("She saw the door at last, once.");
+                const heHeardChanged = heHeard.withSource("He heard the bell twice.");
+                const documentWithSheSawChanged = document.withCell(sheSawChanged);
+                const documentChanged = documentWithSheSawChanged.withCell(heHeardChanged);
+                return documentChanged;
+            });
+
+            expect(editsRecorded).toHaveLength(1);
+
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + SHE_SAW + "\n" + SUGGESTED_AT_LAST_ONCE + "\n" +
+                    '<!-- cell: markdown id="c2" -->\n\nHe heard the bell twice.\n',
+            );
+        });
+
+        it("come back as they stood when the author takes back accepting one, and are accepted again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.acceptTheSuggestion("c1");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(
+                THE_CHAPTER + "\n" + '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n' + "\n" + HE_HEARD,
+            );
+        });
+
+        it("come back when the author takes back rejecting one, and are rejected again", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.rejectTheSuggestion("c1");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(THE_STORY);
+        });
+
+        it("come back when the author takes back changing the cell back to how it stands", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c1", "She saw the door.");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+
+            editsRecorded[0].redo();
+
+            expect(session.document.serialize()).toBe(THE_STORY);
+        });
+
+        it("stay as they are when the author takes back an edit of a cell without one", () => {
+            const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
+
+            session.theAuthorTypedInTheCell("c2", "He heard the bell!");
+            editsRecorded[0].undo();
+
+            expect(session.document.serialize()).toBe(THE_STORY_WITH_A_SUGGESTION);
+        });
     });
 });

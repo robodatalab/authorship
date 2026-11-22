@@ -106,3 +106,89 @@ describe("refreshing the document", () => {
         expect(renderedCellText()).toEqual(["kept"]);
     });
 });
+
+describe("the suggestions the host sends", () => {
+    it("draws the cell a suggestion is on as the suggestion makes it, in its frame", async () => {
+        await openWebview();
+        await hostSends([markdownCell("m1", "one")]);
+
+        await act(async () => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data: {
+                        type: "suggestions",
+                        suggestions:
+                            '<!-- suggestion: id="m1" -->\n<!-- change: text from="3" removed="" written=" more" -->\n',
+                    },
+                }),
+            );
+        });
+
+        const proposed = document.querySelector(
+            '[data-suggestion-id="m1"] .author-file-editor-suggestion-proposed',
+        );
+        expect(proposed?.textContent).toContain("one more");
+    });
+
+    describe("drawing every cell in the story as the suggestions make it", () => {
+        const MARKUS = '<!-- cell: character id="mv" title="Markus Vader" -->\n';
+        const EMPTY_PLACES_CHARACTER_AND_PLOT = [
+            '<!-- cell: place id="ms" -->\n',
+            '<!-- cell: place id="hb" -->\n',
+            '<!-- cell: character id="tl" -->\n',
+            '<!-- cell: plot id="dd" -->\n',
+        ];
+        const SUGGESTED_PLACES_CHARACTER_AND_PLOT =
+            '<!-- suggestion: id="ms" -->\n<!-- change: header kind="place" after-title="Mars" -->\n\n' +
+            '<!-- suggestion: id="hb" -->\n<!-- change: header kind="place" after-title="Hellas Basin" after-parent="ms" -->\n\n' +
+            '<!-- suggestion: id="tl" -->\n<!-- change: header kind="character" after-title="Teodor Lin" -->\n' +
+            '<!-- change: text from="0" removed="" written="A drill operator in debt to the company." -->\n\n' +
+            '<!-- suggestion: id="dd" -->\n<!-- change: header kind="plot" after-title="Drilling deeper" -->\n' +
+            '<!-- change: text from="0" removed="" written="<ol>\\n<li id=\\"e1\\" timestamp=\\"2.4\\" place=\\"hb\\" characters=\\"mv, tl\\">They drive the drill deeper.</li>\\n</ol>" -->\n';
+
+        async function hostSendsMarkusAndTheSuggestions(): Promise<void> {
+            await openWebview();
+            await hostSends([MARKUS, ...EMPTY_PLACES_CHARACTER_AND_PLOT]);
+            await act(async () => {
+                window.dispatchEvent(
+                    new MessageEvent("message", {
+                        data: {
+                            type: "suggestions",
+                            suggestions: SUGGESTED_PLACES_CHARACTER_AND_PLOT,
+                        },
+                    }),
+                );
+            });
+        }
+
+        it.each([
+            ["the suggested place it happens in", ".author-file-editor-plot-event-place", ["Hellas Basin"]],
+            ["the suggested characters in it beside the ones the story has", ".author-file-editor-plot-event-characters", ["Markus Vader", "Teodor Lin"]],
+        ])("names, in a suggested event, %s", async (_, referencesShown, expected) => {
+            await hostSendsMarkusAndTheSuggestions();
+
+            const named = [
+                ...document.querySelectorAll(
+                    `[data-suggestion-id="dd"] ${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
+                ),
+            ].map((reference) => reference.textContent);
+
+            expect(named).toEqual(expected);
+        });
+
+        it("draws a suggested place under the suggested place it lies within", async () => {
+            await hostSendsMarkusAndTheSuggestions();
+
+            const nestedUnder = [
+                ...document.querySelectorAll(".author-file-editor-place-scope"),
+            ].map((scope) => [
+                scope.parentElement!.getAttribute("data-cell-id"),
+                [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
+                    nested.getAttribute("data-cell-id"),
+                ),
+            ]);
+
+            expect(nestedUnder).toEqual([["ms", ["hb"]]]);
+        });
+    });
+});

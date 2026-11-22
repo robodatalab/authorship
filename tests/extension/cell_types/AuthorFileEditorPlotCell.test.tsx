@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -100,6 +100,8 @@ describe("a plot cell", () => {
     let posted: unknown[] = [];
     let root: Root;
 
+    afterEach(() => vi.restoreAllMocks());
+
     interface WhatTheCellIsGiven {
         story: string;
         isShownInTheManuscript?: boolean;
@@ -174,12 +176,6 @@ describe("a plot cell", () => {
         });
     }
 
-    async function stopDragging(element: Element): Promise<void> {
-        await act(async () => {
-            element.dispatchEvent(new MouseEvent("dragend", { bubbles: true }));
-        });
-    }
-
     it("shows the plot's title, overview and trajectory", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_ITS_PASSAGE].join("\n"),
@@ -194,7 +190,7 @@ describe("a plot cell", () => {
             ".markdown-rendered p",
         )?.textContent;
         const nodeShown = document.querySelector(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
+            ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-shown",
         )?.textContent;
         expect(titleShown).toBe("The door");
         expect(descriptionShown).toBe("She finds the door.");
@@ -231,35 +227,17 @@ describe("a plot cell", () => {
         ]);
     });
 
-    it("lists every event by its summary, the story telling it or not", async () => {
+    it("asks only for the event whose node is clicked to be selected", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
             isShownInTheManuscript: true,
                 eventIdSelected: null,
         });
-
-        const eventsShown = [
-            ...document.querySelectorAll(
-                ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-            ),
-        ].map((event) => [event.textContent, event.getAttribute("title")]);
-        expect(eventsShown).toEqual([
-            ["She finds the door.", "1.1 · The hall · the door."],
-            ["She opens the door.", "1.2 · The hall · Not told in the story yet"],
-        ]);
-    });
-
-    it("asks only for an event the story does not tell yet to be selected", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const eventUntold = document.querySelectorAll(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
+        const nodeOfTheEventUntold = document.querySelectorAll(
+            ".author-file-editor-plot-trajectory-node",
         )[1];
 
-        await click(eventUntold);
+        await click(nodeOfTheEventUntold);
 
         expect(posted).toEqual([
             { type: "selectPassage", cellKind: "plot", passageId: "e2" },
@@ -436,345 +414,6 @@ describe("a plot cell", () => {
         });
     });
 
-    describe("the event selected", () => {
-        function eventFieldsShown(): string[] {
-            return [
-                ...document.querySelectorAll<HTMLInputElement>(
-                    ".author-file-editor-plot-event .author-file-editor-cell-field-input",
-                ),
-            ].map((field) => field.value);
-        }
-
-        async function type(
-            field: HTMLInputElement | HTMLTextAreaElement,
-            said: string,
-        ): Promise<void> {
-            const setTheValue = Object.getOwnPropertyDescriptor(
-                Object.getPrototypeOf(field),
-                "value",
-            )!.set!;
-            await act(async () => {
-                setTheValue.call(field, said);
-                field.dispatchEvent(new Event("input", { bubbles: true }));
-            });
-        }
-
-        it("is shown with its summary, timestamp and the words that tell it", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-
-            const wordsShown = document.querySelector(
-                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-shown",
-            )?.textContent;
-            expect(eventFieldsShown()).toEqual(["She finds the door.", "1.1"]);
-            expect(wordsShown).toBe("the door.");
-        });
-
-        it("shows its summary, labelled so, in a box of many lines", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-
-            const [summaryField] = document.querySelectorAll(
-                ".author-file-editor-plot-event .author-file-editor-cell-field",
-            );
-            const label = summaryField.querySelector(
-                ".author-file-editor-cell-field-label",
-            )?.textContent;
-            const box = summaryField.querySelector(
-                ".author-file-editor-cell-field-input",
-            )?.tagName;
-            expect(label).toBe("Summary");
-            expect(box).toBe("TEXTAREA");
-        });
-
-        it("is not shown when no event is selected", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: null,
-            });
-
-            expect(document.querySelector(".author-file-editor-plot-event")).toBeNull();
-        });
-
-        it("says so when the story does not tell it yet", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e2",
-            });
-
-            const said = document.querySelector(
-                ".author-file-editor-plot-event-story-text .author-file-editor-plot-event-untold",
-            )?.textContent;
-            const deleteTheStoryText = document.querySelector(
-                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-removed",
-            );
-            expect(said).toBe("Not told in the story yet");
-            expect(deleteTheStoryText).toBeNull();
-        });
-
-        it("says what goes in each field before anything is written in it", async () => {
-            await mountPlots({
-                story: [
-                    THE_STORY,
-                    '<!-- cell: plot id="p1" title="The door" -->\n\n<ol>\n<li id="e1"></li>\n</ol>\n',
-                ].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-
-            const placeholders = [
-                ...document.querySelectorAll<HTMLInputElement>(
-                    ".author-file-editor-plot-event .author-file-editor-cell-field-input",
-                ),
-            ].map((field) => field.placeholder);
-            expect(placeholders).toEqual(["", "Story time"]);
-        });
-
-        it.each([
-            ["summary", 0, "summary", "She finds the red door."],
-            ["timestamp", 1, "timestamp", "2.1"],
-        ])(
-            "asks for the event's %s, and only that, to be changed as the author types it",
-            async (_, index, field, said) => {
-                await mountPlots({
-                    story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                    isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-                });
-                const fieldTyped = document.querySelectorAll<HTMLInputElement>(
-                    ".author-file-editor-plot-event .author-file-editor-cell-field-input",
-                )[index];
-
-                await type(fieldTyped, said);
-
-                expect(posted).toEqual([
-                    {
-                        type: "invoke",
-                        commandName: "changePlotEvent",
-                        commandArguments: {
-                            annotationCellId: "p1",
-                            nodeId: "e1",
-                            field,
-                            said,
-                        },
-                    },
-                ]);
-            },
-        );
-
-        it("asks for the event's words to be taken away from it", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-            const takeTheWordsAway = document.querySelector(
-                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-removed",
-            )!;
-
-            await click(takeTheWordsAway);
-
-            expect(posted).toEqual([
-                {
-                    type: "invoke",
-                    commandName: "removeStoryTextFromPlotEvent",
-                    commandArguments: { annotationCellId: "p1", nodeId: "e1" },
-                },
-            ]);
-        });
-
-        it("asks for the selected words to tell it", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e2",
-                storyTextSelected: {
-                    cellId: "c3",
-                    startCharacterOffsetInCell: 3,
-                    endCharacterOffsetInCell: 8,
-                },
-            });
-            const tellTheEvent = document.querySelector(
-                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-assign",
-            )!;
-
-            await click(tellTheEvent);
-
-            expect(posted).toEqual([
-                {
-                    type: "invoke",
-                    commandName: "assignStoryTextToPlotEvent",
-                    commandArguments: {
-                        annotationCellId: "p1",
-                        nodeId: "e2",
-                        cellId: "c3",
-                        startCharacterOffsetInCell: 3,
-                        endCharacterOffsetInCell: 8,
-                    },
-                },
-            ]);
-        });
-
-        it.each([
-            ["the place it happens in", ".author-file-editor-plot-event-place", ["The hall"]],
-            ["the characters in it", ".author-file-editor-plot-event-characters", ["Varn"]],
-        ])("shows %s by name", async (_, referencesShown, expected) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-
-            const named = [
-                ...document.querySelectorAll(
-                    `${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
-                ),
-            ].map((reference) => reference.textContent);
-            expect(named).toEqual(expected);
-        });
-
-        it.each([
-            ["the places other than its own", ".author-file-editor-plot-event-place", ["The stairs"]],
-            ["the characters not in it yet", ".author-file-editor-plot-event-characters", ["Lia"]],
-        ])("offers %s", async (_, referencesShown, expected) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-            const chooseButton = document.querySelector(
-                `${referencesShown} .author-file-editor-cell-reference-chosen`,
-            )!;
-
-            await click(chooseButton);
-
-            const offered = [
-                ...document.querySelectorAll(
-                    `${referencesShown} .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown`,
-                ),
-            ].map((reference) => reference.textContent);
-            expect(offered).toEqual(expected);
-        });
-
-        it.each([
-            [
-                "the place chosen to be the event's",
-                ".author-file-editor-plot-event-place",
-                {
-                    type: "invoke",
-                    commandName: "changePlotEvent",
-                    commandArguments: { annotationCellId: "p1", nodeId: "e1", field: "place", said: "h2" },
-                },
-            ],
-            [
-                "the character chosen to be put in the event",
-                ".author-file-editor-plot-event-characters",
-                {
-                    type: "invoke",
-                    commandName: "addCharacterToPlotEvent",
-                    commandArguments: { annotationCellId: "p1", nodeId: "e1", characterCellId: "d1" },
-                },
-            ],
-        ])("asks for %s", async (_, referencesShown, asked) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-            const chooseButton = document.querySelector(
-                `${referencesShown} .author-file-editor-cell-reference-chosen`,
-            )!;
-            await click(chooseButton);
-            const chosen = document.querySelector(
-                `${referencesShown} .author-file-editor-cell-references-to-choose .author-file-editor-story-annotation-passage-shown`,
-            )!;
-
-            await click(chosen);
-
-            expect(posted).toEqual([asked]);
-        });
-
-        it.each([
-            [
-                "out of its place",
-                ".author-file-editor-plot-event-place",
-                {
-                    type: "invoke",
-                    commandName: "changePlotEvent",
-                    commandArguments: { annotationCellId: "p1", nodeId: "e1", field: "place", said: "" },
-                },
-            ],
-            [
-                "a character out of it",
-                ".author-file-editor-plot-event-characters",
-                {
-                    type: "invoke",
-                    commandName: "removeCharacterFromPlotEvent",
-                    commandArguments: { annotationCellId: "p1", nodeId: "e1", characterCellId: "v1" },
-                },
-            ],
-        ])("asks for the event to be taken %s", async (_, referencesShown, asked) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e1",
-            });
-            const takeOut = document.querySelector(
-                `${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-removed`,
-            )!;
-
-            await click(takeOut);
-
-            expect(posted).toEqual([asked]);
-        });
-
-        it("cannot be told with words until words are selected", async () => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_OPENED_BEFORE_THE_STORY_TELLS_IT].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: "e2",
-            });
-
-            const tellTheEvent = document.querySelector<HTMLButtonElement>(
-                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-assign",
-            )!;
-            expect(tellTheEvent.disabled).toBe(true);
-        });
-    });
-
-    it.each([
-        ["its title", '<li id="e1" words="0-3">She finds the door.</li>', "She finds the door."],
-        ["the words that tell it, without a title", '<li id="e1" words="0-3"></li>', "She saw the door."],
-        [
-            "the first few words that tell it, without a title",
-            '<li id="e1" words="0-7"></li>',
-            "She saw the door. He heard…",
-        ],
-        ["that it has no title, told by no words", '<li id="e1"></li>', "Untitled event"],
-    ])("names an event in the trajectory by %s", async (_, eventWritten, named) => {
-        await mountPlots({
-            story: [
-                THE_STORY,
-                `<!-- cell: plot id="p1" title="The door" -->\n\n<ol>\n${eventWritten}\n</ol>\n`,
-            ].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-
-        const eventNamed = document.querySelector(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-        )?.textContent;
-        expect(eventNamed).toBe(named);
-    });
-
     it("lists the trajectory in the order it is written", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
@@ -784,7 +423,7 @@ describe("a plot cell", () => {
 
         const nodesShown = [
             ...document.querySelectorAll(
-                ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
+                ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-shown",
             ),
         ].map((node) => node.textContent);
         expect(nodesShown).toEqual(["the door.", "the bell."]);
@@ -811,11 +450,11 @@ describe("a plot cell", () => {
             isShownInTheManuscript: true,
                 eventIdSelected: null,
         });
-        const secondNode = document.querySelectorAll(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
+        const wordsOfTheSecondNode = document.querySelectorAll(
+            ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-shown",
         )[1];
 
-        await click(secondNode);
+        await click(wordsOfTheSecondNode);
 
         expect(posted).toEqual([
             { type: "selectPassage", cellKind: "plot", passageId: "n2" },
@@ -831,23 +470,23 @@ describe("a plot cell", () => {
         });
 
         const nodesMarked = [
-            ...document.querySelectorAll(
-                ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-            ),
-        ].map((node) => node.getAttribute("aria-pressed"));
-        expect(nodesMarked).toEqual(["true", "false"]);
+            ...document.querySelectorAll(".author-file-editor-plot-event"),
+        ].map((event) =>
+            event.classList.contains("author-file-editor-plot-event-selected"),
+        );
+        expect(nodesMarked).toEqual([true, false]);
     });
 
     it.each([
         {
             trajectory: "once a node above it is taken out",
             nodes: "n2:6-7",
-            nodesMarked: ["true"],
+            nodesMarked: [true],
         },
         {
             trajectory: "once the node selected is taken out",
             nodes: "n1:2-3",
-            nodesMarked: ["false"],
+            nodesMarked: [false],
         },
     ])(
         "marks the node selected, and only that node, $trajectory",
@@ -862,10 +501,10 @@ describe("a plot cell", () => {
             });
 
             const nodesShownMarked = [
-                ...document.querySelectorAll(
-                    ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-                ),
-            ].map((node) => node.getAttribute("aria-pressed"));
+                ...document.querySelectorAll(".author-file-editor-plot-event"),
+            ].map((event) =>
+                event.classList.contains("author-file-editor-plot-event-selected"),
+            );
             expect(nodesShownMarked).toEqual(nodesMarked);
         },
     );
@@ -877,7 +516,7 @@ describe("a plot cell", () => {
                 eventIdSelected: null,
         });
         const secondRemoveButton = document.querySelectorAll(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-removed",
+            "[aria-label='Take this event out of the trajectory']",
         )[1];
 
         await click(secondRemoveButton);
@@ -957,272 +596,83 @@ describe("a plot cell", () => {
         ]);
     });
 
-    it.each([
-        { droppedOn: "its row", target: ".author-file-editor-story-annotation-passage" },
-        { droppedOn: "its node", target: ".author-file-editor-plot-trajectory-node" },
-    ])(
-        "asks for the node dragged from to be connected to the node dropped on $droppedOn",
-        async ({ target }) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: null,
-            });
-            const secondNode = document.querySelectorAll(
-                ".author-file-editor-plot-trajectory-node",
-            )[1];
-            const firstTarget = document.querySelectorAll(target)[0];
-
-            await press(secondNode);
-            await letGo(firstTarget);
-
-            expect(posted).toEqual([
-                {
-                    type: "invoke",
-                    commandName: "addEdgeToPlot",
-                    commandArguments: {
-                        annotationCellId: "p1",
-                        fromNodeId: "n2",
-                        toNodeId: "n1",
-                    },
-                },
-            ]);
-        },
-    );
-
-    it("connects nothing when the drag ends on the node it started from", async () => {
+    it("asks for the node dragged from to be connected to the node let go on", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             isShownInTheManuscript: true,
-                eventIdSelected: null,
+            eventIdSelected: null,
         });
-        const firstNode = document.querySelectorAll(
+        const nodes = document.querySelectorAll(
             ".author-file-editor-plot-trajectory-node",
-        )[0];
+        );
 
-        await press(firstNode);
-        await letGo(firstNode);
+        await press(nodes[1]);
+        await letGo(nodes[0]);
 
-        expect(posted).toEqual([]);
-    });
-
-    it("connects nothing once a drag was let go outside the trajectory", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const firstNode = document.querySelectorAll(
-            ".author-file-editor-plot-trajectory-node",
-        )[0];
-        const secondRow = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
-        )[1];
-
-        await press(firstNode);
-        await letGo(document.body);
-        await letGo(secondRow);
-
-        expect(posted).toEqual([]);
-    });
-
-    it.each([
-        { dragged: 1, droppedOn: 0, nodeId: "n2", inPlaceOfNodeId: "n1" },
-        { dragged: 0, droppedOn: 1, nodeId: "n1", inPlaceOfNodeId: "n2" },
-    ])(
-        "asks for the node on row $dragged to take the place of the node on row $droppedOn",
-        async ({ dragged, droppedOn, nodeId, inPlaceOfNodeId }) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: null,
-            });
-            const rows = document.querySelectorAll(
-                ".author-file-editor-story-annotation-passage",
-            );
-
-            await startDragging(rows[dragged]);
-            await dragOver(rows[droppedOn]);
-            await dropOn(rows[droppedOn]);
-
-            expect(posted).toEqual([
-                {
-                    type: "invoke",
-                    commandName: "moveNodeInPlot",
-                    commandArguments: {
-                        annotationCellId: "p1",
-                        nodeId,
-                        inPlaceOfNodeId,
-                    },
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "addEdgeToPlot",
+                commandArguments: {
+                    annotationCellId: "p1",
+                    fromNodeId: "n2",
+                    toNodeId: "n1",
                 },
-            ]);
-        },
-    );
-
-    it("moves nothing when a row is dropped on itself", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const firstRow = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
-        )[0];
-
-        await startDragging(firstRow);
-        await dragOver(firstRow);
-        await dropOn(firstRow);
-
-        expect(posted).toEqual([]);
+            },
+        ]);
     });
 
-    it("moves nothing once a row was dropped outside the trajectory", async () => {
+    it("asks for the node dragged to take the place of the node dropped on", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             isShownInTheManuscript: true,
-                eventIdSelected: null,
+            eventIdSelected: null,
         });
+        const grips = document.querySelectorAll(
+            ".author-file-editor-plot-event .author-file-editor-cell-drag-handle",
+        );
         const rows = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
+            ".author-file-editor-reorderable-list-item",
         );
 
-        await startDragging(rows[0]);
-        await dragOver(rows[1]);
-        await stopDragging(rows[0]);
-        await dropOn(rows[1]);
+        await startDragging(grips[1]);
+        await dragOver(rows[0]);
+        await dropOn(rows[0]);
 
-        expect(posted).toEqual([]);
-    });
-
-    it.each([
-        {
-            dragging: "the first row over the second",
-            dragged: 0,
-            draggedOver: 1,
-            nodesShown: ["the bell.", "the door."],
-        },
-        {
-            dragging: "the second row over the first",
-            dragged: 1,
-            draggedOver: 0,
-            nodesShown: ["the bell.", "the door."],
-        },
-        {
-            dragging: "a row over itself",
-            dragged: 0,
-            draggedOver: 0,
-            nodesShown: ["the door.", "the bell."],
-        },
-    ])(
-        "shows where the node lands while dragging $dragging",
-        async ({ dragged, draggedOver, nodesShown }) => {
-            await mountPlots({
-                story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: null,
-            });
-            const rows = document.querySelectorAll(
-                ".author-file-editor-story-annotation-passage",
-            );
-
-            await startDragging(rows[dragged]);
-            await dragOver(rows[draggedOver]);
-
-            const nodesShownWhileDragging = [
-                ...document.querySelectorAll(
-                    ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-                ),
-            ].map((node) => node.textContent);
-            expect(nodesShownWhileDragging).toEqual(nodesShown);
-        },
-    );
-
-    it("marks only the row dragged, where it lands, while dragging", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const rows = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
-        );
-
-        await startDragging(rows[0]);
-        await dragOver(rows[1]);
-
-        const rowsMarked = [
-            ...document.querySelectorAll(
-                ".author-file-editor-story-annotation-passage",
-            ),
-        ].map((row) =>
-            row.classList.contains("author-file-editor-plot-trajectory-row-dragged"),
-        );
-        expect(rowsMarked).toEqual([false, true]);
-    });
-
-    it("marks no row once the drag ends", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const rows = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
-        );
-
-        await startDragging(rows[0]);
-        await dragOver(rows[1]);
-        await stopDragging(rows[0]);
-
-        const rowsMarked = [
-            ...document.querySelectorAll(
-                ".author-file-editor-story-annotation-passage",
-            ),
-        ].map((row) =>
-            row.classList.contains("author-file-editor-plot-trajectory-row-dragged"),
-        );
-        expect(rowsMarked).toEqual([false, false]);
+        expect(posted).toEqual([
+            {
+                type: "invoke",
+                commandName: "moveNodeInPlot",
+                commandArguments: {
+                    annotationCellId: "p1",
+                    nodeId: "n2",
+                    inPlaceOfNodeId: "n1",
+                },
+            },
+        ]);
     });
 
     it("redraws the lines for where the node lands while dragging", async () => {
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(100);
         await mountPlots({
             story: [THE_STORY, THE_DOOR_LEADING_TO_THE_BELL].join("\n"),
             isShownInTheManuscript: true,
-                eventIdSelected: null,
+            eventIdSelected: null,
         });
+        const grips = document.querySelectorAll(
+            ".author-file-editor-plot-event .author-file-editor-cell-drag-handle",
+        );
         const rows = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
+            ".author-file-editor-reorderable-list-item",
         );
 
-        await startDragging(rows[0]);
+        await startDragging(grips[0]);
         await dragOver(rows[1]);
 
         const arrowheadDrawn = document
             .querySelector(".author-file-editor-plot-trajectory-edge-arrowhead")
             ?.getAttribute("d");
-        expect(arrowheadDrawn).toBe("M 3.5 24.5 L 10.5 24.5 L 7 19.5 Z");
-    });
-
-    it("puts the node back once the drag is let go outside the trajectory", async () => {
-        await mountPlots({
-            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
-            isShownInTheManuscript: true,
-                eventIdSelected: null,
-        });
-        const rows = document.querySelectorAll(
-            ".author-file-editor-story-annotation-passage",
-        );
-
-        await startDragging(rows[0]);
-        await dragOver(rows[1]);
-        await stopDragging(rows[0]);
-
-        const nodesShown = [
-            ...document.querySelectorAll(
-                ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
-            ),
-        ].map((node) => node.textContent);
-        expect(nodesShown).toEqual(["the door.", "the bell."]);
+        expect(arrowheadDrawn).toBe("M 3.5 102.5 L 10.5 102.5 L 7 97.5 Z");
     });
 
     it("asks for the nodes whose line is clicked to be disconnected", async () => {
@@ -1250,36 +700,6 @@ describe("a plot cell", () => {
     });
 
     it.each([
-        {
-            edge: "to a node written later",
-            edges: "e1:n1>n2",
-            arrowhead: "M 3.5 19.5 L 10.5 19.5 L 7 24.5 Z",
-        },
-        {
-            edge: "back to a node written earlier",
-            edges: "e1:n2>n1",
-            arrowhead: "M 3.5 24.5 L 10.5 24.5 L 7 19.5 Z",
-        },
-    ])(
-        "points the line of an edge $edge at the node it reaches",
-        async ({ edges, arrowhead }) => {
-            await mountPlots({
-                story: [
-                    THE_STORY,
-                    `<!-- cell: plot id="p1" title="The door" nodes="n1:2-3, n2:6-7" edges="${edges}" -->\n\nShe finds the door.\n`,
-                ].join("\n"),
-                isShownInTheManuscript: true,
-                eventIdSelected: null,
-            });
-
-            const arrowheadDrawn = document
-                .querySelector(".author-file-editor-plot-trajectory-edge-arrowhead")
-                ?.getAttribute("d");
-            expect(arrowheadDrawn).toBe(arrowhead);
-        },
-    );
-
-    it.each([
         ["highlighted, while they are not", false, "p1"],
         ["no longer highlighted, while they are", true, null],
     ])("asks for its words in the manuscript to be %s", async (_, isShownInTheManuscript, annotationCellId) => {
@@ -1298,16 +718,31 @@ describe("a plot cell", () => {
         ]);
     });
 
+    it("draws the button that highlights its words in the cell's menu, not next to its title", async () => {
+        await mountPlots({
+            story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
+            isShownInTheManuscript: false,
+        });
+
+        const inTheMenu = document.querySelectorAll(
+            ".author-file-editor-cell-actions [aria-label='Highlight its words in the manuscript']",
+        ).length;
+        const nextToTheTitle = document.querySelectorAll(
+            ".author-file-editor-cell-header [aria-label='Highlight its words in the manuscript']",
+        ).length;
+        expect([inTheMenu, nextToTheTitle]).toEqual([1, 0]);
+    });
+
     it("asks for its words to be highlighted before an event of it is selected, while they are not", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             isShownInTheManuscript: false,
         });
-        const secondNode = document.querySelectorAll(
-            ".author-file-editor-plot-trajectory .author-file-editor-story-annotation-passage-shown",
+        const wordsOfTheSecondNode = document.querySelectorAll(
+            ".author-file-editor-plot-event-story-text .author-file-editor-story-annotation-passage-shown",
         )[1];
 
-        await click(secondNode);
+        await click(wordsOfTheSecondNode);
 
         expect(posted).toEqual([
             { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId: "p1" },

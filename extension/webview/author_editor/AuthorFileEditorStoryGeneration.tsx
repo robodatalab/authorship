@@ -3,11 +3,12 @@ import {
     type SendMessagesToVscode,
 } from "./AuthorFileEditorCanvas";
 import type { StoryGeneration } from "../../vscode_runtime/story_generation";
+import { onTheClock } from "../elapsed_time";
 import "./AuthorFileEditorStoryGeneration.css";
 
 const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
 const GENERATE_STORY = "generateStory";
-const CANCEL_THE_STORY_GENERATION = "cancelTheStoryGeneration";
+const QUIT_THE_STORY_GENERATION = "quitTheStoryGeneration";
 
 // How every stage is drawn: finished, the one the generation is at, or to come.
 const ICON_OF_EACH_STATE: Record<string, string> = {
@@ -18,8 +19,20 @@ const ICON_OF_EACH_STATE: Record<string, string> = {
     "to-come": "codicon codicon-circle-outline",
 };
 
+function rateOfTheSteps(secondsPerStep: number | null): string {
+    if (secondsPerStep === null || secondsPerStep === 0) {
+        return "?it/s";
+    }
+    if (secondsPerStep > 1) {
+        return `${secondsPerStep.toFixed(2)}s/it`;
+    }
+    const stepsPerSecond = 1 / secondsPerStep;
+    return `${stepsPerSecond.toFixed(2)}it/s`;
+}
+
 interface AuthorFileEditorStoryGenerationProps {
     storyGeneration: StoryGeneration | null;
+    suggestionsLeft: number;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
@@ -27,14 +40,16 @@ interface AuthorFileEditorStoryGenerationProps {
  * The story generation, in a row of its own under the main menu's tools, while
  * it runs. Every stage of the workflow, in order: those finished, the one it is
  * at, and those to come. Under them, what the stage it is at does: while it
- * works, how far along it is; once it is done, what the author is to do, and the
- * answers they can give: accept the story as they leave it, edits included, or
- * stop. Asked to do something themselves, with a command highlighted, the
- * author continues once done. Whatever the stage is doing, the author can cancel
- * the generation altogether.
+ * works, how far along it is; once it is done, how many of the suggestions it
+ * made are left for the author to review, where they are drawn, and the answers
+ * they can give about the whole stage: continue once none is left, or reject
+ * them all and have the stage run again. Asked to do something themselves,
+ * with a command highlighted, the author continues once done. Whatever the
+ * stage is doing, the author can quit the generation altogether.
  */
 export function AuthorFileEditorStoryGeneration({
     storyGeneration,
+    suggestionsLeft,
     sendMessagesToVscode,
 }: AuthorFileEditorStoryGenerationProps) {
     if (storyGeneration === null) {
@@ -58,6 +73,18 @@ export function AuthorFileEditorStoryGeneration({
         ? (stepsDone + shareOfTheStepDone) / stepsOf
         : 0;
     const percentOfTheStageDone = shareOfTheStageDone * 100;
+    const wholePercentOfTheStageDone = Math.round(percentOfTheStageDone);
+    const secondsTheStageHasTaken = progressOfTheStageAt?.seconds ?? 0;
+    const secondsPerStep = progressOfTheStageAt?.secondsPerItem ?? null;
+    const stepsLeft =
+        stepsOf === null ? null : stepsOf - stepsDone - shareOfTheStepDone;
+    const timeTheStageHasTaken = onTheClock(secondsTheStageHasTaken);
+    const timeTheStageHasLeft =
+        stepsLeft === null || secondsPerStep === null
+            ? "?"
+            : onTheClock(stepsLeft * secondsPerStep);
+    const rateOfTheStage = rateOfTheSteps(secondsPerStep);
+    const stepsOfTheStage = `${stepsDone}/${stepsOf ?? "?"}`;
     const asked = storyGeneration.asked;
     const running = storyGeneration.running;
 
@@ -69,14 +96,19 @@ export function AuthorFileEditorStoryGeneration({
         );
     }
 
-    function whatTheStageDoes(): string {
+    function whatTheStageDoes(): string | null {
         if (asked === null) {
             return "left off here";
         }
         if (asked.shown.kind === "command") {
-            return "use the highlighted button, then continue";
+            return null;
         }
-        return "review it, edit what you like, then accept";
+        if (suggestionsLeft === 0) {
+            return "nothing left to review";
+        }
+        return suggestionsLeft === 1
+            ? "1 suggestion left to review"
+            : `${suggestionsLeft} suggestions left to review`;
     }
 
     const stageDoes = whatTheStageDoes();
@@ -112,21 +144,29 @@ export function AuthorFileEditorStoryGeneration({
             {stageAt !== undefined && (
                 <div className="author-file-editor-story-generation-status">
                     <span className="author-file-editor-story-generation-doing">
-                        {stateOfTheStageAt === "working"
+                        {stateOfTheStageAt === "working" || stageDoes === null
                             ? stageAt.name
                             : `${stageAt.name}: ${stageDoes}`}
                     </span>
                     {stateOfTheStageAt === "working" && (
-                        <div
-                            className="author-file-editor-story-generation-progress"
-                            role="progressbar"
-                            aria-valuenow={Math.round(percentOfTheStageDone)}
-                        >
+                        <>
+                            <span className="author-file-editor-story-generation-progress-percent">
+                                {`${wholePercentOfTheStageDone}%`}
+                            </span>
                             <div
-                                className="author-file-editor-story-generation-progress-done"
-                                style={{ width: `${percentOfTheStageDone}%` }}
-                            />
-                        </div>
+                                className="author-file-editor-story-generation-progress"
+                                role="progressbar"
+                                aria-valuenow={wholePercentOfTheStageDone}
+                            >
+                                <div
+                                    className="author-file-editor-story-generation-progress-done"
+                                    style={{ width: `${percentOfTheStageDone}%` }}
+                                />
+                            </div>
+                            <span className="author-file-editor-story-generation-progress-steps-and-time">
+                                {`${stepsOfTheStage} [${timeTheStageHasTaken}<${timeTheStageHasLeft}, ${rateOfTheStage}]`}
+                            </span>
+                        </>
                     )}
                     {stateOfTheStageAt === "left-off" && (
                         <button
@@ -148,34 +188,39 @@ export function AuthorFileEditorStoryGeneration({
                             <button
                                 type="button"
                                 className="author-file-editor-story-generation-answer author-file-editor-story-generation-answer-default"
+                                title={
+                                    suggestionsLeft > 0
+                                        ? "Accept or reject every suggestion first"
+                                        : undefined
+                                }
+                                disabled={suggestionsLeft > 0}
                                 onClick={() => answer("accept")}
                             >
-                                {asked.shown.kind === "command"
-                                    ? "Continue"
-                                    : "Accept"}
+                                Continue
                             </button>
                             <button
                                 type="button"
                                 className="author-file-editor-story-generation-answer"
-                                onClick={() => answer("stop")}
+                                title="Throw away what this stage made and run it again"
+                                onClick={() => answer("reject")}
                             >
-                                Stop
+                                Reject
                             </button>
                         </>
                     )}
                     <button
                         type="button"
                         className="author-file-editor-story-generation-answer"
-                        title="Cancel the story generation altogether"
+                        title="Quit the story generation altogether"
                         onClick={() =>
                             invokeAuthorDocumentCommand(
                                 sendMessagesToVscode,
-                                CANCEL_THE_STORY_GENERATION,
+                                QUIT_THE_STORY_GENERATION,
                                 {},
                             )
                         }
                     >
-                        Cancel
+                        Quit
                     </button>
                 </div>
             )}

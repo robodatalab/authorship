@@ -104,6 +104,40 @@ describe("a character cell", () => {
         ]);
     });
 
+    it("shows an X on the button that lists the concepts to choose, while the list is open", async () => {
+        await mountTheCharacter(VARN_FOR_MOTHERHOOD);
+        const listButton = document.querySelector(
+            ".author-file-editor-character-concepts .author-file-editor-cell-reference-chosen",
+        )!;
+
+        await click(listButton);
+
+        expect([listButton.getAttribute("aria-label"), listButton.querySelector("i")!.className]).toEqual([
+            "Close the list without choosing",
+            "codicon codicon-close",
+        ]);
+    });
+
+    it("closes the concepts to choose when the X is clicked, leaving the concepts the character supports as they are", async () => {
+        await mountTheCharacter(VARN_FOR_MOTHERHOOD);
+        const listButton = document.querySelector(
+            ".author-file-editor-character-concepts .author-file-editor-cell-reference-chosen",
+        )!;
+        await click(listButton);
+
+        await click(listButton);
+
+        const listed = document.querySelector(
+            ".author-file-editor-character-concepts .author-file-editor-cell-references-to-choose",
+        );
+        const supported = [
+            ...document.querySelectorAll(
+                ".author-file-editor-character-concepts .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown",
+            ),
+        ].map((concept) => concept.textContent);
+        expect([listed, supported, posted]).toEqual([null, ["Motherhood"], []]);
+    });
+
     it("asks for a concept to stop being supported", async () => {
         await mountTheCharacter(VARN_FOR_MOTHERHOOD);
 

@@ -8,6 +8,7 @@ import type {
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
+import { AuthorFileEditorSuggestionNavigator } from "./AuthorFileEditorSuggestionNavigator";
 import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "./StoryGraphLayout";
 import {
@@ -54,10 +55,12 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
+import { withEverySuggestionApplied } from "../../vscode_runtime/suggestions_applied";
 import {
     MarkdownEditorMediator,
     type MarkdownEditorStoryTextHighlight,
 } from "../markdown/MarkdownEditor";
+import type { Suggestion } from "authordoc/suggestion";
 import "./AuthorFileEditorCanvas.css";
 
 const CELL_BUTTON_GROUP = "cell";
@@ -129,6 +132,8 @@ export function sayTheAuthorTypedInTheCell(
     sendMessagesToVscode({ type: "typed", cellId, markdown });
 }
 
+const REVIEW_THE_SUGGESTION = "reviewTheSuggestion";
+
 export function invokeAuthorDocumentCommand(
     sendMessagesToVscode: SendMessagesToVscode,
     commandName: string,
@@ -162,6 +167,7 @@ interface AuthorFileEditorCanvasProps {
     wordsInEverySection?: Readonly<Record<string, number>>;
     wordsInTheDocument?: number;
     storyGeneration?: StoryGeneration | null;
+    suggestions?: readonly Suggestion[];
 }
 
 export function AuthorFileEditorCanvas({
@@ -179,6 +185,7 @@ export function AuthorFileEditorCanvas({
     wordsInEverySection = {},
     wordsInTheDocument = 0,
     storyGeneration = null,
+    suggestions = [],
 }: AuthorFileEditorCanvasProps) {
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
@@ -186,11 +193,38 @@ export function AuthorFileEditorCanvas({
     const insertCommand = commands.find(
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
-    const sections = useMemo(() => cellsBySection(cells), [cells]);
-    const storyDocument = useMemo(() => Document.fromCells(cells), [cells]);
+    const storyAsSuggested = useMemo(() => {
+        const storyWithTheSuggestions = Document.fromCells(
+            cells,
+            null,
+            suggestions,
+        );
+        const storySuggested = withEverySuggestionApplied(
+            storyWithTheSuggestions,
+        );
+        return storySuggested;
+    }, [cells, suggestions]);
+    const suggestionForEachCell = useMemo(
+        () =>
+            new Map(
+                suggestions.map((suggestion) => [
+                    suggestion.cellId,
+                    suggestion,
+                ]),
+            ),
+        [suggestions],
+    );
+    const cellsAsSuggested = useMemo(
+        () => [...storyAsSuggested.cells],
+        [storyAsSuggested],
+    );
+    const sections = useMemo(
+        () => cellsBySection(cellsAsSuggested),
+        [cellsAsSuggested],
+    );
     const placesNestedInEachPlace = useMemo(
-        () => placesNestedIn(storyDocument),
-        [storyDocument],
+        () => placesNestedIn(storyAsSuggested),
+        [storyAsSuggested],
     );
     const placeIdsNested = useMemo(() => {
         const placesNested = [...placesNestedInEachPlace.values()].flat();
@@ -198,14 +232,14 @@ export function AuthorFileEditorCanvas({
         return new Set(ids);
     }, [placesNestedInEachPlace]);
     const storyWords = useMemo(
-        () => new StoryWordsIterator(storyDocument),
-        [storyDocument],
+        () => new StoryWordsIterator(storyAsSuggested),
+        [storyAsSuggested],
     );
     const storyAnnotationsShown = useMemo(
         () =>
             STORY_ANNOTATION_KINDS.map((cellKind) => {
                 const storyAnnotations = new StoryAnnotationsIterator(
-                    storyDocument,
+                    storyAsSuggested,
                     cellKind,
                 );
                 const annotations = Array.from(storyAnnotations);
@@ -239,7 +273,7 @@ export function AuthorFileEditorCanvas({
                         passageSelected === -1 ? null : passageSelected,
                 };
             }),
-        [storyDocument, storyWords, storyAnnotationsSelected],
+        [storyAsSuggested, storyWords, storyAnnotationsSelected],
     );
     const storyTextHighlightsByCellId = useMemo(() => {
         const byCellId = new Map<
@@ -281,7 +315,7 @@ export function AuthorFileEditorCanvas({
                 }),
             );
             const passageSelected = annotation.passageSelected;
-            const plotCell = storyDocument
+            const plotCell = storyAsSuggested
                 .plots()
                 .find((plot) => plot.uniqueId === annotation.annotationCellId);
             if (plotCell === undefined || passageSelected === null) {
@@ -308,7 +342,7 @@ export function AuthorFileEditorCanvas({
             }
         }
         return { marks, arrows };
-    }, [storyAnnotationsShown, storyDocument]);
+    }, [storyAnnotationsShown, storyAsSuggested]);
 
     function selectThePassagesClicked(cellId: string, clickedAt: number): void {
         for (const annotation of storyAnnotationsShown) {
@@ -338,8 +372,9 @@ export function AuthorFileEditorCanvas({
     const cellDragged =
         cellIdDragged === null
             ? undefined
-            : storyDocument.cellWithId(cellIdDragged);
+            : storyAsSuggested.cellWithId(cellIdDragged);
     const canvasDrawn = useRef<HTMLDivElement>(null);
+    const suggestionShown = useRef<string | null>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<
         number | null
     >(null);
@@ -426,8 +461,8 @@ export function AuthorFileEditorCanvas({
         command: WebviewAuthorDocumentCommandCard,
     ): boolean {
         return (
-            cells.length > 0 &&
-            cells.every((cell) => isDrawnOnCell(command, cell.folded))
+            cellsAsSuggested.length > 0 &&
+            cellsAsSuggested.every((cell) => isDrawnOnCell(command, cell.folded))
         );
     }
 
@@ -494,7 +529,7 @@ export function AuthorFileEditorCanvas({
 
     useEffect(() => {
         const scrolled = metadataOnThePage.current;
-        const firstOfTheKind = cells.find(
+        const firstOfTheKind = cellsAsSuggested.find(
             (cell) => cell.kind === cellKindTheAuthorIsToReview,
         );
         if (!scrolled || firstOfTheKind === undefined) {
@@ -592,10 +627,10 @@ export function AuthorFileEditorCanvas({
     }
 
     function cellFollowing(cell: Cell): string | null {
-        const standsAt = storyDocument.cells.findIndex(
+        const standsAt = storyAsSuggested.cells.findIndex(
             (inTheStory) => inTheStory.uniqueId === cell.uniqueId,
         );
-        const following = storyDocument.cells[standsAt + 1];
+        const following = storyAsSuggested.cells[standsAt + 1];
         return following?.uniqueId ?? null;
     }
 
@@ -634,7 +669,7 @@ export function AuthorFileEditorCanvas({
                   placeMayLieWithin(
                       cellDragged,
                       placeHoldingTheGap,
-                      storyDocument,
+                      storyAsSuggested,
                   );
         return (
             <div
@@ -665,7 +700,7 @@ export function AuthorFileEditorCanvas({
         }
         const landsHere =
             cellDragged instanceof PlaceCell &&
-            placeMayLieWithin(cellDragged, cell, storyDocument);
+            placeMayLieWithin(cellDragged, cell, storyAsSuggested);
         const nestedInIt = placesNestedInEachPlace.get(cell.uniqueId) ?? [];
         const lastNested = nestedInIt[nestedInIt.length - 1];
         const beforeCellId = cellFollowing(lastNested ?? cell);
@@ -687,6 +722,89 @@ export function AuthorFileEditorCanvas({
         return classNamesGiven.length === 0
             ? undefined
             : classNamesGiven.join(" ");
+    }
+
+    function bringTheSuggestionIntoView(step: number): void {
+        const framesFound =
+            canvasDrawn.current?.querySelectorAll("[data-suggestion-id]") ?? [];
+        const framesOnThePage = [...framesFound];
+        const count = framesOnThePage.length;
+        if (count === 0) {
+            return;
+        }
+        const idsOnThePage = framesOnThePage.map((frame) =>
+            frame.getAttribute("data-suggestion-id"),
+        );
+        const standingOfTheOneShown = idsOnThePage.indexOf(
+            suggestionShown.current,
+        );
+        const from =
+            standingOfTheOneShown === -1
+                ? step > 0
+                    ? -1
+                    : 0
+                : standingOfTheOneShown;
+        const shown = (from + step + count) % count;
+        suggestionShown.current = idsOnThePage[shown];
+        framesOnThePage[shown].scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+        });
+    }
+
+    function reviewTheSuggestion(cellId: string, verdict: string): void {
+        invokeAuthorDocumentCommand(
+            sendMessagesToVscode,
+            REVIEW_THE_SUGGESTION,
+            { cellId, verdict },
+        );
+    }
+
+    function cellWithItsSuggestion(
+        cell: Cell,
+        cellShown: ReactNode,
+    ): ReactNode {
+        const suggestion = suggestionForEachCell.get(cell.uniqueId);
+        if (suggestion === undefined) {
+            return cellShown;
+        }
+        return (
+            <div
+                className="author-file-editor-suggestion"
+                data-suggestion-id={suggestion.cellId}
+            >
+                <div className="author-file-editor-suggestion-heading">
+                    <span className="author-file-editor-suggestion-says">
+                        Suggested change
+                    </span>
+                    <button
+                        type="button"
+                        className="author-file-editor-suggestion-accept"
+                        title="Take up the suggestion"
+                        aria-label="Accept the suggestion"
+                        onClick={() =>
+                            reviewTheSuggestion(suggestion.cellId, "accept")
+                        }
+                    >
+                        <i className="codicon codicon-check" />
+                    </button>
+                    <button
+                        type="button"
+                        className="author-file-editor-suggestion-reject"
+                        title="Drop the suggestion"
+                        aria-label="Reject the suggestion"
+                        onClick={() =>
+                            reviewTheSuggestion(suggestion.cellId, "reject")
+                        }
+                    >
+                        <i className="codicon codicon-close" />
+                    </button>
+                </div>
+                <div className="author-file-editor-suggestion-proposed">
+                    {cellShown}
+                </div>
+            </div>
+        );
     }
 
     function cellWithItsState(cell: Cell, cellDrawn: ReactNode): ReactNode {
@@ -776,6 +894,7 @@ export function AuthorFileEditorCanvas({
                 <li>{gapBefore(within[0].uniqueId, METADATA_PANE, place)}</li>
                 {within.map((nested, nestedIndex) => {
                     const nestedDrawn = nested.accept<ReactNode>(cellRenderer);
+                    const nestedShown = cellWithItsState(nested, nestedDrawn);
                     const whatFollowsIt =
                         within[nestedIndex + 1]?.uniqueId ??
                         whatFollowsTheScope;
@@ -786,7 +905,7 @@ export function AuthorFileEditorCanvas({
                             className={classNameOfTheCellOnThePage(nested)}
                             {...dropOntoTheCell(nested)}
                         >
-                            {cellWithItsState(nested, nestedDrawn)}
+                            {cellWithItsSuggestion(nested, nestedShown)}
                             {placesWithinThePlace(nested)}
                             {gapBefore(whatFollowsIt, METADATA_PANE, place)}
                         </li>
@@ -838,6 +957,7 @@ export function AuthorFileEditorCanvas({
                     if (cellDrawn === null) {
                         return null;
                     }
+                    const cellShown = cellWithItsState(cell, cellDrawn);
                     return (
                         <li
                             key={cell.uniqueId}
@@ -845,7 +965,7 @@ export function AuthorFileEditorCanvas({
                             className={classNameOfTheCellOnThePage(cell)}
                             {...dropOntoTheCell(cell)}
                         >
-                            {cellWithItsState(cell, cellDrawn)}
+                            {cellWithItsSuggestion(cell, cellShown)}
                             {cell instanceof PlaceCell
                                 ? placesWithinThePlace(cell)
                                 : null}
@@ -883,14 +1003,22 @@ export function AuthorFileEditorCanvas({
                 commands={mainMenuCommands}
                 sendMessagesToVscode={sendMessagesToVscode}
             >
+                <AuthorFileEditorSuggestionNavigator
+                    suggestionsLeft={suggestions.length}
+                    goToThePreviousSuggestion={() =>
+                        bringTheSuggestionIntoView(-1)
+                    }
+                    goToTheNextSuggestion={() => bringTheSuggestionIntoView(1)}
+                />
                 <AuthorFileEditorPartAndChapterInView
-                    cells={cells}
+                    cells={cellsAsSuggested}
                     cellIdInView={cellIdInView}
                     wordsInTheDocument={wordsInTheDocument}
                 />
                 <AuthorFileEditorFindBar find={find} />
                 <AuthorFileEditorStoryGeneration
                     storyGeneration={storyGeneration}
+                    suggestionsLeft={suggestions.length}
                     sendMessagesToVscode={sendMessagesToVscode}
                 />
             </AuthorFileEditorMainMenu>
@@ -924,7 +1052,7 @@ export function AuthorFileEditorCanvas({
                         cellsInScope(sections, null, METADATA_PANE)
                     ) : (
                         <AuthorFileEditorStoryGraph
-                            story={storyDocument}
+                            story={storyAsSuggested}
                             plotEventSelected={
                                 storyAnnotationsSelected[PLOT] ??
                                 NO_STORY_ANNOTATION_SELECTED
@@ -1059,7 +1187,8 @@ function AuthorFileEditorInsertCellMenuButton({
     insertBeforeCellId,
     sendMessagesToVscode,
 }: AuthorFileEditorInsertCellMenuButtonProps) {
-    return (
+    const kindAdded = cellType.menuLabel.toLowerCase();
+    const button = (
         <button
             type="button"
             className={
@@ -1067,7 +1196,7 @@ function AuthorFileEditorInsertCellMenuButton({
                     ? "author-file-editor-insert-cell-menu-button author-file-editor-insert-cell-menu-button-highlighted"
                     : "author-file-editor-insert-cell-menu-button"
             }
-            title={`Add a ${cellType.menuLabel.toLowerCase()} section here`}
+            title={`Add a ${kindAdded} section here`}
             onClick={() =>
                 invokeAuthorDocumentCommand(
                     sendMessagesToVscode,
@@ -1082,5 +1211,19 @@ function AuthorFileEditorInsertCellMenuButton({
             <i className={insertCommand.iconClassName} />
             {cellType.menuLabel}
         </button>
+    );
+    if (!isHighlighted) {
+        return button;
+    }
+    return (
+        <span className="author-file-editor-insert-cell-menu-button-pointed-at">
+            {button}
+            <span
+                className="author-file-editor-insert-cell-menu-bubble"
+                role="tooltip"
+            >
+                {`Add every ${kindAdded} your story needs here, then press Continue`}
+            </span>
+        </span>
     );
 }

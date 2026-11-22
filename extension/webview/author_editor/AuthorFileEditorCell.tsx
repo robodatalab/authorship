@@ -16,6 +16,11 @@ import "./AuthorFileEditorCell.css";
 
 interface AuthorFileEditorCellProps {
     sidebar?: ReactNode;
+    actions?: ReactNode;
+    children?: ReactNode;
+}
+
+interface AuthorFileEditorCellActionsProps {
     children?: ReactNode;
 }
 
@@ -150,7 +155,9 @@ export function useAuthorFileEditorCellTimesTheHostWroteIt(): number {
     return useContext(AuthorFileEditorCellStateContext).timesTheHostWroteIt;
 }
 
-export function AuthorFileEditorCellActions() {
+export function AuthorFileEditorCellActions({
+    children,
+}: AuthorFileEditorCellActionsProps) {
     const {
         cellCommands,
         cellId,
@@ -191,17 +198,19 @@ export function AuthorFileEditorCellActions() {
                         <i className={command.iconClassName} />
                     </button>
                 ))}
+            {children}
         </div>
     );
 }
 
 export function AuthorFileEditorCell({
     sidebar,
+    actions,
     children,
 }: AuthorFileEditorCellProps) {
     return (
         <section className="author-file-editor-cell">
-            <AuthorFileEditorCellActions />
+            <AuthorFileEditorCellActions>{actions}</AuthorFileEditorCellActions>
             <div className="author-file-editor-cell-sidebar">{sidebar}</div>
             <div className="author-file-editor-cell-main">{children}</div>
         </section>

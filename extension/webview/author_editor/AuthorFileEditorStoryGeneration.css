@@ -77,6 +77,20 @@
     transition: width 0.2s linear;
 }
 
+.author-file-editor-story-generation-progress-percent,
+.author-file-editor-story-generation-progress-steps-and-time {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: calc(var(--vscode-font-size) - 1px);
+    font-variant-numeric: tabular-nums;
+    white-space: pre;
+    color: var(--vscode-descriptionForeground);
+}
+
+.author-file-editor-story-generation-progress-percent {
+    min-width: 4ch;
+    text-align: right;
+}
+
 .author-file-editor-story-generation-stage-to-come {
     color: var(--vscode-descriptionForeground);
 }
@@ -113,4 +127,9 @@
 
 .author-file-editor-story-generation-answer-default:hover {
     background: var(--vscode-button-hoverBackground);
+}
+
+.author-file-editor-story-generation-answer:disabled {
+    opacity: 0.4;
+    cursor: default;
 }

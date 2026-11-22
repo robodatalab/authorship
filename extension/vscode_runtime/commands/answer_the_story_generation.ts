@@ -2,7 +2,7 @@ import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { AuthorDocumentCommand } from "./author_document_command";
 
 // The author's answer to what the story generation asks, from the main menu: a
-// verdict, "accept" or "stop", and the story as the author leaves it.
+// verdict, "accept" or "reject", and the story as the author leaves it.
 export class AnswerTheStoryGenerationCommand implements AuthorDocumentCommand {
     readonly commandName = "answerTheStoryGeneration";
     readonly buttonGroup = "generate";
@@ -17,6 +17,6 @@ export class AnswerTheStoryGenerationCommand implements AuthorDocumentCommand {
             await session.storyGenerationWorkflow.accept();
             return;
         }
-        await session.storyGenerationWorkflow.stop();
+        await session.storyGenerationWorkflow.reject();
     }
 }

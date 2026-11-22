@@ -2,7 +2,7 @@
 work, the story as it leaves it is shown to the author, with the part of
 authorship the stage worked in brought into view. The author looks round it,
 edits what they like, and answers from the editor's main menu: they accept the
-story as they leave it, or stop."""
+story as they leave it, or reject it."""
 
 from __future__ import annotations
 

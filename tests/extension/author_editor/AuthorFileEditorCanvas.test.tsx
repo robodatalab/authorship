@@ -44,6 +44,10 @@ import { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell";
 import type { TitlePageCell } from "authordoc/cells/title_page_cell";
 import type { UnknownCell } from "authordoc/cells/unknown_cell";
+import { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
+import { CellTextChanged } from "authordoc/changes/cell_text_changed";
+import { AuthorDocDiff } from "authordoc/diff";
+import { Suggestion } from "authordoc/suggestion";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -57,6 +61,15 @@ let posted: Invocation[] = [];
 
 function markdownCell(source: string, id = source): MarkdownCell {
     return new MarkdownCell(source, false, null, id);
+}
+
+function suggestionThatFolds(source: string): Suggestion {
+    const unfolded = markdownCell(source);
+    const folded = new MarkdownCell(source, true, null, source);
+    const headerChanged = new CellHeaderChanged(unfolded, folded);
+    const diff = new AuthorDocDiff([headerChanged]);
+    const suggestion = new Suggestion(source, diff);
+    return suggestion;
 }
 
 type CellDrawings = Partial<Record<string, (cell: Cell) => ReactNode>>;
@@ -175,6 +188,7 @@ async function mountCanvas(options: {
     storyAnnotationsSelected?: Record<string, StoryAnnotationSelected>;
     storyTextShown?: StoryTextSpan | null;
     storyGeneration?: StoryGeneration | null;
+    suggestions?: Suggestion[];
 }): Promise<void> {
     posted = [];
     document.body.innerHTML = "";
@@ -197,6 +211,7 @@ async function mountCanvas(options: {
                 storyAnnotationsSelected={options.storyAnnotationsSelected}
                 storyTextShown={options.storyTextShown}
                 storyGeneration={options.storyGeneration}
+                suggestions={options.suggestions}
             />,
         );
     });
@@ -399,7 +414,7 @@ describe("invoking a main menu command", () => {
         ).toHaveLength(1);
     });
 
-    it("draws the one of a pair that the folding of the document calls for", async () => {
+    it("shows Unfold all when every cell is folded, counting a cell folded by its suggestion, and Fold all otherwise", async () => {
         const foldAll = {
             ...command("foldAll", "fold"),
             drawnWhenTheCellIsFolded: false,
@@ -422,8 +437,9 @@ describe("invoking a main menu command", () => {
         await mountCanvas({
             cells: [
                 new MarkdownCell("one", true, null, "one"),
-                new MarkdownCell("two", true, null, "two"),
+                markdownCell("two"),
             ],
+            suggestions: [suggestionThatFolds("two")],
             commands: [foldAll, unfoldAll],
         });
         expect(
@@ -935,19 +951,21 @@ describe("the scope of a part and of a chapter", () => {
 });
 
 describe("a folded cell", () => {
-    it("is marked as folded on the page", async () => {
+    it("is drawn folded, also when its suggestion folds it", async () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
                 new MarkdownCell("two", true, null, "two"),
+                markdownCell("three"),
             ],
+            suggestions: [suggestionThatFolds("three")],
         });
 
         expect(
             listItems().map((item) =>
                 item.classList.contains("author-file-editor-cell-folded"),
             ),
-        ).toEqual([false, false, true]);
+        ).toEqual([false, false, true, true]);
     });
 });
 
@@ -1926,10 +1944,9 @@ describe("the metadata and the manuscript panes", () => {
             cellDrawings: DRAWN_BY_THEIR_IDS,
             storyGeneration: {
                 running: false,
-                error: null,
                 progress: { steps: [] },
                 stages: [{ name: "concept titles", done: false }],
-                asked: { stage: "concept titles", story: "", shown },
+                asked: { stage: "concept titles", shown },
             },
         });
 
@@ -1946,6 +1963,140 @@ describe("the metadata and the manuscript panes", () => {
         );
 
         expect(highlighted).toEqual(expected);
+    });
+
+    it("points the author at the button that adds the kind the story generation asks for, saying what to do", async () => {
+        await mountCanvas({
+            cellTypes: [cellType("salient-concept", "primary")],
+            storyGeneration: {
+                running: false,
+                progress: { steps: [] },
+                stages: [{ name: "concept titles", done: false }],
+                asked: {
+                    stage: "concept titles",
+                    shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+                },
+            },
+        });
+
+        const bubbles = [
+            ...document.querySelectorAll(".author-file-editor-insert-cell-menu-bubble"),
+        ].map((bubble) => bubble.textContent);
+
+        expect(bubbles).toEqual([
+            "Add every salient-concept your story needs here, then press Continue",
+        ]);
+    });
+
+    describe("the suggestions on the cells, left for the author to review", () => {
+        const ONE_CHANGED = new Suggestion(
+            "one",
+            new AuthorDocDiff([new CellTextChanged("one", 3, "", ", changed")]),
+        );
+        const TWO_CHANGED = new Suggestion(
+            "two",
+            new AuthorDocDiff([new CellTextChanged("two", 3, "", ", changed")]),
+        );
+
+        afterEach(() => vi.restoreAllMocks());
+
+        it("draws every cell with a suggestion as the suggestion makes it, in a frame with buttons to accept and reject it", async () => {
+            await mountCanvas({
+                cells: [markdownCell("one"), markdownCell("two")],
+                suggestions: [ONE_CHANGED],
+            });
+
+            const drawn = [...document.querySelectorAll(".author-file-editor-manuscript-pane .test-cell")].map(
+                (cell) => cell.textContent,
+            );
+            const suggestionsDrawn = [...document.querySelectorAll(".author-file-editor-suggestion")].map(
+                (drawnSuggestion) => [
+                    drawnSuggestion.getAttribute("data-suggestion-id"),
+                    drawnSuggestion.querySelector(".author-file-editor-suggestion-says")!.textContent,
+                    [...drawnSuggestion.querySelectorAll("button")].map((button) => button.getAttribute("aria-label")),
+                    drawnSuggestion.querySelector(".author-file-editor-suggestion-proposed")!.textContent,
+                ],
+            );
+            expect([drawn, suggestionsDrawn]).toEqual([
+                ["one, changed", "two"],
+                [["one", "Suggested change", ["Accept the suggestion", "Reject the suggestion"], "one, changed"]],
+            ]);
+        });
+
+        it.each([
+            ["accepting", "Accept the suggestion", "accept"],
+            ["rejecting", "Reject the suggestion", "reject"],
+        ])("%s a suggestion answers for its cell", async (_, label, verdict) => {
+            await mountCanvas({
+                cells: [markdownCell("one")],
+                suggestions: [ONE_CHANGED],
+            });
+            const button = document.querySelector(
+                `[data-suggestion-id="one"] [aria-label="${label}"]`,
+            ) as HTMLButtonElement;
+
+            await act(async () => button.click());
+
+            expect(posted).toEqual([
+                {
+                    type: "invoke",
+                    commandName: "reviewTheSuggestion",
+                    commandArguments: { cellId: "one", verdict },
+                },
+            ]);
+        });
+
+        it.each([
+            ["next", "Next suggestion", ["m", "h", "e", "m"]],
+            ["previous", "Previous suggestion", ["e", "h", "m", "e"]],
+        ])("the %s suggestion button goes through the suggestions in the order they appear on the page, starting over after the last", async (_, label, expected) => {
+            const scrollIntoView = vi.fn();
+            Element.prototype.scrollIntoView = scrollIntoView;
+            const marsDescribed = new CellTextChanged("m", 0, "", "red");
+            const earthDescribed = new CellTextChanged("e", 0, "", "blue");
+            const hellasBasinDescribed = new CellTextChanged("h", 0, "", "dusty");
+            const marsDiff = new AuthorDocDiff([marsDescribed]);
+            const earthDiff = new AuthorDocDiff([earthDescribed]);
+            const hellasBasinDiff = new AuthorDocDiff([hellasBasinDescribed]);
+            await mountCanvas({
+                cells: [
+                    new PlaceCell("mars", "", false, null, "m"),
+                    new PlaceCell("earth", "", false, null, "e"),
+                    new PlaceCell("Hellas Basin", "", false, null, "h", "m"),
+                ],
+                cellDrawings: { place: () => <AuthorFileEditorCell /> },
+                suggestions: [
+                    new Suggestion("m", marsDiff),
+                    new Suggestion("e", earthDiff),
+                    new Suggestion("h", hellasBasinDiff),
+                ],
+            });
+            const button = document.querySelector(
+                `.author-file-editor-main-menu [aria-label="${label}"]`,
+            ) as HTMLButtonElement;
+
+            await act(async () => button.click());
+            await act(async () => button.click());
+            await act(async () => button.click());
+            await act(async () => button.click());
+
+            const broughtIntoView = scrollIntoView.mock.contexts.map((drawn) =>
+                (drawn as Element).getAttribute("data-suggestion-id"),
+            );
+            expect(broughtIntoView).toEqual(expected);
+        });
+
+        it("counts the suggestions in the main menu", async () => {
+            await mountCanvas({
+                cells: [markdownCell("one"), markdownCell("two")],
+                suggestions: [ONE_CHANGED, TWO_CHANGED],
+            });
+
+            const counted = document.querySelector(
+                ".author-file-editor-main-menu .author-file-editor-suggestion-navigator-count",
+            );
+            expect(counted?.textContent).toBe("2 suggestions");
+        });
     });
 
     describe("the cells the story generation asks the author to review", () => {
@@ -1970,10 +2121,9 @@ describe("the metadata and the manuscript panes", () => {
                 cellDrawings: DRAWN_BY_THEIR_IDS,
                 storyGeneration: {
                     running: false,
-                    error: null,
                     progress: { steps: [] },
                     stages: [{ name: "plots", done: false }],
-                    asked: { stage: "plots", story: "", shown },
+                    asked: { stage: "plots", shown },
                 },
             });
 
