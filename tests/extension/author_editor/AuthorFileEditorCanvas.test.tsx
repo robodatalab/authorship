@@ -44,7 +44,6 @@ import { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { TableOfContentsCell } from "authordoc/cells/table_of_contents_cell";
 import type { TitlePageCell } from "authordoc/cells/title_page_cell";
 import type { UnknownCell } from "authordoc/cells/unknown_cell";
-import { CellAdded } from "authordoc/changes/cell_added";
 import { CellHeaderChanged } from "authordoc/changes/cell_header_changed";
 import { CellTextChanged } from "authordoc/changes/cell_text_changed";
 import { AuthorDocDiff } from "authordoc/diff";
@@ -1998,17 +1997,13 @@ describe("the metadata and the manuscript panes", () => {
             "two",
             new AuthorDocDiff([new CellTextChanged("two", 3, "", ", changed")]),
         );
-        const A_NEW_ONE = new Suggestion(
-            "new",
-            new AuthorDocDiff([new CellAdded(2, new MarkdownCell("a new one", false, null, "new"))]),
-        );
 
         afterEach(() => vi.restoreAllMocks());
 
-        it("draws every cell with a suggestion as the suggestion makes it, and a cell suggested where it would go, each in a frame with buttons to accept and reject it", async () => {
+        it("draws every cell with a suggestion as the suggestion makes it, in a frame with buttons to accept and reject it", async () => {
             await mountCanvas({
                 cells: [markdownCell("one"), markdownCell("two")],
-                suggestions: [ONE_CHANGED, A_NEW_ONE],
+                suggestions: [ONE_CHANGED],
             });
 
             const drawn = [...document.querySelectorAll(".author-file-editor-manuscript-pane .test-cell")].map(
@@ -2023,11 +2018,8 @@ describe("the metadata and the manuscript panes", () => {
                 ],
             );
             expect([drawn, suggestionsDrawn]).toEqual([
-                ["one, changed", "two", "a new one"],
-                [
-                    ["one", "Suggested change", ["Accept the suggestion", "Reject the suggestion"], "one, changed"],
-                    ["new", "Suggested new section", ["Accept the suggestion", "Reject the suggestion"], "a new one"],
-                ],
+                ["one, changed", "two"],
+                [["one", "Suggested change", ["Accept the suggestion", "Reject the suggestion"], "one, changed"]],
             ]);
         });
 

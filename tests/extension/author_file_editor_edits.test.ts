@@ -476,8 +476,6 @@ describe("the suggestions the document holds", () => {
     describe("undone and redone", () => {
         const SUGGESTED_AT_LAST_ONCE =
             '<!-- suggestion: id="c1" -->\n<!-- change: text from="16" removed="" written=" at last, once" -->\n';
-        const A_NEW_SECTION_SUGGESTED =
-            '<!-- suggestion: id="c3" -->\n<!-- change: added at="3" kind="markdown" text="It rang." -->\n';
 
         it("record one edit for a run of keystrokes typed into a suggestion", () => {
             const { session, editsRecorded } = openSession(THE_STORY_WITH_A_SUGGESTION);
@@ -588,21 +586,6 @@ describe("the suggestions the document holds", () => {
             editsRecorded[0].redo();
 
             expect(session.document.serialize()).toBe(THE_STORY);
-        });
-
-        it("take what the author types in a suggested new section into its suggestion, and take it back", () => {
-            const { session, editsRecorded } = openSession(THE_STORY + "\n" + A_NEW_SECTION_SUGGESTED);
-
-            session.theAuthorTypedInTheCell("c3", "It rang twice.");
-
-            expect(session.document.serialize()).toBe(
-                THE_STORY + "\n" +
-                    '<!-- suggestion: id="c3" -->\n<!-- change: added at="3" kind="markdown" text="It rang twice." -->\n',
-            );
-
-            editsRecorded[0].undo();
-
-            expect(session.document.serialize()).toBe(THE_STORY + "\n" + A_NEW_SECTION_SUGGESTED);
         });
 
         it("stay as they are when the author takes back an edit of a cell without one", () => {

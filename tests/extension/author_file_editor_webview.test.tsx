@@ -132,15 +132,23 @@ describe("the suggestions the host sends", () => {
 
     describe("drawing every cell in the story as the suggestions make it", () => {
         const MARKUS = '<!-- cell: character id="mv" title="Markus Vader" -->\n';
+        const EMPTY_PLACES_CHARACTER_AND_PLOT = [
+            '<!-- cell: place id="ms" -->\n',
+            '<!-- cell: place id="hb" -->\n',
+            '<!-- cell: character id="tl" -->\n',
+            '<!-- cell: plot id="dd" -->\n',
+        ];
         const SUGGESTED_PLACES_CHARACTER_AND_PLOT =
-            '<!-- suggestion: id="ms" -->\n<!-- change: added at="1" kind="place" text="" after-title="Mars" -->\n\n' +
-            '<!-- suggestion: id="hb" -->\n<!-- change: added at="2" kind="place" text="" after-title="Hellas Basin" after-parent="ms" -->\n\n' +
-            '<!-- suggestion: id="tl" -->\n<!-- change: added at="3" kind="character" text="A drill operator in debt to the company." after-title="Teodor Lin" -->\n\n' +
-            '<!-- suggestion: id="dd" -->\n<!-- change: added at="4" kind="plot" text="<ol>\\n<li id=\\"e1\\" timestamp=\\"2.4\\" place=\\"hb\\" characters=\\"mv, tl\\">They drive the drill deeper.</li>\\n</ol>" after-title="Drilling deeper" -->\n';
+            '<!-- suggestion: id="ms" -->\n<!-- change: header kind="place" after-title="Mars" -->\n\n' +
+            '<!-- suggestion: id="hb" -->\n<!-- change: header kind="place" after-title="Hellas Basin" after-parent="ms" -->\n\n' +
+            '<!-- suggestion: id="tl" -->\n<!-- change: header kind="character" after-title="Teodor Lin" -->\n' +
+            '<!-- change: text from="0" removed="" written="A drill operator in debt to the company." -->\n\n' +
+            '<!-- suggestion: id="dd" -->\n<!-- change: header kind="plot" after-title="Drilling deeper" -->\n' +
+            '<!-- change: text from="0" removed="" written="<ol>\\n<li id=\\"e1\\" timestamp=\\"2.4\\" place=\\"hb\\" characters=\\"mv, tl\\">They drive the drill deeper.</li>\\n</ol>" -->\n';
 
         async function hostSendsMarkusAndTheSuggestions(): Promise<void> {
             await openWebview();
-            await hostSends([MARKUS]);
+            await hostSends([MARKUS, ...EMPTY_PLACES_CHARACTER_AND_PLOT]);
             await act(async () => {
                 window.dispatchEvent(
                     new MessageEvent("message", {

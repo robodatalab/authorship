@@ -129,10 +129,14 @@ function openTheAuthorFileEditor(): void {
     };
 
     function drawTheCanvas(): void {
+        const suggestionsOfTheCellsDrawn = drawn.suggestions.filter(
+            (suggestion) =>
+                drawn.cells.some((cell) => cell.uniqueId === suggestion.cellId),
+        );
         const storyWithTheSuggestions = Document.fromCells(
             drawn.cells,
             null,
-            drawn.suggestions,
+            suggestionsOfTheCellsDrawn,
         );
         const storyAsSuggested = withEverySuggestionApplied(
             storyWithTheSuggestions,
@@ -159,7 +163,7 @@ function openTheAuthorFileEditor(): void {
                 wordsInEverySection={drawn.wordsInEverySection}
                 wordsInTheDocument={drawn.wordsInTheDocument}
                 storyGeneration={drawn.storyGeneration}
-                suggestions={drawn.suggestions}
+                suggestions={suggestionsOfTheCellsDrawn}
             />,
         );
     }
