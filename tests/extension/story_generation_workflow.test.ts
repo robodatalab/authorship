@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ReviewTheSuggestionCommand } from "../../extension/vscode_runtime/commands/review_the_suggestion";
 import type { StoryGenerationStageJob } from "../../extension/vscode_runtime/story_generation";
 import { executedCommands, files, shownMessages } from "./vscode";
 import {
@@ -497,6 +498,32 @@ describe("StoryGenerationWorkflow.reject — the author rejects what a stage lea
             stages: STAGES_LEFT_OFF_AT_THE_CONCEPTS,
             asked: null,
         });
+    });
+});
+
+describe("StoryGenerationWorkflow — watches the author review the suggestions of a stage one by one", () => {
+    it("deletes a cell the stage proposed once its suggestion is rejected, and leaves a cell the stage only changed", async () => {
+        const session = openStory(THE_STORY_AWAITING_REVIEW);
+
+        await new ReviewTheSuggestionCommand().invoke(session, { cellId: "k1", verdict: "reject" });
+        await new ReviewTheSuggestionCommand().invoke(session, { cellId: "c1", verdict: "reject" });
+
+        expect(files.get(STORY_FILE)).toBe(`<!-- cell: markdown id="c1" -->
+
+She saw the door.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: True
+stage: concepts: Review
+stage: cast: False
+stage: plots: False
+stage: mesh: False
+stage: scenes: False
+stage: choices: False
+stage: validity: False
+review shows: {"kind":"cells","cellKind":"salient-concept"}
+`);
     });
 });
 

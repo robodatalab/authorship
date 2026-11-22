@@ -312,6 +312,7 @@ export class AuthorFileEditorSession
         const documentWithoutTheSuggestion =
             this.documentAsItStands.withoutSuggestion(cellId);
         this.changeTheDocumentInto(documentWithoutTheSuggestion);
+        this.storyGenerationWorkflow.suggestionRejected(cellId);
     }
 
     private documentChangedAsSuggested(
@@ -708,34 +709,10 @@ function suggestedAlike(suggestion: Suggestion, other: Suggestion): boolean {
 }
 
 function suggestionOfTheEdit(
-    documentAsItStands: Document,
-    documentEdited: Document,
-    cellId: string,
+    cellAsItStands: Cell,
+    cellEdited: Cell,
     suggestion: Suggestion,
 ): Suggestion | null {
-    const cellAsItStands = documentAsItStands.cellWithId(cellId);
-    const cellEdited = documentEdited.cellWithId(cellId);
-    if (cellEdited === undefined) {
-        if (cellAsItStands === undefined) {
-            return null;
-        }
-        const cellIndex = documentAsItStands.cells.findIndex(
-            (cell) => cell.uniqueId === cellId,
-        );
-        const cellRemoved = new CellRemoved(cellIndex, cellAsItStands);
-        const diffRemoving = new AuthorDocDiff([cellRemoved]);
-        const suggestionRemoving = suggestion.withTheDiff(diffRemoving);
-        return suggestionRemoving;
-    }
-    if (cellAsItStands === undefined) {
-        const cellIndex = documentEdited.cells.findIndex(
-            (cell) => cell.uniqueId === cellId,
-        );
-        const cellAdded = new CellAdded(cellIndex, cellEdited);
-        const diffAdding = new AuthorDocDiff([cellAdded]);
-        const suggestionAdding = suggestion.withTheDiff(diffAdding);
-        return suggestionAdding;
-    }
     const documentOfTheCell = Document.fromCells([cellAsItStands]);
     const documentOfTheCellEdited = Document.fromCells([cellEdited]);
     const diff = AuthorDocDiff.diff(documentOfTheCell, documentOfTheCellEdited);
@@ -744,37 +721,6 @@ function suggestionOfTheEdit(
     }
     const suggestionEdited = suggestion.withTheDiff(diff);
     return suggestionEdited;
-}
-
-function withTheSuggestedCellsAsTheyStand(
-    cellsEdited: readonly Cell[],
-    documentAsItStands: Document,
-): Cell[] {
-    const cells = [...cellsEdited];
-    documentAsItStands.cells.forEach((cellAsItStands, standing) => {
-        const kept = cells.some(
-            (cell) => cell.uniqueId === cellAsItStands.uniqueId,
-        );
-        const suggested =
-            documentAsItStands.suggestionFor(cellAsItStands.uniqueId) !==
-            undefined;
-        if (kept || !suggested) {
-            return;
-        }
-        const cellsStandingBefore = documentAsItStands.cells.slice(0, standing);
-        const cellsStandingBeforeNearestFirst = cellsStandingBefore.reverse();
-        const nearestKeptBefore = cellsStandingBeforeNearestFirst.find(
-            (before) => cells.some((cell) => cell.uniqueId === before.uniqueId),
-        );
-        const keptBeforeAt =
-            nearestKeptBefore === undefined
-                ? -1
-                : cells.findIndex(
-                      (cell) => cell.uniqueId === nearestKeptBefore.uniqueId,
-                  );
-        cells.splice(keptBeforeAt + 1, 0, cellAsItStands);
-    });
-    return cells;
 }
 
 function withTheEditsOfTheSuggestedCells(
@@ -793,17 +739,23 @@ function withTheEditsOfTheSuggestedCells(
             if (theChangeSuggestedIt) {
                 return [suggestion];
             }
+            const cellAsItStands = documentAsItStands.cellWithId(
+                suggestion.cellId,
+            );
             const cellSuggested = documentAsSuggested.cellWithId(
                 suggestion.cellId,
             );
             const cellEdited = documentEdited.cellWithId(suggestion.cellId);
-            if (writtenAlike(cellSuggested, cellEdited)) {
+            if (
+                cellAsItStands === undefined ||
+                cellEdited === undefined ||
+                writtenAlike(cellSuggested, cellEdited)
+            ) {
                 return [suggestionAsItStands];
             }
             const suggestionEdited = suggestionOfTheEdit(
-                documentAsItStands,
-                documentEdited,
-                suggestion.cellId,
+                cellAsItStands,
+                cellEdited,
                 suggestionAsItStands,
             );
             return suggestionEdited === null ? [] : [suggestionEdited];
@@ -816,11 +768,7 @@ function withTheEditsOfTheSuggestedCells(
         const cellAsItStands = documentAsItStands.cellWithId(cell.uniqueId);
         return cellAsItStands === undefined ? [] : [cellAsItStands];
     });
-    const cells = withTheSuggestedCellsAsTheyStand(
-        cellsEdited,
-        documentAsItStands,
-    );
-    const documentWithTheCells = documentAsItStands.withCells(cells);
+    const documentWithTheCells = documentAsItStands.withCells(cellsEdited);
     const documentWithTheSuggestions = Document.fromCells(
         documentWithTheCells.cells,
         documentWithTheCells.path,

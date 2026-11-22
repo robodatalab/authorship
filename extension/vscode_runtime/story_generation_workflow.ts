@@ -160,15 +160,6 @@ function idsProposedInTheCheckpoint(document: Document): string[] {
     return idsProposed;
 }
 
-function withoutTheCellsProposed(document: Document): Document {
-    const idsProposed = idsProposedInTheCheckpoint(document);
-    const cellsKept = document.cells.filter(
-        (cell) => !idsProposed.includes(cell.uniqueId),
-    );
-    const documentWithoutThem = document.withCells(cellsKept);
-    return documentWithoutThem;
-}
-
 function shownInTheCheckpoint(document: Document): StoryGenerationShown {
     const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
     const lines = checkpoint?.source.split("\n") ?? [];
@@ -246,18 +237,35 @@ function withTheStageAwaitingReview(
         STAGE_AWAITING_REVIEW,
     );
     const shownWritten = JSON.stringify(shown);
-    const reviewLines = [...stageLines, `${REVIEW_SHOWS}${shownWritten}`];
-    const idsProposed = cellsProposed.map((cell) => cell.uniqueId);
-    const idsProposedWritten = idsProposed.join(", ");
-    const lines =
-        idsProposed.length === 0
-            ? reviewLines
-            : [...reviewLines, `${PROPOSED_BY_THE_STAGE}${idsProposedWritten}`];
+    const lines = [...stageLines, `${REVIEW_SHOWS}${shownWritten}`];
     const documentWithTheStageAwaitingReview = withTheCheckpointWritten(
         document,
         lines,
     );
-    return documentWithTheStageAwaitingReview;
+    const idsProposed = cellsProposed.map((cell) => cell.uniqueId);
+    const documentWithTheIdsProposed = withTheIdsProposed(
+        documentWithTheStageAwaitingReview,
+        idsProposed,
+    );
+    return documentWithTheIdsProposed;
+}
+
+function withTheIdsProposed(document: Document, idsProposed: string[]): Document {
+    const checkpoint = document.getCell(UnknownCell, CHECKPOINT);
+    const lines = checkpoint?.source.split("\n") ?? [];
+    const otherLines = lines.filter(
+        (line) => !line.startsWith(PROPOSED_BY_THE_STAGE),
+    );
+    const idsProposedWritten = idsProposed.join(", ");
+    const linesWithTheIds =
+        idsProposed.length === 0
+            ? otherLines
+            : [...otherLines, `${PROPOSED_BY_THE_STAGE}${idsProposedWritten}`];
+    const documentWithTheIds = withTheCheckpointWritten(
+        document,
+        linesWithTheIds,
+    );
+    return documentWithTheIds;
 }
 
 function stageLinesWithTheStageIn(
@@ -405,10 +413,8 @@ export class StoryGenerationWorkflow {
             this.session.rejectTheSuggestion(suggestion.cellId);
         }
         this.session.changeTheDocument((document) => {
-            const documentWithoutTheCellsProposed =
-                withoutTheCellsProposed(document);
             const documentWithTheStageNotDone = withTheStageIn(
-                documentWithoutTheCellsProposed,
+                document,
                 stageAwaiting,
                 STAGE_NOT_DONE,
             );
@@ -418,19 +424,31 @@ export class StoryGenerationWorkflow {
         await this.runTheNextStage();
     }
 
+    suggestionRejected(cellId: string): void {
+        const idsProposed = idsProposedInTheCheckpoint(this.session.document);
+        if (!idsProposed.includes(cellId)) {
+            return;
+        }
+        this.session.changeTheDocument((document) => {
+            const cellsKept = document.cells.filter(
+                (cell) => cell.uniqueId !== cellId,
+            );
+            const documentWithoutTheCell = document.withCells(cellsKept);
+            const idsStillProposed = idsProposed.filter((id) => id !== cellId);
+            const documentWithTheIdsStillProposed = withTheIdsProposed(
+                documentWithoutTheCell,
+                idsStillProposed,
+            );
+            return documentWithTheIdsStillProposed;
+        });
+    }
+
     async quit(): Promise<void> {
         await this.dropWhatTheStageAsks();
         for (const suggestion of this.session.document.suggestions) {
             this.session.rejectTheSuggestion(suggestion.cellId);
         }
-        this.session.changeTheDocument((document) => {
-            const documentWithoutTheCellsProposed =
-                withoutTheCellsProposed(document);
-            const documentWithoutTheCheckpoint = withoutTheCheckpoint(
-                documentWithoutTheCellsProposed,
-            );
-            return documentWithoutTheCheckpoint;
-        });
+        this.session.changeTheDocument(withoutTheCheckpoint);
         this.session.showNoStageRunning();
         await this.session.writeTheDocumentToItsFile();
     }

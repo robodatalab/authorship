@@ -99,26 +99,11 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
 });
 
 describe("DeleteCellCommand — deletes a cell with a suggestion", () => {
-    it("turns the suggestion into the removal of the cell, leaving the cell as it stands", async () => {
+    it("deletes the cell together with its suggestion", async () => {
         const session = openStory(
             '<!-- cell: chapter id="c1" title="One" -->\n\n' +
                 '<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n\n' +
                 '<!-- suggestion: id="c2" -->\n<!-- change: text from="16" removed="" written=" at last" -->\n',
-        );
-
-        await new DeleteCellCommand().invoke(session, { cellId: "c2" });
-
-        expect(session.document.serialize()).toBe(
-            '<!-- cell: chapter id="c1" title="One" -->\n\n' +
-                '<!-- cell: markdown id="c2" -->\n\nShe saw the door.\n\n' +
-                '<!-- suggestion: id="c2" -->\n<!-- change: removed at="1" kind="markdown" text="She saw the door." -->\n',
-        );
-    });
-
-    it("drops a suggested new section, leaving the cells as they stand", async () => {
-        const session = openStory(
-            '<!-- cell: chapter id="c1" title="One" -->\n\n' +
-                '<!-- suggestion: id="c2" -->\n<!-- change: added at="1" kind="markdown" text="She saw the door." -->\n',
         );
 
         await new DeleteCellCommand().invoke(session, { cellId: "c2" });
