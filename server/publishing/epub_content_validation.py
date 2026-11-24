@@ -50,7 +50,7 @@ def _first_of(cells: list[Cell]) -> dict[str, int]:
 def _check_missing_content(cells: list[Cell], imprint: Imprint) -> tuple[MissingContent, ...]:
     """Which of the four have nothing in them yet."""
 
-    def check_cell(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
+    def check_cell(kind: str, cell: Cell, imprint: Imprint) -> tuple[str, ...]:
         if kind == TABLE_OF_CONTENTS:
             # Built from the chapters whatever the cell holds, so never a gap.
             return ()
@@ -65,7 +65,7 @@ def _check_missing_content(cells: list[Cell], imprint: Imprint) -> tuple[Missing
             }
             return tuple(name for name in TITLE_PAGE_FIELDS if not said[name].strip())
         if kind == BLURB:
-            return () if cell and cell.source.strip() else (TEXT,)
+            return () if cell.source.strip() else (TEXT,)
         if kind == ABOUT:
             # Every field on it is optional, so somewhere to send the reader is as
             # good as a page about them — but a page with neither is not printed.
@@ -76,7 +76,8 @@ def _check_missing_content(cells: list[Cell], imprint: Imprint) -> tuple[Missing
     missing_content = [
         MissingContent(kind, needs)
         for kind in REQUIRED
-        for needs in [check_cell(kind, cells[found[kind]] if kind in found else None, imprint)]
+        if kind in found
+        for needs in [check_cell(kind, cells[found[kind]], imprint)]
         if needs
     ]
     return tuple(missing_content)
@@ -97,7 +98,7 @@ class Slot:
 
 
 @dataclass(frozen=True)
-class Report:
+class DocumentToEpubConversionReadiness:
     """What stands between this document and a book.
 
     Three faults, and each stops a binding. A section can be absent; a section
@@ -107,17 +108,17 @@ class Report:
     present and in place is still not ready while one of them is empty.
     """
 
-    plan: list[Slot]
-    added: tuple[str, ...]
-    moved: tuple[str, ...]
-    wanting: tuple[MissingContent, ...]
+    cell_export_order: list[Slot]
+    missing_cells: list[str]
+    misplaced_cells: list[str]
+    missing_cell_content: tuple[MissingContent, ...]
 
     @property
-    def ready(self) -> bool:
-        return not (self.added or self.moved or self.wanting)
+    def ready_to_export(self) -> bool:
+        return not (self.missing_cells or self.misplaced_cells or self.missing_cell_content)
 
 
-def report_of(document: Document) -> Report:
+def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness:
     """Everything the editor needs to lay this document out and mark it.
 
     One answer rather than three questions, because the three are asked together
@@ -129,7 +130,7 @@ def report_of(document: Document) -> Report:
     found = _first_of(cells)
     claimed = set(found.values())
     art = _opening_art(cells)
-    plan = (
+    cell_export_order = (
         [Slot(IMAGE, at) for at in sorted(art)]
         + [Slot(kind, found.get(kind)) for kind in OPENING]
         + [
@@ -141,11 +142,11 @@ def report_of(document: Document) -> Report:
     )
     imprint = imprint_of(document)
     missing_content = _check_missing_content(cells, imprint)
-    return Report(
-        plan=plan,
-        added=tuple(kind for kind in REQUIRED if kind not in found),
-        moved=_moved(plan, found),
-        wanting=missing_content,
+    return DocumentToEpubConversionReadiness(
+        cell_export_order=cell_export_order,
+        missing_cells=[kind for kind in REQUIRED if kind not in found],
+        misplaced_cells=_misplaced_cells(cell_export_order, found),
+        missing_cell_content=missing_content,
     )
 
 
@@ -158,7 +159,7 @@ def _opening_art(cells: list[Cell]) -> set[int]:
     return art
 
 
-def _moved(plan: list[Slot], found: dict[str, int]) -> tuple[str, ...]:
+def _misplaced_cells(cell_export_order: list[Slot], found: dict[str, int]) -> list[str]:
     """The sections that changed places with a cell that was already there.
 
     Not the sections whose index changed. Writing a blurb into the front matter
@@ -167,12 +168,12 @@ def _moved(plan: list[Slot], found: dict[str, int]) -> tuple[str, ...]:
     a change nobody made. A section written in is not a cell that was already
     there, so writing one moves nothing; passing one is the only thing that does.
     """
-    now = {slot.at: order for order, slot in enumerate(plan) if slot.at is not None}
-    moved = {
+    now = {slot.at: order for order, slot in enumerate(cell_export_order) if slot.at is not None}
+    misplaced = {
         kind
         for kind, at in found.items()
         if any(
             (other < at) != (now[other] < now[at]) for other in now if other != at
         )
     }
-    return tuple(kind for kind in REQUIRED if kind in moved)
+    return [kind for kind in REQUIRED if kind in misplaced]

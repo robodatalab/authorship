@@ -14,25 +14,25 @@ export interface SectionStillToWrite {
 }
 
 export interface BookLayoutReport {
-    ready: boolean;
-    plan: PlannedSection[];
-    added: string[];
-    moved: string[];
-    wanting: SectionStillToWrite[];
+    ready_to_export: boolean;
+    cell_export_order: PlannedSection[];
+    missing_cells: string[];
+    misplaced_cells: string[];
+    missing_cell_content: SectionStillToWrite[];
     path?: string;
 }
 
 export function cellsLaidOutByPlan(
     cells: readonly Cell[],
-    plan: PlannedSection[],
+    cellExportOrder: PlannedSection[],
 ): Cell[] {
-    return plan.map((section) =>
+    return cellExportOrder.map((section) =>
         section.at === null ? cellOfKind(section.kind) : cells[section.at],
     );
 }
 
 export function kindsStillToWrite(report: BookLayoutReport): string[] {
-    return report.wanting.map((section) => section.kind);
+    return report.missing_cell_content.map((section) => section.kind);
 }
 
 export function wordsForWhatIsMissing(missing: string[]): string {
@@ -46,13 +46,13 @@ export function askedBeforeBinding(
     report: BookLayoutReport,
 ): { message: string; detail: string } {
     const lines: string[] = [];
-    if (report.added.length) {
-        lines.push(`Missing: ${report.added.join(", ")}`);
+    if (report.missing_cells.length) {
+        lines.push(`Missing: ${report.missing_cells.join(", ")}`);
     }
-    if (report.moved.length) {
-        lines.push(`Out of place: ${report.moved.join(", ")}`);
+    if (report.misplaced_cells.length) {
+        lines.push(`Out of place: ${report.misplaced_cells.join(", ")}`);
     }
-    for (const section of report.wanting) {
+    for (const section of report.missing_cell_content) {
         lines.push(
             `${section.kind} needs ${wordsForWhatIsMissing(section.needs)}`,
         );
@@ -73,14 +73,14 @@ export function saidAfterLayingOut(
     report: BookLayoutReport,
 ): string {
     const lines = [
-        report.added.length && `Added ${report.added.join(", ")}`,
-        report.moved.length && `moved ${report.moved.join(", ")} into place`,
+        report.missing_cells.length && `Added ${report.missing_cells.join(", ")}`,
+        report.misplaced_cells.length && `moved ${report.misplaced_cells.join(", ")} into place`,
     ].filter(Boolean);
 
     const laidOut = lines.length
         ? `${lines.join(" and ")} in ${fileName}.`
         : `${fileName} laid out.`;
-    return report.wanting.length
+    return report.missing_cell_content.length
         ? `${laidOut} The sections still to write are marked.`
         : laidOut;
 }

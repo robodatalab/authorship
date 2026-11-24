@@ -21,11 +21,11 @@ import { UnknownCell } from "authordoc/cells/unknown_cell";
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {
-        ready: false,
-        plan: [],
-        added: [],
-        moved: [],
-        wanting: [],
+        ready_to_export: false,
+        cell_export_order: [],
+        missing_cells: [],
+        misplaced_cells: [],
+        missing_cell_content: [],
         ...over,
     };
 }
@@ -100,9 +100,9 @@ describe("askedBeforeBinding — what the author is asked when the book will not
         const { message, detail } = askedBeforeBinding(
             "story.author",
             report({
-                added: ["contents", "blurb"],
-                moved: ["about"],
-                wanting: [{ kind: "title-page", needs: ["author", "date"] }],
+                missing_cells: ["contents", "blurb"],
+                misplaced_cells: ["about"],
+                missing_cell_content: [{ kind: "title-page", needs: ["author", "date"] }],
             }),
         );
         expect(message).toBe("story.author is not ready to bind.");
@@ -114,7 +114,7 @@ describe("askedBeforeBinding — what the author is asked when the book will not
     it("says a section is not filled in even when nothing is missing", () => {
         const { detail } = askedBeforeBinding(
             "story.author",
-            report({ wanting: [{ kind: "title-page", needs: ["author"] }] }),
+            report({ missing_cell_content: [{ kind: "title-page", needs: ["author"] }] }),
         );
         expect(detail).not.toContain("Missing:");
         expect(detail).not.toContain("Out of place:");
@@ -124,7 +124,7 @@ describe("askedBeforeBinding — what the author is asked when the book will not
     it("says that fixing does not export, and exporting does not fix", () => {
         const { detail } = askedBeforeBinding(
             "story.author",
-            report({ added: ["contents"] }),
+            report({ missing_cells: ["contents"] }),
         );
         expect(detail).toContain("It does not export.");
         expect(detail).toContain("Export Anyway binds the book as it stands.");
@@ -137,8 +137,8 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
             saidAfterLayingOut(
                 "story.author",
                 report({
-                    added: ["contents", "blurb"],
-                    wanting: [{ kind: "blurb", needs: ["text"] }],
+                    missing_cells: ["contents", "blurb"],
+                    missing_cell_content: [{ kind: "blurb", needs: ["text"] }],
                 }),
             ),
         ).toBe(
@@ -150,7 +150,7 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
     it("reports adding and moving together", () => {
         const toldTheAuthor = saidAfterLayingOut(
             "story.author",
-            report({ added: ["contents"], moved: ["about"] }),
+            report({ missing_cells: ["contents"], misplaced_cells: ["about"] }),
         );
         expect(toldTheAuthor).toBe(
             "Added contents and moved about into place in story.author.",
@@ -160,7 +160,7 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
     it("says nothing about marks when nothing is left to write", () => {
         const toldTheAuthor = saidAfterLayingOut(
             "story.author",
-            report({ moved: ["about"] }),
+            report({ misplaced_cells: ["about"] }),
         );
         expect(toldTheAuthor).not.toContain("marked");
     });
@@ -171,7 +171,7 @@ describe("kindsStillToWrite — what the page marks", () => {
         expect(
             kindsStillToWrite(
                 report({
-                    wanting: [
+                    missing_cell_content: [
                         { kind: "blurb", needs: ["text"] },
                         { kind: "title-page", needs: ["author"] },
                     ],
@@ -181,6 +181,6 @@ describe("kindsStillToWrite — what the page marks", () => {
     });
 
     it("is empty for a document with everything written", () => {
-        expect(kindsStillToWrite(report({ ready: true }))).toEqual([]);
+        expect(kindsStillToWrite(report({ ready_to_export: true }))).toEqual([]);
     });
 });

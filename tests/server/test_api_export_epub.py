@@ -59,7 +59,7 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()["ready"])
+        self.assertTrue(response.json()["ready_to_export"])
 
         written = Path(response.json()["path"])
         self.assertEqual(written, self.document.with_suffix(".epub"))
@@ -77,7 +77,7 @@ class ExportEpub(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         said = response.json()
-        self.assertFalse(said["ready"])
+        self.assertFalse(said["ready_to_export"])
         self.assertIsNone(said["path"])
         self.assertFalse(self.document.with_suffix(".epub").exists())
 
@@ -88,13 +88,13 @@ class ExportEpub(unittest.TestCase):
             json={"path": str(self.document), "text": self.document.read_text()},
         ).json()
         self.assertEqual(
-            said["added"], [TABLE_OF_CONTENTS, BLURB, ABOUT]
+            said["missing_cells"], [TABLE_OF_CONTENTS, BLURB, ABOUT]
         )
-        wanting = {item["kind"]: item["needs"] for item in said["wanting"]}
+        missing_cell_content = {item["kind"]: item["needs"] for item in said["missing_cell_content"]}
         # The title page is there, in place, and still not filled in — which is
         # the fault a document can have while looking complete.
         self.assertEqual(
-            wanting[TITLE_PAGE],
+            missing_cell_content[TITLE_PAGE],
             ["subtitle", "author", "publisher", "date"],
         )
 
@@ -111,7 +111,7 @@ class ExportEpub(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         said = response.json()
-        self.assertFalse(said["ready"])
+        self.assertFalse(said["ready_to_export"])
         written = Path(said["path"])
         self.assertTrue(written.exists())
         self.assertTrue(zipfile.is_zipfile(written))

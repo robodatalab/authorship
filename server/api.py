@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
-from server.publishing.epub_content_validation import Report, report_of
+from server.publishing.epub_content_validation import DocumentToEpubConversionReadiness, can_convert_to_epub
 from server.publishing.epub_publisher import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
@@ -89,14 +89,14 @@ class EpubExportRequest(BaseModel):
     force: bool = False
 
 
-def _said(found: Report) -> dict[str, Any]:
+def _said(found: DocumentToEpubConversionReadiness) -> dict[str, Any]:
     return {
-        "ready": found.ready,
-        "plan": [{"kind": slot.kind, "at": slot.at} for slot in found.plan],
-        "added": list(found.added),
-        "moved": list(found.moved),
-        "wanting": [
-            {"kind": item.kind, "needs": list(item.needs)} for item in found.wanting
+        "ready_to_export": found.ready_to_export,
+        "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
+        "missing_cells": found.missing_cells,
+        "misplaced_cells": found.misplaced_cells,
+        "missing_cell_content": [
+            {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
         ],
     }
 
@@ -104,15 +104,15 @@ def _said(found: Report) -> dict[str, Any]:
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    found = report_of(document)
-    if not (found.ready or request.force):
+    found = can_convert_to_epub(document)
+    if not (found.ready_to_export or request.force):
         return {
-        "ready": found.ready,
-        "plan": [{"kind": slot.kind, "at": slot.at} for slot in found.plan],
-        "added": list(found.added),
-        "moved": list(found.moved),
-        "wanting": [
-            {"kind": item.kind, "needs": list(item.needs)} for item in found.wanting
+        "ready_to_export": found.ready_to_export,
+        "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
+        "missing_cells": found.missing_cells,
+        "misplaced_cells": found.misplaced_cells,
+        "missing_cell_content": [
+            {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
         ],
         "path": None,
     }
@@ -121,12 +121,12 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     out_path = document.path.with_suffix(".epub")
     build_epub(document, out_path)
     return {
-        "ready": found.ready,
-        "plan": [{"kind": slot.kind, "at": slot.at} for slot in found.plan],
-        "added": list(found.added),
-        "moved": list(found.moved),
-        "wanting": [
-            {"kind": item.kind, "needs": list(item.needs)} for item in found.wanting
+        "ready_to_export": found.ready_to_export,
+        "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
+        "missing_cells": found.missing_cells,
+        "misplaced_cells": found.misplaced_cells,
+        "missing_cell_content": [
+            {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
         ],
         "path": str(out_path)
     }

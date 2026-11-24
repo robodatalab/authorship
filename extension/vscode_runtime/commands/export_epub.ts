@@ -75,7 +75,7 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         if (answer !== "Fix") {
             return;
         }
-        const laidOut = cellsLaidOutByPlan(session.document.cells, report.plan);
+        const laidOut = cellsLaidOutByPlan(session.document.cells, report.cell_export_order);
         session.changeTheDocument((story) => {
             const storyLaidOut = story.withCells(laidOut);
             return storyLaidOut;
