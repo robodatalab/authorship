@@ -10,38 +10,36 @@ from authordoc.cells.image_cell import IMAGE
 from authordoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS
 from authordoc.cells.title_page_cell import TITLE_PAGE
 
-from server.publishing.epub_content import Imprint, Wanting, imprint_of
+from server.publishing.epub_content import Imprint, imprint_of
 from server.publishing.epub_xhtml_exporter import build_about_page
 
-# What the book opens with, in the order it opens with it, and what closes it.
-# The document's order is otherwise the author's, and the story between these is
-# never touched — but a reader does not choose where they meet the title, the
-# list of chapters or the author's own page, so these do not float.
 OPENING = (TITLE_PAGE, TABLE_OF_CONTENTS, BLURB)
 CLOSING = (ABOUT,)
 REQUIRED = OPENING + CLOSING
 
-# The facts a title page prints. Read off the same `Imprint` that builds the
-# page, so what stops an export is exactly what would have been left off it. An
-# ISBN is a fact about an edition many books never have, and is not among them.
 TITLE_PAGE_FIELDS = ("title", "subtitle", "author", "publisher", "date")
 
-# What a book is called when nobody has named it: the title the editor starts a
-# page with, and the one `Document.title` falls back to when there is no page at
-# all. Neither is a title.
 UNNAMED = ("Untitled", "Anonymous")
 
-# Why a section is wanting when what it lacks is not one of its fields.
 TEXT = "text"
 
 
-def _first_of(cells: list[Cell]) -> dict[str, int]:
-    """Where each required section is, by kind.
+@dataclass(frozen=True)
+class MissingContent:
+    """A section the book needs that has nothing in it yet.
 
-    Only the first of a kind is claimed. A second is a page the author put where
-    they put it, and this is not the place to decide they were wrong; the binding
-    already names duplicate pages apart.
+    `needs` are field names for a section whose facts are typed into boxes, and
+    `art` or `text` for one that wants an image or prose. Names rather than
+    sentences: what a field is called in front of the author is the editor's to
+    say, and it already says it everywhere else.
     """
+
+    kind: str
+    needs: tuple[str, ...]
+
+
+def _first_of(cells: list[Cell]) -> dict[str, int]:
+    """Where each required section is, by kind."""
     found: dict[str, int] = {}
     for at, cell in enumerate(cells):
         if cell.kind in REQUIRED and cell.kind not in found:
@@ -49,60 +47,39 @@ def _first_of(cells: list[Cell]) -> dict[str, int]:
     return found
 
 
-def _wanting(cells: list[Cell], imprint: Imprint) -> tuple[Wanting, ...]:
-    """Which of the four have nothing in them yet.
+def _check_missing_content(cells: list[Cell], imprint: Imprint) -> tuple[MissingContent, ...]:
+    """Which of the four have nothing in them yet."""
 
-    Asked of the same function that does the binding — `build_about_page` for the
-    author's page — so what stops an export is exactly what the book would have
-    gone out without, rather than a second opinion about it that can drift from
-    the first.
-    """
+    def check_cell(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
+        if kind == TABLE_OF_CONTENTS:
+            # Built from the chapters whatever the cell holds, so never a gap.
+            return ()
+        if kind == TITLE_PAGE:
+            said = {
+                "title": "" if imprint.title in UNNAMED else imprint.title,
+                "subtitle": imprint.subtitle,
+                "author": imprint.author,
+                "publisher": imprint.publisher,
+                "date": imprint.date,
+                "version": imprint.version,
+            }
+            return tuple(name for name in TITLE_PAGE_FIELDS if not said[name].strip())
+        if kind == BLURB:
+            return () if cell and cell.source.strip() else (TEXT,)
+        if kind == ABOUT:
+            # Every field on it is optional, so somewhere to send the reader is as
+            # good as a page about them — but a page with neither is not printed.
+            return () if isinstance(cell, AboutCell) and build_about_page(cell) else (TEXT,)
+        return ()
+
     found = _first_of(cells)
-    said = [
-        Wanting(kind, needs)
+    missing_content = [
+        MissingContent(kind, needs)
         for kind in REQUIRED
-        for needs in [_wants(kind, cells[found[kind]] if kind in found else None, imprint)]
+        for needs in [check_cell(kind, cells[found[kind]] if kind in found else None, imprint)]
         if needs
     ]
-    return tuple(said)
-
-
-def _wants(kind: str, cell: Cell | None, imprint: Imprint) -> tuple[str, ...]:
-    """What this section still needs before it can be printed.
-
-    `cell` is None for a section that is not in the document at all, which wants
-    everything its kind wants — a missing section and one nobody has filled in
-    are the same fault to a reader, and are reported the same way.
-    """
-    if kind == TABLE_OF_CONTENTS:
-        # Built from the chapters whatever the cell holds, so never a gap.
-        return ()
-    if kind == TITLE_PAGE:
-        return _imprint_wants(imprint if cell else Imprint())
-    if kind == BLURB:
-        return () if cell and cell.source.strip() else (TEXT,)
-    if kind == ABOUT:
-        # Every field on it is optional, so somewhere to send the reader is as
-        # good as a page about them — but a page with neither is not printed.
-        return () if isinstance(cell, AboutCell) and build_about_page(cell) else (TEXT,)
-    return ()
-
-
-def _imprint_wants(imprint: Imprint) -> tuple[str, ...]:
-    """The facts a title page prints that are not there yet.
-
-    Read off the `Imprint` the page is built from, field for field, so this says
-    no more and no less than what `build_title_page` would have left off.
-    """
-    said = {
-        "title": "" if imprint.title in UNNAMED else imprint.title,
-        "subtitle": imprint.subtitle,
-        "author": imprint.author,
-        "publisher": imprint.publisher,
-        "date": imprint.date,
-        "version": imprint.version,
-    }
-    return tuple(name for name in TITLE_PAGE_FIELDS if not said[name].strip())
+    return tuple(missing_content)
 
 
 @dataclass(frozen=True)
@@ -133,7 +110,7 @@ class Report:
     plan: list[Slot]
     added: tuple[str, ...]
     moved: tuple[str, ...]
-    wanting: tuple[Wanting, ...]
+    wanting: tuple[MissingContent, ...]
 
     @property
     def ready(self) -> bool:
@@ -163,12 +140,12 @@ def report_of(document: Document) -> Report:
         + [Slot(kind, found.get(kind)) for kind in CLOSING]
     )
     imprint = imprint_of(document)
-    wanting = _wanting(cells, imprint)
+    missing_content = _check_missing_content(cells, imprint)
     return Report(
         plan=plan,
         added=tuple(kind for kind in REQUIRED if kind not in found),
         moved=_moved(plan, found),
-        wanting=wanting,
+        wanting=missing_content,
     )
 
 

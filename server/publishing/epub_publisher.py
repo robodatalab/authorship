@@ -11,7 +11,7 @@ from pathlib import Path
 from authordoc.storydoc import Document
 
 from server.publishing.document_to_epub_content_converter import read_book
-from server.publishing.epub_content import Book, Listing
+from server.publishing.epub_content import EpubDocument, Listing
 from server.publishing.epub_xhtml_exporter import links_in_the_listing
 
 CONTAINER_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -101,7 +101,7 @@ def xhtml_page(lang: str, title: str, body: str) -> str:
     return XHTML_DOC.format(lang=lang, title=html.escape(title), body=body)
 
 
-def build_content_opf(book_id: uuid.UUID, book: Book, modified: str) -> str:
+def build_content_opf(book_id: uuid.UUID, book: EpubDocument, modified: str) -> str:
     imprint = book.imprint
     manifest = [
         '<item id="css" href="style.css" media-type="text/css"/>',

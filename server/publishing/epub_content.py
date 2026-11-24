@@ -112,33 +112,12 @@ class Art:
         self.media = mimetypes.guess_type(source.name)[0] or "image/jpeg"
 
 
-@dataclass(frozen=True)
-class Wanting:
-    """A section the book needs that has nothing in it yet.
-
-    `needs` are field names for a section whose facts are typed into boxes, and
-    `art` or `text` for one that wants an image or prose. Names rather than
-    sentences: what a field is called in front of the author is the editor's to
-    say, and it already says it everywhere else.
-    """
-
-    kind: str
-    needs: tuple[str, ...]
-
-
 @dataclass
-class Book:
-    """A document read as the thing it will be printed as."""
-
+class EpubDocument:
     imprint: Imprint
     documents: list[Chapter | Page]
     art: list[Art]
     cover: Art | None
-    # What was asked for and could not be printed. Every one of these is a
-    # judgement the binding already made — an about page with nothing on it —
-    # and which used to be thrown away the moment it was made, so a book went
-    # out short of a section and said nothing.
-    wanting: tuple[Wanting, ...] = ()
 
     @property
     def chapters(self) -> list[Chapter]:

@@ -10,8 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from server.publishing.document_to_epub_content_converter import read_book
-from server.publishing.epub_content_validation import TEXT
+from server.publishing.epub_content_validation import TEXT, report_of
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import ABOUT, AboutCell
@@ -58,8 +57,8 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
         self.root = Path(self._dir.name)
 
     def wanting(self, *cells: Cell) -> dict[str, tuple[str, ...]]:
-        book = read_book(placed(self.root, *cells))
-        return {item.kind: item.needs for item in book.wanting}
+        found = report_of(placed(self.root, *cells))
+        return {item.kind: item.needs for item in found.wanting}
 
     def test_a_title_page_nobody_filled_in(self) -> None:
         said = self.wanting(TitlePageCell(title="Untitled"))

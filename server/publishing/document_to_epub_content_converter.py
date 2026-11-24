@@ -22,8 +22,7 @@ from authordoc.cells.table_of_contents_cell import TableOfContentsCell
 from authordoc.cells.title_page_cell import TitlePageCell
 from authordoc.cells.unknown_cell import UnknownCell
 
-from server.publishing.epub_content import Art, Book, Chapter, Imprint, Page, imprint_of, listing_of
-from server.publishing.epub_content_validation import _wanting
+from server.publishing.epub_content import Art, Chapter, EpubDocument, Imprint, Page, imprint_of, listing_of
 from server.publishing.epub_xhtml_exporter import (
     build_about_page,
     build_copyright_page,
@@ -42,7 +41,7 @@ from server.publishing.markdown_to_xhtml_converter import blocks_to_xhtml
 LOOSE = "page_"
 
 
-def read_book(document: Document) -> Book:
+def read_book(document: Document) -> EpubDocument:
     """The book the document lays out, in the order it lays it out.
 
     Which cells are pages and which are the story is the kind's to say, so a
@@ -60,8 +59,8 @@ def read_book(document: Document) -> Book:
     built = contents_xhtml(listing)
     for page in binding.listings:
         page.body_xhtml = built
-    wanting = _wanting(document.cells, imprint)
-    return Book(imprint, binding.documents, binding.art, binding.cover, wanting)
+    epub_document = EpubDocument(imprint, binding.documents, binding.art, binding.cover)
+    return epub_document
 
 
 class _BookBinding(CellVisitor[None]):
