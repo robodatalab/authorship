@@ -11,7 +11,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from server.publishing.epub_exporter import build_epub
+from server.publishing.epub_publisher import build_epub
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import AboutCell

@@ -9,7 +9,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
-from server.publishing.epub_exporter import Report, build_epub, report_of
+from server.publishing.epub_content_validation import Report, report_of
+from server.publishing.epub_publisher import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
 from server.writing_tools.recap import volumes_in_reading_order, write_recap

@@ -1,6 +1,6 @@
 import unittest
 
-from server.publishing.epub_exporter import chapters_of
+from tests.server.epub_exporter_util import chapters_of
 from authordoc.storydoc import Document
 from authordoc.cells.cell import Cell
 from authordoc.cells.chapter_cell import ChapterCell

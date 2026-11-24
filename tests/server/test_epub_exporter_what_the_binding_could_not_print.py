@@ -10,7 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from server.publishing.epub_exporter import TEXT, read_book
+from server.publishing.document_to_epub_content_converter import read_book
+from server.publishing.epub_content_validation import TEXT
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import ABOUT, AboutCell

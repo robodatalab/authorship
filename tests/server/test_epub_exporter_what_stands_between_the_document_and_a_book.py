@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from server.publishing.epub_exporter import CLOSING, OPENING, REQUIRED, report_of
+from server.publishing.epub_content_validation import CLOSING, OPENING, REQUIRED, report_of
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import AboutCell

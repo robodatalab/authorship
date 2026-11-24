@@ -1,6 +1,6 @@
 import unittest
 
-from server.publishing.epub_exporter import blocks_to_xhtml
+from server.publishing.markdown_to_xhtml_converter import blocks_to_xhtml
 
 
 class Blocks(unittest.TestCase):

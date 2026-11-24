@@ -1,6 +1,6 @@
 import unittest
 
-from server.publishing.epub_exporter import _inline
+from server.publishing.markdown_to_xhtml_converter import _inline
 
 
 class Inline(unittest.TestCase):
