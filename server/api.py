@@ -89,18 +89,6 @@ class EpubExportRequest(BaseModel):
     force: bool = False
 
 
-def _said(found: DocumentToEpubConversionReadiness) -> dict[str, Any]:
-    return {
-        "ready_to_export": found.ready_to_export,
-        "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
-        "missing_cells": found.missing_cells,
-        "misplaced_cells": found.misplaced_cells,
-        "missing_cell_content": [
-            {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
-        ],
-    }
-
-
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
@@ -110,7 +98,6 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         "ready_to_export": found.ready_to_export,
         "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
         "missing_cells": found.missing_cells,
-        "misplaced_cells": found.misplaced_cells,
         "missing_cell_content": [
             {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
         ],
@@ -124,7 +111,6 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
         "ready_to_export": found.ready_to_export,
         "cell_export_order": [{"kind": slot.kind, "at": slot.at} for slot in found.cell_export_order],
         "missing_cells": found.missing_cells,
-        "misplaced_cells": found.misplaced_cells,
         "missing_cell_content": [
             {"kind": item.kind, "needs": list(item.needs)} for item in found.missing_cell_content
         ],

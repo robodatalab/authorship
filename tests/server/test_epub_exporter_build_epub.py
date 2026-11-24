@@ -745,6 +745,67 @@ class BuildEpub(unittest.TestCase):
             ],
         )
 
+    def test_a_document_written_back_to_front_is_bound_in_the_order_of_a_book(self) -> None:
+        out = written(
+            self.root,
+            AboutCell(website="https://writer.example"),
+            TableOfContentsCell(),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            TitlePageCell(title="Book"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(
+            order,
+            ["titlepage", "copyright", "contents", "chap_000", "about"],
+        )
+
+    def test_a_section_placed_after_the_story_is_bound_before_it(self) -> None:
+        out = written(
+            self.root,
+            TitlePageCell(title="Book"),
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            TableOfContentsCell(),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(order, ["titlepage", "copyright", "contents", "chap_000"])
+
+    def test_a_second_section_of_a_kind_is_bound_where_the_author_put_it(self) -> None:
+        out = written(
+            self.root,
+            ChapterCell("One"),
+            MarkdownCell("prose"),
+            TableOfContentsCell(),
+            TableOfContentsCell(),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(order, ["contents", "chap_000", "contents_2"])
+
     def test_prose_standing_outside_every_chapter_is_still_printed(self) -> None:
         out = written(
             self.root,

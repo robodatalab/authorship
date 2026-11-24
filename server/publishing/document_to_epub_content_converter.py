@@ -23,6 +23,7 @@ from authordoc.cells.title_page_cell import TitlePageCell
 from authordoc.cells.unknown_cell import UnknownCell
 
 from server.publishing.epub_content import Art, Chapter, EpubDocument, Imprint, Page, imprint_of, listing_of
+from server.publishing.epub_content_validation import cell_export_order_of
 from server.publishing.epub_xhtml_exporter import (
     build_about_page,
     build_copyright_page,
@@ -42,7 +43,7 @@ LOOSE = "page_"
 
 
 def read_book(document: Document) -> EpubDocument:
-    """The book the document lays out, in the order it lays it out.
+    """The book the document lays out, in the order of a book.
 
     Which cells are pages and which are the story is the kind's to say, so a
     chapter called "Disclaimer" is a chapter and a disclaimer standing between
@@ -51,7 +52,12 @@ def read_book(document: Document) -> EpubDocument:
     imprint = imprint_of(document)
     root = document.path.parent if document.path else Path()
     binding = _BookBinding(imprint, root)
-    for cell in document.cells:
+    cells = document.cells
+    cell_export_order = cell_export_order_of(cells)
+    for slot in cell_export_order:
+        if slot.at is None:
+            continue
+        cell = cells[slot.at]
         cell.accept(binding)
 
     _name_apart(binding.documents)

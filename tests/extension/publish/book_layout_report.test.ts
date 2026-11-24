@@ -24,7 +24,6 @@ function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
         ready_to_export: false,
         cell_export_order: [],
         missing_cells: [],
-        misplaced_cells: [],
         missing_cell_content: [],
         ...over,
     };
@@ -96,18 +95,16 @@ describe("wordsForWhatIsMissing — what a section wants, in the author’s word
 });
 
 describe("askedBeforeBinding — what the author is asked when the book will not bind", () => {
-    it("tells the three faults apart", () => {
+    it("tells the two faults apart", () => {
         const { message, detail } = askedBeforeBinding(
             "story.author",
             report({
                 missing_cells: ["contents", "blurb"],
-                misplaced_cells: ["about"],
                 missing_cell_content: [{ kind: "title-page", needs: ["author", "date"] }],
             }),
         );
         expect(message).toBe("story.author is not ready to bind.");
         expect(detail).toContain("Missing: contents, blurb");
-        expect(detail).toContain("Out of place: about");
         expect(detail).toContain("title-page needs author, date");
     });
 
@@ -117,7 +114,6 @@ describe("askedBeforeBinding — what the author is asked when the book will not
             report({ missing_cell_content: [{ kind: "title-page", needs: ["author"] }] }),
         );
         expect(detail).not.toContain("Missing:");
-        expect(detail).not.toContain("Out of place:");
         expect(detail).toContain("title-page needs author");
     });
 
@@ -147,22 +143,12 @@ describe("saidAfterLayingOut — what the author is told once it is laid out", (
         );
     });
 
-    it("reports adding and moving together", () => {
-        const toldTheAuthor = saidAfterLayingOut(
-            "story.author",
-            report({ missing_cells: ["contents"], misplaced_cells: ["about"] }),
-        );
-        expect(toldTheAuthor).toBe(
-            "Added contents and moved about into place in story.author.",
-        );
-    });
-
     it("says nothing about marks when nothing is left to write", () => {
         const toldTheAuthor = saidAfterLayingOut(
             "story.author",
-            report({ misplaced_cells: ["about"] }),
+            report({ missing_cells: ["contents"] }),
         );
-        expect(toldTheAuthor).not.toContain("marked");
+        expect(toldTheAuthor).toBe("Added contents in story.author.");
     });
 });
 

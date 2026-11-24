@@ -101,21 +101,19 @@ class Slot:
 class DocumentToEpubConversionReadiness:
     """What stands between this document and a book.
 
-    Three faults, and each stops a binding. A section can be absent; a section
-    can be somewhere a reader would not look for it; and a section can be there
-    in name with nothing in it. The third is the one worth stating: adding a
-    title page does not give a book a title, so a document whose sections are all
-    present and in place is still not ready while one of them is empty.
+    Two faults, and each stops a binding. A section can be absent; and a section
+    can be there in name with nothing in it. The second is the one worth stating:
+    adding a title page does not give a book a title, so a document whose sections
+    are all present is still not ready while one of them is empty.
     """
 
     cell_export_order: list[Slot]
     missing_cells: list[str]
-    misplaced_cells: list[str]
     missing_cell_content: tuple[MissingContent, ...]
 
     @property
     def ready_to_export(self) -> bool:
-        return not (self.missing_cells or self.misplaced_cells or self.missing_cell_content)
+        return not (self.missing_cells or self.missing_cell_content)
 
 
 def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness:
@@ -127,6 +125,18 @@ def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness
     are the sections `read_book` could not print.
     """
     cells = document.cells
+    found = _first_of(cells)
+    cell_export_order = cell_export_order_of(cells)
+    imprint = imprint_of(document)
+    missing_content = _check_missing_content(cells, imprint)
+    return DocumentToEpubConversionReadiness(
+        cell_export_order=cell_export_order,
+        missing_cells=[kind for kind in REQUIRED if kind not in found],
+        missing_cell_content=missing_content,
+    )
+
+
+def cell_export_order_of(cells: list[Cell]) -> list[Slot]:
     found = _first_of(cells)
     claimed = set(found.values())
     art = _opening_art(cells)
@@ -140,14 +150,7 @@ def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness
         ]
         + [Slot(kind, found.get(kind)) for kind in CLOSING]
     )
-    imprint = imprint_of(document)
-    missing_content = _check_missing_content(cells, imprint)
-    return DocumentToEpubConversionReadiness(
-        cell_export_order=cell_export_order,
-        missing_cells=[kind for kind in REQUIRED if kind not in found],
-        misplaced_cells=_misplaced_cells(cell_export_order, found),
-        missing_cell_content=missing_content,
-    )
+    return cell_export_order
 
 
 def _opening_art(cells: list[Cell]) -> set[int]:
@@ -157,23 +160,3 @@ def _opening_art(cells: list[Cell]) -> set[int]:
             break
         art.add(at)
     return art
-
-
-def _misplaced_cells(cell_export_order: list[Slot], found: dict[str, int]) -> list[str]:
-    """The sections that changed places with a cell that was already there.
-
-    Not the sections whose index changed. Writing a blurb into the front matter
-    pushes every index below it down by one, and an author told their about page
-    had been moved, when it was last before and is last now, would go looking for
-    a change nobody made. A section written in is not a cell that was already
-    there, so writing one moves nothing; passing one is the only thing that does.
-    """
-    now = {slot.at: order for order, slot in enumerate(cell_export_order) if slot.at is not None}
-    misplaced = {
-        kind
-        for kind, at in found.items()
-        if any(
-            (other < at) != (now[other] < now[at]) for other in now if other != at
-        )
-    }
-    return [kind for kind in REQUIRED if kind in misplaced]

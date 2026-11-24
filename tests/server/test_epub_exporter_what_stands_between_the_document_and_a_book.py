@@ -82,24 +82,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         )
         self.assertEqual([s.at for s in found.cell_export_order if s.at is not None], [0, 1, 2])
 
-    def test_a_section_that_passed_the_story_has_moved(self) -> None:
-        found = can_convert_to_epub(
-            placed(self.root, ChapterCell("One"), TableOfContentsCell())
-        )
-        self.assertIn(TABLE_OF_CONTENTS, found.misplaced_cells)
-
-    def test_writing_a_section_in_moves_nothing(self) -> None:
-        # The about page is last before and last after; only its index changed.
-        found = can_convert_to_epub(
-            placed(
-                self.root,
-                ChapterCell("One"),
-                AboutCell(source="I live by the sea."),
-            )
-        )
-        self.assertEqual(found.misplaced_cells, [])
-
-    def test_a_front_matter_written_back_to_front_has_all_of_it_moved(self) -> None:
+    def test_a_document_written_back_to_front_is_ready(self) -> None:
         found = can_convert_to_epub(
             placed(
                 self.root,
@@ -110,8 +93,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 ChapterCell("One"),
             )
         )
-        self.assertEqual(found.missing_cells, [])
-        self.assertEqual(found.misplaced_cells, [TITLE_PAGE, TABLE_OF_CONTENTS, BLURB, ABOUT])
+        self.assertTrue(found.ready_to_export)
 
     def test_a_picture_the_document_opens_with_keeps_its_place(self) -> None:
         found = can_convert_to_epub(
@@ -125,7 +107,6 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
                 AboutCell(source="I live by the sea."),
             )
         )
-        self.assertEqual(found.misplaced_cells, [])
         self.assertEqual(found.cell_export_order[0].at, 0)
 
     def test_the_disclaimer_keeps_the_place_the_author_gave_it(self) -> None:
@@ -165,7 +146,6 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             )
         )
         self.assertEqual(found.missing_cells, [])
-        self.assertEqual(found.misplaced_cells, [])
         self.assertFalse(found.ready_to_export)
 
     def test_a_document_with_everything_written_is_ready(self) -> None:

@@ -17,7 +17,6 @@ export interface BookLayoutReport {
     ready_to_export: boolean;
     cell_export_order: PlannedSection[];
     missing_cells: string[];
-    misplaced_cells: string[];
     missing_cell_content: SectionStillToWrite[];
     path?: string;
 }
@@ -49,9 +48,6 @@ export function askedBeforeBinding(
     if (report.missing_cells.length) {
         lines.push(`Missing: ${report.missing_cells.join(", ")}`);
     }
-    if (report.misplaced_cells.length) {
-        lines.push(`Out of place: ${report.misplaced_cells.join(", ")}`);
-    }
     for (const section of report.missing_cell_content) {
         lines.push(
             `${section.kind} needs ${wordsForWhatIsMissing(section.needs)}`,
@@ -72,13 +68,8 @@ export function saidAfterLayingOut(
     fileName: string,
     report: BookLayoutReport,
 ): string {
-    const lines = [
-        report.missing_cells.length && `Added ${report.missing_cells.join(", ")}`,
-        report.misplaced_cells.length && `moved ${report.misplaced_cells.join(", ")} into place`,
-    ].filter(Boolean);
-
-    const laidOut = lines.length
-        ? `${lines.join(" and ")} in ${fileName}.`
+    const laidOut = report.missing_cells.length
+        ? `Added ${report.missing_cells.join(", ")} in ${fileName}.`
         : `${fileName} laid out.`;
     return report.missing_cell_content.length
         ? `${laidOut} The sections still to write are marked.`
