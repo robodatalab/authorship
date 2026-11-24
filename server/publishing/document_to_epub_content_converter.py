@@ -3,14 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from authordoc.storydoc import Document
-from authordoc.cells.about_cell import AboutCell
-from authordoc.cells.blurb_cell import BlurbCell
+from authordoc.cells.about_cell import ABOUT, AboutCell
+from authordoc.cells.blurb_cell import BLURB, BlurbCell
+from authordoc.cells.cell import Cell
 from authordoc.cells.cell_visitor import CellVisitor
 from authordoc.cells.chapter_cell import ChapterCell
 from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.disclaimer_cell import DisclaimerCell
 from authordoc.cells.divider_cell import DividerCell
-from authordoc.cells.image_cell import ImageCell
+from authordoc.cells.image_cell import IMAGE, ImageCell
 from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.note_cell import NoteCell
 from authordoc.cells.part_cell import PartCell
@@ -18,12 +19,11 @@ from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PlotCell
 from authordoc.cells.recap_cell import RecapCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
-from authordoc.cells.table_of_contents_cell import TableOfContentsCell
-from authordoc.cells.title_page_cell import TitlePageCell
+from authordoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
+from authordoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
 from authordoc.cells.unknown_cell import UnknownCell
 
 from server.publishing.epub_content import Art, Chapter, EpubDocument, Imprint, Page, imprint_of, listing_of
-from server.publishing.epub_content_validation import cell_export_order_of
 from server.publishing.epub_xhtml_exporter import (
     build_about_page,
     build_copyright_page,
@@ -35,6 +35,10 @@ from server.publishing.epub_xhtml_exporter import (
     contents_xhtml,
 )
 from server.publishing.markdown_to_xhtml_converter import blocks_to_xhtml
+
+OPENING = (TITLE_PAGE, TABLE_OF_CONTENTS, BLURB)
+CLOSING = (ABOUT,)
+REQUIRED = OPENING + CLOSING
 
 # Prose the author left standing outside every chapter — a dedication, an
 # epigraph, a note to the reader. Printed where it stands rather than swallowed
@@ -52,12 +56,8 @@ def read_book(document: Document) -> EpubDocument:
     imprint = imprint_of(document)
     root = document.path.parent if document.path else Path()
     binding = _BookBinding(imprint, root)
-    cells = document.cells
-    cell_export_order = cell_export_order_of(cells)
-    for slot in cell_export_order:
-        if slot.at is None:
-            continue
-        cell = cells[slot.at]
+    cells_in_export_order = cell_export_order_of(document.cells)
+    for cell in cells_in_export_order:
         cell.accept(binding)
 
     _name_apart(binding.documents)
@@ -67,6 +67,36 @@ def read_book(document: Document) -> EpubDocument:
         page.body_xhtml = built
     epub_document = EpubDocument(imprint, binding.documents, binding.art, binding.cover)
     return epub_document
+
+
+def cell_export_order_of(cells: list[Cell]) -> list[Cell]:
+    found = _first_of(cells)
+    claimed = set(found.values())
+    art = _opening_art(cells)
+    opening_art = [cells[at] for at in sorted(art)]
+    opening = [cells[found[kind]] for kind in OPENING if kind in found]
+    story = [cell for at, cell in enumerate(cells) if at not in claimed and at not in art]
+    closing = [cells[found[kind]] for kind in CLOSING if kind in found]
+    cell_export_order = opening_art + opening + story + closing
+    return cell_export_order
+
+
+def _first_of(cells: list[Cell]) -> dict[str, int]:
+    """Where each required section is, by kind."""
+    found: dict[str, int] = {}
+    for at, cell in enumerate(cells):
+        if cell.kind in REQUIRED and cell.kind not in found:
+            found[cell.kind] = at
+    return found
+
+
+def _opening_art(cells: list[Cell]) -> set[int]:
+    art: set[int] = set()
+    for at, cell in enumerate(cells):
+        if cell.kind != IMAGE:
+            break
+        art.add(at)
+    return art
 
 
 class _BookBinding(CellVisitor[None]):

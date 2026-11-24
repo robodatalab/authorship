@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import {
     askedBeforeBinding,
-    cellsLaidOutByPlan,
+    cellsWithMissingCellsAppended,
     saidAfterLayingOut,
     type BookLayoutReport,
 } from "../publish/book_layout_report";
@@ -75,10 +75,10 @@ export class ExportEpubCommand implements AuthorDocumentCommand {
         if (answer !== "Fix") {
             return;
         }
-        const laidOut = cellsLaidOutByPlan(session.document.cells, report.cell_export_order);
+        const withMissingCells = cellsWithMissingCellsAppended(session.document.cells, report.missing_cells);
         session.changeTheDocument((story) => {
-            const storyLaidOut = story.withCells(laidOut);
-            return storyLaidOut;
+            const storyWithMissingCells = story.withCells(withMissingCells);
+            return storyWithMissingCells;
         });
         void vscode.window.showInformationMessage(
             saidAfterLayingOut(fileName, report),

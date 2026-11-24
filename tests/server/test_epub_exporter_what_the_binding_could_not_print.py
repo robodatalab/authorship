@@ -56,7 +56,7 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
         self.addCleanup(self._dir.cleanup)
         self.root = Path(self._dir.name)
 
-    def missing_cell_content(self, *cells: Cell) -> dict[str, tuple[str, ...]]:
+    def missing_cell_content(self, *cells: Cell) -> dict[str, list[str]]:
         found = can_convert_to_epub(placed(self.root, *cells))
         return {item.kind: item.needs for item in found.missing_cell_content}
 
@@ -64,12 +64,12 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
         said = self.missing_cell_content(TitlePageCell(title="Untitled"))
         self.assertEqual(
             said[TITLE_PAGE],
-            ("title", "subtitle", "author", "publisher", "date"),
+            ["title", "subtitle", "author", "publisher", "date"],
         )
 
     def test_it_names_only_the_fields_that_are_empty(self) -> None:
         said = self.missing_cell_content(filled_title_page(author="", date="   "))
-        self.assertEqual(said[TITLE_PAGE], ("author", "date"))
+        self.assertEqual(said[TITLE_PAGE], ["author", "date"])
 
     def test_a_version_is_never_wanted(self) -> None:
         # A fact about an edition, like an ISBN, not a thing a book waits for.
@@ -84,7 +84,7 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
     def test_an_about_page_with_nothing_on_it(self) -> None:
         # `build_about_page` already answers None here.
         said = self.missing_cell_content(AboutCell())
-        self.assertEqual(said[ABOUT], (TEXT,))
+        self.assertEqual(said[ABOUT], [TEXT])
 
     def test_an_about_page_with_only_a_link_is_written(self) -> None:
         said = self.missing_cell_content(AboutCell(website="https://x.com"))
@@ -92,7 +92,7 @@ class WhatTheBindingCouldNotPrint(unittest.TestCase):
 
     def test_an_empty_blurb(self) -> None:
         said = self.missing_cell_content(BlurbCell())
-        self.assertEqual(said[BLURB], (TEXT,))
+        self.assertEqual(said[BLURB], [TEXT])
 
     def test_the_table_of_contents_is_never_wanting(self) -> None:
         # It is built from the chapters whatever the cell holds.

@@ -10,16 +10,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from server.publishing.epub_content_validation import CLOSING, OPENING, can_convert_to_epub
+from server.publishing.epub_content_validation import can_convert_to_epub
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import ABOUT, AboutCell
 from authordoc.cells.blurb_cell import BLURB, BlurbCell
 from authordoc.cells.cell import Cell
-from authordoc.cells.chapter_cell import CHAPTER, ChapterCell
-from authordoc.cells.disclaimer_cell import DISCLAIMER, DisclaimerCell
-from authordoc.cells.image_cell import ImageCell
-from authordoc.cells.markdown_cell import MarkdownCell
+from authordoc.cells.chapter_cell import ChapterCell
 from authordoc.cells.table_of_contents_cell import (
     TABLE_OF_CONTENTS,
     TableOfContentsCell,
@@ -57,30 +54,11 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.assertEqual(found.missing_cells, [TITLE_PAGE, TABLE_OF_CONTENTS, BLURB, ABOUT])
         self.assertFalse(found.ready_to_export)
 
-    def test_the_plan_opens_and_closes_the_document(self) -> None:
-        found = can_convert_to_epub(placed(self.root, ChapterCell("One")))
-        self.assertEqual(
-            [slot.kind for slot in found.cell_export_order],
-            [*OPENING, CHAPTER, *CLOSING],
-        )
-
-    def test_a_section_already_there_is_carried_by_index(self) -> None:
+    def test_a_section_after_the_story_is_not_missing(self) -> None:
         found = can_convert_to_epub(
             placed(self.root, ChapterCell("One"), filled_title_page())
         )
-        self.assertNotIn(TITLE_PAGE, found.missing_cells)
-        self.assertEqual(found.cell_export_order[0].at, 1)
-
-    def test_the_story_keeps_the_order_it_was_written_in(self) -> None:
-        found = can_convert_to_epub(
-            placed(
-                self.root,
-                ChapterCell("One"),
-                MarkdownCell("The lantern."),
-                ChapterCell("Two"),
-            )
-        )
-        self.assertEqual([s.at for s in found.cell_export_order if s.at is not None], [0, 1, 2])
+        self.assertEqual(found.missing_cells, [TABLE_OF_CONTENTS, BLURB, ABOUT])
 
     def test_a_document_written_back_to_front_is_ready(self) -> None:
         found = can_convert_to_epub(
@@ -94,45 +72,6 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
             )
         )
         self.assertTrue(found.ready_to_export)
-
-    def test_a_picture_the_document_opens_with_keeps_its_place(self) -> None:
-        found = can_convert_to_epub(
-            placed(
-                self.root,
-                ImageCell("art.png"),
-                filled_title_page(),
-                TableOfContentsCell(),
-                BlurbCell(source="A lantern, and a stair."),
-                ChapterCell("One"),
-                AboutCell(source="I live by the sea."),
-            )
-        )
-        self.assertEqual(found.cell_export_order[0].at, 0)
-
-    def test_the_disclaimer_keeps_the_place_the_author_gave_it(self) -> None:
-        found = can_convert_to_epub(
-            placed(
-                self.root,
-                DisclaimerCell(source="All fiction."),
-                ChapterCell("One"),
-            )
-        )
-        self.assertEqual(
-            [slot.kind for slot in found.cell_export_order],
-            [*OPENING, DISCLAIMER, CHAPTER, *CLOSING],
-        )
-
-    def test_only_the_first_of_a_kind_is_claimed(self) -> None:
-        found = can_convert_to_epub(
-            placed(
-                self.root,
-                ChapterCell("One"),
-                TableOfContentsCell(),
-                TableOfContentsCell(),
-            )
-        )
-        self.assertEqual(found.cell_export_order[1].at, 1)
-        self.assertIn(2, [slot.at for slot in found.cell_export_order[3:]])
 
     def test_everything_present_and_one_of_them_empty_is_not_ready(self) -> None:
         found = can_convert_to_epub(

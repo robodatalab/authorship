@@ -3,11 +3,6 @@ import { cellOfKind } from "authordoc/parser";
 
 const NEEDS_TEXT = "text";
 
-export interface PlannedSection {
-    kind: string;
-    at: number | null;
-}
-
 export interface SectionStillToWrite {
     kind: string;
     needs: string[];
@@ -15,19 +10,17 @@ export interface SectionStillToWrite {
 
 export interface BookLayoutReport {
     ready_to_export: boolean;
-    cell_export_order: PlannedSection[];
     missing_cells: string[];
     missing_cell_content: SectionStillToWrite[];
     path?: string;
 }
 
-export function cellsLaidOutByPlan(
+export function cellsWithMissingCellsAppended(
     cells: readonly Cell[],
-    cellExportOrder: PlannedSection[],
+    missingCells: string[],
 ): Cell[] {
-    return cellExportOrder.map((section) =>
-        section.at === null ? cellOfKind(section.kind) : cells[section.at],
-    );
+    const blanks = missingCells.map((kind) => cellOfKind(kind));
+    return [...cells, ...blanks];
 }
 
 export function kindsStillToWrite(report: BookLayoutReport): string[] {
@@ -54,7 +47,7 @@ export function askedBeforeBinding(
         );
     }
     lines.push(
-        "Fix lays the sections out and marks what is still to write. It does not export. " +
+        "Fix adds the missing sections and marks what is still to write. It does not export. " +
             "Export Anyway binds the book as it stands.",
     );
 

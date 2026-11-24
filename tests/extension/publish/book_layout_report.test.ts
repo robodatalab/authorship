@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    cellsLaidOutByPlan,
+    cellsWithMissingCellsAppended,
     askedBeforeBinding,
     saidAfterLayingOut,
     wordsForWhatIsMissing,
@@ -12,73 +12,49 @@ import {
     CHAPTER,
     ChapterCell,
 } from "authordoc/cells/chapter_cell";
-import {
-    IMAGE,
-    ImageCell,
-} from "authordoc/cells/image_cell";
+import { ImageCell } from "authordoc/cells/image_cell";
 import { MarkdownCell } from "authordoc/cells/markdown_cell";
 import { UnknownCell } from "authordoc/cells/unknown_cell";
 
 function report(over: Partial<BookLayoutReport> = {}): BookLayoutReport {
     return {
         ready_to_export: false,
-        cell_export_order: [],
         missing_cells: [],
         missing_cell_content: [],
         ...over,
     };
 }
 
-describe("cellsLaidOutByPlan — the document laid out as the server planned it", () => {
-    it("carries the author’s own cells across by index", () => {
-        const authorsOwnCover = new ImageCell("art/mine.png");
-        const cells = [new ChapterCell("One"), authorsOwnCover];
-        const laidOut = cellsLaidOutByPlan(cells, [
-            { kind: IMAGE, at: 1 },
-            { kind: CHAPTER, at: 0 },
-        ]);
-        expect(laidOut[0]).toBe(authorsOwnCover);
-        expect(laidOut[1]).toBe(cells[0]);
-    });
-
-    it("writes a blank for a section the document has not got", () => {
-        const laidOut = cellsLaidOutByPlan(
-            [new ChapterCell("One")],
-            [
-                { kind: "contents", at: null },
-                { kind: CHAPTER, at: 0 },
-                { kind: "about", at: null },
-            ],
-        );
-        expect(laidOut.map((cell) => cell.kind)).toEqual([
-            "contents",
-            CHAPTER,
-            "about",
-        ]);
-        expect(laidOut[0].source).toBe("");
-        expect(laidOut[2].source).toBe("");
-    });
-
-    it("keeps the story in the order the plan gives", () => {
+describe("cellsWithMissingCellsAppended — the document with a blank for each missing cell", () => {
+    it("keeps the author’s own cells in the order they wrote them", () => {
         const cells = [
+            new ImageCell("art/mine.png"),
             new ChapterCell("One"),
             new MarkdownCell("The lantern."),
-            new ChapterCell("Two"),
         ];
-        const laidOut = cellsLaidOutByPlan(cells, [
-            { kind: "contents", at: null },
-            { kind: CHAPTER, at: 0 },
-            { kind: "markdown", at: 1 },
-            { kind: CHAPTER, at: 2 },
+        const withMissingCells = cellsWithMissingCellsAppended(cells, []);
+        expect(withMissingCells).toEqual(cells);
+    });
+
+    it("appends a blank for each missing cell, in the order the server names them", () => {
+        const chapter = new ChapterCell("One");
+        const withMissingCells = cellsWithMissingCellsAppended(
+            [chapter],
+            ["contents", "about"],
+        );
+        expect(withMissingCells[0]).toBe(chapter);
+        expect(withMissingCells.map((cell) => cell.kind)).toEqual([
+            CHAPTER,
+            "contents",
+            "about",
         ]);
-        expect(laidOut.slice(1)).toEqual(cells);
+        expect(withMissingCells[1].source).toBe("");
+        expect(withMissingCells[2].source).toBe("");
     });
 
     it("carries a kind it has never heard of", () => {
         const strange = new UnknownCell("epigraph", {}, "Whom the gods…");
-        expect(
-            cellsLaidOutByPlan([strange], [{ kind: "epigraph", at: 0 }]),
-        ).toEqual([strange]);
+        expect(cellsWithMissingCellsAppended([strange], [])).toEqual([strange]);
     });
 });
 
