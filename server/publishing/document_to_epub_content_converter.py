@@ -6,11 +6,7 @@ from authordoc import cells
 from authordoc.storydoc import Document
 from authordoc.story_sections import cells_by_section
 
-from server.publishing import epub_items
-
-OPENING = (cells.TITLE_PAGE, cells.TABLE_OF_CONTENTS, cells.BLURB)
-CLOSING = (cells.ABOUT,)
-REQUIRED = OPENING + CLOSING
+from server.publishing import epub_items, tools
 
 EpubSpineItem = (
     epub_items.EpubAboutPage
@@ -67,24 +63,16 @@ def convert_document_to_epub(document: Document) -> list[epub_items.EpubItem]:
 
 
 def cell_export_order_of(document_cells: list[cells.Cell]) -> list[cells.Cell]:
-    found = _first_of(document_cells)
+    found = tools.find_required_cell_indexes(document_cells)
     claimed = set(found.values())
     art = _opening_art(document_cells)
     opening_art = [document_cells[at] for at in sorted(art)]
-    opening = [document_cells[found[kind]] for kind in OPENING if kind in found]
+    opening = [document_cells[found[kind]] for kind in tools.OPENING if kind in found]
     story = [cell for at, cell in enumerate(document_cells) if at not in claimed and at not in art]
-    closing = [document_cells[found[kind]] for kind in CLOSING if kind in found]
+    closing = [document_cells[found[kind]] for kind in tools.CLOSING if kind in found]
     cell_export_order = opening_art + opening + story + closing
     return cell_export_order
 
-
-def _first_of(document_cells: list[cells.Cell]) -> dict[str, int]:
-    """Where each required section is, by kind."""
-    found: dict[str, int] = {}
-    for at, cell in enumerate(document_cells):
-        if cell.kind in REQUIRED and cell.kind not in found:
-            found[cell.kind] = at
-    return found
 
 
 def _opening_art(document_cells: list[cells.Cell]) -> set[int]:

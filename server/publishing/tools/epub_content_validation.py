@@ -9,13 +9,24 @@ from authordoc.cells.cell import Cell
 from authordoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS
 from authordoc.cells.title_page_cell import TITLE_PAGE
 
-from server.publishing.document_to_epub_content_converter import REQUIRED, _first_of
+OPENING = (TITLE_PAGE, TABLE_OF_CONTENTS, BLURB)
+CLOSING = (ABOUT,)
+REQUIRED = OPENING + CLOSING
 
 TITLE_PAGE_FIELDS = ("title", "subtitle", "author", "publisher", "date")
 
 UNNAMED = ("Untitled", "Anonymous")
 
 TEXT = "text"
+
+
+def find_required_cell_indexes(document_cells: list[Cell]) -> dict[str, int]:
+    """Where each required section is, by kind."""
+    found: dict[str, int] = {}
+    for at, cell in enumerate(document_cells):
+        if cell.kind in REQUIRED and cell.kind not in found:
+            found[cell.kind] = at
+    return found
 
 
 @dataclass(frozen=True)
@@ -51,7 +62,7 @@ def _check_missing_content(cells: list[Cell]) -> list[MissingContent]:
             return [] if isinstance(cell, AboutCell) and (cell.kdp or cell.website or cell.substack or cell.source.strip()) else [TEXT]
         return []
 
-    found = _first_of(cells)
+    found = find_required_cell_indexes(cells)
     missing_content = [
         MissingContent(kind, needs)
         for kind in REQUIRED
@@ -74,7 +85,7 @@ class DocumentToEpubConversionReadiness:
 
 def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness:
     cells = document.cells
-    found = _first_of(cells)
+    found = find_required_cell_indexes(cells)
     missing_content = _check_missing_content(cells)
     return DocumentToEpubConversionReadiness(
         missing_cells=[kind for kind in REQUIRED if kind not in found],

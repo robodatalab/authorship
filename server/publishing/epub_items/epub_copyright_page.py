@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_writer import EpubWriter
-from server.publishing.markdown_to_xhtml_converter import _inline
+from server.publishing import tools
 
 # What the page says whatever book it stands in, and what it says about this one.
 RIGHTS = (
@@ -66,16 +66,16 @@ class EpubCopyrightPage(EpubItem):
         )
         copyright_line = f"Copyright © {year} {rights_holders}".strip()
         copyright_lines = [
-            f"  <p>{_inline(copyright_line)}. All rights reserved.</p>",
+            f"  <p>{tools.inline_to_xhtml(copyright_line)}. All rights reserved.</p>",
             f"  <p>{RIGHTS}</p>",
         ]
         if self.author:
             moral_rights = MORAL_RIGHTS.format(named=rights_holders)
-            copyright_lines.append(f"  <p>{_inline(moral_rights)}</p>")
+            copyright_lines.append(f"  <p>{tools.inline_to_xhtml(moral_rights)}</p>")
         if self.cover_designer:
-            copyright_lines.append(f"  <p>Cover design by {_inline(self.cover_designer)}</p>")
+            copyright_lines.append(f"  <p>Cover design by {tools.inline_to_xhtml(self.cover_designer)}</p>")
         if self.publisher:
-            copyright_lines.append(f"  <p>Published by {_inline(self.publisher)}</p>")
+            copyright_lines.append(f"  <p>Published by {tools.inline_to_xhtml(self.publisher)}</p>")
 
         edition = []
         if self.version:
@@ -84,9 +84,9 @@ class EpubCopyrightPage(EpubItem):
             edition.append(self.date)
         if edition:
             edition_line = " · ".join(edition)
-            copyright_lines.append(f"  <p>{_inline(edition_line)}</p>")
+            copyright_lines.append(f"  <p>{tools.inline_to_xhtml(edition_line)}</p>")
         if self.isbn:
-            copyright_lines.append(f"  <p>ISBN {_inline(self.isbn)}</p>")
+            copyright_lines.append(f"  <p>ISBN {tools.inline_to_xhtml(self.isbn)}</p>")
         joined_lines = "\n".join(copyright_lines)
         body_xhtml = f'<div class="copyright">\n{joined_lines}\n</div>'
         epub_writer.write_page(self.id, COPYRIGHT_TITLE, self.language, body_xhtml)

@@ -1,25 +1,25 @@
 import unittest
 
-from server.publishing.markdown_to_xhtml_converter import blocks_to_xhtml
+from server.publishing import tools
 
 
 class Blocks(unittest.TestCase):
     def test_every_line_is_its_own_paragraph(self) -> None:
         self.assertEqual(
-            blocks_to_xhtml(["one", "two", "", "three"]),
+            tools.blocks_to_xhtml(["one", "two", "", "three"]),
             "<p>one</p>\n<p>two</p>\n<p>three</p>",
         )
 
     def test_a_heading_written_in_the_prose_stands_under_the_section_title(
         self,
     ) -> None:
-        self.assertEqual(blocks_to_xhtml(["# Title"]), "<h3>Title</h3>")
-        self.assertEqual(blocks_to_xhtml(["## Two"]), "<h4>Two</h4>")
-        self.assertEqual(blocks_to_xhtml(["### Three"]), "<h5>Three</h5>")
+        self.assertEqual(tools.blocks_to_xhtml(["# Title"]), "<h3>Title</h3>")
+        self.assertEqual(tools.blocks_to_xhtml(["## Two"]), "<h4>Two</h4>")
+        self.assertEqual(tools.blocks_to_xhtml(["### Three"]), "<h5>Three</h5>")
 
     def test_a_heading_carries_the_formatting_written_into_it(self) -> None:
         self.assertEqual(
-            blocks_to_xhtml(["## The *Queendom* at war"]),
+            tools.blocks_to_xhtml(["## The *Queendom* at war"]),
             "<h4>The <em>Queendom</em> at war</h4>",
         )
 
@@ -28,7 +28,7 @@ class Blocks(unittest.TestCase):
             with self.subTest(rule=rule):
                 self.assertIn(
                     '<hr class="scene-break"/>',
-                    blocks_to_xhtml(["a", "", rule, "", "b"]),
+                    tools.blocks_to_xhtml(["a", "", rule, "", "b"]),
                 )
 
 

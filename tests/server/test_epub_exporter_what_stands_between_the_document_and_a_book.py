@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from server.publishing.epub_content_validation import can_convert_to_epub
+from server.publishing import tools
 from authordoc import storydoc
 from authordoc.storydoc import Document
 from authordoc.cells.about_cell import ABOUT, AboutCell
@@ -50,18 +50,18 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.root = Path(self._dir.name)
 
     def test_a_bare_story_is_missing_all_four(self) -> None:
-        found = can_convert_to_epub(placed(self.root, ChapterCell("One")))
+        found = tools.can_convert_to_epub(placed(self.root, ChapterCell("One")))
         self.assertEqual(found.missing_cells, [TITLE_PAGE, TABLE_OF_CONTENTS, BLURB, ABOUT])
         self.assertFalse(found.ready_to_export)
 
     def test_a_section_after_the_story_is_not_missing(self) -> None:
-        found = can_convert_to_epub(
+        found = tools.can_convert_to_epub(
             placed(self.root, ChapterCell("One"), filled_title_page())
         )
         self.assertEqual(found.missing_cells, [TABLE_OF_CONTENTS, BLURB, ABOUT])
 
     def test_a_document_written_back_to_front_is_ready(self) -> None:
-        found = can_convert_to_epub(
+        found = tools.can_convert_to_epub(
             placed(
                 self.root,
                 AboutCell(source="I live by the sea."),
@@ -74,7 +74,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.assertTrue(found.ready_to_export)
 
     def test_everything_present_and_one_of_them_empty_is_not_ready(self) -> None:
-        found = can_convert_to_epub(
+        found = tools.can_convert_to_epub(
             placed(
                 self.root,
                 filled_title_page(),
@@ -88,7 +88,7 @@ class WhatStandsBetweenTheDocumentAndABook(unittest.TestCase):
         self.assertFalse(found.ready_to_export)
 
     def test_a_document_with_everything_written_is_ready(self) -> None:
-        found = can_convert_to_epub(
+        found = tools.can_convert_to_epub(
             placed(
                 self.root,
                 filled_title_page(),

@@ -13,7 +13,7 @@ from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_items.epub_part_page import EpubPartPage
 from server.publishing.epub_writer import EpubWriter
-from server.publishing.markdown_to_xhtml_converter import _inline
+from server.publishing import tools
 
 CONTENTS_PAGE_ID = "contents"
 CONTENTS_TITLE = "Contents"
@@ -117,7 +117,7 @@ class EpubTableOfContents(EpubItem):
         self._export_ncx(epub_writer)
 
     def _export_contents_page(self, epub_writer: EpubWriter) -> None:
-        items = render_table_of_contents_items(self.entries, "    ", _inline)
+        items = render_table_of_contents_items(self.entries, "    ", tools.inline_to_xhtml)
         body_xhtml = (
             '<div class="contents">\n  <h1>Contents</h1>\n  <ol>\n'
             f"{items}\n  </ol>\n</div>"

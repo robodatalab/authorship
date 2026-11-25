@@ -18,7 +18,7 @@ _HEADING = re.compile(r"(#{1,3})\s+(.*)")
 _IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)")
 
 
-def _inline(text: str) -> str:
+def inline_to_xhtml(text: str) -> str:
     text = html.escape(text, quote=False)
     text = _BOLD_ITALIC.sub(r"<strong><em>\1</em></strong>", text)
     text = _BOLD.sub(r"<strong>\1</strong>", text)
@@ -49,7 +49,7 @@ def blocks_to_xhtml(lines: list[str]) -> str:
         elif heading := _HEADING.fullmatch(stripped):
             hashes, said = heading.groups()
             level = SECTION_TITLE + len(hashes)
-            out.append(f"<h{level}>{_inline(said.strip())}</h{level}>")
+            out.append(f"<h{level}>{inline_to_xhtml(said.strip())}</h{level}>")
         else:
-            out.append(f"<p>{_inline(stripped)}</p>")
+            out.append(f"<p>{inline_to_xhtml(stripped)}</p>")
     return "\n".join(out)

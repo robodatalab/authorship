@@ -7,7 +7,7 @@ from authordoc import cells
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_writer import EpubWriter
-from server.publishing.markdown_to_xhtml_converter import SECTION_TITLE, _inline, blocks_to_xhtml
+from server.publishing import tools
 
 ABOUT_TITLE = "About the Author"
 
@@ -48,7 +48,7 @@ class EpubAboutPage(EpubItem):
         links = [(label, link) for label, link in author_links if link]
         blurb = self.blurb.strip()
 
-        about_lines = [f"  <h{SECTION_TITLE}>{ABOUT_TITLE}</h{SECTION_TITLE}>"]
+        about_lines = [f"  <h{tools.SECTION_TITLE}>{ABOUT_TITLE}</h{tools.SECTION_TITLE}>"]
         if links or self.portrait:
             # The face and the list of places to go, side by side under the heading:
             # a reader looks at both at once rather than reading down them.
@@ -61,14 +61,14 @@ class EpubAboutPage(EpubItem):
             if links:
                 about_lines.append('    <div class="links">')
                 about_lines += [
-                    f'      <p><a href="{html.escape(url, quote=True)}">{_inline(label)}</a></p>'
+                    f'      <p><a href="{html.escape(url, quote=True)}">{tools.inline_to_xhtml(label)}</a></p>'
                     for label, url in links
                 ]
                 about_lines.append("    </div>")
             about_lines.append("  </div>")
         if blurb:
             blurb_lines = blurb.splitlines()
-            blurb_xhtml = blocks_to_xhtml(blurb_lines)
+            blurb_xhtml = tools.blocks_to_xhtml(blurb_lines)
             about_lines.append(blurb_xhtml)
         joined_lines = "\n".join(about_lines)
         body_xhtml = f'<div class="about">\n{joined_lines}\n</div>'

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from server import log
-from server.publishing.epub_content_validation import can_convert_to_epub
+from server.publishing import tools
 from server.publishing.epub_publisher import build_epub
 from server.writing_tools.blurb import write_blurb
 from server.writing_tools.check_errors import CheckErrorsJob
@@ -92,7 +92,7 @@ class EpubExportRequest(BaseModel):
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     document = Document(request.text, Path(request.path))
-    found = can_convert_to_epub(document)
+    found = tools.can_convert_to_epub(document)
     if not (found.ready_to_export or request.force):
         return {
         "ready_to_export": found.ready_to_export,
