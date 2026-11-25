@@ -189,11 +189,11 @@ wheels = [
 
 [[package]]
 name = "authordoc"
-version = "0.1.18"
+version = "0.1.19"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5a/72/5e8aef74e3d7004ad0aa1b55976726bf14379781729393fee41d0d3e0cb7/authordoc-0.1.18.tar.gz", hash = "sha256:89a9c7d5376c07d71732900f95cd75d1c98299eead5e117b5a3a24e7741bc60d", size = 96789, upload-time = "2026-11-21T23:20:32.299Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fc/b8/513a26db94302657d13fe0dc904962d1ef4871f33d89c8888e7602fc77ad/authordoc-0.1.19.tar.gz", hash = "sha256:fcd39c6de5d02d53db5c6030ca984508ebd29b6fb1099c90ef5a9a2905d47149", size = 97678, upload-time = "2026-11-24T19:46:21.335Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/e1/9e1c628b2cded8cc459ee8e01380e229f739cacb61fbd35c4d8124a2dbb8/authordoc-0.1.18-py3-none-any.whl", hash = "sha256:d56421b67120910fa7ecdb07d9adf8117eba569420cb4df04c0a6c3c3f8e277d", size = 49240, upload-time = "2026-11-21T23:20:31.068Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/3e/8bec30762d125e6277c6421b699c807a09e3a58df103f5e1c55be3f25445/authordoc-0.1.19-py3-none-any.whl", hash = "sha256:ffe601517984e0092cc26c02db9636eab0502b34dd8e73d4c6253f877d874dea", size = 49996, upload-time = "2026-11-24T19:46:20.256Z" },
 ]
 
 [[package]]
@@ -227,7 +227,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "authordoc", specifier = ">=0.1.18" },
+    { name = "authordoc", specifier = ">=0.1.19" },
     { name = "cortexgrid", specifier = ">=0.3.20" },
     { name = "cortexgrid-infer", specifier = ">=0.3.12" },
     { name = "cortexgrid-train", specifier = ">=0.1.8" },

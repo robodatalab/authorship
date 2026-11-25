@@ -10,8 +10,6 @@ from authordoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS
 from authordoc.cells.title_page_cell import TITLE_PAGE
 
 from server.publishing.document_to_epub_content_converter import REQUIRED, _first_of
-from server.publishing.epub_content import Imprint, imprint_of
-from server.publishing.epub_xhtml_exporter import build_about_page
 
 TITLE_PAGE_FIELDS = ("title", "subtitle", "author", "publisher", "date")
 
@@ -28,21 +26,21 @@ class MissingContent:
     needs: list[str]
 
 
-def _check_missing_content(cells: list[Cell], imprint: Imprint) -> list[MissingContent]:
+def _check_missing_content(cells: list[Cell]) -> list[MissingContent]:
     """Which of the four have nothing in them yet."""
 
-    def check_cell(kind: str, cell: Cell, imprint: Imprint) -> list[str]:
+    def check_cell(kind: str, cell: Cell) -> list[str]:
         if kind == TABLE_OF_CONTENTS:
             # Built from the chapters whatever the cell holds, so never a gap.
             return []
         if kind == TITLE_PAGE:
             said = {
-                "title": "" if imprint.title in UNNAMED else imprint.title,
-                "subtitle": imprint.subtitle,
-                "author": imprint.author,
-                "publisher": imprint.publisher,
-                "date": imprint.date,
-                "version": imprint.version,
+                "title": "" if cell.title in UNNAMED else cell.title,  # type: ignore[attr-defined]
+                "subtitle": cell.subtitle,  # type: ignore[attr-defined]
+                "author": cell.author,  # type: ignore[attr-defined]
+                "publisher": cell.publisher,  # type: ignore[attr-defined]
+                "date": cell.date,  # type: ignore[attr-defined]
+                "version": cell.version,  # type: ignore[attr-defined]
             }
             return [name for name in TITLE_PAGE_FIELDS if not said[name].strip()]
         if kind == BLURB:
@@ -50,7 +48,7 @@ def _check_missing_content(cells: list[Cell], imprint: Imprint) -> list[MissingC
         if kind == ABOUT:
             # Every field on it is optional, so somewhere to send the reader is as
             # good as a page about them — but a page with neither is not printed.
-            return [] if isinstance(cell, AboutCell) and build_about_page(cell) else [TEXT]
+            return [] if isinstance(cell, AboutCell) and (cell.kdp or cell.website or cell.substack or cell.source.strip()) else [TEXT]
         return []
 
     found = _first_of(cells)
@@ -58,7 +56,7 @@ def _check_missing_content(cells: list[Cell], imprint: Imprint) -> list[MissingC
         MissingContent(kind, needs)
         for kind in REQUIRED
         if kind in found
-        for needs in [check_cell(kind, cells[found[kind]], imprint)]
+        for needs in [check_cell(kind, cells[found[kind]])]
         if needs
     ]
     return missing_content
@@ -77,8 +75,7 @@ class DocumentToEpubConversionReadiness:
 def can_convert_to_epub(document: Document) -> DocumentToEpubConversionReadiness:
     cells = document.cells
     found = _first_of(cells)
-    imprint = imprint_of(document)
-    missing_content = _check_missing_content(cells, imprint)
+    missing_content = _check_missing_content(cells)
     return DocumentToEpubConversionReadiness(
         missing_cells=[kind for kind in REQUIRED if kind not in found],
         missing_cell_content=missing_content,

@@ -2,215 +2,222 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from authordoc import cells
 from authordoc.storydoc import Document
-from authordoc.cells.about_cell import ABOUT, AboutCell
-from authordoc.cells.blurb_cell import BLURB, BlurbCell
-from authordoc.cells.cell import Cell
-from authordoc.cells.cell_visitor import CellVisitor
-from authordoc.cells.chapter_cell import ChapterCell
-from authordoc.cells.character_cell import CharacterCell
-from authordoc.cells.disclaimer_cell import DisclaimerCell
-from authordoc.cells.divider_cell import DividerCell
-from authordoc.cells.image_cell import IMAGE, ImageCell
-from authordoc.cells.markdown_cell import MarkdownCell
-from authordoc.cells.note_cell import NoteCell
-from authordoc.cells.part_cell import PartCell
-from authordoc.cells.place_cell import PlaceCell
-from authordoc.cells.plot_cell import PlotCell
-from authordoc.cells.recap_cell import RecapCell
-from authordoc.cells.salient_concept_cell import SalientConceptCell
-from authordoc.cells.table_of_contents_cell import TABLE_OF_CONTENTS, TableOfContentsCell
-from authordoc.cells.title_page_cell import TITLE_PAGE, TitlePageCell
-from authordoc.cells.unknown_cell import UnknownCell
+from authordoc.story_sections import CellsInASection, cells_by_section
 
-from server.publishing.epub_content import Art, Chapter, EpubDocument, Imprint, Page, imprint_of, listing_of
-from server.publishing.epub_xhtml_exporter import (
-    build_about_page,
-    build_copyright_page,
-    build_cover_page,
-    build_disclaimer_page,
-    build_image_page,
-    build_part_page,
-    build_title_page,
-    contents_xhtml,
-)
-from server.publishing.markdown_to_xhtml_converter import blocks_to_xhtml
+from server.publishing import epub_items
 
-OPENING = (TITLE_PAGE, TABLE_OF_CONTENTS, BLURB)
-CLOSING = (ABOUT,)
+OPENING = (cells.TITLE_PAGE, cells.TABLE_OF_CONTENTS, cells.BLURB)
+CLOSING = (cells.ABOUT,)
 REQUIRED = OPENING + CLOSING
 
-# Prose the author left standing outside every chapter — a dedication, an
-# epigraph, a note to the reader. Printed where it stands rather than swallowed
-# by a chapter it was never part of.
-LOOSE = "page_"
 
-
-def read_book(document: Document) -> EpubDocument:
+def read_book(document: Document) -> epub_items.EpubDocument:
     """The book the document lays out, in the order of a book.
 
     Which cells are pages and which are the story is the kind's to say, so a
     chapter called "Disclaimer" is a chapter and a disclaimer standing between
     two chapters is still its own page.
     """
-    imprint = imprint_of(document)
+    metadata = epub_items.EpubMetadata.create(document)
     root = document.path.parent if document.path else Path()
-    binding = _BookBinding(imprint, root)
+    binding = _BookBinding(metadata, root)
     cells_in_export_order = cell_export_order_of(document.cells)
     for cell in cells_in_export_order:
         cell.accept(binding)
 
     _name_apart(binding.documents)
-    listing = listing_of(binding.documents)
-    built = contents_xhtml(listing)
-    for page in binding.listings:
-        page.body_xhtml = built
-    epub_document = EpubDocument(imprint, binding.documents, binding.art, binding.cover)
+    sections = cells_by_section(cells_in_export_order)
+    table_of_contents = _build_table_of_contents(sections, binding.page_of_cell)
+    for contents_page in binding.contents_pages:
+        contents_page.table_of_contents = table_of_contents
+    navigation_document = epub_items.EpubNavigationDocument(metadata, table_of_contents)
+    ncx = epub_items.EpubNcx(metadata, table_of_contents)
+    epub_document = epub_items.EpubDocument(
+        [
+            epub_items.EpubMimetypeFile(),
+            epub_items.EpubContainerFile(),
+            metadata,
+            epub_items.EpubStylesheet(),
+            navigation_document,
+            ncx,
+            *binding.art,
+            *binding.documents,
+        ]
+    )
     return epub_document
 
 
-def cell_export_order_of(cells: list[Cell]) -> list[Cell]:
-    found = _first_of(cells)
+def _build_table_of_contents(
+    sections: list[CellsInASection], page_of_cell: dict[str, epub_items.EpubPage]
+) -> list[epub_items.Listing]:
+    table_of_contents: list[epub_items.Listing] = []
+    for section in sections:
+        if section.cell.kind == cells.CHAPTER:
+            chapter_page = page_of_cell[section.cell.unique_id]
+            chapter_entry = epub_items.Listing(chapter_page, [])
+            table_of_contents.append(chapter_entry)
+        elif section.cell.kind == cells.PART:
+            part_page = page_of_cell[section.cell.unique_id]
+            chapter_entries = _build_table_of_contents(section.within, page_of_cell)
+            part_entry = epub_items.Listing(part_page, chapter_entries)
+            table_of_contents.append(part_entry)
+    return table_of_contents
+
+
+def cell_export_order_of(document_cells: list[cells.Cell]) -> list[cells.Cell]:
+    found = _first_of(document_cells)
     claimed = set(found.values())
-    art = _opening_art(cells)
-    opening_art = [cells[at] for at in sorted(art)]
-    opening = [cells[found[kind]] for kind in OPENING if kind in found]
-    story = [cell for at, cell in enumerate(cells) if at not in claimed and at not in art]
-    closing = [cells[found[kind]] for kind in CLOSING if kind in found]
+    art = _opening_art(document_cells)
+    opening_art = [document_cells[at] for at in sorted(art)]
+    opening = [document_cells[found[kind]] for kind in OPENING if kind in found]
+    story = [cell for at, cell in enumerate(document_cells) if at not in claimed and at not in art]
+    closing = [document_cells[found[kind]] for kind in CLOSING if kind in found]
     cell_export_order = opening_art + opening + story + closing
     return cell_export_order
 
 
-def _first_of(cells: list[Cell]) -> dict[str, int]:
+def _first_of(document_cells: list[cells.Cell]) -> dict[str, int]:
     """Where each required section is, by kind."""
     found: dict[str, int] = {}
-    for at, cell in enumerate(cells):
+    for at, cell in enumerate(document_cells):
         if cell.kind in REQUIRED and cell.kind not in found:
             found[cell.kind] = at
     return found
 
 
-def _opening_art(cells: list[Cell]) -> set[int]:
+def _opening_art(document_cells: list[cells.Cell]) -> set[int]:
     art: set[int] = set()
-    for at, cell in enumerate(cells):
-        if cell.kind != IMAGE:
+    for at, cell in enumerate(document_cells):
+        if cell.kind != cells.IMAGE:
             break
         art.add(at)
     return art
 
 
-class _BookBinding(CellVisitor[None]):
-    def __init__(self, imprint: Imprint, root: Path) -> None:
-        self.imprint = imprint
+class _BookBinding(cells.CellVisitor[None]):
+    def __init__(self, metadata: epub_items.EpubMetadata, root: Path) -> None:
+        self.metadata = metadata
         self.root = root
-        self.documents: list[Chapter | Page] = []
-        self.listings: list[Page] = []
-        self.art: list[Art] = []
-        self.cover: Art | None = None
+        self.documents: list[epub_items.EpubPage] = []
+        self.contents_pages: list[epub_items.EpubContentsPage] = []
+        self.art: list[epub_items.EpubImage] = []
+        self.cover: epub_items.EpubCoverImage | None = None
+        self.page_of_cell: dict[str, epub_items.EpubPage] = {}
         self.chapters = 0
         self.parts = 0
 
-    def visit_markdown(self, cell: MarkdownCell) -> None:
+    def visit_markdown(self, cell: cells.MarkdownCell) -> None:
         if cell.source:
-            _add_lines(self.documents, cell.source.splitlines())
+            _add_lines(self.documents, cell.source.splitlines(), self.metadata)
 
-    def visit_chapter(self, cell: ChapterCell) -> None:
-        chapter = Chapter(self.chapters, cell.title, [])
+    def visit_chapter(self, cell: cells.ChapterCell) -> None:
+        chapter = epub_items.EpubChapter.create(self.chapters, cell.title, self.metadata)
         self.documents.append(chapter)
+        self.page_of_cell[cell.unique_id] = chapter
         self.chapters += 1
 
-    def visit_part(self, cell: PartCell) -> None:
-        part = build_part_page(self.parts, cell)
+    def visit_part(self, cell: cells.PartCell) -> None:
+        part = epub_items.EpubPartPage.create(self.parts, cell.title, self.metadata)
         self.documents.append(part)
+        self.page_of_cell[cell.unique_id] = part
         self.parts += 1
 
-    def visit_title_page(self, cell: TitlePageCell) -> None:
-        title_page = build_title_page(self.imprint)
-        copyright_page = build_copyright_page(self.imprint)
+    def visit_title_page(self, cell: cells.TitlePageCell) -> None:
+        title_page = epub_items.EpubTitlePage.create(self.metadata)
+        copyright_page = epub_items.EpubCopyrightPage.create(self.metadata)
         self.documents.append(title_page)
         self.documents.append(copyright_page)
 
-    def visit_image(self, cell: ImageCell) -> None:
+    def visit_image(self, cell: cells.ImageCell) -> None:
         source = _art_file(self.root, cell.src)
         if source is None:
             return
-        picture = Art(f"art_{len(self.art):03d}", source)
+        image_id = f"art_{len(self.art):03d}"
+        if cell.full_page and self.cover is None and self.chapters == 0:
+            cover = epub_items.EpubCoverImage(image_id, source)
+            self.art.append(cover)
+            self.cover = cover
+            cover_page = epub_items.EpubCoverPage.create(cover, self.metadata)
+            self.documents.append(cover_page)
+            return
+        picture = epub_items.EpubImage(image_id, source)
         self.art.append(picture)
         if not cell.full_page:
-            _add_lines(self.documents, [f"![]({picture.href})"])
-        elif self.cover is None and self.chapters == 0:
-            self.cover = picture
-            cover_page = build_cover_page(picture, self.imprint.title)
-            self.documents.append(cover_page)
+            _add_lines(self.documents, [f"![]({picture.href})"], self.metadata)
         else:
-            image_page = build_image_page(picture)
+            image_page = epub_items.EpubImagePage.create(picture, self.metadata)
             self.documents.append(image_page)
 
-    def visit_table_of_contents(self, cell: TableOfContentsCell) -> None:
+    def visit_table_of_contents(self, cell: cells.TableOfContentsCell) -> None:
         # Built here rather than taken from the cell: on the page a table of
         # contents is a list of names, in a book it is a list of links.
-        listing = Page("contents", "Contents", "")
-        self.listings.append(listing)
-        self.documents.append(listing)
+        contents_page = epub_items.EpubContentsPage.create(self.metadata)
+        self.contents_pages.append(contents_page)
+        self.documents.append(contents_page)
 
-    def visit_disclaimer(self, cell: DisclaimerCell) -> None:
-        page = build_disclaimer_page(cell)
-        if page:
-            self.documents.append(page)
+    def visit_disclaimer(self, cell: cells.DisclaimerCell) -> None:
+        if not cell.source.strip():
+            return
+        disclaimer_page = epub_items.EpubDisclaimerPage.create(cell.title, cell.source, self.metadata)
+        self.documents.append(disclaimer_page)
 
-    def visit_about(self, cell: AboutCell) -> None:
+    def visit_about(self, cell: cells.AboutCell) -> None:
+        has_links = cell.kdp or cell.website or cell.substack
+        if not has_links and not cell.source.strip():
+            return
         portrait = _art_file(self.root, cell.portrait)
         drawn = (
-            Art(f"art_{len(self.art):03d}", portrait)
+            epub_items.EpubImage(f"art_{len(self.art):03d}", portrait)
             if portrait is not None
             else None
         )
-        page = build_about_page(cell, drawn.href if drawn else "", self.imprint.author)
-        if page:
-            if drawn:
-                self.art.append(drawn)
-            self.documents.append(page)
+        if drawn:
+            self.art.append(drawn)
+        about_page = epub_items.EpubAboutPage.create(cell, drawn.href if drawn else "", self.metadata)
+        self.documents.append(about_page)
 
-    def visit_unknown(self, cell: UnknownCell) -> None:
+    def visit_unknown(self, cell: cells.UnknownCell) -> None:
         if cell.source:
-            _add_lines(self.documents, cell.source.splitlines())
+            _add_lines(self.documents, cell.source.splitlines(), self.metadata)
 
     # A cell whose text is neither a page of the book nor part of one: built from the
     # document, or kept beside it and published nowhere.
-    def visit_divider(self, cell: DividerCell) -> None:
+    def visit_divider(self, cell: cells.DividerCell) -> None:
         pass
 
-    def visit_blurb(self, cell: BlurbCell) -> None:
+    def visit_blurb(self, cell: cells.BlurbCell) -> None:
         pass
 
-    def visit_note(self, cell: NoteCell) -> None:
+    def visit_note(self, cell: cells.NoteCell) -> None:
         pass
 
-    def visit_recap(self, cell: RecapCell) -> None:
+    def visit_recap(self, cell: cells.RecapCell) -> None:
         pass
 
-    def visit_salient_concept(self, cell: SalientConceptCell) -> None:
+    def visit_salient_concept(self, cell: cells.SalientConceptCell) -> None:
         pass
 
-    def visit_plot(self, cell: PlotCell) -> None:
+    def visit_plot(self, cell: cells.PlotCell) -> None:
         pass
 
-    def visit_character(self, cell: CharacterCell) -> None:
+    def visit_character(self, cell: cells.CharacterCell) -> None:
         pass
 
-    def visit_place(self, cell: PlaceCell) -> None:
+    def visit_place(self, cell: cells.PlaceCell) -> None:
         pass
 
 
-def _add_lines(documents: list[Chapter | Page], lines: list[str]) -> None:
-    if documents and isinstance(documents[-1], Chapter):
+def _add_lines(
+    documents: list[epub_items.EpubPage], lines: list[str], metadata: epub_items.EpubMetadata
+) -> None:
+    if documents and isinstance(documents[-1], epub_items.EpubChapter):
         documents[-1].body_lines.extend(lines)
         return
-    loose = sum(1 for item in documents if item.id.startswith(LOOSE))
-    written = blocks_to_xhtml(lines)
-    documents.append(
-        Page(f"{LOOSE}{loose:03d}", "", f'<div class="chapter">\n{written}\n</div>')
-    )
+    prose_pages = sum(1 for item in documents if isinstance(item, epub_items.EpubProsePage))
+    prose_page = epub_items.EpubProsePage.create(prose_pages, lines, metadata)
+    documents.append(prose_page)
 
 
 def _art_file(root: Path, src: str) -> Path | None:
@@ -222,7 +229,7 @@ def _art_file(root: Path, src: str) -> Path | None:
     return root / src if src and (root / src).is_file() else None
 
 
-def _name_apart(documents: list[Chapter | Page]) -> None:
+def _name_apart(documents: list[epub_items.EpubPage]) -> None:
     # Nothing stops an author from adding a second disclaimer, and two manifest
     # items under one id is a book no reader will open.
     seen: dict[str, int] = {}

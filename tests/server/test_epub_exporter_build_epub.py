@@ -587,25 +587,6 @@ class BuildEpub(unittest.TestCase):
             ncx,
         )
 
-    def test_a_page_that_is_not_of_the_story_closes_the_part_before_it(
-        self,
-    ) -> None:
-        out = written(
-            self.root,
-            TitlePageCell(title="Book"),
-            PartCell("Book One"),
-            ChapterCell("One"),
-            MarkdownCell("a"),
-            AboutCell(website="https://writer.example"),
-        )
-
-        with zipfile.ZipFile(out) as z:
-            nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
-
-        self.assertIn(
-            '      <li><a href="about.xhtml">About the Author</a></li>', nav
-        )
-
     def test_a_book_with_no_disclaimer_has_no_disclaimer_page(self) -> None:
         out = written(self.root, ChapterCell("One"), MarkdownCell("prose"))
 
@@ -821,11 +802,12 @@ class BuildEpub(unittest.TestCase):
 
         self.assertIn("For my mother.", page)
 
-    def test_the_table_of_contents_names_the_chapters_and_the_named_pages(self) -> None:
+    def test_the_navigation_lists_only_the_parts_and_chapters(self) -> None:
         out = written(
             self.root,
             TitlePageCell(title="Book"),
             DisclaimerCell(title="Disclaimer", source="All fiction."),
+            PartCell("Book One"),
             ChapterCell("One"),
             MarkdownCell("prose"),
             AboutCell(website="https://writer.example"),
@@ -833,12 +815,15 @@ class BuildEpub(unittest.TestCase):
 
         with zipfile.ZipFile(out) as z:
             nav = z.read("OEBPS/nav.xhtml").decode("utf-8")
+            ncx = z.read("OEBPS/toc.ncx").decode("utf-8")
 
-        self.assertIn("Disclaimer", nav)
-        self.assertIn("One", nav)
-        self.assertIn("About the Author", nav)
-        # Neither the cover nor the title page is somewhere a reader looks up.
+        self.assertIn('<a href="part.xhtml">Book One</a>', nav)
+        self.assertIn('<a href="chap_000.xhtml">One</a>', nav)
         self.assertNotIn("titlepage.xhtml", nav)
+        self.assertNotIn("disclaimer.xhtml", nav)
+        self.assertNotIn("about.xhtml", nav)
+        self.assertNotIn("disclaimer.xhtml", ncx)
+        self.assertNotIn("about.xhtml", ncx)
 
     def test_the_blurb_reaches_no_part_of_the_book(self) -> None:
         # It is what the author writes to sell the story, not part of the story.
