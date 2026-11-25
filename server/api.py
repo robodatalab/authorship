@@ -169,16 +169,15 @@ class RecapJob(WritingJob):
         )
 
 
-@app.post("/generate/blurb", status_code=202)
-def generate_blurb(request: BlurbRequest) -> dict[str, Any]:
-    """Start writing the story's blurb; poll /generate/status for it."""
+@jobs.job_endpoint(app, post="/generate/blurb", get="/generate/blurb/status")
+def generate_blurb(request: BlurbRequest) -> BlurbJob:
+    """Start writing the story's blurb; poll /generate/blurb/status for it."""
     job = BlurbJob(_deployed("causal_deployment"), Path(request.path), request.text)
-    app.state.jobs.start(job)
-    return {"id": job.target}
+    return job
 
 
-@app.post("/generate/recap", status_code=202)
-def generate_recap(request: RecapRequest) -> dict[str, Any]:
+@jobs.job_endpoint(app, post="/generate/recap", get="/generate/recap/status")
+def generate_recap(request: RecapRequest) -> RecapJob:
     if not request.documents:
         raise HTTPException(
             status_code=400,
@@ -189,17 +188,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
         if not volume.is_file():
             raise HTTPException(status_code=400, detail=f"No such document: {volume}")
     job = RecapJob(_deployed("causal_deployment"), Path(request.path), earlier)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/generate/status")
-def generate_status(id: str) -> dict[str, Any]:
-    job = app.state.jobs.get(id)
-    if not isinstance(job, WritingJob):
-        raise HTTPException(status_code=404, detail=f"No writing job for {id}")
-    status = app.state.jobs.reported(id)
-    return status
+    return job
 
 
 class StoryGenerationRequest(BaseModel):
@@ -209,8 +198,8 @@ class StoryGenerationRequest(BaseModel):
     stage: str
 
 
-@app.post("/generate/story", status_code=202)
-def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
+@jobs.job_endpoint(app, post="/generate/story", get="/generate/story/status")
+def generate_story(request: StoryGenerationRequest) -> story_generator.StoryGenerationJob:
     """Run a stage of generating the story with its author; poll
     /generate/story/status for the story it generates."""
     make_the_stage = story_generator.STAGES_BY_NAME.get(request.stage)
@@ -219,17 +208,7 @@ def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
     deployment = _deployed("writing_deployment")
     stage = make_the_stage(deployment)
     job = story_generator.StoryGenerationJob(request.stage, stage, Path(request.path), request.story)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/generate/story/status")
-def generate_story_status(id: str) -> dict[str, Any]:
-    job = app.state.jobs.get(id)
-    if not isinstance(job, story_generator.StoryGenerationJob):
-        raise HTTPException(status_code=404, detail=f"No story generation for {id}")
-    status = app.state.jobs.reported(id)
-    return status
+    return job
 
 
 class StyleFixRequest(BaseModel):
@@ -237,20 +216,10 @@ class StyleFixRequest(BaseModel):
     text: str
 
 
-@app.post("/fix/style", status_code=202)
-def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
+@jobs.job_endpoint(app, post="/fix/style", get="/fix/style/status")
+def fix_style_endpoint(request: StyleFixRequest) -> writing_tools.StyleFixJob:
     job = writing_tools.StyleFixJob(_deployed("style_deployment"), Path(request.path), request.text)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/fix/style/status")
-def fix_style_status(id: str) -> dict[str, Any]:
-    job = app.state.jobs.get(id)
-    if not isinstance(job, writing_tools.StyleFixJob):
-        raise HTTPException(status_code=404, detail=f"No style pass for {id}")
-    status = app.state.jobs.reported(id)
-    return status
+    return job
 
 
 class LineSelection(BaseModel):
@@ -264,8 +233,8 @@ class CheckErrorsRequest(BaseModel):
     selection: LineSelection | None = None
 
 
-@app.post("/check/errors", status_code=202)
-def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
+@jobs.job_endpoint(app, post="/check/errors", get="/check/errors/status")
+def check_errors(request: CheckErrorsRequest) -> writing_tools.CheckErrorsJob:
     """Start checking a passage; poll /check/errors/status for what it found.
 
     The whole document when the author turns the checks on, and one paragraph
@@ -277,14 +246,4 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
         (request.selection.start, request.selection.end) if request.selection else None
     )
     job = writing_tools.CheckErrorsJob(_deployed("gec_deployment"), Path(request.path), request.text, selection)
-    app.state.jobs.start(job)
-    return {"id": job.target}
-
-
-@app.get("/check/errors/status")
-def check_errors_status(id: str) -> dict[str, Any]:
-    job = app.state.jobs.get(id)
-    if not isinstance(job, writing_tools.CheckErrorsJob):
-        raise HTTPException(status_code=404, detail=f"No check for {id}")
-    status = app.state.jobs.reported(id)
-    return status
+    return job

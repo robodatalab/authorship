@@ -147,6 +147,30 @@ class GenerateRecap(unittest.TestCase):
         # Said before the model is loaded rather than a minute into the reading.
         self.assertEqual(self.start("a.author", "gone.author").status_code, 400)
 
+    def test_hands_back_what_the_job_reported(self) -> None:
+        self.start("a.author")
+        app.state.jobs.get.return_value = app.state.jobs.start.call_args.args[0]
+        app.state.jobs.reported.return_value = {
+            "running": True,
+            "error": None,
+            "kind": RECAP,
+            "text": "",
+            "progress": {"written": 1, "chapters": 1},
+        }
+
+        response = TestClient(app).get("/generate/recap/status", params={"id": str(self.document)})
+
+        self.assertEqual(
+            response.json(),
+            {
+                "running": True,
+                "error": None,
+                "kind": RECAP,
+                "text": "",
+                "progress": {"written": 1, "chapters": 1},
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

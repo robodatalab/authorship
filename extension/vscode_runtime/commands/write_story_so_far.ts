@@ -51,7 +51,7 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
                 documents,
             });
             const storySoFar = await awaitServerJob<WrittenSection>(
-                "/generate/status",
+                "/generate/recap/status",
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );

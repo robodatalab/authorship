@@ -49,7 +49,7 @@ function serverThatWritesEveryBlurb(
 }
 
 function blurbsAsked(asked: string[]): number {
-    return asked.filter((url) => url.includes("/generate/blurb")).length;
+    return asked.filter((url) => url.endsWith("/generate/blurb")).length;
 }
 
 beforeEach(forgetWhatTheEditorDid);

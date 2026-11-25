@@ -45,6 +45,7 @@ describe("WriteStorySoFarCommand — writes the story so far", () => {
             text: asItStoodWhenAsked,
             documents: ["parts/part_1.author", "parts/part_2.author"],
         });
+        expect(asked[1].url).toContain("/generate/recap/status?id=job-1");
         expect(session.document.cells[0].source).toBe("She had lost her name.");
     });
 

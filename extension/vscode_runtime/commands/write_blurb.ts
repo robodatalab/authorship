@@ -40,7 +40,7 @@ export class WriteBlurbCommand implements AuthorDocumentCommand {
                 text: session.document.text,
             });
             const blurb = await awaitServerJob<WrittenSection>(
-                "/generate/status",
+                "/generate/blurb/status",
                 jobId,
                 (written) => session?.writingCell(cellId, howFarAlong(written)),
             );

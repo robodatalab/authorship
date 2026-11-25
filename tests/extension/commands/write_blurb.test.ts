@@ -55,7 +55,7 @@ describe("WriteBlurbCommand — writes the blurb", () => {
             path: STORY_FILE,
             text: asItStoodWhenAsked,
         });
-        expect(asked[1].url).toContain("/generate/status?id=job-1");
+        expect(asked[1].url).toContain("/generate/blurb/status?id=job-1");
         expect(session.document.cells[0].source).toBe(
             "A woman loses her name.",
         );

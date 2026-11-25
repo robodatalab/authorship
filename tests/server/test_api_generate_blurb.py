@@ -107,8 +107,36 @@ class GenerateBlurb(unittest.TestCase):
     def test_asking_after_a_job_nobody_started_is_a_miss(self) -> None:
         app.state.jobs.get.return_value = None
         client = TestClient(app)
-        response = client.get("/generate/status", params={"id": "nothing"})
+        response = client.get("/generate/blurb/status", params={"id": "nothing"})
         self.assertEqual(response.status_code, 404)
+
+    def test_hands_back_what_the_job_reported(self) -> None:
+        client = TestClient(app)
+        client.post(
+            "/generate/blurb",
+            json={"path": str(self.document), "text": self.document.read_text()},
+        )
+        app.state.jobs.get.return_value = app.state.jobs.start.call_args.args[0]
+        app.state.jobs.reported.return_value = {
+            "running": True,
+            "error": None,
+            "kind": BLURB,
+            "text": "",
+            "progress": {"written": 1, "chapters": 2},
+        }
+
+        response = client.get("/generate/blurb/status", params={"id": str(self.document)})
+
+        self.assertEqual(
+            response.json(),
+            {
+                "running": True,
+                "error": None,
+                "kind": BLURB,
+                "text": "",
+                "progress": {"written": 1, "chapters": 2},
+            },
+        )
 
     def test_says_how_much_of_the_story_it_has_read_while_it_reads(self) -> None:
         # The one division the work has is chapters, and it is what the editor

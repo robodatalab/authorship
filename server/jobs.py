@@ -1,12 +1,15 @@
 import abc
 import asyncio
+import functools
 import multiprocessing
 import os
 import threading
 from dataclasses import dataclass
 from multiprocessing.connection import Connection
 from multiprocessing.process import BaseProcess
-from typing import Any
+from typing import Any, Callable, get_type_hints
+
+from fastapi import FastAPI, HTTPException
 
 from server import log
 from server.progress import WorkProgress, reporting_progress_to
@@ -199,3 +202,31 @@ class ParallelJobsManager:
             "stopped" if running.stopped else "finished",
             running.job.target,
         )
+
+
+
+def job_endpoint(app: FastAPI, post: str, get: str) -> Callable[[Callable[..., Job]], Callable[..., Job]]:
+    def register_job_endpoints(create_job: Callable[..., Job]) -> Callable[..., Job]:
+        type_hints = get_type_hints(create_job)
+        job_type = type_hints["return"]
+
+        @functools.wraps(create_job)
+        def start_job(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            job = create_job(*args, **kwargs)
+            app.state.jobs.start(job)
+            return {"id": job.target}
+
+        def job_status(id: str) -> dict[str, Any]:
+            job = app.state.jobs.get(id)
+            if not isinstance(job, job_type):
+                raise HTTPException(status_code=404, detail=f"No {job_type.kind} job for {id}")
+            status = app.state.jobs.reported(id)
+            return status
+
+        register_start_job = app.post(post, status_code=202, response_model=None)
+        register_start_job(start_job)
+        register_job_status = app.get(get)
+        register_job_status(job_status)
+        return create_job
+
+    return register_job_endpoints
