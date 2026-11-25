@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from authordoc.storydoc import Document
@@ -13,19 +12,30 @@ from server.publishing.epub_writer import EpubWriter
 DEFAULT_LANGUAGE = "en"
 
 
-@dataclass(frozen=True)
 class EpubMetadata(EpubItem):
-
-    title: str = "Anonymous"
-    subtitle: str = ""
-    author: str = ""
-    publisher: str = ""
-    date: str = ""
-    version: str = ""
-    isbn: str = ""
-    cover_designer: str = ""
-    language: str = DEFAULT_LANGUAGE
-    book_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    def __init__(
+        self,
+        title: str,
+        subtitle: str,
+        author: str,
+        publisher: str,
+        date: str,
+        version: str,
+        isbn: str,
+        cover_designer: str,
+        language: str,
+        book_id: uuid.UUID,
+    ) -> None:
+        self.title = title
+        self.subtitle = subtitle
+        self.author = author
+        self.publisher = publisher
+        self.date = date
+        self.version = version
+        self.isbn = isbn
+        self.cover_designer = cover_designer
+        self.language = language
+        self.book_id = book_id
 
     @classmethod
     def create(cls, document: Document) -> 'EpubMetadata':
@@ -39,6 +49,7 @@ class EpubMetadata(EpubItem):
             isbn=document.title_page.isbn,
             cover_designer=document.title_page.cover_designer,
             language=document.title_page.language or DEFAULT_LANGUAGE,
+            book_id=uuid.uuid4(),
         )
 
     def export(self, epub_writer: EpubWriter) -> None:

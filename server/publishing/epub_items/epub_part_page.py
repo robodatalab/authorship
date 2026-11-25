@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_items.epub_stylesheet import ALONE_ON_THE_PAGE
@@ -9,13 +7,12 @@ from server.publishing.epub_writer import EpubWriter, page_filename
 from server.publishing.markdown_to_xhtml_converter import _inline
 
 
-@dataclass
 class EpubPartPage(EpubItem):
-
-    id: str
-    idx: int
-    title: str
-    language: str
+    def __init__(self, id: str, idx: int, title: str, language: str) -> None:
+        self.id = id
+        self.idx = idx
+        self.title = title
+        self.language = language
 
     @classmethod
     def create(cls, idx: int, title: str, metadata: EpubMetadata) -> EpubPartPage:

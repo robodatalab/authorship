@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_writer import EpubWriter
 
@@ -71,7 +69,6 @@ p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 """
 
 
-@dataclass
 class EpubStylesheet(EpubItem):
     def export(self, epub_writer: EpubWriter) -> None:
         epub_writer.write_file("OEBPS/style.css", CSS)

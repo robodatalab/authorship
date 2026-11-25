@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 import mimetypes
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_writer import EpubWriter
 
 
-@dataclass
 class EpubImage(EpubItem):
-    id: str
-    source: Path
-    is_cover: bool = False
-    href: str = field(init=False)
-    media: str = field(init=False)
-
-    def __post_init__(self) -> None:
+    def __init__(self, id: str, source: Path, is_cover: bool = False) -> None:
+        self.id = id
+        self.source = source
+        self.is_cover = is_cover
         self.href = f"{self.id}{self.source.suffix.lower() or '.jpg'}"
         self.media = mimetypes.guess_type(self.source.name)[0] or "image/jpeg"
 

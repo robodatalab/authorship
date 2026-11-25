@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-from dataclasses import dataclass
 
 from server.publishing.epub_items.epub_image import EpubImage
 from server.publishing.epub_items.epub_item import EpubItem
@@ -9,12 +8,12 @@ from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_writer import EpubWriter
 
 
-@dataclass
 class EpubCoverPage(EpubItem):
-    id: str
-    title: str
-    image_href: str
-    language: str
+    def __init__(self, id: str, title: str, image_href: str, language: str) -> None:
+        self.id = id
+        self.title = title
+        self.image_href = image_href
+        self.language = language
 
     @classmethod
     def create(cls, image: EpubImage, metadata: EpubMetadata) -> EpubCoverPage:

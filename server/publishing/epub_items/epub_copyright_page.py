@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from server.publishing.epub_items.epub_item import EpubItem
@@ -35,17 +34,16 @@ def copyright_year(date: str) -> str:
     return found.group() if found else str(datetime.now(timezone.utc).year)
 
 
-@dataclass
 class EpubCopyrightPage(EpubItem):
-
-    id: str
-    author: str
-    publisher: str
-    date: str
-    version: str
-    isbn: str
-    cover_designer: str
-    language: str
+    def __init__(self, id: str, author: str, publisher: str, date: str, version: str, isbn: str, cover_designer: str, language: str) -> None:
+        self.id = id
+        self.author = author
+        self.publisher = publisher
+        self.date = date
+        self.version = version
+        self.isbn = isbn
+        self.cover_designer = cover_designer
+        self.language = language
 
     @classmethod
     def create(cls, metadata: EpubMetadata) -> EpubCopyrightPage:

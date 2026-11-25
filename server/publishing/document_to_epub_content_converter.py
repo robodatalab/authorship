@@ -25,7 +25,7 @@ EpubSpineItem = (
 )
 
 
-def read_book(document: Document) -> list[epub_items.EpubItem]:
+def convert_document_to_epub(document: Document) -> list[epub_items.EpubItem]:
     """The book the document lays out, in the order of a book.
 
     Which cells are pages and which are the story is the kind's to say, so a

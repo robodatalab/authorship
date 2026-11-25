@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_writer import EpubWriter
 from server.publishing.markdown_to_xhtml_converter import _inline
 
 
-@dataclass
 class EpubTitlePage(EpubItem):
-    id: str
-    title: str
-    subtitle: str
-    author: str
-    publisher: str
-    language: str
+    def __init__(self, id: str, title: str, subtitle: str, author: str, publisher: str, language: str) -> None:
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.author = author
+        self.publisher = publisher
+        self.language = language
 
     @classmethod
     def create(cls, metadata: EpubMetadata) -> EpubTitlePage:

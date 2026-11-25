@@ -88,13 +88,13 @@ def table_of_contents_depth(entries: list[TableOfContentsEntry]) -> int:
     )
 
 
-@dataclass
 class EpubTableOfContents(EpubItem):
-    entries: list[TableOfContentsEntry]
-    has_contents_page: bool
-    book_id: uuid.UUID
-    book_title: str
-    language: str
+    def __init__(self, entries: list[TableOfContentsEntry], has_contents_page: bool, book_id: uuid.UUID, book_title: str, language: str) -> None:
+        self.entries = entries
+        self.has_contents_page = has_contents_page
+        self.book_id = book_id
+        self.book_title = book_title
+        self.language = language
 
     @classmethod
     def create(

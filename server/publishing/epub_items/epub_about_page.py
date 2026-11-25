@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-from dataclasses import dataclass
 
 from authordoc import cells
 
@@ -13,17 +12,16 @@ from server.publishing.markdown_to_xhtml_converter import SECTION_TITLE, _inline
 ABOUT_TITLE = "About the Author"
 
 
-@dataclass
 class EpubAboutPage(EpubItem):
-
-    id: str
-    kdp: str
-    website: str
-    substack: str
-    blurb: str
-    portrait: str
-    author: str
-    language: str
+    def __init__(self, id: str, kdp: str, website: str, substack: str, blurb: str, portrait: str, author: str, language: str) -> None:
+        self.id = id
+        self.kdp = kdp
+        self.website = website
+        self.substack = substack
+        self.blurb = blurb
+        self.portrait = portrait
+        self.author = author
+        self.language = language
 
     @classmethod
     def create(cls, cell: cells.AboutCell, portrait: str, metadata: EpubMetadata) -> EpubAboutPage:
