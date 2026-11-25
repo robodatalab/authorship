@@ -2,25 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_items.epub_page import ALONE_ON_THE_PAGE, EpubPage
+from server.publishing.epub_items.epub_stylesheet import ALONE_ON_THE_PAGE
+from server.publishing.epub_writer import EpubWriter, page_filename
 from server.publishing.markdown_to_xhtml_converter import _inline
 
 
 @dataclass
-class EpubPartPage(EpubPage):
-    """The divider a reader turns to before the chapters under it.
+class EpubPartPage(EpubItem):
 
-    A page of its own carrying one line: every document in the spine opens a
-    page, so the name stands alone with nothing above or below it.
-    """
-
+    id: str
     idx: int
     title: str
+    language: str
 
     @classmethod
     def create(cls, idx: int, title: str, metadata: EpubMetadata) -> EpubPartPage:
-        part_page = cls("part", metadata, idx, title)
+        part_page = cls("part", idx, title, metadata.language)
         return part_page
 
     @property
@@ -28,6 +27,10 @@ class EpubPartPage(EpubPage):
         return self.title or f"Part {self.idx + 1}"
 
     @property
-    def body_xhtml(self) -> str:
+    def filename(self) -> str:
+        return page_filename(self.id)
+
+    def export(self, epub_writer: EpubWriter) -> None:
         part_name = _inline(self.name)
-        return f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{part_name}</h1>\n</div>'
+        body_xhtml = f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{part_name}</h1>\n</div>'
+        epub_writer.write_page(self.id, self.name, self.language, body_xhtml)

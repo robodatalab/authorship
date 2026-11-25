@@ -1,6 +1,25 @@
 from __future__ import annotations
 
+import html
 import zipfile
+
+XHTML_DOC = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="{lang}" lang="{lang}">
+<head>
+  <meta charset="utf-8"/>
+  <title>{title}</title>
+  <link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body>
+{body}
+</body>
+</html>
+"""
+
+
+def page_filename(page_id: str) -> str:
+    return f"{page_id}.xhtml"
 
 
 class EpubWriter:
@@ -12,6 +31,14 @@ class EpubWriter:
 
     def write_file(self, path: str, content: str | bytes, compress_type: int | None = None) -> None:
         self._epub_file.writestr(path, content, compress_type=compress_type)
+
+    def write_page(self, page_id: str, title: str, language: str, body_xhtml: str) -> None:
+        filename = page_filename(page_id)
+        escaped_title = html.escape(title)
+        page_xhtml = XHTML_DOC.format(lang=language, title=escaped_title, body=body_xhtml)
+        self.write_file(f"OEBPS/{filename}", page_xhtml)
+        self.add_manifest_item(page_id, filename, "application/xhtml+xml")
+        self.add_spine_item(page_id)
 
     def add_metadata_element(self, element: str) -> None:
         self._metadata_elements.append(element)

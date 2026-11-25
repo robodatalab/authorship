@@ -13,8 +13,9 @@ from server.publishing.epub_writer import EpubWriter
 
 def build_epub(document: Document, out_path: Path) -> None:
     """Write the document as an EPUB, dressed in what the document says about it."""
-    epub_document = read_book(document)
+    items_in_export_order = read_book(document)
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as epub_file:
         epub_writer = EpubWriter(epub_file)
-        epub_document.export(epub_writer)
+        for item in items_in_export_order:
+            item.export(epub_writer)
         epub_writer.write_package_document()

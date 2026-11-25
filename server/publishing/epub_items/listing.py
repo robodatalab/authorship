@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from server.publishing.epub_items.epub_page import EpubPage
 
 
 @dataclass
 class Listing:
-    item: EpubPage
+    name: str
+    filename: str
     within: list[Listing]
 
 
@@ -18,8 +18,8 @@ def links_in_the_listing(
     lines = []
     for entry in listing:
         link = (
-            f'{indent}<li><a href="{entry.item.filename}">'
-            f"{named(entry.item.name)}</a>"
+            f'{indent}<li><a href="{entry.filename}">'
+            f"{named(entry.name)}</a>"
         )
         if not entry.within:
             lines.append(f"{link}</li>")

@@ -4,24 +4,24 @@ import html
 from dataclasses import dataclass
 
 from server.publishing.epub_items.epub_image import EpubImage
+from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_items.epub_page import EpubPage
+from server.publishing.epub_writer import EpubWriter
 
 
 @dataclass
-class EpubCoverPage(EpubPage):
-    image: EpubImage
+class EpubCoverPage(EpubItem):
+    id: str
+    title: str
+    image_href: str
+    language: str
 
     @classmethod
     def create(cls, image: EpubImage, metadata: EpubMetadata) -> EpubCoverPage:
-        cover_page = cls("cover", metadata, image)
+        cover_page = cls("cover", metadata.title, image.href, metadata.language)
         return cover_page
 
-    @property
-    def name(self) -> str:
-        return self.metadata.title
-
-    @property
-    def body_xhtml(self) -> str:
-        alt_text = html.escape(self.metadata.title, quote=True)
-        return f'<div class="cover"><img src="{self.image.href}" alt="{alt_text}"/></div>'
+    def export(self, epub_writer: EpubWriter) -> None:
+        alt_text = html.escape(self.title, quote=True)
+        body_xhtml = f'<div class="cover"><img src="{self.image_href}" alt="{alt_text}"/></div>'
+        epub_writer.write_page(self.id, self.title, self.language, body_xhtml)

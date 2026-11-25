@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import uuid
 from dataclasses import dataclass
 
 from server.publishing.epub_items.epub_item import EpubItem
@@ -21,9 +22,9 @@ def nav_points(
             held, played = nav_points(entry.within, indent + "  ", played)
         points.append(
             f'{indent}<navPoint id="np{at}" playOrder="{at}">\n'
-            f"{indent}  <navLabel><text>{html.escape(entry.item.name)}</text>"
+            f"{indent}  <navLabel><text>{html.escape(entry.name)}</text>"
             f"</navLabel>\n"
-            f'{indent}  <content src="{entry.item.filename}"/>\n'
+            f'{indent}  <content src="{entry.filename}"/>\n'
             + ("\n".join(held) + "\n" if held else "")
             + f"{indent}</navPoint>"
         )
@@ -39,18 +40,24 @@ def how_deep_the_listing_goes(listing: list[Listing]) -> int:
 
 @dataclass
 class EpubNcx(EpubItem):
-    metadata: EpubMetadata
+    book_id: uuid.UUID
+    title: str
     table_of_contents: list[Listing]
+
+    @classmethod
+    def create(cls, metadata: EpubMetadata, table_of_contents: list[Listing]) -> EpubNcx:
+        ncx = cls(metadata.book_id, metadata.title, table_of_contents)
+        return ncx
 
     def export(self, epub_writer: EpubWriter) -> None:
         points, _ = nav_points(self.table_of_contents, "    ", 0)
         depth = max(1, how_deep_the_listing_goes(self.table_of_contents))
-        title = html.escape(self.metadata.title)
+        title = html.escape(self.title)
         nav_map = "\n".join(points)
         ncx = f"""<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <head>
-    <meta name="dtb:uid" content="urn:uuid:{self.metadata.book_id}"/>
+    <meta name="dtb:uid" content="urn:uuid:{self.book_id}"/>
     <meta name="dtb:depth" content="{depth}"/>
     <meta name="dtb:totalPageCount" content="0"/>
     <meta name="dtb:maxPageNumber" content="0"/>

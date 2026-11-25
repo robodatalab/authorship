@@ -11,12 +11,18 @@ from server.publishing.epub_items.listing import Listing, links_in_the_listing
 
 @dataclass
 class EpubNavigationDocument(EpubItem):
-    metadata: EpubMetadata
+    language: str
+    title: str
     table_of_contents: list[Listing]
 
+    @classmethod
+    def create(cls, metadata: EpubMetadata, table_of_contents: list[Listing]) -> EpubNavigationDocument:
+        navigation_document = cls(metadata.language, metadata.title, table_of_contents)
+        return navigation_document
+
     def export(self, epub_writer: EpubWriter) -> None:
-        language = self.metadata.language
-        title = html.escape(self.metadata.title)
+        language = self.language
+        title = html.escape(self.title)
         items = links_in_the_listing(self.table_of_contents, "      ", html.escape)
         body = f"""<nav epub:type="toc" id="toc">
     <h1>Contents</h1>

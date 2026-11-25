@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_writer import EpubWriter
 
+# A name with nothing under it: a part divider, or a chapter whose prose has not
+# been written yet. The reader turns to a page holding one line, and it is set in
+# the middle of that page rather than at the top of it.
+ALONE_ON_THE_PAGE = "alone-on-the-page"
+
 CSS = """\
 html, body { margin: 0; padding: 0; }
 body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5;

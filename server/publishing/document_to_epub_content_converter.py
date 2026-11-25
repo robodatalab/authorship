@@ -12,8 +12,21 @@ OPENING = (cells.TITLE_PAGE, cells.TABLE_OF_CONTENTS, cells.BLURB)
 CLOSING = (cells.ABOUT,)
 REQUIRED = OPENING + CLOSING
 
+EpubSpineItem = (
+    epub_items.EpubAboutPage
+    | epub_items.EpubChapter
+    | epub_items.EpubContentsPage
+    | epub_items.EpubCopyrightPage
+    | epub_items.EpubCoverPage
+    | epub_items.EpubDisclaimerPage
+    | epub_items.EpubImagePage
+    | epub_items.EpubPartPage
+    | epub_items.EpubProsePage
+    | epub_items.EpubTitlePage
+)
 
-def read_book(document: Document) -> epub_items.EpubDocument:
+
+def read_book(document: Document) -> list[epub_items.EpubItem]:
     """The book the document lays out, in the order of a book.
 
     Which cells are pages and which are the story is the kind's to say, so a
@@ -32,36 +45,34 @@ def read_book(document: Document) -> epub_items.EpubDocument:
     table_of_contents = _build_table_of_contents(sections, binding.page_of_cell)
     for contents_page in binding.contents_pages:
         contents_page.table_of_contents = table_of_contents
-    navigation_document = epub_items.EpubNavigationDocument(metadata, table_of_contents)
-    ncx = epub_items.EpubNcx(metadata, table_of_contents)
-    epub_document = epub_items.EpubDocument(
-        [
-            epub_items.EpubMimetypeFile(),
-            epub_items.EpubContainerFile(),
-            metadata,
-            epub_items.EpubStylesheet(),
-            navigation_document,
-            ncx,
-            *binding.art,
-            *binding.documents,
-        ]
-    )
-    return epub_document
+    navigation_document = epub_items.EpubNavigationDocument.create(metadata, table_of_contents)
+    ncx = epub_items.EpubNcx.create(metadata, table_of_contents)
+    items_in_export_order: list[epub_items.EpubItem] = [
+        epub_items.EpubMimetypeFile(),
+        epub_items.EpubContainerFile(),
+        metadata,
+        epub_items.EpubStylesheet(),
+        navigation_document,
+        ncx,
+        *binding.art,
+        *binding.documents,
+    ]
+    return items_in_export_order
 
 
 def _build_table_of_contents(
-    sections: list[CellsInASection], page_of_cell: dict[str, epub_items.EpubPage]
+    sections: list[CellsInASection], page_of_cell: dict[str, epub_items.EpubChapter | epub_items.EpubPartPage]
 ) -> list[epub_items.Listing]:
     table_of_contents: list[epub_items.Listing] = []
     for section in sections:
         if section.cell.kind == cells.CHAPTER:
             chapter_page = page_of_cell[section.cell.unique_id]
-            chapter_entry = epub_items.Listing(chapter_page, [])
+            chapter_entry = epub_items.Listing(chapter_page.name, chapter_page.filename, [])
             table_of_contents.append(chapter_entry)
         elif section.cell.kind == cells.PART:
             part_page = page_of_cell[section.cell.unique_id]
             chapter_entries = _build_table_of_contents(section.within, page_of_cell)
-            part_entry = epub_items.Listing(part_page, chapter_entries)
+            part_entry = epub_items.Listing(part_page.name, part_page.filename, chapter_entries)
             table_of_contents.append(part_entry)
     return table_of_contents
 
@@ -100,11 +111,11 @@ class _BookBinding(cells.CellVisitor[None]):
     def __init__(self, metadata: epub_items.EpubMetadata, root: Path) -> None:
         self.metadata = metadata
         self.root = root
-        self.documents: list[epub_items.EpubPage] = []
+        self.documents: list[EpubSpineItem] = []
         self.contents_pages: list[epub_items.EpubContentsPage] = []
         self.art: list[epub_items.EpubImage] = []
-        self.cover: epub_items.EpubCoverImage | None = None
-        self.page_of_cell: dict[str, epub_items.EpubPage] = {}
+        self.cover: epub_items.EpubImage | None = None
+        self.page_of_cell: dict[str, epub_items.EpubChapter | epub_items.EpubPartPage] = {}
         self.chapters = 0
         self.parts = 0
 
@@ -136,7 +147,7 @@ class _BookBinding(cells.CellVisitor[None]):
             return
         image_id = f"art_{len(self.art):03d}"
         if cell.full_page and self.cover is None and self.chapters == 0:
-            cover = epub_items.EpubCoverImage(image_id, source)
+            cover = epub_items.EpubImage(image_id, source, is_cover=True)
             self.art.append(cover)
             self.cover = cover
             cover_page = epub_items.EpubCoverPage.create(cover, self.metadata)
@@ -210,7 +221,7 @@ class _BookBinding(cells.CellVisitor[None]):
 
 
 def _add_lines(
-    documents: list[epub_items.EpubPage], lines: list[str], metadata: epub_items.EpubMetadata
+    documents: list[EpubSpineItem], lines: list[str], metadata: epub_items.EpubMetadata
 ) -> None:
     if documents and isinstance(documents[-1], epub_items.EpubChapter):
         documents[-1].body_lines.extend(lines)
@@ -229,7 +240,7 @@ def _art_file(root: Path, src: str) -> Path | None:
     return root / src if src and (root / src).is_file() else None
 
 
-def _name_apart(documents: list[epub_items.EpubPage]) -> None:
+def _name_apart(documents: list[EpubSpineItem]) -> None:
     # Nothing stops an author from adding a second disclaimer, and two manifest
     # items under one id is a book no reader will open.
     seen: dict[str, int] = {}
@@ -237,4 +248,3 @@ def _name_apart(documents: list[epub_items.EpubPage]) -> None:
         seen[item.id] = seen.get(item.id, 0) + 1
         if seen[item.id] > 1:
             item.id = f"{item.id}_{seen[item.id]}"
-            item.filename = f"{item.id}.xhtml"
