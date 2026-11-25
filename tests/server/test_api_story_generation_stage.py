@@ -50,7 +50,7 @@ class StoryGenerationStage(unittest.TestCase):
 
         self.addCleanup(_restore_model)
 
-    def test_runs_the_stage_it_is_given_and_asks_the_author_to_review_it(self) -> None:
+    def test_runs_the_stage_it_is_given_and_reports_the_story_it_generated(self) -> None:
         model = build_fake_completion_model()
         app.state.writing_deployment = build_fake_deployment(model)
 
@@ -61,18 +61,7 @@ class StoryGenerationStage(unittest.TestCase):
         job = run_the_job_started()
 
         self.assertEqual(started.status_code, 202)
-        self.assertEqual(
-            job.snapshot()["asked"],
-            {
-                "stage": "concept titles",
-                "story": "",
-                "shown": {
-                    "kind": "command",
-                    "cellKind": "salient-concept",
-                    "commandName": "insertCell",
-                },
-            },
-        )
+        self.assertEqual(job.snapshot()["story"], "")
 
     def test_runs_the_stage_on_the_story_the_editor_sends(self) -> None:
         model = build_fake_completion_model("### Motherhood\nA mother's care.")
@@ -89,13 +78,8 @@ class StoryGenerationStage(unittest.TestCase):
         job = run_the_job_started()
 
         self.assertEqual(
-            job.snapshot()["asked"],
-            {
-                "stage": "concepts",
-                "story": '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\n'
-                "A mother's care.\n",
-                "shown": {"kind": "cells", "cellKind": "salient-concept"},
-            },
+            job.snapshot()["story"],
+            '<!-- cell: salient-concept id="k1" title="Motherhood" -->\n\nA mother\'s care.\n',
         )
 
     def test_a_stage_it_does_not_know_is_refused(self) -> None:

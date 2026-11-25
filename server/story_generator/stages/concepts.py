@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import re
 
-from authordoc.cells.salient_concept_cell import SALIENT_CONCEPT, SalientConceptCell
+from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import CommandShown, Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 # Where the author adds the concepts: the metadata pane's button that adds a concept.
-ADD_THE_CONCEPTS = CommandShown(SALIENT_CONCEPT, "insertCell")
-
 DESCRIPTION_INSTRUCTIONS = """You help an author describe what an interactive story is about: its salient concepts, the ideas a reader should come away understanding, though the story never states them.
 
 A concept is either a general theme the story is built on, such as motherhood, war or justice, or a story-specific hook that keeps a reader wanting to learn more, such as a stranger stranded under the surface of Mars. Every concept will get a plot of its own that illustrates it.
@@ -72,8 +69,6 @@ class ConceptTitles(Stage):
     def run(self, document: Document) -> list[StageStep]:
         return []
 
-    def shown(self) -> Shown:
-        return ADD_THE_CONCEPTS
 
 
 class Concepts(Stage):
@@ -87,5 +82,3 @@ class Concepts(Stage):
         concepts_steps: list[StageStep] = [describe_step]
         return concepts_steps
 
-    def shown(self) -> Shown:
-        return CellsShown(SALIENT_CONCEPT)

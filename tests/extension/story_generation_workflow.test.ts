@@ -91,7 +91,6 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
-review shows: {"kind":"cells","cellKind":"salient-concept"}
 proposed by the stage: k1
 `;
 
@@ -128,7 +127,7 @@ const DESCRIBES_THE_CONCEPTS: StoryGenerationStageJob = {
     progress: {
         steps: [{ doing: "concepts", done: 0, of: 1, seconds: 0, secondsPerItem: null, state: "running", steps: [] }],
     },
-    asked: null,
+    story: null,
 };
 
 const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
@@ -137,11 +136,7 @@ const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
     progress: {
         steps: [{ doing: "concepts", done: 1, of: 1, seconds: 0, secondsPerItem: null, state: "done", steps: [] }],
     },
-    asked: {
-        stage: "concepts",
-        story: THE_STORY_REVIEWED,
-        shown: { kind: "cells", cellKind: "salient-concept" },
-    },
+    story: THE_STORY_REVIEWED,
 };
 
 const STOPPED_IN_THE_CONCEPTS: StoryGenerationStageJob = {
@@ -150,7 +145,7 @@ const STOPPED_IN_THE_CONCEPTS: StoryGenerationStageJob = {
     progress: {
         steps: [{ doing: "concepts", done: 0, of: 1, seconds: 0, secondsPerItem: null, state: "done", steps: [] }],
     },
-    asked: null,
+    story: null,
 };
 
 const REVIEWS_THE_CONCEPTS = {
@@ -341,7 +336,6 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
-review shows: {"kind":"cells","cellKind":"salient-concept"}
 `);
 
         await session.storyGenerationWorkflow.accept();
@@ -374,7 +368,6 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
-review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
 `;
 
     it("flags as an error every character the author tied to no concept, and stays at the cast stage", async () => {
@@ -403,7 +396,6 @@ A mother's care.
 stage: concept titles: True
 stage: concepts: True
 stage: cast: Review
-review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
 `;
         const session = openStory(noCast);
 
@@ -446,7 +438,6 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
-review shows: {"kind":"command","cellKind":"character","commandName":"insertCell"}
 `;
         const session = openStory(everyoneTied);
 
@@ -522,7 +513,6 @@ stage: mesh: False
 stage: scenes: False
 stage: choices: False
 stage: validity: False
-review shows: {"kind":"cells","cellKind":"salient-concept"}
 `);
     });
 });
@@ -654,11 +644,7 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
                 json: () =>
                     Promise.resolve({
                         ...ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS,
-                        asked: {
-                            stage: "concepts",
-                            story: LEFT_OFF_AT_THE_CONCEPTS,
-                            shown: { kind: "cells", cellKind: "salient-concept" },
-                        },
+                        story: LEFT_OFF_AT_THE_CONCEPTS,
                     }),
             })
             .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
@@ -704,11 +690,7 @@ stage: validity: False
                         running: false,
                         error: null,
                         progress: { steps: [] },
-                        asked: {
-                            stage: "concept titles",
-                            story: NEVER_GENERATED,
-                            shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
-                        },
+                        story: NEVER_GENERATED,
                     }),
             })
             .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
@@ -727,27 +709,6 @@ stage: validity: False
         await session.storyGenerationWorkflow.showWhereItStands();
 
         expect(session.theStoryGeneration).toEqual(REVIEWS_THE_CONCEPTS);
-    });
-
-    it("brings back the review in the editor when the checkpoint does not say what it shows", async () => {
-        const awaitingReviewWithNothingShown = `<!-- cell: markdown id="c1" -->
-
-She saw the door.
-
-<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
-
-stage: concept titles: True
-stage: concepts: Review
-`;
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(NO_STAGE_RUNS));
-        const session = openStory(awaitingReviewWithNothingShown);
-
-        await session.storyGenerationWorkflow.showWhereItStands();
-
-        expect(session.theStoryGeneration?.asked).toEqual({
-            stage: "concepts",
-            shown: { kind: "editor" },
-        });
     });
 
     it("leaves the review the story's file awaits alone while the server still holds what the stage left", async () => {

@@ -5,7 +5,7 @@ from collections.abc import AsyncIterable, AsyncIterator, Iterable, Iterator, Si
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Any, Generator, Generic, TypeVar
 
 WorkItem = TypeVar("WorkItem")
 
@@ -64,7 +64,7 @@ _work_being_done: ContextVar[WorkProgress | None] = ContextVar(
 
 
 @contextmanager
-def reporting_progress_to(work: WorkProgress) -> Iterator[None]:
+def reporting_progress_to(work: WorkProgress) -> Generator[None, None, None]:
     work.began = time.monotonic()
     reporting = _work_being_done.set(work)
     try:

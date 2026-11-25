@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from authordoc.cells.place_cell import PlaceCell
-from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 INSTRUCTIONS = """You help an author mesh the plots of an interactive story into one world. The story is built from its salient concepts: every concept has a plot that illustrates it, and every plot respects every concept, so that a character who is a mother acts as a mother in whichever plot she appears.
@@ -184,8 +182,6 @@ class Mesh(Stage):
 
         return mesh_steps
 
-    def shown(self) -> Shown:
-        return CellsShown(PLOT)
 
 
 def _parse_event_str(event_str: str) -> tuple[str, str]:

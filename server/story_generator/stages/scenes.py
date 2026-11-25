@@ -8,7 +8,6 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 SCENE_INSTRUCTIONS = """You write one scene of an interactive story, the way a text adventure such as Zork shows a location: whoever reads it may have come to it from anywhere in the story, so it stands on its own. It says nothing of what happened before it, and nothing of what may happen after it. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself. Write in the third person and the past tense.
@@ -68,5 +67,3 @@ class Scenes(Stage):
         scene_steps: list[StageStep] = [SceneStep(events, model) for events in events_of_scene.values()]
         return scene_steps
 
-    def shown(self) -> Shown:
-        return EditorShown()

@@ -9,7 +9,6 @@ from typing import Any
 from authordoc.storydoc import Document
 from server.jobs import Job
 from server.progress import with_progress
-from server.story_generator.review import Asked
 from server.story_generator.stage import Stage
 
 
@@ -22,17 +21,15 @@ class StoryGenerationJob(Job):
         self._stage = stage
         self._path = path
         self._story = story
-        self.asked: Asked | None = None
+        self.story_generated: str | None = None
 
     async def execute(self) -> None:
         document = Document(self._story, self._path)
         steps = self._stage.run(document)
         for step in with_progress(steps, self._stage_name):
             document = await step(document)
-        shown = self._stage.shown()
-        self.asked = Asked(self._stage_name, document.text, shown)
+        self.story_generated = document.text
 
     def snapshot(self) -> dict[str, Any]:
         progress = self.progress.reported()
-        asked = None if self.asked is None else self.asked.written()
-        return {"progress": progress, "asked": asked}
+        return {"progress": progress, "story": self.story_generated}

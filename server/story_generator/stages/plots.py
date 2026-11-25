@@ -5,12 +5,11 @@ from uuid import uuid4
 
 from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.place_cell import PlaceCell
-from authordoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
+from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | characters | what happens.
@@ -239,8 +238,6 @@ class Plots(Stage):
             spans = halves
         return plot_steps
 
-    def shown(self) -> Shown:
-        return CellsShown(PLOT)
 
 
 

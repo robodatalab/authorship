@@ -7,7 +7,6 @@ from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 CHOICES_INSTRUCTIONS = """You write the choices that end one scene of an interactive story. You are the story's narrator and its only witness: you never take part in what happens and never mention yourself.
@@ -93,5 +92,3 @@ class Choices(Stage):
 
         return choices_steps
 
-    def shown(self) -> Shown:
-        return EditorShown()

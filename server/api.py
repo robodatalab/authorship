@@ -224,7 +224,7 @@ class StoryGenerationRequest(BaseModel):
 @app.post("/generate/story", status_code=202)
 def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
     """Run a stage of generating the story with its author; poll
-    /generate/story/status for what it asks them."""
+    /generate/story/status for the story it generates."""
     make_the_stage = STAGES_BY_NAME.get(request.stage)
     if make_the_stage is None:
         raise HTTPException(status_code=400, detail=f"No stage {request.stage}")

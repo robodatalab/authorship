@@ -10,7 +10,6 @@ from authordoc.cells.plot_cell import PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from server.progress import with_progress
-from server.story_generator.review import EditorShown, Shown
 from server.story_generator.stage import Stage, StageStep
 
 # How many times every plot is played from its start, taking each option every
@@ -233,8 +232,6 @@ class Validity(Stage):
         validity_steps = [*plot_steps, scene_counts_step]
         return validity_steps
 
-    def shown(self) -> Shown:
-        return EditorShown()
 
 
 class ExposureTracker:
