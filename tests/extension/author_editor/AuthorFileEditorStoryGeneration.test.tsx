@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { AuthorFileEditorStoryGeneration } from "../../../extension/webview/author_editor/AuthorFileEditorStoryGeneration";
-import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation";
+import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation/story_generation";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 

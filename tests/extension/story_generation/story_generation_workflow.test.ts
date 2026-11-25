@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ReviewTheSuggestionCommand } from "../../extension/vscode_runtime/commands/review_the_suggestion";
-import type { StoryGenerationStageJob } from "../../extension/vscode_runtime/story_generation";
-import { executedCommands, files, shownMessages } from "./vscode";
+import { ReviewTheSuggestionCommand } from "../../../extension/vscode_runtime/commands/review_the_suggestion";
+import type { StoryGenerationStageJob } from "../../../extension/vscode_runtime/story_generation/story_generation";
+import { executedCommands, files, shownMessages } from "../vscode";
 import {
     closeTheStoryEditor,
     forgetWhatTheEditorDid,
     openStory,
     sentToThePage,
     STORY_FILE,
-} from "./commands/open_story";
+} from "../commands/open_story";
 
 const NEVER_GENERATED = `<!-- cell: markdown id="c1" -->
 

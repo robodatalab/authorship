@@ -9,9 +9,9 @@ import { AuthorDocDiff } from "authordoc/diff";
 import { parse } from "authordoc/parser";
 import { Document } from "authordoc/storydoc";
 import { Suggestion } from "authordoc/suggestion";
-import type { AuthorFileEditorSession } from "./author_file_editor_session";
-import { fetchFromServer } from "./server/fetch";
-import { awaitServerJob, startServerJob } from "./server/jobs";
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import { fetchFromServer } from "../server/fetch";
+import { awaitServerJob, startServerJob } from "../server/jobs";
 import type {
     StoryGeneration,
     StoryGenerationShown,

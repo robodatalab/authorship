@@ -12,10 +12,6 @@ import { AuthorFileEditorSuggestionNavigator } from "./AuthorFileEditorSuggestio
 import { AuthorFileEditorStoryGraph } from "./AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "./StoryGraphLayout";
 import {
-    placeMayLieWithin,
-    placesNestedIn,
-} from "../../vscode_runtime/place_hierarchy";
-import {
     AuthorFileEditorCellState,
     isDrawnOnCell,
 } from "./AuthorFileEditorCell";
@@ -31,7 +27,7 @@ import {
 import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
 import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
-import type { StoryGeneration } from "../../vscode_runtime/story_generation";
+import type { StoryGeneration } from "../../vscode_runtime/story_generation/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { CHARACTER } from "authordoc/cells/character_cell";
@@ -55,7 +51,7 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import { withEverySuggestionApplied } from "../../vscode_runtime/suggestions_applied";
+import { withEverySuggestionApplied } from "../../vscode_runtime/tools/suggestions_applied";
 import {
     MarkdownEditorMediator,
     type MarkdownEditorStoryTextHighlight,
@@ -85,6 +81,18 @@ function paneHoldingTheKind(kind: string): string {
     return KINDS_IN_THE_METADATA_PANE.has(kind)
         ? METADATA_PANE
         : MANUSCRIPT_PANE;
+}
+
+function canBeMovedInto(
+    place: PlaceCell,
+    around: PlaceCell,
+    story: Document,
+): boolean {
+    const aroundTheAround = around.ancestors(story);
+    const aroundLiesWithinThePlace = aroundTheAround.some(
+        (outer) => outer.uniqueId === place.uniqueId,
+    );
+    return around.uniqueId !== place.uniqueId && !aroundLiesWithinThePlace;
 }
 
 export interface WebviewAuthorDocumentCommandCard {
@@ -222,15 +230,11 @@ export function AuthorFileEditorCanvas({
         () => cellsBySection(cellsAsSuggested),
         [cellsAsSuggested],
     );
-    const placesNestedInEachPlace = useMemo(
-        () => placesNestedIn(storyAsSuggested),
-        [storyAsSuggested],
-    );
-    const placeIdsNested = useMemo(() => {
-        const placesNested = [...placesNestedInEachPlace.values()].flat();
-        const ids = placesNested.map((place) => place.uniqueId);
+    const topLevelPlaceIds = useMemo(() => {
+        const topLevelPlaces = storyAsSuggested.places();
+        const ids = topLevelPlaces.map((place) => place.uniqueId);
         return new Set(ids);
-    }, [placesNestedInEachPlace]);
+    }, [storyAsSuggested]);
     const storyWords = useMemo(
         () => new StoryWordsIterator(storyAsSuggested),
         [storyAsSuggested],
@@ -666,7 +670,7 @@ export function AuthorFileEditorCanvas({
             placeHoldingTheGap === null
                 ? draggedWithinItsPane
                 : cellDragged instanceof PlaceCell &&
-                  placeMayLieWithin(
+                  canBeMovedInto(
                       cellDragged,
                       placeHoldingTheGap,
                       storyAsSuggested,
@@ -700,8 +704,8 @@ export function AuthorFileEditorCanvas({
         }
         const landsHere =
             cellDragged instanceof PlaceCell &&
-            placeMayLieWithin(cellDragged, cell, storyAsSuggested);
-        const nestedInIt = placesNestedInEachPlace.get(cell.uniqueId) ?? [];
+            canBeMovedInto(cellDragged, cell, storyAsSuggested);
+        const nestedInIt = cell.children(storyAsSuggested);
         const lastNested = nestedInIt[nestedInIt.length - 1];
         const beforeCellId = cellFollowing(lastNested ?? cell);
         return dropZone(cell.uniqueId, landsHere, () =>
@@ -885,7 +889,7 @@ export function AuthorFileEditorCanvas({
     }
 
     function placesWithinThePlace(place: PlaceCell): ReactNode {
-        const within = placesNestedInEachPlace.get(place.uniqueId) ?? [];
+        const within = place.children(storyAsSuggested);
         if (within.length === 0 || place.folded) {
             return null;
         }
@@ -951,7 +955,8 @@ export function AuthorFileEditorCanvas({
                         whatFollowsTheScope;
                     if (
                         !sectionsInThePane.includes(section) ||
-                        placeIdsNested.has(cell.uniqueId)
+                        (cell instanceof PlaceCell &&
+                            !topLevelPlaceIds.has(cell.uniqueId))
                     ) {
                         return null;
                     }

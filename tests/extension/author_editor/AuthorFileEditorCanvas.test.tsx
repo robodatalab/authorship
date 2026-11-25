@@ -12,7 +12,7 @@ import {
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
-import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation";
+import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation/story_generation";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -2288,6 +2288,7 @@ describe("moving cells by dragging them", () => {
             [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "v1", parentCellId: "hv" } }],
         ],
         ["nothing for a place dropped onto a place within it", "en", "li[data-cell-id='ln']", []],
+        ["nothing for a place dropped onto itself", "en", "li[data-cell-id='en']", []],
         ["nothing for a cell dropped in the other pane", "v1", FIRST_GAP_OF_THE_MANUSCRIPT, []],
         ["nothing for a cell that is not a place dropped within a place", "v1", FIRST_GAP_WITHIN_ENGLAND, []],
         ["nothing for a cell that is not a place dropped onto a place", "v1", "li[data-cell-id='hg']", []],

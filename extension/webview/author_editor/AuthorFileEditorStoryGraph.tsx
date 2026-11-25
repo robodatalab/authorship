@@ -1,8 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { CharacterCell } from "authordoc/cells/character_cell";
-import { PlaceCell } from "authordoc/cells/place_cell";
+import { DepthFirstPlacesIterator } from "authordoc/iterators/depth_first_places_iterator";
 import type { Document } from "authordoc/storydoc";
-import { placesNestedIn } from "../../vscode_runtime/place_hierarchy";
 import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
 import {
     StoryGraphLayout,
@@ -38,20 +37,15 @@ const CHARACTERS_VIEW: AuthorFileEditorStoryGraphView = {
 };
 
 function railsOfTheNestedPlaces(story: Document): (readonly [string, string, number])[] {
-    const nestedInEachPlace = placesNestedIn(story);
-    const placesNested = [...nestedInEachPlace.values()].flat();
-    const places = story.cells.filter((cell) => cell instanceof PlaceCell);
-    const outermost = places.filter((place) => !placesNested.includes(place));
+    const topLevelPlaces = story.places();
     const rails: (readonly [string, string, number])[] = [];
-    const railTheNestedPlaces = (place: PlaceCell, depth: number): void => {
-        rails.push([place.uniqueId, place.title || UNTITLED, depth]);
-        const nested = nestedInEachPlace.get(place.uniqueId) ?? [];
-        for (const inner of nested) {
-            railTheNestedPlaces(inner, depth + 1);
+    for (const place of topLevelPlaces) {
+        rails.push([place.uniqueId, place.title || UNTITLED, 0]);
+        const placesWithin = new DepthFirstPlacesIterator(story, place);
+        for (const nested of placesWithin) {
+            const depth = nested.ancestors(story).length;
+            rails.push([nested.uniqueId, nested.title || UNTITLED, depth]);
         }
-    };
-    for (const place of outermost) {
-        railTheNestedPlaces(place, 0);
     }
     return rails;
 }

@@ -1,4 +1,4 @@
-import type { ServerJob } from "./server/jobs";
+import type { ServerJob } from "../server/jobs";
 
 // The cells of a kind, in the editor's metadata pane.
 export interface StoryGenerationCellsShown {

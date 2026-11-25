@@ -1,6 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlaceCell } from "authordoc/cells/place_cell";
-import { placeMayLieWithin } from "../place_hierarchy";
 import type { AuthorDocumentCommand } from "./author_document_command";
 import { moveTheSection } from "./move_cell";
 
@@ -24,9 +23,6 @@ export class MovePlaceCommand implements AuthorDocumentCommand {
             }
             const named = story.cellWithId(parentCellId);
             const parent = named instanceof PlaceCell ? named : null;
-            if (parent !== null && !placeMayLieWithin(place, parent, story)) {
-                return story;
-            }
             const moved = moveTheSection(story, placeCellId, beforeCellId);
             const placed = place.withParent(parent);
             const storyChanged = moved.withCell(placed);

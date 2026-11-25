@@ -2,7 +2,7 @@ import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
 } from "./AuthorFileEditorCanvas";
-import type { StoryGeneration } from "../../vscode_runtime/story_generation";
+import type { StoryGeneration } from "../../vscode_runtime/story_generation/story_generation";
 import { onTheClock } from "../elapsed_time";
 import "./AuthorFileEditorStoryGeneration.css";
 

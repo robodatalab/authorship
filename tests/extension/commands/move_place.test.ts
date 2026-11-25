@@ -21,8 +21,6 @@ describe("MovePlaceCommand — moves a place within another", () => {
         ["moves it to the place given", "ln", "hg", "hg", ["en", "hv", "ln", "hg", "v1"], "hg"],
         ["takes it out of its parent, given none", "hv", "v1", "", ["en", "ln", "hg", "hv", "v1"], ""],
         ["takes it out of its parent, given a cell that is not a place", "hv", "v1", "v1", ["en", "ln", "hg", "hv", "v1"], ""],
-        ["leaves it where it is rather than within itself", "hv", "en", "hv", ["en", "hv", "ln", "hg", "v1"], "en"],
-        ["leaves it where it is rather than within a place that lies within it", "en", "hg", "ln", ["en", "hv", "ln", "hg", "v1"], ""],
     ])("%s", (_, placeCellId, beforeCellId, parentCellId, expectedCellIds, expectedParent) => {
         const session = openStory(THE_STORY);
 

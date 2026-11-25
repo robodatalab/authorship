@@ -33,12 +33,12 @@ import { WordCounter } from "authordoc/synchronizers/word_counter";
 import type {
     StoryGeneration,
     StoryGenerationStageJob,
-} from "./story_generation";
+} from "./story_generation/story_generation";
 import {
     StoryGenerationWorkflow,
     storyGenerationOf,
-} from "./story_generation_workflow";
-import { withEverySuggestionApplied } from "./suggestions_applied";
+} from "./story_generation/story_generation_workflow";
+import { withEverySuggestionApplied } from "./tools/suggestions_applied";
 
 export class AuthorFileEditorSession
     implements vscode.CustomDocument, MessageQueueListener
