@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 
@@ -18,7 +17,7 @@ class EpubDisclaimerPage(EpubItem):
         disclaimer_page = cls("disclaimer", title, source, metadata.language)
         return disclaimer_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         name = self.title or "Disclaimer"
         heading = tools.inline_to_xhtml(name)
         source_lines = self.source.splitlines()

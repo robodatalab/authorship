@@ -3,6 +3,7 @@ from server.publishing.tools.markdown_to_xhtml_converter import (
     blocks_to_xhtml,
     inline_to_xhtml,
 )
+from server.publishing.tools.epub_writer import EpubWriter, page_filename
 from server.publishing.tools.epub_content_validation import (
     CLOSING,
     OPENING,
@@ -13,6 +14,7 @@ from server.publishing.tools.epub_content_validation import (
 
 __all__ = [
     "CLOSING",
+    "EpubWriter",
     "OPENING",
     "SECTION_TITLE",
     "TEXT",
@@ -20,4 +22,5 @@ __all__ = [
     "can_convert_to_epub",
     "find_required_cell_indexes",
     "inline_to_xhtml",
+    "page_filename",
 ]

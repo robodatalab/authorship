@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.publishing.epub_items.epub_item import EpubItem
-from server.publishing.epub_writer import EpubWriter
+from server.publishing import tools
 
 # A name with nothing under it: a part divider, or a chapter whose prose has not
 # been written yet. The reader turns to a page holding one line, and it is set in
@@ -70,6 +70,6 @@ p.image img { max-width: 100%; max-height: 45vh; width: auto; height: auto; }
 
 
 class EpubStylesheet(EpubItem):
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         epub_writer.write_file("OEBPS/style.css", CSS)
         epub_writer.add_manifest_item("css", "style.css", "text/css")

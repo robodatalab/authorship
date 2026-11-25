@@ -4,7 +4,7 @@ import mimetypes
 from pathlib import Path
 
 from server.publishing.epub_items.epub_item import EpubItem
-from server.publishing.epub_writer import EpubWriter
+from server.publishing import tools
 
 
 class EpubImage(EpubItem):
@@ -15,7 +15,7 @@ class EpubImage(EpubItem):
         self.href = f"{self.id}{self.source.suffix.lower() or '.jpg'}"
         self.media = mimetypes.guess_type(self.source.name)[0] or "image/jpeg"
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         image_bytes = self.source.read_bytes()
         epub_writer.write_file(f"OEBPS/{self.href}", image_bytes)
         if self.is_cover:

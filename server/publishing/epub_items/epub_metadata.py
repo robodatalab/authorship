@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from authordoc.storydoc import Document
 
 from server.publishing.epub_items.epub_item import EpubItem
-from server.publishing.epub_writer import EpubWriter
+from server.publishing import tools
 
 DEFAULT_LANGUAGE = "en"
 
@@ -52,7 +52,7 @@ class EpubMetadata(EpubItem):
             book_id=uuid.uuid4(),
         )
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         title = html.escape(self.title)
         language = html.escape(self.language)
         modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

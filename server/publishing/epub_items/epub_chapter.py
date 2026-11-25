@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_items.epub_stylesheet import ALONE_ON_THE_PAGE
-from server.publishing.epub_writer import EpubWriter, page_filename
 from server.publishing import tools
 
 
@@ -26,9 +25,9 @@ class EpubChapter(EpubItem):
 
     @property
     def filename(self) -> str:
-        return page_filename(self.id)
+        return tools.page_filename(self.id)
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         # A chapter cell carries the name and no prose of its own, so the heading
         # is put back onto the page here.
         name = f"<h{tools.SECTION_TITLE}>{tools.inline_to_xhtml(self.name)}</h{tools.SECTION_TITLE}>"

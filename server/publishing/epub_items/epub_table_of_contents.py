@@ -12,7 +12,6 @@ from server.publishing.epub_items.epub_chapter import EpubChapter
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_items.epub_part_page import EpubPartPage
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 CONTENTS_PAGE_ID = "contents"
@@ -110,13 +109,13 @@ class EpubTableOfContents(EpubItem):
         )
         return table_of_contents
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         if self.has_contents_page:
             self._export_contents_page(epub_writer)
         self._export_navigation_document(epub_writer)
         self._export_ncx(epub_writer)
 
-    def _export_contents_page(self, epub_writer: EpubWriter) -> None:
+    def _export_contents_page(self, epub_writer: tools.EpubWriter) -> None:
         items = render_table_of_contents_items(self.entries, "    ", tools.inline_to_xhtml)
         body_xhtml = (
             '<div class="contents">\n  <h1>Contents</h1>\n  <ol>\n'
@@ -124,7 +123,7 @@ class EpubTableOfContents(EpubItem):
         )
         epub_writer.write_page(CONTENTS_PAGE_ID, CONTENTS_TITLE, self.language, body_xhtml)
 
-    def _export_navigation_document(self, epub_writer: EpubWriter) -> None:
+    def _export_navigation_document(self, epub_writer: tools.EpubWriter) -> None:
         language = self.language
         title = html.escape(self.book_title)
         items = render_table_of_contents_items(self.entries, "      ", html.escape)
@@ -147,7 +146,7 @@ class EpubTableOfContents(EpubItem):
         epub_writer.write_file("OEBPS/nav.xhtml", nav_xhtml)
         epub_writer.add_manifest_item("nav", "nav.xhtml", "application/xhtml+xml", "nav")
 
-    def _export_ncx(self, epub_writer: EpubWriter) -> None:
+    def _export_ncx(self, epub_writer: tools.EpubWriter) -> None:
         nav_points, _ = render_ncx_nav_points(self.entries, "    ", 0)
         depth = max(1, table_of_contents_depth(self.entries))
         title = html.escape(self.book_title)

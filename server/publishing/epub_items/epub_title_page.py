@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 
@@ -27,7 +26,7 @@ class EpubTitlePage(EpubItem):
         )
         return title_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         title_page_lines = [f'  <h1 class="book-title">{tools.inline_to_xhtml(self.title)}</h1>']
         if self.subtitle:
             title_page_lines.append(f'  <p class="subtitle">{tools.inline_to_xhtml(self.subtitle)}</p>')

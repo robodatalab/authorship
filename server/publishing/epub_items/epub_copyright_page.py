@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 # What the page says whatever book it stands in, and what it says about this one.
@@ -59,7 +58,7 @@ class EpubCopyrightPage(EpubItem):
         )
         return copyright_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         year = copyright_year(self.date)
         rights_holders = " and ".join(
             who for who in (self.author, self.publisher) if who

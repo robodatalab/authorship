@@ -3,7 +3,7 @@ from __future__ import annotations
 from server.publishing.epub_items.epub_image import EpubImage
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
+from server.publishing import tools
 
 
 class EpubImagePage(EpubItem):
@@ -18,6 +18,6 @@ class EpubImagePage(EpubItem):
         image_page = cls(f"{image.id}_page", image.href, metadata.title, metadata.language)
         return image_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         body_xhtml = f'<div class="image-page"><img src="{self.image_href}" alt=""/></div>'
         epub_writer.write_page(self.id, self.book_title, self.language, body_xhtml)

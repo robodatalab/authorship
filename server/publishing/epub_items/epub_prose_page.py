@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 # Prose the author left standing outside every chapter — a dedication, an
@@ -23,7 +22,7 @@ class EpubProsePage(EpubItem):
         prose_page = cls(f"{LOOSE}{number:03d}", lines, metadata.title, metadata.language)
         return prose_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         written = tools.blocks_to_xhtml(self.lines)
         body_xhtml = f'<div class="chapter">\n{written}\n</div>'
         epub_writer.write_page(self.id, self.book_title, self.language, body_xhtml)

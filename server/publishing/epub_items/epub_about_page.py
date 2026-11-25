@@ -6,7 +6,6 @@ from authordoc import cells
 
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
-from server.publishing.epub_writer import EpubWriter
 from server.publishing import tools
 
 ABOUT_TITLE = "About the Author"
@@ -37,7 +36,7 @@ class EpubAboutPage(EpubItem):
         )
         return about_page
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         # Where the reader is sent once the story has let them go. Mirrors the editor's
         # own list, so a link added there is a link printed here.
         author_links = [

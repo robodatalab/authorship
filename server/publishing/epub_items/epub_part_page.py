@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.publishing.epub_items.epub_item import EpubItem
 from server.publishing.epub_items.epub_metadata import EpubMetadata
 from server.publishing.epub_items.epub_stylesheet import ALONE_ON_THE_PAGE
-from server.publishing.epub_writer import EpubWriter, page_filename
 from server.publishing import tools
 
 
@@ -25,9 +24,9 @@ class EpubPartPage(EpubItem):
 
     @property
     def filename(self) -> str:
-        return page_filename(self.id)
+        return tools.page_filename(self.id)
 
-    def export(self, epub_writer: EpubWriter) -> None:
+    def export(self, epub_writer: tools.EpubWriter) -> None:
         part_name = tools.inline_to_xhtml(self.name)
         body_xhtml = f'<div class="{ALONE_ON_THE_PAGE}">\n<h1>{part_name}</h1>\n</div>'
         epub_writer.write_page(self.id, self.name, self.language, body_xhtml)
