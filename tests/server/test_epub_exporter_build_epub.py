@@ -773,6 +773,25 @@ class BuildEpub(unittest.TestCase):
             self.root,
             ChapterCell("One"),
             MarkdownCell("prose"),
+            TitlePageCell(title="Book"),
+            TitlePageCell(title="Book"),
+        )
+
+        with zipfile.ZipFile(out) as z:
+            opf = z.read("OEBPS/content.opf").decode("utf-8")
+
+        order = [
+            line.split('idref="')[1].split('"')[0]
+            for line in opf.splitlines()
+            if "itemref" in line
+        ]
+        self.assertEqual(order, ["titlepage", "copyright", "chap_000", "titlepage_2", "copyright_2"])
+
+    def test_a_second_contents_cell_adds_no_second_contents_page(self) -> None:
+        out = written(
+            self.root,
+            ChapterCell("One"),
+            MarkdownCell("prose"),
             TableOfContentsCell(),
             TableOfContentsCell(),
         )
@@ -785,7 +804,7 @@ class BuildEpub(unittest.TestCase):
             for line in opf.splitlines()
             if "itemref" in line
         ]
-        self.assertEqual(order, ["contents", "chap_000", "contents_2"])
+        self.assertEqual(order, ["contents", "chap_000"])
 
     def test_prose_standing_outside_every_chapter_is_still_printed(self) -> None:
         out = written(

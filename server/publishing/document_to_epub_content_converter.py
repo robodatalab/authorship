@@ -4,7 +4,7 @@ from pathlib import Path
 
 from authordoc import cells
 from authordoc.storydoc import Document
-from authordoc.story_sections import CellsInASection, cells_by_section
+from authordoc.story_sections import cells_by_section
 
 from server.publishing import epub_items
 
@@ -15,7 +15,6 @@ REQUIRED = OPENING + CLOSING
 EpubSpineItem = (
     epub_items.EpubAboutPage
     | epub_items.EpubChapter
-    | epub_items.EpubContentsPage
     | epub_items.EpubCopyrightPage
     | epub_items.EpubCoverPage
     | epub_items.EpubDisclaimerPage
@@ -42,39 +41,29 @@ def read_book(document: Document) -> list[epub_items.EpubItem]:
 
     _name_apart(binding.documents)
     sections = cells_by_section(cells_in_export_order)
-    table_of_contents = _build_table_of_contents(sections, binding.page_of_cell)
-    for contents_page in binding.contents_pages:
-        contents_page.table_of_contents = table_of_contents
-    navigation_document = epub_items.EpubNavigationDocument.create(metadata, table_of_contents)
-    ncx = epub_items.EpubNcx.create(metadata, table_of_contents)
-    items_in_export_order: list[epub_items.EpubItem] = [
+    has_contents_page = binding.contents_page_position is not None
+    table_of_contents = epub_items.EpubTableOfContents.create(
+        sections, binding.page_by_cell_id, has_contents_page, metadata
+    )
+    package_files: list[epub_items.EpubItem] = [
         epub_items.EpubMimetypeFile(),
         epub_items.EpubContainerFile(),
         metadata,
         epub_items.EpubStylesheet(),
-        navigation_document,
-        ncx,
+    ]
+    if binding.contents_page_position is None:
+        items_in_export_order = [*package_files, table_of_contents, *binding.art, *binding.documents]
+        return items_in_export_order
+    pages_before_contents = binding.documents[: binding.contents_page_position]
+    pages_after_contents = binding.documents[binding.contents_page_position :]
+    items_in_export_order = [
+        *package_files,
         *binding.art,
-        *binding.documents,
+        *pages_before_contents,
+        table_of_contents,
+        *pages_after_contents,
     ]
     return items_in_export_order
-
-
-def _build_table_of_contents(
-    sections: list[CellsInASection], page_of_cell: dict[str, epub_items.EpubChapter | epub_items.EpubPartPage]
-) -> list[epub_items.Listing]:
-    table_of_contents: list[epub_items.Listing] = []
-    for section in sections:
-        if section.cell.kind == cells.CHAPTER:
-            chapter_page = page_of_cell[section.cell.unique_id]
-            chapter_entry = epub_items.Listing(chapter_page.name, chapter_page.filename, [])
-            table_of_contents.append(chapter_entry)
-        elif section.cell.kind == cells.PART:
-            part_page = page_of_cell[section.cell.unique_id]
-            chapter_entries = _build_table_of_contents(section.within, page_of_cell)
-            part_entry = epub_items.Listing(part_page.name, part_page.filename, chapter_entries)
-            table_of_contents.append(part_entry)
-    return table_of_contents
 
 
 def cell_export_order_of(document_cells: list[cells.Cell]) -> list[cells.Cell]:
@@ -112,10 +101,10 @@ class _BookBinding(cells.CellVisitor[None]):
         self.metadata = metadata
         self.root = root
         self.documents: list[EpubSpineItem] = []
-        self.contents_pages: list[epub_items.EpubContentsPage] = []
+        self.contents_page_position: int | None = None
         self.art: list[epub_items.EpubImage] = []
         self.cover: epub_items.EpubImage | None = None
-        self.page_of_cell: dict[str, epub_items.EpubChapter | epub_items.EpubPartPage] = {}
+        self.page_by_cell_id: dict[str, epub_items.EpubChapter | epub_items.EpubPartPage] = {}
         self.chapters = 0
         self.parts = 0
 
@@ -126,13 +115,13 @@ class _BookBinding(cells.CellVisitor[None]):
     def visit_chapter(self, cell: cells.ChapterCell) -> None:
         chapter = epub_items.EpubChapter.create(self.chapters, cell.title, self.metadata)
         self.documents.append(chapter)
-        self.page_of_cell[cell.unique_id] = chapter
+        self.page_by_cell_id[cell.unique_id] = chapter
         self.chapters += 1
 
     def visit_part(self, cell: cells.PartCell) -> None:
         part = epub_items.EpubPartPage.create(self.parts, cell.title, self.metadata)
         self.documents.append(part)
-        self.page_of_cell[cell.unique_id] = part
+        self.page_by_cell_id[cell.unique_id] = part
         self.parts += 1
 
     def visit_title_page(self, cell: cells.TitlePageCell) -> None:
@@ -164,9 +153,8 @@ class _BookBinding(cells.CellVisitor[None]):
     def visit_table_of_contents(self, cell: cells.TableOfContentsCell) -> None:
         # Built here rather than taken from the cell: on the page a table of
         # contents is a list of names, in a book it is a list of links.
-        contents_page = epub_items.EpubContentsPage.create(self.metadata)
-        self.contents_pages.append(contents_page)
-        self.documents.append(contents_page)
+        if self.contents_page_position is None:
+            self.contents_page_position = len(self.documents)
 
     def visit_disclaimer(self, cell: cells.DisclaimerCell) -> None:
         if not cell.source.strip():
