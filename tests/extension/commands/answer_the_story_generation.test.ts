@@ -14,7 +14,8 @@ She saw the door.
 
 <!-- cell: GeneratedDocumentCheckpoint id="g1" -->
 
-stage: concept titles: Review
+stage: concept titles: True
+stage: concepts: Review
 `;
 
 beforeEach(forgetWhatTheEditorDid);
@@ -74,7 +75,7 @@ She saw the door.
 
 <!-- cell: GeneratedDocumentCheckpoint id="g1" -->
 
-stage: concept titles: False
+stage: concept titles: True
 stage: concepts: False
 stage: cast: False
 stage: plots: False
@@ -83,7 +84,7 @@ stage: scenes: False
 stage: choices: False
 stage: validity: False
 `,
-            stage: "concept titles",
+            stage: "concepts",
         });
     });
 });

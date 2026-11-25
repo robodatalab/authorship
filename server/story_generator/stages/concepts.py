@@ -62,13 +62,6 @@ class DescribeConceptsStep(StageStep):
         return with_the_concepts_described
 
 
-class ConceptTitles(Stage):
-    """The concepts of the author's choosing: the stage does no work of its own,
-    and the author adds the concepts at its review, in the metadata pane."""
-
-    def run(self, document: Document) -> list[StageStep]:
-        return []
-
 
 
 class Concepts(Stage):

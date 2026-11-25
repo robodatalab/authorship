@@ -50,19 +50,6 @@ class StoryGenerationStage(unittest.TestCase):
 
         self.addCleanup(_restore_model)
 
-    def test_runs_the_stage_it_is_given_and_reports_the_story_it_generated(self) -> None:
-        model = build_fake_completion_model()
-        app.state.writing_deployment = build_fake_deployment(model)
-
-        started = TestClient(app).post(
-            "/generate/story",
-            json={"path": str(self.document), "story": "", "stage": "concept titles"},
-        )
-        job = run_the_job_started()
-
-        self.assertEqual(started.status_code, 202)
-        self.assertEqual(job.snapshot()["story"], "")
-
     def test_runs_the_stage_on_the_story_the_editor_sends(self) -> None:
         model = build_fake_completion_model("### Motherhood\nA mother's care.")
         app.state.writing_deployment = build_fake_deployment(model)

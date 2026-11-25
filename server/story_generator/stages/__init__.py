@@ -3,7 +3,7 @@ them.
 
 The stages run one after another, each on what the ones before it wrote:
 
-    concept titles → concepts → cast → plot ends → mesh → scenes → choices → validity
+    concepts → plot ends → mesh → scenes → choices → validity
 
 The story is built from its concepts: the author adds them; the author casts
 the main characters and writes their backstories; every concept gets a plot that
@@ -18,18 +18,15 @@ from collections.abc import Callable
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.stage import Stage
-from server.story_generator.stages.cast import Cast
 from server.story_generator.stages.choices import Choices
-from server.story_generator.stages.concepts import Concepts, ConceptTitles
+from server.story_generator.stages.concepts import Concepts
 from server.story_generator.stages.mesh import Mesh
 from server.story_generator.stages.plots import Plots
 from server.story_generator.stages.scenes import Scenes
 from server.story_generator.stages.validity import Validity
 
 STAGES_BY_NAME: dict[str, Callable[[cortexgrid.Deployment[CompletingModel]], Stage]] = {
-    "concept titles": lambda _: ConceptTitles(),
     "concepts": Concepts,
-    "cast": lambda _: Cast(),
     "plots": Plots,
     "mesh": Mesh,
     "scenes": Scenes,

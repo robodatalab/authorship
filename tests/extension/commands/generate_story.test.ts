@@ -7,6 +7,10 @@ const THE_STORY = `
 <!-- cell: markdown id="c1" -->
 
 She saw the door.
+
+<!-- cell: GeneratedDocumentCheckpoint id="g1" -->
+
+stage: concept titles: True
 `;
 
 beforeEach(forgetWhatTheEditorDid);
@@ -30,8 +34,10 @@ describe("GenerateStoryCommand — generates the story with the author", () => {
         expect(startedAt).toContain("/generate/story");
         expect(JSON.parse(started.body)).toEqual({
             path: STORY_FILE,
-            story: '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
-            stage: "concept titles",
+            story:
+                '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n\n' +
+                '<!-- cell: GeneratedDocumentCheckpoint id="g1" -->\n\nstage: concept titles: True\n',
+            stage: "concepts",
         });
     });
 });

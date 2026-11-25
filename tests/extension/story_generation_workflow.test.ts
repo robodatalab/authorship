@@ -102,7 +102,7 @@ She saw the door at last.
 
 stage: concept titles: True
 stage: concepts: True
-stage: cast: False
+stage: cast: Review
 stage: plots: False
 stage: mesh: False
 stage: scenes: False
@@ -181,7 +181,6 @@ afterEach(() => {
 
 describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not done", () => {
     it.each([
-        ["never generated", NEVER_GENERATED, "concept titles"],
         ["left off at the concepts", LEFT_OFF_AT_THE_CONCEPTS, "concepts"],
     ])(
         "on a story %s, runs %s on the story as the editor has it",
@@ -207,6 +206,22 @@ describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not d
             });
         },
     );
+
+    it("has the author add the concepts on a story never generated, without asking the server", async () => {
+        const fetched = vi.fn();
+        vi.stubGlobal("fetch", fetched);
+        const session = openStory(NEVER_GENERATED);
+
+        await session.storyGenerationWorkflow.runTheNextStage();
+
+        expect([fetched.mock.calls.length, session.theStoryGeneration?.asked]).toEqual([
+            0,
+            {
+                stage: "concept titles",
+                shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+            },
+        ]);
+    });
 
     it("runs nothing on a story generated to the end", async () => {
         const fetched = vi.fn();
@@ -292,7 +307,7 @@ describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not d
             "fetch",
             vi.fn().mockRejectedValueOnce(new Error("connection refused")),
         );
-        const session = openStory(NEVER_GENERATED);
+        const session = openStory(LEFT_OFF_AT_THE_CONCEPTS);
 
         await session.storyGenerationWorkflow.runTheNextStage();
 
@@ -313,14 +328,8 @@ describe("StoryGenerationWorkflow.accept — the author continues past a stage",
         expect([fetched.mock.calls.length, session.document.serialize()]).toEqual([0, THE_STORY_AWAITING_REVIEW]);
     });
 
-    it("saves the story with the stage done once no suggestion is left, and runs the next stage on it", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ id: STORY_FILE }),
-            })
-            .mockResolvedValueOnce(NO_STAGE_RUNS);
+    it("saves the story with the stage done once no suggestion is left, and has the author cast the characters, without asking the server", async () => {
+        const fetched = vi.fn();
         vi.stubGlobal("fetch", fetched);
         const session = openStory(`<!-- cell: markdown id="c1" -->
 
@@ -340,8 +349,7 @@ stage: validity: False
 
         await session.storyGenerationWorkflow.accept();
 
-        const [, started] = fetched.mock.calls[0];
-        expect([files.get(STORY_FILE), JSON.parse(started.body).stage]).toEqual([THE_STORY_ACCEPTED, "cast"]);
+        expect([files.get(STORY_FILE), fetched.mock.calls.length]).toEqual([THE_STORY_ACCEPTED, 0]);
     });
 });
 
@@ -635,7 +643,7 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
         ]);
     });
 
-    it("accepts a stage that changed nothing, with nothing to review, and runs the next stage", async () => {
+    it("accepts a stage that changed nothing, with nothing to review, and moves on to the next stage", async () => {
         files.set(STORY_FILE, LEFT_OFF_AT_THE_CONCEPTS);
         const fetched = vi
             .fn()
@@ -647,20 +655,14 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
                         story: LEFT_OFF_AT_THE_CONCEPTS,
                     }),
             })
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ id: STORY_FILE }),
-            })
-            .mockResolvedValueOnce(NO_STAGE_RUNS);
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
         vi.stubGlobal("fetch", fetched);
         const session = openStory(LEFT_OFF_AT_THE_CONCEPTS);
 
         await session.storyGenerationWorkflow.showWhereItStands();
 
-        const [, started] = fetched.mock.calls[2];
-        expect([JSON.parse(started.body).stage, files.get(STORY_FILE)]).toEqual([
-            "cast",
+        expect([fetched.mock.calls.length, files.get(STORY_FILE)]).toEqual([
+            2,
             `<!-- cell: markdown id="c1" -->
 
 She saw the door.
@@ -669,7 +671,7 @@ She saw the door.
 
 stage: concept titles: True
 stage: concepts: True
-stage: cast: False
+stage: cast: Review
 stage: plots: False
 stage: mesh: False
 stage: scenes: False
@@ -677,29 +679,6 @@ stage: choices: False
 stage: validity: False
 `,
         ]);
-    });
-
-    it("waits for the author after a stage that asks them to do something, though it changed nothing", async () => {
-        files.set(STORY_FILE, NEVER_GENERATED);
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () =>
-                    Promise.resolve({
-                        running: false,
-                        error: null,
-                        progress: { steps: [] },
-                        story: NEVER_GENERATED,
-                    }),
-            })
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
-        vi.stubGlobal("fetch", fetched);
-        const session = openStory(NEVER_GENERATED);
-
-        await session.storyGenerationWorkflow.showWhereItStands();
-
-        expect([fetched.mock.calls.length, session.theStoryGeneration?.asked?.stage]).toEqual([2, "concept titles"]);
     });
 
     it("brings back the review the story's file awaits, with no stage running", async () => {

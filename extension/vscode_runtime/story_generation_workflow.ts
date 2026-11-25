@@ -45,6 +45,11 @@ const SHOWN_BY_THE_STAGE: Readonly<Record<string, StoryGenerationShown>> = {
     validity: { kind: "editor" },
 };
 
+const STAGES_DONE_BY_THE_AUTHOR: ReadonlySet<string> = new Set([
+    "concept titles",
+    "cast",
+]);
+
 const CHECKPOINT = "GeneratedDocumentCheckpoint";
 
 const STAGE_IN_THE_CHECKPOINT = "stage: ";
@@ -358,6 +363,18 @@ export class StoryGenerationWorkflow {
         if (nextStage === undefined || stageAwaiting !== undefined) {
             return;
         }
+        if (STAGES_DONE_BY_THE_AUTHOR.has(nextStage.name)) {
+            this.session.changeTheDocument((document) => {
+                const documentAwaitingTheAuthor = withTheStageAwaitingReview(
+                    document,
+                    nextStage.name,
+                    [],
+                );
+                return documentAwaitingTheAuthor;
+            });
+            await this.session.writeTheDocumentToItsFile();
+            return;
+        }
         try {
             await startServerJob("/generate/story", {
                 path: this.session.document.path,
@@ -479,10 +496,7 @@ export class StoryGenerationWorkflow {
                 stageRun.name,
                 storyTheStageLeaves,
             );
-            const shown = SHOWN_BY_THE_STAGE[stageRun.name];
-            const nothingToReview =
-                shown.kind !== "command" && suggestionsMade === 0;
-            if (nothingToReview) {
+            if (suggestionsMade === 0) {
                 await this.accept();
             }
         }
