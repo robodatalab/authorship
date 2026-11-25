@@ -9,8 +9,8 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
-from server.api import app, ParallelJobsManager
-from server.jobs import Job
+from server.api import app
+from server.jobs import Job, ParallelJobsManager
 from authordoc.storydoc import Document
 from authordoc import storydoc
 from authordoc.cells.blurb_cell import BLURB, BlurbCell

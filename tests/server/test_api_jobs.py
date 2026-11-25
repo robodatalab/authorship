@@ -3,7 +3,8 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from server.api import app, ParallelJobsManager
+from server.api import app
+from server.jobs import ParallelJobsManager
 
 
 class Jobs(unittest.TestCase):

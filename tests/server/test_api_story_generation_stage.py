@@ -7,8 +7,8 @@ from unittest import mock
 from cortexgrid_infer import CompletionChunk
 from fastapi.testclient import TestClient
 
-from server.api import app, ParallelJobsManager
-from server.jobs import Job
+from server.api import app
+from server.jobs import Job, ParallelJobsManager
 
 
 DEFAULT_REPLY = (

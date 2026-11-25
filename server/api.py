@@ -8,30 +8,18 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from server import log
-from server.publishing import tools
-from server.publishing.epub_publisher import build_epub
-from server.writing_tools.blurb import write_blurb
-from server.writing_tools.check_errors import CheckErrorsJob
-from server.writing_tools.recap import volumes_in_reading_order, write_recap
-from server.writing_tools import style
-from server.story_generator.job import StoryGenerationJob
-from server.story_generator.stages import STAGES_BY_NAME
-from server.models.inference_models import deploy_inference_models
 import cortexgrid
-from cortexgrid_infer import CompletingModel
-from server.jobs import Job, ParallelJobsManager
-from authordoc.storydoc import Document
-from authordoc.cells.blurb_cell import BLURB
-from authordoc.cells.recap_cell import RECAP
+import cortexgrid_infer
+from authordoc import cells, storydoc
+from server import jobs, log, models, publishing, story_generator, writing_tools
 
 _log = log.logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.inference_models = {}
-    app.state.jobs = ParallelJobsManager()
-    threading.Thread(target=deploy_inference_models, args=(app,), daemon=True).start()
+    app.state.jobs = jobs.ParallelJobsManager()
+    threading.Thread(target=models.deploy_inference_models, args=(app,), daemon=True).start()
     _log.info("Yielding control to FastAPI server")
     yield
     _log.info("FastAPI server terminated")
@@ -46,7 +34,7 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/models")
-def models() -> dict[str, Any]:
+def get_models() -> dict[str, Any]:
     return {
         "models": [
             {"model": name, "status": cortexgrid.model_serving_status(key).phase}
@@ -65,7 +53,7 @@ def _deployed(deployment_name: str) -> Any:
 
 
 @app.get("/jobs")
-def jobs() -> dict[str, Any]:
+def get_jobs() -> dict[str, Any]:
     in_flight = app.state.jobs.in_flight()
     return {"jobs": in_flight}
 
@@ -91,8 +79,8 @@ class EpubExportRequest(BaseModel):
 
 @app.post("/export/epub")
 def export_epub(request: EpubExportRequest) -> dict[str, Any]:
-    document = Document(request.text, Path(request.path))
-    found = tools.can_convert_to_epub(document)
+    document = storydoc.Document(request.text, Path(request.path))
+    found = publishing.tools.can_convert_to_epub(document)
     if not (found.ready_to_export or request.force):
         return {
         "ready_to_export": found.ready_to_export,
@@ -105,7 +93,7 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     
     assert document.path is not None
     out_path = document.path.with_suffix(".epub")
-    build_epub(document, out_path)
+    publishing.build_epub(document, out_path)
     return {
         "ready_to_export": found.ready_to_export,
         "missing_cells": found.missing_cells,
@@ -116,7 +104,7 @@ def export_epub(request: EpubExportRequest) -> dict[str, Any]:
     }
 
 
-class WritingJob(Job):
+class WritingJob(jobs.Job):
 
     def __init__(self, cell_kind: str, target: str) -> None:
         super().__init__(target)
@@ -145,16 +133,16 @@ class BlurbRequest(BaseModel):
 class BlurbJob(WritingJob):
     kind = "blurb"
 
-    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, story: str) -> None:
-        super().__init__(BLURB, str(path))
+    def __init__(self, deployment: cortexgrid.Deployment[cortexgrid_infer.CompletingModel], path: Path, story: str) -> None:
+        super().__init__(cells.BLURB, str(path))
         self._deployment = deployment
         self._path = path
         self._story = story
 
     async def execute(self) -> None:
         model = self._deployment.client_async()
-        document = Document(self._story, self._path)
-        self.text = await write_blurb(
+        document = storydoc.Document(self._story, self._path)
+        self.text = await writing_tools.write_blurb(
             model, document, progress=self.reached
         )
 
@@ -168,15 +156,15 @@ class RecapRequest(BaseModel):
 class RecapJob(WritingJob):
     kind = "recap"
 
-    def __init__(self, deployment: cortexgrid.Deployment[CompletingModel], path: Path, earlier: list[Path]) -> None:
-        super().__init__(RECAP, str(path))
+    def __init__(self, deployment: cortexgrid.Deployment[cortexgrid_infer.CompletingModel], path: Path, earlier: list[Path]) -> None:
+        super().__init__(cells.RECAP, str(path))
         self._deployment = deployment
         self._earlier = earlier
 
     async def execute(self) -> None:
         model = self._deployment.client_async()
-        earlier = [Document.load(volume) for volume in self._earlier]
-        self.text = await write_recap(
+        earlier = [storydoc.Document.load(volume) for volume in self._earlier]
+        self.text = await writing_tools.write_recap(
             model, earlier, progress=self.reached
         )
 
@@ -196,7 +184,7 @@ def generate_recap(request: RecapRequest) -> dict[str, Any]:
             status_code=400,
             detail="That section names no documents to summarise.",
         )
-    earlier = volumes_in_reading_order(Path(request.path).parent, request.documents)
+    earlier = writing_tools.volumes_in_reading_order(Path(request.path).parent, request.documents)
     for volume in earlier:
         if not volume.is_file():
             raise HTTPException(status_code=400, detail=f"No such document: {volume}")
@@ -225,12 +213,12 @@ class StoryGenerationRequest(BaseModel):
 def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
     """Run a stage of generating the story with its author; poll
     /generate/story/status for the story it generates."""
-    make_the_stage = STAGES_BY_NAME.get(request.stage)
+    make_the_stage = story_generator.STAGES_BY_NAME.get(request.stage)
     if make_the_stage is None:
         raise HTTPException(status_code=400, detail=f"No stage {request.stage}")
     deployment = _deployed("writing_deployment")
     stage = make_the_stage(deployment)
-    job = StoryGenerationJob(request.stage, stage, Path(request.path), request.story)
+    job = story_generator.StoryGenerationJob(request.stage, stage, Path(request.path), request.story)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -238,7 +226,7 @@ def generate_story(request: StoryGenerationRequest) -> dict[str, Any]:
 @app.get("/generate/story/status")
 def generate_story_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
-    if not isinstance(job, StoryGenerationJob):
+    if not isinstance(job, story_generator.StoryGenerationJob):
         raise HTTPException(status_code=404, detail=f"No story generation for {id}")
     status = app.state.jobs.reported(id)
     return status
@@ -251,7 +239,7 @@ class StyleFixRequest(BaseModel):
 
 @app.post("/fix/style", status_code=202)
 def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
-    job = style.StyleFixJob(_deployed("style_deployment"), Path(request.path), request.text)
+    job = writing_tools.StyleFixJob(_deployed("style_deployment"), Path(request.path), request.text)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -259,7 +247,7 @@ def fix_style_endpoint(request: StyleFixRequest) -> dict[str, Any]:
 @app.get("/fix/style/status")
 def fix_style_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
-    if not isinstance(job, style.StyleFixJob):
+    if not isinstance(job, writing_tools.StyleFixJob):
         raise HTTPException(status_code=404, detail=f"No style pass for {id}")
     status = app.state.jobs.reported(id)
     return status
@@ -288,7 +276,7 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
     selection = (
         (request.selection.start, request.selection.end) if request.selection else None
     )
-    job = CheckErrorsJob(_deployed("gec_deployment"), Path(request.path), request.text, selection)
+    job = writing_tools.CheckErrorsJob(_deployed("gec_deployment"), Path(request.path), request.text, selection)
     app.state.jobs.start(job)
     return {"id": job.target}
 
@@ -296,7 +284,7 @@ def check_errors(request: CheckErrorsRequest) -> dict[str, Any]:
 @app.get("/check/errors/status")
 def check_errors_status(id: str) -> dict[str, Any]:
     job = app.state.jobs.get(id)
-    if not isinstance(job, CheckErrorsJob):
+    if not isinstance(job, writing_tools.CheckErrorsJob):
         raise HTTPException(status_code=404, detail=f"No check for {id}")
     status = app.state.jobs.reported(id)
     return status
