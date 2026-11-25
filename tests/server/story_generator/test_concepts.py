@@ -6,7 +6,6 @@ from authordoc.cells.markdown_cell import MarkdownCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.stages.concepts import DESCRIPTION_INSTRUCTIONS, DescribeConceptsStep
 
 
@@ -30,8 +29,8 @@ class DescribeConceptsStepCall(unittest.IsolatedAsyncioTestCase):
                 {"role": "user", "content": "The author's concepts:\n### Motherhood\n"},
             ],
         )
-        written = InteractiveAuthorStory(described).written_concepts()
-        self.assertEqual(written, "### Motherhood\nA mother's care.")
+        (motherhood,) = described.salient_concepts()
+        self.assertEqual((motherhood.title, motherhood.source), ("Motherhood", "A mother's care."))
 
     async def test_the_concepts_come_first_in_the_story(self) -> None:
         # The author added two concepts in the Salient Concepts tab, after the prologue.

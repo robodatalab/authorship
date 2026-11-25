@@ -6,9 +6,7 @@ from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.secondary_characters import SECONDARY_CHARACTER_INSTRUCTIONS
-from server.story_generator.stages.plots import ENDS_INSTRUCTIONS, Plots
+from server.story_generator.stages.plots import ENDS_INSTRUCTIONS, SECONDARY_CHARACTER_INSTRUCTIONS, Plots
 
 
 async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
@@ -40,14 +38,21 @@ class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
                 {"role": "user", "content": "Motherhood: A mother's care.\n\nThe main characters:\n### Varn\nA captain."},
             ],
         )
-        written = InteractiveAuthorStory(with_the_ends).written_world_events("")
+        (plot,) = with_the_ends.plots()
+        start, second, third, end = plot.nodes
         self.assertEqual(
-            written,
-            "### Motherhood\n"
-            "1 | earth, Varn's house | Varn | Varn learns she is pregnant.\n"
-            " |  |  | \n"
-            " |  |  | \n"
-            "4 | mars, the base | Varn | Varn buries her son on Mars.",
+            [
+                (start.timestamp, start.place(with_the_ends).title, start.characters(with_the_ends), start.summary),
+                (second.timestamp, second.place(with_the_ends), second.characters(with_the_ends), second.summary),
+                (third.timestamp, third.place(with_the_ends), third.characters(with_the_ends), third.summary),
+                (end.timestamp, end.place(with_the_ends).title, end.characters(with_the_ends), end.summary),
+            ],
+            [
+                ("1", "earth, Varn's house", [varn], "Varn learns she is pregnant."),
+                ("", None, [], ""),
+                ("", None, [], ""),
+                ("4", "mars, the base", [varn], "Varn buries her son on Mars."),
+            ],
         )
 
     async def test_adds_a_character_the_story_does_not_have_yet_with_a_short_backstory(self) -> None:
@@ -75,10 +80,10 @@ class PlotEndsStepCall(unittest.IsolatedAsyncioTestCase):
                 {"role": "user", "content": "The character: Dr Okafor\n\nThe event:\nDr Okafor delivers Varn's son."},
             ],
         )
-        okafor = InteractiveAuthorStory(with_the_ends).character_named("Dr Okafor")
         (plot,) = with_the_ends.plots()
         *_, the_end = plot.nodes
+        varn_at_the_end, okafor = the_end.characters(with_the_ends)
         self.assertEqual(
-            (okafor.source, okafor.concepts(with_the_ends), the_end.characters(with_the_ends)),
-            ("The base's only doctor, who has never delivered a child.", [concept], [varn, okafor]),
+            (varn_at_the_end, okafor.title, okafor.source, okafor.concepts(with_the_ends)),
+            (varn, "Dr Okafor", "The base's only doctor, who has never delivered a child.", [concept]),
         )

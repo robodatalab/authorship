@@ -6,7 +6,6 @@ from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.stages.plots import IN_BETWEEN_INSTRUCTIONS, Plots
 
 
@@ -49,16 +48,22 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        written = InteractiveAuthorStory(with_every_event).written_world_events("")
-        self.assertEqual(
-            written,
-            "### Motherhood\n"
-            "1 | earth, Varn's house | Varn | Varn learns she is pregnant.\n"
-            "2 | earth, Varn's house | Varn | Varn hides it from mission control.\n"
-            "3 | mars, the base | Varn | Varn gives birth on Mars.\n"
-            "4 | mars, the base | Varn | Varn raises her son on Mars.",
-        )
         (plot,) = with_every_event.plots()
+        first, second, third, fourth = plot.nodes
+        self.assertEqual(
+            [
+                (first.timestamp, first.place(with_every_event).title, first.characters(with_every_event), first.summary),
+                (second.timestamp, second.place(with_every_event).title, second.characters(with_every_event), second.summary),
+                (third.timestamp, third.place(with_every_event).title, third.characters(with_every_event), third.summary),
+                (fourth.timestamp, fourth.place(with_every_event).title, fourth.characters(with_every_event), fourth.summary),
+            ],
+            [
+                ("1", "earth, Varn's house", [varn], "Varn learns she is pregnant."),
+                ("2", "earth, Varn's house", [varn], "Varn hides it from mission control."),
+                ("3", "mars, the base", [varn], "Varn gives birth on Mars."),
+                ("4", "mars, the base", [varn], "Varn raises her son on Mars."),
+            ],
+        )
         self.assertEqual(plot.concepts(with_every_event), [concept])
 
     async def test_every_plot_follows_the_main_characters_of_its_concept(self) -> None:
@@ -101,13 +106,5 @@ class PlotsRun(unittest.IsolatedAsyncioTestCase):
         with_the_second_event = await second_event(with_the_ends)
         with_every_event = await third_event(with_the_second_event)
 
-        _, _, _, earth, varns_house, mars, the_base = with_every_event.cells
-        self.assertEqual(
-            [
-                (earth.title, earth.parent(with_every_event)),
-                (varns_house.title, varns_house.parent(with_every_event)),
-                (mars.title, mars.parent(with_every_event)),
-                (the_base.title, the_base.parent(with_every_event)),
-            ],
-            [("earth", None), ("Varn's house", earth), ("mars", None), ("the base", mars)],
-        )
+        _, _, _, varns_house, the_base = with_every_event.cells
+        self.assertEqual((varns_house.title, the_base.title), ("earth, Varn's house", "mars, the base"))

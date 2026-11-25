@@ -1,37 +1,16 @@
-"""For every concept, the plot that best illustrates it, titled as its concept and
-referencing it. The stage lays out every plot as a trajectory of placeholder
-events, of the length the mesh needs: four events for every plot the story has.
-The model writes how the story that best illustrates the concept starts and
-ends, into the trajectory's first and last events; then, level by level and
-every plot at every level, the event halfway between two written events.
-
-The causality runs from the concept to the plot: every event is written to
-show the plot's concept, so how the concept shows at an event is what the event
-says.
-
-Every plot follows the main characters of its concept, and the model writes an
-event as its moment on the world's clock, its place, the characters who take
-part in it and what happens, separated by bars. A character the story does not
-have yet is added with a backstory no longer than its part. The author reviews
-the plots in the metadata pane:
-
-    1 | earth, Varn's house | Varn, Lia | Varn is given command of a ship bound for Mars.
-"""
-
 from __future__ import annotations
 
 import re
 from uuid import uuid4
 
 from authordoc.cells.character_cell import CharacterCell
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PLOT, PlotCell, PlotEdge, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
-from server.story_generator.interactive_author_story import InteractiveAuthorStory, written_under_their_titles
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import Shown, CellsShown
-from server.story_generator.secondary_characters import with_the_characters_named
 from server.story_generator.stage import Stage, StageStep
 
 EVENTS = """Each event is written on one line as: moment | place | characters | what happens.
@@ -76,6 +55,21 @@ def _parse_events_table_returned_by_llm(table: str) -> list[tuple[str, str, list
     return events
 
 
+def _write_under_their_titles(characters: list[CharacterCell]) -> str:
+    characters_under_their_titles = [f"### {character.title}\n{character.source}" for character in characters]
+    written = "\n\n".join(characters_under_their_titles) or "None yet."
+    return written
+
+
+def _write_event(document: Document, event: PlotNode) -> str:
+    place = event.place(document)
+    place_name = "" if place is None else place.title
+    characters = event.characters(document)
+    names = ", ".join(character.title for character in characters)
+    line = " | ".join((event.timestamp, place_name, names, event.summary))
+    return line
+
+
 def _is_named_in(what_happens: str, name: str) -> bool:
     words_of_what_happens = set(re.findall(r"\w+", what_happens))
     words_of_the_name = re.findall(r"\w+", name)
@@ -84,18 +78,23 @@ def _is_named_in(what_happens: str, name: str) -> bool:
 
 
 async def _with_the_event_told(
-    story: InteractiveAuthorStory,
+    document: Document,
     plot: PlotCell,
     concept: SalientConceptCell,
     node_id: str,
     event_written: tuple[str, str, list[str], str],
     model: CompletingModel,
-) -> tuple[InteractiveAuthorStory, PlotCell]:
+) -> tuple[Document, PlotCell]:
     moment, place_name, names, summary = event_written
     names_in_what_happens = [name for name in names if _is_named_in(summary, name)]
-    story_with_the_place, place = story.with_place_named(place_name)
-    story_with_the_characters, characters = await with_the_characters_named(
-        story_with_the_place, names_in_what_happens, f"The event:\n{summary}", model
+    places = [cell for cell in document.cells if isinstance(cell, PlaceCell)]
+    place = next((place for place in places if place.title.casefold() == place_name.casefold()), None)
+    document_with_the_place = document
+    if place is None:
+        place = PlaceCell(place_name)
+        document_with_the_place = document.with_cells([*document.cells, place])
+    document_with_the_characters, characters = await with_the_characters_named(
+        document_with_the_place, names_in_what_happens, f"The event:\n{summary}", model
     )
     character_ids = [character.unique_id for character in characters]
     event = PlotNode(
@@ -106,16 +105,15 @@ async def _with_the_event_told(
         character_ids=character_ids,
         summary=summary,
     )
-    generated = [character for character in characters if story_with_the_place.document.cell_with_id(character.unique_id) is None]
+    generated = [character for character in characters if document_with_the_place.cell_with_id(character.unique_id) is None]
     tied = [character.with_concepts([concept]) for character in generated]
-    document_with_them_tied = story_with_the_characters.document
+    document_with_them_tied = document_with_the_characters
     for character in tied:
         document_with_them_tied = document_with_them_tied.with_cell(character)
     main_characters = plot.characters(document_with_them_tied)
     plot_following_them = plot.with_characters([*main_characters, *tied])
     plot_with_the_event = plot_following_them.with_node(event)
-    story_with_them_tied = InteractiveAuthorStory(document_with_them_tied)
-    return story_with_them_tied, plot_with_the_event
+    return document_with_them_tied, plot_with_the_event
 
 
 class LayOutPlotsStep(StageStep):
@@ -143,19 +141,20 @@ class PlotEndsStep(StageStep):
     async def __call__(self, document: Document) -> Document:
         plot = document.get_plot_of_node(self._first)
         main_characters = plot.characters(document)
-        main_characters_written = written_under_their_titles(main_characters)
+        main_characters_written = _write_under_their_titles(main_characters)
         request = f"{self._concept.title}: {self._concept.source}\n\nThe main characters:\n{main_characters_written}"
         messages = [{"role": "system", "content": ENDS_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         start, end = _parse_events_table_returned_by_llm(written)
-        story = InteractiveAuthorStory(document)
-        story_with_the_start, plot_with_the_start = await _with_the_event_told(story, plot, self._concept, self._first.node_id, start, self._model)
-        story_with_both_ends, plot_with_the_ends = await _with_the_event_told(
-            story_with_the_start, plot_with_the_start, self._concept, self._last.node_id, end, self._model
+        document_with_the_start, plot_with_the_start = await _with_the_event_told(
+            document, plot, self._concept, self._first.node_id, start, self._model
         )
-        document_with_the_ends = story_with_both_ends.document.with_cell(plot_with_the_ends)
+        document_with_both_ends, plot_with_the_ends = await _with_the_event_told(
+            document_with_the_start, plot_with_the_start, self._concept, self._last.node_id, end, self._model
+        )
+        document_with_the_ends = document_with_both_ends.with_cell(plot_with_the_ends)
         return document_with_the_ends
 
 
@@ -171,14 +170,13 @@ class InBetweenStep(StageStep):
         self._model = model
 
     async def __call__(self, document: Document) -> Document:
-        story = InteractiveAuthorStory(document)
         plot = document.get_plot_of_node(self._at)
         event_before = plot.get_node_by_id(self._before.node_id)
         event_after = plot.get_node_by_id(self._after.node_id)
-        written_before = story.written_event(event_before)
-        written_after = story.written_event(event_after)
+        written_before = _write_event(document, event_before)
+        written_after = _write_event(document, event_after)
         main_characters = plot.characters(document)
-        main_characters_written = written_under_their_titles(main_characters)
+        main_characters_written = _write_under_their_titles(main_characters)
         request = (
             f"{self._concept.title}: {self._concept.source}\n\n"
             f"The main characters:\n{main_characters_written}\n\n"
@@ -190,8 +188,10 @@ class InBetweenStep(StageStep):
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
         (event_written,) = _parse_events_table_returned_by_llm(written)
-        story_with_the_event, plot_with_the_event = await _with_the_event_told(story, plot, self._concept, self._at.node_id, event_written, self._model)
-        document_with_the_event = story_with_the_event.document.with_cell(plot_with_the_event)
+        document_with_the_event, plot_with_the_event = await _with_the_event_told(
+            document, plot, self._concept, self._at.node_id, event_written, self._model
+        )
+        document_with_the_event = document_with_the_event.with_cell(plot_with_the_event)
         return document_with_the_event
 
 
@@ -241,3 +241,29 @@ class Plots(Stage):
 
     def shown(self) -> Shown:
         return CellsShown(PLOT)
+
+
+
+SECONDARY_CHARACTER_INSTRUCTIONS = """You help an author write an interactive story. A character the story has no backstory for takes part in the part of it you are given.
+
+Write the character's backstory in one or two sentences: who they are, and why they take part. Write the sentences and nothing else."""
+
+
+async def with_the_characters_named(
+    document: Document, names: list[str], taking_part_in: str, model: CompletingModel
+) -> tuple[Document, list[CharacterCell]]:
+    characters: list[CharacterCell] = []
+    for name in names:
+        characters_in_the_story = [cell for cell in document.cells if isinstance(cell, CharacterCell)]
+        named = next((character for character in characters_in_the_story if character.title == name), None)
+        if named is None:
+            request = f"The character: {name}\n\n{taking_part_in}"
+            messages = [{"role": "system", "content": SECONDARY_CHARACTER_INSTRUCTIONS}, {"role": "user", "content": request}]
+            streamed = model.complete(messages)
+            chunks = [chunk.content async for chunk in streamed]
+            written = "".join(chunks)
+            backstory = written.strip()
+            named = CharacterCell(name, backstory)
+            document = document.with_cells([*document.cells, named])
+        characters.append(named)
+    return document, characters

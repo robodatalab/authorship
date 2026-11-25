@@ -14,9 +14,6 @@ from server.story_generator.stage import Stage
 
 
 class StoryGenerationJob(Job):
-    """A stage of the workflow, run on the story; once it is done, what it asks
-    the author is `asked`."""
-
     kind = "story"
 
     def __init__(self, stage_name: str, stage: Stage, path: Path, story: str) -> None:

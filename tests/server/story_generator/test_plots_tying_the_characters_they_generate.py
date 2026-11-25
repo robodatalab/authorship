@@ -6,7 +6,6 @@ from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.stages.plots import Plots
 
 
@@ -34,11 +33,11 @@ class PlotsTyingTheCharactersTheyGenerate(unittest.IsolatedAsyncioTestCase):
 
         with_the_ends = await ends(laid_out)
 
-        okafor = InteractiveAuthorStory(with_the_ends).character_named("Dr Okafor")
         (plot,) = with_the_ends.plots()
+        varn_of_the_plot, okafor = plot.characters(with_the_ends)
         self.assertEqual(
-            (plot.characters(with_the_ends), okafor.concepts(with_the_ends)),
-            ([varn, okafor], [concept]),
+            (varn_of_the_plot, okafor.title, okafor.concepts(with_the_ends)),
+            (varn, "Dr Okafor", [concept]),
         )
 
     async def test_ties_a_character_an_event_between_the_ends_generates_to_the_plot_and_its_concept(self) -> None:
@@ -64,11 +63,11 @@ class PlotsTyingTheCharactersTheyGenerate(unittest.IsolatedAsyncioTestCase):
 
         with_every_event = await third_event(with_the_second_event)
 
-        mira = InteractiveAuthorStory(with_every_event).character_named("Mira")
         (plot,) = with_every_event.plots()
+        varn_of_the_plot, mira = plot.characters(with_every_event)
         self.assertEqual(
-            (plot.characters(with_every_event), mira.concepts(with_every_event)),
-            ([varn, mira], [concept]),
+            (varn_of_the_plot, mira.title, mira.concepts(with_every_event)),
+            (varn, "Mira", [concept]),
         )
 
     async def test_leaves_a_character_of_the_cast_an_event_names_as_it_is(self) -> None:
@@ -90,7 +89,7 @@ class PlotsTyingTheCharactersTheyGenerate(unittest.IsolatedAsyncioTestCase):
 
         with_the_ends = await ends(laid_out)
 
-        dax_after = InteractiveAuthorStory(with_the_ends).character_named("Dax")
+        dax_after = with_the_ends.cell_with_id("d1")
         (plot,) = with_the_ends.plots()
         self.assertEqual(
             (plot.characters(with_the_ends), dax_after.concepts(with_the_ends)),

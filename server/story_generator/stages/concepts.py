@@ -1,29 +1,9 @@
-"""The story's salient concepts: what the story is about, kept as its salient
-concept cells, first in the story. The author adds the concepts of their
-choosing in the editor's metadata pane; then the model describes every one of them,
-in the light of the others, as what it is really about and in what light the
-story shows it. The model adds no concept: the story is about what the author
-chose. The author reviews the descriptions in the metadata pane.
-
-A concept is an idea, not a thing that appears in the story: a general theme the
-story is built on, such as motherhood or war, or a story-specific hook, such as
-a stranger stranded under the surface of Mars. Every concept gets a plot of its
-own, and every plot respects every concept.
-
-The model writes every concept as its title on a line of its own, opened with
-"### ", followed by its description:
-
-    ### Motherhood
-    A mother's care for her child, shown in the light of what it costs her.
-"""
-
 from __future__ import annotations
 
 import re
 
 from authordoc.cells.salient_concept_cell import SALIENT_CONCEPT, SalientConceptCell
 from authordoc.storydoc import Document
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import CommandShown, Shown, CellsShown
@@ -61,8 +41,9 @@ class DescribeConceptsStep(StageStep):
         self._model = model
 
     async def __call__(self, document: Document) -> Document:
-        story = InteractiveAuthorStory(document)
-        chosen = story.written_concepts()
+        concepts = document.salient_concepts()
+        concepts_under_their_titles = [f"### {concept.title}\n{concept.source}" for concept in concepts]
+        chosen = "\n\n".join(concepts_under_their_titles) or "None yet."
         request = f"The author's concepts:\n{chosen}"
         messages = [{"role": "system", "content": DESCRIPTION_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)

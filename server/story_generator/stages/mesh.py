@@ -1,19 +1,10 @@
-"""The plots brought together on a schedule, so that they meet all the time. Every
-plot has as many events as every other, and at every step the round robin pairs
-every plot with another, as players are paired in a tournament: one plot stays
-put and the others turn round it, a seat a step, and with an odd number of plots
-one sits out every step. Every plot's event at a step happens at the step's
-moment, and the two events of every pair are rewritten to happen in one place,
-where the people of both plots come together: the two plots share a scene. The
-author reviews the meetings in the metadata pane."""
-
 from __future__ import annotations
 
+from authordoc.cells.place_cell import PlaceCell
 from authordoc.cells.plot_cell import PLOT
 from authordoc.storydoc import Document
 import cortexgrid
 from cortexgrid_infer import CompletingModel
-from server.story_generator.interactive_author_story import InteractiveAuthorStory, written_under_their_titles
 from server.story_generator.review import Shown, CellsShown
 from server.story_generator.stage import Stage, StageStep
 
@@ -98,15 +89,20 @@ class MeshStep(StageStep):
         first_event = first_plot.nodes[self._step_index]
         second_event = second_plot.nodes[self._step_index]
 
-        story = InteractiveAuthorStory(document)
-        first_place_name = story.place_name_of(first_event)
-        second_place_name = story.place_name_of(second_event)
-        first_who = story.names_of_the_characters_in(first_event) or "no one named"
-        second_who = story.names_of_the_characters_in(second_event) or "no one named"
+        first_place = first_event.place(document)
+        second_place = second_event.place(document)
+        first_place_name = "" if first_place is None else first_place.title
+        second_place_name = "" if second_place is None else second_place.title
+        first_characters = first_event.characters(document)
+        second_characters = second_event.characters(document)
+        first_who = ", ".join(character.title for character in first_characters) or "no one named"
+        second_who = ", ".join(character.title for character in second_characters) or "no one named"
         first_concepts = first_plot.concepts(document)
         second_concepts = second_plot.concepts(document)
-        first_written = written_under_their_titles(first_concepts)
-        second_written = written_under_their_titles(second_concepts)
+        first_concepts_under_their_titles = [f"### {concept.title}\n{concept.source}" for concept in first_concepts]
+        second_concepts_under_their_titles = [f"### {concept.title}\n{concept.source}" for concept in second_concepts]
+        first_written = "\n\n".join(first_concepts_under_their_titles) or "None yet."
+        second_written = "\n\n".join(second_concepts_under_their_titles) or "None yet."
         user = "Merge the two events."
         system = f"""
 Two story plot events meet, and we need to unify them.
@@ -135,10 +131,13 @@ nothing else.
         merged_event_str = "".join(chunks)
 
         merged_event_desc, merged_event_place_name = _parse_event_str(merged_event_str)
-        story_with_the_merged_place, merged_place = story.with_place_named(merged_event_place_name)
+        places = [cell for cell in document.cells if isinstance(cell, PlaceCell)]
+        merged_place = next((place for place in places if place.title.casefold() == merged_event_place_name.casefold()), None)
+        document_with_the_merged_place = document
+        if merged_place is None:
+            merged_place = PlaceCell(merged_event_place_name)
+            document_with_the_merged_place = document.with_cells([*document.cells, merged_place])
 
-        first_characters = first_event.characters(document)
-        second_characters = second_event.characters(document)
         first_character_ids = [character.unique_id for character in first_characters]
         only_in_the_second = [character for character in second_characters if character.unique_id not in first_character_ids]
         merged_characters = [*first_characters, *only_in_the_second]
@@ -156,7 +155,7 @@ nothing else.
 
         first_plot_meshed = first_plot.with_node(first_meshed)
         second_plot_meshed = second_plot.with_node(second_meshed)
-        meshed = story_with_the_merged_place.document.with_cell(first_plot_meshed)
+        meshed = document_with_the_merged_place.with_cell(first_plot_meshed)
         meshed = meshed.with_cell(second_plot_meshed)
         return meshed
 

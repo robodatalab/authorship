@@ -1,20 +1,10 @@
-"""The choices every scene the story goes on from ends with: for every edge leaving
-the scene's events, a choice that follows from the scene's narrative and leads
-towards the event the edge reaches, without telling it. The model writes a
-scene's choices together, so that they read as one, and the author reviews them
-in the editor:
-
-    1. Varn followed the water to her room.
-    2. Dax raised his cup to the crowd.
-"""
-
 from __future__ import annotations
 
 import re
 
-from authordoc.cells.plot_cell import PlotEdge
+from authordoc.cells.plot_cell import PlotEdge, PlotNode
+from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
-from server.story_generator.interactive_author_story import InteractiveAuthorStory, InteractiveScene
 import cortexgrid
 from cortexgrid_infer import CompletingModel
 from server.story_generator.review import EditorShown, Shown
@@ -41,32 +31,35 @@ def _parse_choices_returned_by_llm(written: str) -> list[str]:
 class ChoicesStep(StageStep):
     """The choices one scene ends with: one for each edge leaving its events."""
 
-    def __init__(self, scene: InteractiveScene, edges: list[PlotEdge], model: CompletingModel) -> None:
-        self._scene = scene
+    def __init__(self, scene_cell_id: str, edges: list[PlotEdge], model: CompletingModel) -> None:
+        self._scene_cell_id = scene_cell_id
         self._edges = edges
         self._model = model
 
     async def __call__(self, document: Document) -> Document:
-        story = InteractiveAuthorStory(document)
+        scene_cell = document.cell_with_id(self._scene_cell_id)
+        story_words = StoryWordsIterator(document)
         could_happen = []
         for number, edge in enumerate(self._edges, start=1):
             plot = document.get_plot_of_edge(edge)
             next_event = plot.get_node_by_id(edge.to_node_id)
-            next_scene = story.scene_of(next_event)
-            next_place_name = story.place_name_of(next_event)
-            could_happen.append(f"{number}. {next_place_name}: {next_event.summary}\n{next_scene.text}")
+            next_scene_text = story_words.text(next_event.story_word_range)
+            next_place = next_event.place(document)
+            next_place_name = "" if next_place is None else next_place.title
+            could_happen.append(f"{number}. {next_place_name}: {next_event.summary}\n{next_scene_text}")
         written_could_happen = "\n\n".join(could_happen)
-        request = f"The scene:\n{self._scene.text}\n\nWhat could happen next:\n{written_could_happen}"
+        request = f"The scene:\n{scene_cell.source}\n\nWhat could happen next:\n{written_could_happen}"
         messages = [{"role": "system", "content": CHOICES_INSTRUCTIONS}, {"role": "user", "content": request}]
         streamed = self._model.complete(messages)
         chunks = [chunk.content async for chunk in streamed]
         written = "".join(chunks)
 
         choices = _parse_choices_returned_by_llm(written)
-        options = {edge.edge_id: choice for edge, choice in zip(self._edges, choices, strict=True)}
-        scene = self._scene.with_options(options)
-        story_with_the_choices = story.with_scenes([scene])
-        return story_with_the_choices.document
+        numbered_choices = [f"{number}. {choice}" for number, choice in enumerate(choices, start=1)]
+        choices_list = "\n".join(numbered_choices)
+        scene_with_the_choices = scene_cell.with_source(f"{scene_cell.source}\n\n{choices_list}")
+        document_with_the_choices = document.with_cell(scene_with_the_choices)
+        return document_with_the_choices
 
 
 class Choices(Stage):
@@ -76,11 +69,15 @@ class Choices(Stage):
 
     def run(self, document: Document) -> list[StageStep]:
         model = self._deployment.client_async()
-        story = InteractiveAuthorStory(document)
+        story_words = StoryWordsIterator(document)
+        events_of_scene: dict[tuple[str, str], list[PlotNode]] = {}
+        for plot in document.plots():
+            for event in plot.nodes:
+                events = events_of_scene.setdefault((event.timestamp, event.place_id), [])
+                events.append(event)
 
         choices_steps: list[StageStep] = []
-        for scene in story.scenes:
-            events = story.events_of(scene)
+        for events in events_of_scene.values():
             edges: list[PlotEdge] = []
             for event in events:
                 plot = document.get_plot_of_node(event)
@@ -89,7 +86,9 @@ class Choices(Stage):
             # The story ends at a scene no edge leaves: it has no choices.
             if not edges:
                 continue
-            choices_step = ChoicesStep(scene, edges, model)
+            first_event, *_ = events
+            first_span, *_ = story_words.spans(first_event.story_word_range)
+            choices_step = ChoicesStep(first_span.cell_id, edges, model)
             choices_steps.append(choices_step)
 
         return choices_steps

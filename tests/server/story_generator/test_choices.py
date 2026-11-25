@@ -9,7 +9,6 @@ from authordoc.cells.story_word_range import StoryWordRange
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.stages.choices import CHOICES_INSTRUCTIONS, Choices
 
 
@@ -67,9 +66,13 @@ class ChoicesRun(unittest.IsolatedAsyncioTestCase):
 
         with_the_choices = await where_they_meet(self.document)
 
-        story = InteractiveAuthorStory(with_the_choices)
-        meeting, _, _ = story.scenes
-        self.assertEqual(meeting.options, {"x1": "Varn followed the water to her room.", "x2": "Dax raised his cup to the crowd."})
+        meeting = with_the_choices.cell_with_id("s1")
+        self.assertEqual(
+            meeting.source,
+            "Dax took the water while Varn held her son close.\n\n"
+            "1. Varn followed the water to her room.\n"
+            "2. Dax raised his cup to the crowd.",
+        )
 
     async def test_every_event_keeps_pointing_at_its_scene_once_the_choices_are_written(self) -> None:
         (where_they_meet,) = Choices(self.deployment).run(self.document)

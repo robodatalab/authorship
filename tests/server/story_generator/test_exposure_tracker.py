@@ -4,7 +4,7 @@ from authordoc.cells.plot_cell import PlotCell, PlotNode
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from parameterized import parameterized
-from server.story_generator.exposure_tracker import ExposureTracker
+from server.story_generator.stages.validity import ExposureTracker
 
 
 class ExposureTrackerGetExposure(unittest.TestCase):

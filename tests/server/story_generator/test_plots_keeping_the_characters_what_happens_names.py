@@ -6,7 +6,6 @@ from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.salient_concept_cell import SalientConceptCell
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
 from server.story_generator.stages.plots import Plots
 
 
@@ -56,10 +55,9 @@ class PlotsKeepingTheCharactersWhatHappensNames(unittest.IsolatedAsyncioTestCase
 
         with_the_ends = await ends(laid_out)
 
-        okafor = InteractiveAuthorStory(with_the_ends).character_named("Dr Okafor")
         (plot,) = with_the_ends.plots()
         *_, the_end = plot.nodes
-        self.assertEqual((okafor, the_end.characters(with_the_ends)), (None, [varn]))
+        self.assertEqual((model.complete.call_count, the_end.characters(with_the_ends)), (1, [varn]))
 
     async def test_keeps_a_character_what_happens_names_by_one_of_their_names(self) -> None:
         concept = SalientConceptCell("Motherhood", [], "A mother's care.", False, None, "k1")

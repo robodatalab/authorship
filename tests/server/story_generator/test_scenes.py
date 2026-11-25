@@ -1,6 +1,6 @@
 import unittest
 from collections.abc import AsyncIterator
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 from authordoc.cells.character_cell import CharacterCell
 from authordoc.cells.markdown_cell import MarkdownCell
@@ -11,9 +11,7 @@ from authordoc.cells.story_word_range import StoryWordRange
 from authordoc.iterators.story_words_iterator import StoryWordsIterator
 from authordoc.storydoc import Document
 from cortexgrid_infer import CompletionChunk
-from server.story_generator.interactive_author_story import InteractiveAuthorStory
-from server.story_generator.secondary_characters import SECONDARY_CHARACTER_INSTRUCTIONS
-from server.story_generator.stages.scenes import NAMES_INSTRUCTIONS, SCENE_INSTRUCTIONS, Scenes, SceneStep
+from server.story_generator.stages.scenes import SCENE_INSTRUCTIONS, Scenes, SceneStep
 
 
 async def streamed(reply: str) -> AsyncIterator[CompletionChunk]:
@@ -54,11 +52,8 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         self.deployment.client_async.return_value = self.model
         self.model.complete.side_effect = [
             streamed("Dax took the water while Varn held her son close."),
-            streamed(""),
             streamed("Varn gave her son the last cup.\n\nHe drank it slowly."),
-            streamed(""),
             streamed("Dax drank in front of them."),
-            streamed(""),
         ]
 
     async def test_every_event_points_at_the_whole_of_its_scene(self) -> None:
@@ -81,15 +76,14 @@ class ScenesRun(unittest.IsolatedAsyncioTestCase):
         with_the_meeting = await where_they_meet(self.document)
         with_varns_room = await in_varns_room(with_the_meeting)
         with_every_scene = await where_dax_drinks(with_varns_room)
-        story = InteractiveAuthorStory(with_every_scene)
-        meeting, _, _ = story.scenes
+        *_, meeting, _, _ = with_every_scene.cells
 
-        # As the choices stage grows a scene: the opening of a sentence it leaves unfinished.
-        opened = meeting.with_opening("Varn looked at the door, and then at the window")
-        grown = story.with_scenes([opened])
+        # As the choices stage grows a scene: the choices it ends with.
+        meeting_with_the_choices = meeting.with_source(f"{meeting.source}\n\n1. Varn looked at the door.\n2. Dax looked at the window.")
+        grown = with_every_scene.with_cell(meeting_with_the_choices)
 
-        story_words = StoryWordsIterator(grown.document)
-        varn, dax = grown.document.plots()
+        story_words = StoryWordsIterator(grown)
+        varn, dax = grown.plots()
         meeting_of_varn, varns_room = varn.nodes
         meeting_of_dax, dax_drinks = dax.nodes
         self.assertEqual(story_words.text(meeting_of_varn.story_word_range), "Dax took the water while Varn held her son close.")
@@ -144,7 +138,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
         the_landing = MarkdownCell("The ship landed on Mars at dawn.", False, None, "s0")
         document = Document.from_cells([arrival, landing, varn, dax, the_landing])
         model = Mock()
-        model.complete.side_effect = [streamed("Dax took the water while Varn held her son close."), streamed("")]
+        model.complete.side_effect = [streamed("Dax took the water while Varn held her son close.")]
         where_they_meet = SceneStep(
             [
                 PlotNode("e1", None, "1", "b1", [], "Dax takes the water from Varn and her son."),
@@ -169,7 +163,7 @@ class SceneStepCall(unittest.IsolatedAsyncioTestCase):
 
 
 class SceneStepCharacters(unittest.IsolatedAsyncioTestCase):
-    async def test_every_event_takes_part_with_the_characters_the_scene_names(self) -> None:
+    async def test_adds_no_character_the_scene_names(self) -> None:
         varn = CharacterCell("Varn", "A captain.", False, None, "v1")
         dax = CharacterCell("Dax", "An officer.", False, None, "x1")
         meeting = PlotNode("e1", None, "1", "", ["v1"], "Dax takes the water from Varn.")
@@ -177,36 +171,10 @@ class SceneStepCharacters(unittest.IsolatedAsyncioTestCase):
         model = Mock()
         model.complete.side_effect = [
             streamed("Dax took the water while Varn held her son, and the quartermaster Ilse looked away."),
-            streamed("Dax\nVarn\nIlse"),
-            streamed("The base's quartermaster, who keeps the water log."),
         ]
 
         told = await SceneStep([meeting], model)(document)
 
-        ilse = InteractiveAuthorStory(told).character_named("Ilse")
         (plot,) = told.plots()
         (meeting_told,) = plot.nodes
-        self.assertEqual(
-            (meeting_told.characters(told), ilse.source),
-            ([varn, dax, ilse], "The base's quartermaster, who keeps the water log."),
-        )
-        self.assertEqual(
-            model.complete.call_args_list[1:],
-            [
-                call(
-                    [
-                        {"role": "system", "content": NAMES_INSTRUCTIONS},
-                        {"role": "user", "content": "Dax took the water while Varn held her son, and the quartermaster Ilse looked away."},
-                    ]
-                ),
-                call(
-                    [
-                        {"role": "system", "content": SECONDARY_CHARACTER_INSTRUCTIONS},
-                        {
-                            "role": "user",
-                            "content": "The character: Ilse\n\nThe scene:\nDax took the water while Varn held her son, and the quartermaster Ilse looked away.",
-                        },
-                    ]
-                ),
-            ],
-        )
+        self.assertEqual((model.complete.call_count, meeting_told.characters(told)), (1, [varn]))
