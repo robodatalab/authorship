@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 
 import { AuthorFileEditorProvider } from "../../../extension/vscode_runtime/author_file_editor_provider";
-import { Uri, files, watchersOnTheFiles, window as vscodeWindow } from "../vscode";
+import {
+    Uri,
+    files,
+    watchersOnTheFiles,
+    window as vscodeWindow,
+} from "../vscode";
 import type { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
 import { Document } from "authordoc/storydoc";
@@ -16,7 +21,8 @@ vi.mock("monaco-editor/languages/definitions/markdown/markdown.js", () => ({
     language: {},
 }));
 vi.mock("monaco-editor/editor/editor.api", async () => {
-    const { monacoEditorApi } = await import("../markdown/monaco_editor_double");
+    const { monacoEditorApi } =
+        await import("../markdown/monaco_editor_double");
     return monacoEditorApi();
 });
 
@@ -105,7 +111,7 @@ async function openEditor(text: string): Promise<OpenEditor> {
     }) as typeof window.addEventListener;
     await act(async () => {
         await import("../../../extension/webview/cell_types/AuthorFileEditorMarkdownCell");
-        await import("../../../extension/webview/message_queue_between_vscode_and_webview");
+        await import("../../../extension/webview/webview_command_executor");
     });
     window.addEventListener = addEventListenerItself;
     await settle();
@@ -172,7 +178,9 @@ async function settle(): Promise<void> {
 async function openTheCellForTyping(): Promise<void> {
     await act(async () => {
         document
-            .querySelector(".author-file-editor-manuscript-pane .markdown-rendered")
+            .querySelector(
+                ".author-file-editor-manuscript-pane .markdown-rendered",
+            )
             ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     });
 }
@@ -407,9 +415,7 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            keystrokes: [
-                { cursorAt: 11, typed: "long " },
-            ],
+            keystrokes: [{ cursorAt: 11, typed: "long " }],
             textAfter: "She waited long for him—a Companion knelt—head bowed.",
             highlightAfter: {
                 from: { lineNumber: 1, column: 27 },
@@ -440,10 +446,9 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            keystrokes: [
-                { cursorAt: 31, typed: "slowly " },
-            ],
-            textAfter: "She waited for him—a Companion slowly knelt—head bowed.",
+            keystrokes: [{ cursorAt: 31, typed: "slowly " }],
+            textAfter:
+                "She waited for him—a Companion slowly knelt—head bowed.",
             highlightAfter: {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 56 },
@@ -456,9 +461,7 @@ describe("the words of a salient concept while the author types", () => {
                 from: { lineNumber: 1, column: 22 },
                 to: { lineNumber: 1, column: 49 },
             },
-            keystrokes: [
-                { cursorAt: 48, typed: " Then she smiled." },
-            ],
+            keystrokes: [{ cursorAt: 48, typed: " Then she smiled." }],
             textAfter:
                 "She waited for him—a Companion knelt—head bowed. Then she smiled.",
             highlightAfter: {
@@ -770,7 +773,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -786,7 +790,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 50 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -801,7 +806,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -814,7 +820,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 53 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -829,7 +836,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -850,12 +858,14 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
             keystrokes: [{ cursorAt: 31, typed: "slowly " }],
-            textAfter: "She waited for him—a Companion slowly knelt—head bowed.",
+            textAfter:
+                "She waited for him—a Companion slowly knelt—head bowed.",
             marksAfter: [],
         },
         {
@@ -868,7 +878,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -882,7 +893,8 @@ describe("the prose errors marked while the author types", () => {
                         to: { lineNumber: 1, column: 48 },
                     },
                     options: {
-                        inlineClassName: "markdown-editor-mark markdown-editor-mark-style",
+                        inlineClassName:
+                            "markdown-editor-mark markdown-editor-mark-style",
                     },
                 },
             ],
@@ -1012,7 +1024,9 @@ describe("a salient concept's cell beside the manuscript", () => {
         );
         const thePage = (
             globalThis as unknown as {
-                acquireVsCodeApi: () => { postMessage: (message: unknown) => void };
+                acquireVsCodeApi: () => {
+                    postMessage: (message: unknown) => void;
+                };
             }
         ).acquireVsCodeApi();
         await act(async () => {
@@ -1038,8 +1052,8 @@ describe("a salient concept's cell beside the manuscript", () => {
         const concept = new Document(editor.documentText()).cellWithId(
             "k1",
         ) as SalientConceptCell;
-        expect(concept.references.map((reference) => reference.storyWordRange)).toEqual([
-            new StoryWordRange(1, 1),
-        ]);
+        expect(
+            concept.references.map((reference) => reference.storyWordRange),
+        ).toEqual([new StoryWordRange(1, 1)]);
     });
 });

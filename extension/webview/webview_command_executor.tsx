@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
 import type {
     SendMessagesToVscode,
@@ -46,73 +46,8 @@ function theHostWrote(cells: Cell[], drawn: WhatTheWebviewDraws): void {
     }
 }
 
-function processMessageFromVscode(
-    message: MessageEvent,
-    drawn: WhatTheWebviewDraws,
-): boolean {
-    if (message.data?.type === "document") {
-        const cells = cellsAsTheHostWroteThem(message.data.cells as string[]);
-        theHostWrote(cells, drawn);
-        drawn.cells = cells;
-    } else if (message.data?.type === "cells") {
-        const changed = cellsAsTheHostWroteThem(message.data.cells as string[]);
-        const typed = cellsAsTheHostWroteThem(
-            message.data.cellsThePageTyped as string[],
-        );
-        theHostWrote(changed, drawn);
-        drawn.cells = drawn.cells.map(
-            (drawing) =>
-                changed.find((cell) => cell.uniqueId === drawing.uniqueId) ??
-                typed.find((cell) => cell.uniqueId === drawing.uniqueId) ??
-                drawing,
-        );
-    } else if (message.data?.type === "commands") {
-        drawn.commands = message.data
-            .commands as WebviewAuthorDocumentCommandCard[];
-    } else if (message.data?.type === "proseErrors") {
-        drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
-    } else if (message.data?.type === "storyAnnotationsSelected") {
-        drawn.storyAnnotationsSelected = message.data
-            .storyAnnotationsSelected as Record<string, StoryAnnotationSelected>;
-    } else if (message.data?.type === "storyTextShown") {
-        drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
-    } else if (message.data?.type === "storyTextSelected") {
-        drawn.storyTextSelected = message.data
-            .storyTextSelected as StoryTextSpan | null;
-    } else if (message.data?.type === "findMatches") {
-        drawn.findMatches = message.data
-            .findMatches as AuthorFileEditorFindMatch[];
-    } else if (message.data?.type === "cellsBeingWritten") {
-        drawn.cellsBeingWritten = message.data.cellsBeingWritten as Record<
-            string,
-            number
-        >;
-    } else if (message.data?.type === "wordCounts") {
-        drawn.wordsInEverySection = message.data.wordsInEverySection as Record<
-            string,
-            number
-        >;
-        drawn.wordsInTheDocument = message.data.wordsInTheDocument as number;
-    } else if (message.data?.type === "storyGeneration") {
-        drawn.storyGeneration = message.data
-            .storyGeneration as StoryGeneration | null;
-    } else if (message.data?.type === "suggestions") {
-        drawn.suggestions = parseSuggestions(
-            message.data.suggestions as string,
-        );
-    } else {
-        return false;
-    }
-    return true;
-}
-
-function openTheAuthorFileEditor(): void {
-    const sendMessagesToVscode: SendMessagesToVscode =
-        acquireVsCodeApi().postMessage;
-    const root = createRoot(
-        document.getElementById("author-file-editor-root")!,
-    );
-    const drawn: WhatTheWebviewDraws = {
+class WebviewCommandExecutor {
+    private readonly drawn: WhatTheWebviewDraws = {
         cells: [],
         timesTheHostWroteEachCell: {},
         commands: [],
@@ -128,7 +63,79 @@ function openTheAuthorFileEditor(): void {
         suggestions: [],
     };
 
-    function drawTheCanvas(): void {
+    constructor(
+        private readonly root: Root,
+        private readonly sendMessagesToVscode: SendMessagesToVscode,
+    ) {}
+
+    executeMessageReceivedFromVscodeRuntime(message: MessageEvent): void {
+        const drawn = this.drawn;
+        if (message.data?.type === "document") {
+            const cells = cellsAsTheHostWroteThem(
+                message.data.cells as string[],
+            );
+            theHostWrote(cells, drawn);
+            drawn.cells = cells;
+        } else if (message.data?.type === "cells") {
+            const changed = cellsAsTheHostWroteThem(
+                message.data.cells as string[],
+            );
+            const typed = cellsAsTheHostWroteThem(
+                message.data.cellsThePageTyped as string[],
+            );
+            theHostWrote(changed, drawn);
+            drawn.cells = drawn.cells.map(
+                (drawing) =>
+                    changed.find(
+                        (cell) => cell.uniqueId === drawing.uniqueId,
+                    ) ??
+                    typed.find((cell) => cell.uniqueId === drawing.uniqueId) ??
+                    drawing,
+            );
+        } else if (message.data?.type === "commands") {
+            drawn.commands = message.data
+                .commands as WebviewAuthorDocumentCommandCard[];
+        } else if (message.data?.type === "proseErrors") {
+            drawn.proseErrors = message.data.proseErrors as ProseCheckError[];
+        } else if (message.data?.type === "storyAnnotationsSelected") {
+            drawn.storyAnnotationsSelected = message.data
+                .storyAnnotationsSelected as Record<
+                string,
+                StoryAnnotationSelected
+            >;
+        } else if (message.data?.type === "storyTextShown") {
+            drawn.storyTextShown = message.data.storyTextShown as StoryTextSpan;
+        } else if (message.data?.type === "storyTextSelected") {
+            drawn.storyTextSelected = message.data
+                .storyTextSelected as StoryTextSpan | null;
+        } else if (message.data?.type === "findMatches") {
+            drawn.findMatches = message.data
+                .findMatches as AuthorFileEditorFindMatch[];
+        } else if (message.data?.type === "cellsBeingWritten") {
+            drawn.cellsBeingWritten = message.data.cellsBeingWritten as Record<
+                string,
+                number
+            >;
+        } else if (message.data?.type === "wordCounts") {
+            drawn.wordsInEverySection = message.data
+                .wordsInEverySection as Record<string, number>;
+            drawn.wordsInTheDocument = message.data
+                .wordsInTheDocument as number;
+        } else if (message.data?.type === "storyGeneration") {
+            drawn.storyGeneration = message.data
+                .storyGeneration as StoryGeneration | null;
+        } else if (message.data?.type === "suggestions") {
+            drawn.suggestions = parseSuggestions(
+                message.data.suggestions as string,
+            );
+        } else {
+            return;
+        }
+        this.drawTheCanvas();
+    }
+
+    drawTheCanvas(): void {
+        const drawn = this.drawn;
         const suggestionsOfTheCellsDrawn = drawn.suggestions.filter(
             (suggestion) =>
                 drawn.cells.some((cell) => cell.uniqueId === suggestion.cellId),
@@ -142,18 +149,18 @@ function openTheAuthorFileEditor(): void {
             storyWithTheSuggestions,
         );
         const cellRenderer = new AuthorFileEditorCellRenderer(
-            sendMessagesToVscode,
+            this.sendMessagesToVscode,
             storyAsSuggested,
             drawn.storyAnnotationsSelected,
             drawn.storyTextSelected,
         );
-        root.render(
+        this.root.render(
             <AuthorFileEditorCanvas
                 cells={drawn.cells}
                 timesTheHostWroteEachCell={drawn.timesTheHostWroteEachCell}
                 commands={drawn.commands}
                 cellTypes={authorDocumentCellTypes()}
-                sendMessagesToVscode={sendMessagesToVscode}
+                sendMessagesToVscode={this.sendMessagesToVscode}
                 cellRenderer={cellRenderer}
                 proseErrors={drawn.proseErrors}
                 storyAnnotationsSelected={drawn.storyAnnotationsSelected}
@@ -167,14 +174,23 @@ function openTheAuthorFileEditor(): void {
             />,
         );
     }
+}
+
+function openTheAuthorFileEditor(): void {
+    const vscodeApi = acquireVsCodeApi();
+    const sendMessagesToVscode: SendMessagesToVscode = vscodeApi.postMessage;
+    const rootElement = document.getElementById("author-file-editor-root")!;
+    const root = createRoot(rootElement);
+    const commandExecutor = new WebviewCommandExecutor(
+        root,
+        sendMessagesToVscode,
+    );
 
     window.addEventListener("message", (message: MessageEvent) => {
-        if (processMessageFromVscode(message, drawn)) {
-            drawTheCanvas();
-        }
+        commandExecutor.executeMessageReceivedFromVscodeRuntime(message);
     });
 
-    drawTheCanvas();
+    commandExecutor.drawTheCanvas();
     sendMessagesToVscode({ type: "ready" });
 }
 

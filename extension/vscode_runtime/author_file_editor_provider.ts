@@ -9,23 +9,13 @@ import {
 } from "./author_file_editor_session";
 import {
     ReadTheDocumentBackFromItsFile,
-    TheAuthorIsEditingTheCell,
-    TheAuthorAskedToSeeTheStoryWords,
-    TheAuthorSelectedStoryText,
-    TheAuthorSelectedTheStoryAnnotation,
-    TheAuthorSelectedThePassage,
-    TheAuthorTypedInTheCell,
-    ThePageIsReady,
     WriteTheDocumentTo,
     WriteTheDocumentToItsFile,
 } from "./author_file_editor_messages";
 import {
-    authorDocumentCommand,
-    authorDocumentCommandCards,
-} from "./commands/author_document_commands";
-import { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
-import { StoryWordRange } from "authordoc/cells/story_word_range";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
+    VsCodeCommandExecutor,
+    type MessageReceivedFromWebview,
+} from "./vscode_command_executor";
 import { loadTemplates, watchSettings } from "./settings/file";
 import { watchTheAuthorFileForChanges } from "./author_file_watcher";
 import { useTemplates } from "./settings/model";
@@ -36,9 +26,9 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     private readonly edited = new vscode.EventEmitter<
         vscode.CustomDocumentEditEvent<AuthorFileEditorSession>
     >();
-    private readonly documentChangesMessageQueues = new Map<
+    private readonly commandExecutors = new Map<
         string,
-        MessageQueueBetweenVscodeAndWebview
+        VsCodeCommandExecutor
     >();
     readonly onDidChangeCustomDocument = this.edited.event;
 
@@ -80,13 +70,11 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         );
         session.showOn(panel);
         void session.storyGenerationWorkflow.showWhereItStands();
-        const documentChangesMessageQueue =
-            new MessageQueueBetweenVscodeAndWebview(this.log);
-        documentChangesMessageQueue.addListener(session);
-        this.documentChangesMessageQueues.set(
-            session.uri.toString(),
-            documentChangesMessageQueue,
+        const commandExecutor = new VsCodeCommandExecutor(
+            session,
+            this.log,
         );
+        this.commandExecutors.set(session.uri.toString(), commandExecutor);
 
         const readTemplates = (): void => {
             void loadTemplates(session.uri).then(useTemplates);
@@ -94,99 +82,23 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         readTemplates();
         const templatesWatcher = watchSettings(session.uri, readTemplates);
 
-        const sendCommandCards = (): void => {
-            void panel.webview.postMessage({
-                type: "commands",
-                commands: authorDocumentCommandCards(),
-            });
-        };
-
         const onMessageFromWebView = panel.webview.onDidReceiveMessage(
-            (message: {
-                type?: string;
-                cellId?: string | null;
-                commandName?: string;
-                commandArguments?: Record<string, unknown>;
-                markdown?: string;
-                storyTextSelected?: StoryTextSpan | null;
-                cellKind?: string;
-                annotationCellId?: string | null;
-                passageId?: string | null;
-                firstWord?: number;
-                lastWord?: number;
-            }) => {
-                if (message?.type === "typed" && message.cellId) {
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorTypedInTheCell(
-                            message.cellId,
-                            message.markdown ?? "",
-                        ),
-                    );
-                } else if (message?.type === "editing") {
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorIsEditingTheCell(message.cellId ?? null),
-                    );
-                } else if (message?.type === "storyTextSelected") {
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorSelectedStoryText(
-                            message.storyTextSelected ?? null,
-                        ),
-                    );
-                } else if (
-                    message?.type === "selectStoryAnnotation" &&
-                    message.cellKind
-                ) {
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorSelectedTheStoryAnnotation(
-                            message.cellKind,
-                            message.annotationCellId ?? null,
-                        ),
-                    );
-                } else if (
-                    message?.type === "showStoryWordRange" &&
-                    message.firstWord !== undefined &&
-                    message.lastWord !== undefined
-                ) {
-                    const storyWordRange = new StoryWordRange(
-                        message.firstWord,
-                        message.lastWord,
-                    );
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorAskedToSeeTheStoryWords(storyWordRange),
-                    );
-                } else if (
-                    message?.type === "selectPassage" &&
-                    message.cellKind
-                ) {
-                    void documentChangesMessageQueue.post(
-                        new TheAuthorSelectedThePassage(
-                            message.cellKind,
-                            message.passageId ?? null,
-                        ),
-                    );
-                } else if (message?.type === "ready") {
-                    sendCommandCards();
-                    void documentChangesMessageQueue.post(new ThePageIsReady());
-                } else if (message?.type === "invoke" && message.commandName) {
-                    void authorDocumentCommand(message.commandName)?.invoke(
-                        session,
-                        message.commandArguments ?? {},
-                    );
-                }
+            (message: MessageReceivedFromWebview) => {
+                commandExecutor.executeMessageReceivedFromWebview(message);
             },
         );
 
         const settingsChanged = vscode.workspace.onDidChangeConfiguration(
             (changed) => {
                 if (changed.affectsConfiguration("authorship")) {
-                    sendCommandCards();
+                    session.sendCommandCards();
                 }
             },
         );
 
         const watchingTheFile = watchTheAuthorFileForChanges(
             session,
-            documentChangesMessageQueue,
+            commandExecutor,
         );
 
         panel.onDidDispose(() => {
@@ -194,12 +106,12 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
             settingsChanged.dispose();
             watchingTheFile.dispose();
             onMessageFromWebView.dispose();
-            this.documentChangesMessageQueues.delete(session.uri.toString());
+            this.commandExecutors.delete(session.uri.toString());
         });
     }
 
     async saveCustomDocument(session: AuthorFileEditorSession): Promise<void> {
-        await this.documentChangesMessageQueues
+        await this.commandExecutors
             .get(session.uri.toString())
             ?.post(new WriteTheDocumentToItsFile());
     }
@@ -208,7 +120,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         session: AuthorFileEditorSession,
         destination: vscode.Uri,
     ): Promise<void> {
-        await this.documentChangesMessageQueues
+        await this.commandExecutors
             .get(session.uri.toString())
             ?.post(new WriteTheDocumentTo(destination));
     }
@@ -216,7 +128,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     async revertCustomDocument(
         session: AuthorFileEditorSession,
     ): Promise<void> {
-        await this.documentChangesMessageQueues
+        await this.commandExecutors
             .get(session.uri.toString())
             ?.post(new ReadTheDocumentBackFromItsFile());
     }
@@ -225,7 +137,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         session: AuthorFileEditorSession,
         context: vscode.CustomDocumentBackupContext,
     ): Promise<vscode.CustomDocumentBackup> {
-        await this.documentChangesMessageQueues
+        await this.commandExecutors
             .get(session.uri.toString())
             ?.post(new WriteTheDocumentTo(context.destination));
         return {

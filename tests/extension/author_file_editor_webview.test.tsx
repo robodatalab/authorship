@@ -17,7 +17,7 @@ async function openWebview(): Promise<void> {
     });
     vi.resetModules();
     await act(async () => {
-        await import("../../extension/webview/message_queue_between_vscode_and_webview");
+        await import("../../extension/webview/webview_command_executor");
     });
 }
 
@@ -131,7 +131,8 @@ describe("the suggestions the host sends", () => {
     });
 
     describe("drawing every cell in the story as the suggestions make it", () => {
-        const MARKUS = '<!-- cell: character id="mv" title="Markus Vader" -->\n';
+        const MARKUS =
+            '<!-- cell: character id="mv" title="Markus Vader" -->\n';
         const EMPTY_PLACES_CHARACTER_AND_PLOT = [
             '<!-- cell: place id="ms" -->\n',
             '<!-- cell: place id="hb" -->\n',
@@ -162,19 +163,30 @@ describe("the suggestions the host sends", () => {
         }
 
         it.each([
-            ["the suggested place it happens in", ".author-file-editor-plot-event-place", ["Hellas Basin"]],
-            ["the suggested characters in it beside the ones the story has", ".author-file-editor-plot-event-characters", ["Markus Vader", "Teodor Lin"]],
-        ])("names, in a suggested event, %s", async (_, referencesShown, expected) => {
-            await hostSendsMarkusAndTheSuggestions();
+            [
+                "the suggested place it happens in",
+                ".author-file-editor-plot-event-place",
+                ["Hellas Basin"],
+            ],
+            [
+                "the suggested characters in it beside the ones the story has",
+                ".author-file-editor-plot-event-characters",
+                ["Markus Vader", "Teodor Lin"],
+            ],
+        ])(
+            "names, in a suggested event, %s",
+            async (_, referencesShown, expected) => {
+                await hostSendsMarkusAndTheSuggestions();
 
-            const named = [
-                ...document.querySelectorAll(
-                    `[data-suggestion-id="dd"] ${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
-                ),
-            ].map((reference) => reference.textContent);
+                const named = [
+                    ...document.querySelectorAll(
+                        `[data-suggestion-id="dd"] ${referencesShown} .author-file-editor-cell-references-referenced .author-file-editor-story-annotation-passage-shown`,
+                    ),
+                ].map((reference) => reference.textContent);
 
-            expect(named).toEqual(expected);
-        });
+                expect(named).toEqual(expected);
+            },
+        );
 
         it("draws a suggested place under the suggested place it lies within", async () => {
             await hostSendsMarkusAndTheSuggestions();
@@ -183,8 +195,8 @@ describe("the suggestions the host sends", () => {
                 ...document.querySelectorAll(".author-file-editor-place-scope"),
             ].map((scope) => [
                 scope.parentElement!.getAttribute("data-cell-id"),
-                [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
-                    nested.getAttribute("data-cell-id"),
+                [...scope.querySelectorAll(":scope > li[data-cell-id]")].map(
+                    (nested) => nested.getAttribute("data-cell-id"),
                 ),
             ]);
 

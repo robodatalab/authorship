@@ -99,7 +99,7 @@ const authorshipPanelViewConfig = {
 /** @type WebpackConfig */
 const authorFileEditorViewConfig = {
   ...authorshipPanelViewConfig,
-  entry: './extension/webview/message_queue_between_vscode_and_webview.tsx',
+  entry: './extension/webview/webview_command_executor.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'author_file_editor_view.js'

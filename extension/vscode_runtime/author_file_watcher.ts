@@ -2,11 +2,11 @@ import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import { TheFileChangedUnderneath } from "./author_file_editor_messages";
-import type { MessageQueueBetweenVscodeAndWebview } from "./message_queue_between_vscode_and_webview";
+import type { VsCodeCommandExecutor } from "./vscode_command_executor";
 
 export function watchTheAuthorFileForChanges(
     session: AuthorFileEditorSession,
-    documentChanges: MessageQueueBetweenVscodeAndWebview,
+    commandExecutor: VsCodeCommandExecutor,
 ): vscode.Disposable {
     const watcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(
@@ -20,7 +20,7 @@ export function watchTheAuthorFileForChanges(
         if (savedText === session.document.text) {
             return;
         }
-        await documentChanges.post(new TheFileChangedUnderneath(savedText));
+        await commandExecutor.post(new TheFileChangedUnderneath(savedText));
     });
     return vscode.Disposable.from(changed, watcher);
 }

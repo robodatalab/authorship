@@ -2,10 +2,7 @@ import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "./commands/find_in_the_document";
-import type {
-    AuthorFileEditorMessage,
-    MessageQueueListener,
-} from "./message_queue_between_vscode_and_webview";
+import { authorDocumentCommandCards } from "./commands/author_document_commands";
 import { CharacterRangeSynchronizer } from "authordoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
 import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";
@@ -40,9 +37,7 @@ import {
 } from "./story_generation/story_generation_workflow";
 import { withEverySuggestionApplied } from "./tools/suggestions_applied";
 
-export class AuthorFileEditorSession
-    implements vscode.CustomDocument, MessageQueueListener
-{
+export class AuthorFileEditorSession implements vscode.CustomDocument {
     private readonly proseErrors: ProseCheckError[] = [];
     private readonly findMatches: AuthorFileEditorFindMatch[] = [];
     private readonly howFarEachCellHasBeenWritten = new Map<string, number>();
@@ -66,8 +61,9 @@ export class AuthorFileEditorSession
 
     private storyTextSelected: StoryTextSpan | null = null;
 
-    private progressOfTheStageRunning: StoryGenerationStageJob["progress"] | null =
-        null;
+    private progressOfTheStageRunning:
+        | StoryGenerationStageJob["progress"]
+        | null = null;
 
     readonly storyGenerationWorkflow = new StoryGenerationWorkflow(this);
 
@@ -111,10 +107,6 @@ export class AuthorFileEditorSession
 
     get isShownInItsEditor(): boolean {
         return this.panel !== undefined;
-    }
-
-    async onMessage(message: AuthorFileEditorMessage): Promise<void> {
-        await message.invoke(this);
     }
 
     get document(): Document {
@@ -439,6 +431,14 @@ export class AuthorFileEditorSession
         this.sendCellsBeingWritten();
     }
 
+    sendCommandCards(): void {
+        const commandCards = authorDocumentCommandCards();
+        void this.panel?.webview.postMessage({
+            type: "commands",
+            commands: commandCards,
+        });
+    }
+
     sendCellsBeingWritten(): void {
         void this.panel?.webview.postMessage({
             type: "cellsBeingWritten",
@@ -695,7 +695,10 @@ class AuthorFileEditorEdit {
     }
 }
 
-function writtenAlike(cell: Cell | undefined, other: Cell | undefined): boolean {
+function writtenAlike(
+    cell: Cell | undefined,
+    other: Cell | undefined,
+): boolean {
     const written = cell === undefined ? undefined : asThePageDrawsIt(cell);
     const otherWritten =
         other === undefined ? undefined : asThePageDrawsIt(other);
@@ -728,39 +731,33 @@ function withTheEditsOfTheSuggestedCells(
     documentAsSuggested: Document,
     documentEdited: Document,
 ): Document {
-    const suggestionsLeft = documentEdited.suggestions.flatMap(
-        (suggestion) => {
-            const suggestionAsItStands = documentAsItStands.suggestionFor(
-                suggestion.cellId,
-            );
-            const theChangeSuggestedIt =
-                suggestionAsItStands === undefined ||
-                !suggestedAlike(suggestionAsItStands, suggestion);
-            if (theChangeSuggestedIt) {
-                return [suggestion];
-            }
-            const cellAsItStands = documentAsItStands.cellWithId(
-                suggestion.cellId,
-            );
-            const cellSuggested = documentAsSuggested.cellWithId(
-                suggestion.cellId,
-            );
-            const cellEdited = documentEdited.cellWithId(suggestion.cellId);
-            if (
-                cellAsItStands === undefined ||
-                cellEdited === undefined ||
-                writtenAlike(cellSuggested, cellEdited)
-            ) {
-                return [suggestionAsItStands];
-            }
-            const suggestionEdited = suggestionOfTheEdit(
-                cellAsItStands,
-                cellEdited,
-                suggestionAsItStands,
-            );
-            return suggestionEdited === null ? [] : [suggestionEdited];
-        },
-    );
+    const suggestionsLeft = documentEdited.suggestions.flatMap((suggestion) => {
+        const suggestionAsItStands = documentAsItStands.suggestionFor(
+            suggestion.cellId,
+        );
+        const theChangeSuggestedIt =
+            suggestionAsItStands === undefined ||
+            !suggestedAlike(suggestionAsItStands, suggestion);
+        if (theChangeSuggestedIt) {
+            return [suggestion];
+        }
+        const cellAsItStands = documentAsItStands.cellWithId(suggestion.cellId);
+        const cellSuggested = documentAsSuggested.cellWithId(suggestion.cellId);
+        const cellEdited = documentEdited.cellWithId(suggestion.cellId);
+        if (
+            cellAsItStands === undefined ||
+            cellEdited === undefined ||
+            writtenAlike(cellSuggested, cellEdited)
+        ) {
+            return [suggestionAsItStands];
+        }
+        const suggestionEdited = suggestionOfTheEdit(
+            cellAsItStands,
+            cellEdited,
+            suggestionAsItStands,
+        );
+        return suggestionEdited === null ? [] : [suggestionEdited];
+    });
     const cellsEdited = documentEdited.cells.flatMap((cell) => {
         if (documentAsItStands.suggestionFor(cell.uniqueId) === undefined) {
             return [cell];
