@@ -5,9 +5,9 @@ import type {
     WebviewAuthorDocumentCommandCard,
 } from "./author_editor/AuthorFileEditorCanvas";
 import { AuthorFileEditorCellRenderer } from "./author_editor/AuthorFileEditorCellRenderer";
-import { authorDocumentCellTypes } from "../vscode_runtime/commands/author_document_cell_types";
-import type { ProseCheckError } from "../vscode_runtime/commands/check_prose";
-import type { AuthorFileEditorFindMatch } from "../vscode_runtime/commands/find_in_the_document";
+import { authorDocumentCellTypes } from "../vscode_runtime/runtime_commands/author_document_cell_types";
+import type { ProseCheckError } from "../vscode_runtime/runtime_commands/check_prose";
+import type { AuthorFileEditorFindMatch } from "../vscode_runtime/runtime_commands/find_in_the_document";
 import type { StoryAnnotationSelected } from "../vscode_runtime/story_annotation_selection";
 import type { StoryGeneration } from "../vscode_runtime/story_generation/story_generation";
 import { withEverySuggestionApplied } from "../vscode_runtime/tools/suggestions_applied";

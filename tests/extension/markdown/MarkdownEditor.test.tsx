@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
+import type { ProseCheckError } from "../../../extension/vscode_runtime/runtime_commands/check_prose";
 
 vi.mock(
     "monaco-editor/editor/contrib/multicursor/browser/multicursor.js",
@@ -327,7 +327,9 @@ describe("markdown that changes underneath the editor", () => {
 
         await render("The lantern had gone out.", committed, 1);
 
-        expect(monacoEditorsOnThePage[0].getValue()).toBe("The lantern had gone out.");
+        expect(monacoEditorsOnThePage[0].getValue()).toBe(
+            "The lantern had gone out.",
+        );
     });
 });
 
@@ -718,7 +720,10 @@ describe("selecting text in the rendered markdown", () => {
         to: string,
     ): Promise<void> {
         const textNodes: Text[] = [];
-        const walking = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+        const walking = document.createTreeWalker(
+            rendered,
+            NodeFilter.SHOW_TEXT,
+        );
         while (walking.nextNode()) {
             textNodes.push(walking.currentNode as Text);
         }
@@ -813,7 +818,8 @@ describe("the words of a salient concept", () => {
 
         expect(
             [
-                ...(highlights.get("markdown-editor-story-text-highlight-1") ?? []),
+                ...(highlights.get("markdown-editor-story-text-highlight-1") ??
+                    []),
             ].map((range) => range.toString()),
         ).toEqual(["the door."]);
         vi.unstubAllGlobals();

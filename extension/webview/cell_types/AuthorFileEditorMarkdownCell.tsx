@@ -13,16 +13,13 @@ import {
     useAuthorFileEditorCellTimesTheHostWroteIt,
 } from "../author_editor/AuthorFileEditorCell";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
 } from "../author_editor/AuthorFileEditorCanvas";
-import {
-    MARKDOWN,
-    type MarkdownCell,
-} from "authordoc/cells/markdown_cell";
+import { MARKDOWN, type MarkdownCell } from "authordoc/cells/markdown_cell";
 
 interface AuthorFileEditorMarkdownCellProps {
     cell: MarkdownCell;
@@ -37,8 +34,7 @@ export function AuthorFileEditorMarkdownCell({
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const storyTextSelected = useAuthorFileEditorCellStoryTextSelected();
     const storyTextClicked = useAuthorFileEditorCellStoryTextClicked();
-    const storyTextHighlights =
-        useAuthorFileEditorCellStoryTextHighlights();
+    const storyTextHighlights = useAuthorFileEditorCellStoryTextHighlights();
     const { storyTextShown, onStoryTextShownAt } =
         useAuthorFileEditorCellStoryTextShown();
     const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();

@@ -1,0 +1,81 @@
+import { describe, expect, it } from "vitest";
+
+import { AddEventToPlotCommand } from "../../../extension/vscode_runtime/runtime_commands/add_event_to_plot";
+import { PlotNode, type PlotCell } from "authordoc/cells/plot_cell";
+import { StoryWordRange } from "authordoc/cells/story_word_range";
+import { openStory } from "./open_story";
+
+const THE_STORY = `
+<!-- cell: markdown id="c1" -->
+
+She saw the door.
+
+<!-- cell: plot title="The door" id="p1" -->
+
+<ol title="She finds the door.">
+<li id="e1" timestamp="1.1" place="h1" words="2-3">She finds the door.</li>
+</ol>
+`;
+
+describe("AddEventToPlotCommand — adds an event no story text tells yet", () => {
+    it("adds it, with the id it is given, at the end of the trajectory", () => {
+        const session = openStory(THE_STORY);
+
+        new AddEventToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            nodeId: "e2",
+        });
+
+        expect(session.document.cellWithId("p1")).toMatchObject({
+            nodes: [
+                new PlotNode(
+                    "e1",
+                    new StoryWordRange(2, 3),
+                    "1.1",
+                    "h1",
+                    [],
+                    "She finds the door.",
+                ),
+                new PlotNode("e2", null),
+            ],
+        });
+    });
+
+    it("adds nothing when the plot has an event with that id already", () => {
+        const session = openStory(THE_STORY);
+        const plotBefore = session.document.cellWithId("p1");
+
+        new AddEventToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            nodeId: "e1",
+        });
+
+        expect(session.document.cellWithId("p1")).toEqual(plotBefore);
+    });
+
+    it("keeps the concepts the plot references", () => {
+        const session = openStory(`
+<!-- cell: markdown id="c1" -->
+
+She saw the door. He heard the bell.
+
+<!-- cell: salient-concept id="k1" title="Motherhood" -->
+
+A mother puts her child first.
+
+<!-- cell: plot title="The door" concepts="k1" id="p1" -->
+
+She finds the door.
+`);
+
+        new AddEventToPlotCommand().invoke(session, {
+            annotationCellId: "p1",
+            nodeId: "e2",
+        });
+
+        const plot = session.document.cellWithId("p1") as PlotCell;
+        const concepts = plot.concepts(session.document);
+        const motherhood = session.document.cellWithId("k1");
+        expect(concepts).toEqual([motherhood]);
+    });
+});

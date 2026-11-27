@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ReviewTheSuggestionCommand } from "../../../extension/vscode_runtime/commands/review_the_suggestion";
+import { ReviewTheSuggestionCommand } from "../../../extension/vscode_runtime/runtime_commands/review_the_suggestion";
 import type { StoryGenerationStageJob } from "../../../extension/vscode_runtime/story_generation/story_generation";
 import { executedCommands, files, shownMessages } from "../vscode";
 import {
@@ -9,7 +9,7 @@ import {
     openStory,
     sentToThePage,
     STORY_FILE,
-} from "../commands/open_story";
+} from "../runtime_commands/open_story";
 
 const NEVER_GENERATED = `<!-- cell: markdown id="c1" -->
 
@@ -125,7 +125,17 @@ const DESCRIBES_THE_CONCEPTS: StoryGenerationStageJob = {
     running: true,
     error: null,
     progress: {
-        steps: [{ doing: "concepts", done: 0, of: 1, seconds: 0, secondsPerItem: null, state: "running", steps: [] }],
+        steps: [
+            {
+                doing: "concepts",
+                done: 0,
+                of: 1,
+                seconds: 0,
+                secondsPerItem: null,
+                state: "running",
+                steps: [],
+            },
+        ],
     },
     story: null,
 };
@@ -134,7 +144,17 @@ const ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS: StoryGenerationStageJob = {
     running: false,
     error: null,
     progress: {
-        steps: [{ doing: "concepts", done: 1, of: 1, seconds: 0, secondsPerItem: null, state: "done", steps: [] }],
+        steps: [
+            {
+                doing: "concepts",
+                done: 1,
+                of: 1,
+                seconds: 0,
+                secondsPerItem: null,
+                state: "done",
+                steps: [],
+            },
+        ],
     },
     story: THE_STORY_REVIEWED,
 };
@@ -143,7 +163,17 @@ const STOPPED_IN_THE_CONCEPTS: StoryGenerationStageJob = {
     running: false,
     error: null,
     progress: {
-        steps: [{ doing: "concepts", done: 0, of: 1, seconds: 0, secondsPerItem: null, state: "done", steps: [] }],
+        steps: [
+            {
+                doing: "concepts",
+                done: 0,
+                of: 1,
+                seconds: 0,
+                secondsPerItem: null,
+                state: "done",
+                steps: [],
+            },
+        ],
     },
     story: null,
 };
@@ -214,11 +244,18 @@ describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not d
 
         await session.storyGenerationWorkflow.runTheNextStage();
 
-        expect([fetched.mock.calls.length, session.theStoryGeneration?.asked]).toEqual([
+        expect([
+            fetched.mock.calls.length,
+            session.theStoryGeneration?.asked,
+        ]).toEqual([
             0,
             {
                 stage: "concept titles",
-                shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+                shown: {
+                    kind: "command",
+                    cellKind: "salient-concept",
+                    commandName: "insertCell",
+                },
             },
         ]);
     });
@@ -325,7 +362,10 @@ describe("StoryGenerationWorkflow.accept — the author continues past a stage",
 
         await session.storyGenerationWorkflow.accept();
 
-        expect([fetched.mock.calls.length, session.document.serialize()]).toEqual([0, THE_STORY_AWAITING_REVIEW]);
+        expect([
+            fetched.mock.calls.length,
+            session.document.serialize(),
+        ]).toEqual([0, THE_STORY_AWAITING_REVIEW]);
     });
 
     it("saves the story with the stage done once no suggestion is left, and has the author cast the characters, without asking the server", async () => {
@@ -349,7 +389,10 @@ stage: validity: False
 
         await session.storyGenerationWorkflow.accept();
 
-        expect([files.get(STORY_FILE), fetched.mock.calls.length]).toEqual([THE_STORY_ACCEPTED, 0]);
+        expect([files.get(STORY_FILE), fetched.mock.calls.length]).toEqual([
+            THE_STORY_ACCEPTED,
+            0,
+        ]);
     });
 });
 
@@ -385,8 +428,14 @@ stage: validity: False
 
         await session.storyGenerationWorkflow.accept();
 
-        expect([shownMessages, fetched.mock.calls.length, session.document.serialize()]).toEqual([
-            ["Tie every character to the concepts it supports before continuing: Dax supports none."],
+        expect([
+            shownMessages,
+            fetched.mock.calls.length,
+            session.document.serialize(),
+        ]).toEqual([
+            [
+                "Tie every character to the concepts it supports before continuing: Dax supports none.",
+            ],
             0,
             THE_CAST_AWAITING_REVIEW,
         ]);
@@ -410,7 +459,9 @@ stage: cast: Review
         await session.storyGenerationWorkflow.accept();
 
         expect([shownMessages, fetched.mock.calls.length]).toEqual([
-            ["Add the characters of the story before continuing: the cast has none."],
+            [
+                "Add the characters of the story before continuing: the cast has none.",
+            ],
             0,
         ]);
     });
@@ -452,7 +503,10 @@ stage: validity: False
         await session.storyGenerationWorkflow.accept();
 
         const [, started] = fetched.mock.calls[0];
-        expect([shownMessages, JSON.parse(started.body).stage]).toEqual([[], "plots"]);
+        expect([shownMessages, JSON.parse(started.body).stage]).toEqual([
+            [],
+            "plots",
+        ]);
     });
 });
 
@@ -471,9 +525,17 @@ describe("StoryGenerationWorkflow.reject — the author rejects what a stage lea
         await session.storyGenerationWorkflow.reject();
 
         const [startedAt, started] = fetched.mock.calls[0];
-        expect([startedAt, JSON.parse(started.body), files.get(STORY_FILE)]).toEqual([
+        expect([
+            startedAt,
+            JSON.parse(started.body),
+            files.get(STORY_FILE),
+        ]).toEqual([
             expect.stringContaining("/generate/story"),
-            { path: STORY_FILE, story: LEFT_OFF_AT_THE_CONCEPTS, stage: "concepts" },
+            {
+                path: STORY_FILE,
+                story: LEFT_OFF_AT_THE_CONCEPTS,
+                stage: "concepts",
+            },
             LEFT_OFF_AT_THE_CONCEPTS,
         ]);
     });
@@ -484,7 +546,9 @@ describe("StoryGenerationWorkflow.reject — the author rejects what a stage lea
             vi
                 .fn()
                 .mockResolvedValueOnce(NO_STAGE_RUNS)
-                .mockRejectedValueOnce(new Error("The models are still being deployed")),
+                .mockRejectedValueOnce(
+                    new Error("The models are still being deployed"),
+                ),
         );
         const session = openStory(THE_STORY_AWAITING_REVIEW);
         await session.storyGenerationWorkflow.showWhereItStands();
@@ -504,8 +568,14 @@ describe("StoryGenerationWorkflow — watches the author review the suggestions 
     it("deletes a cell the stage proposed once its suggestion is rejected, and leaves a cell the stage only changed", async () => {
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
-        await new ReviewTheSuggestionCommand().invoke(session, { cellId: "k1", verdict: "reject" });
-        await new ReviewTheSuggestionCommand().invoke(session, { cellId: "c1", verdict: "reject" });
+        await new ReviewTheSuggestionCommand().invoke(session, {
+            cellId: "k1",
+            verdict: "reject",
+        });
+        await new ReviewTheSuggestionCommand().invoke(session, {
+            cellId: "c1",
+            verdict: "reject",
+        });
 
         expect(files.get(STORY_FILE)).toBe(`<!-- cell: markdown id="c1" -->
 
@@ -527,16 +597,21 @@ stage: validity: False
 
 describe("StoryGenerationWorkflow.quit — the author quits the generation altogether", () => {
     it("drops the suggestions of the stage awaiting review, and saves the story without the record of the stages", async () => {
-        const fetched = vi
-            .fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
+        const fetched = vi.fn().mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({}),
+        });
         vi.stubGlobal("fetch", fetched);
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
         await session.storyGenerationWorkflow.quit();
 
         const [droppedAt] = fetched.mock.calls[0];
-        expect([droppedAt, files.get(STORY_FILE), session.theStoryGeneration]).toEqual([
+        expect([
+            droppedAt,
+            files.get(STORY_FILE),
+            session.theStoryGeneration,
+        ]).toEqual([
             expect.stringContaining("/jobs/cancel"),
             NEVER_GENERATED,
             null,
@@ -547,7 +622,10 @@ describe("StoryGenerationWorkflow.quit — the author quits the generation altog
         files.set(STORY_FILE, NEVER_GENERATED);
         vi.stubGlobal(
             "fetch",
-            vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }),
+            vi.fn().mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({}),
+            }),
         );
         const session = openStory(THE_STORY_REVIEWED);
 
@@ -623,7 +701,10 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
                 ok: true,
                 json: () => Promise.resolve(ASKS_FOR_A_REVIEW_OF_THE_CONCEPTS),
             })
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({}),
+            });
         vi.stubGlobal("fetch", fetched);
         const session = openStory(LEFT_OFF_AT_THE_CONCEPTS);
 
@@ -655,7 +736,10 @@ describe("StoryGenerationWorkflow.showWhereItStands — the generation of a stor
                         story: LEFT_OFF_AT_THE_CONCEPTS,
                     }),
             })
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({}),
+            });
         vi.stubGlobal("fetch", fetched);
         const session = openStory(LEFT_OFF_AT_THE_CONCEPTS);
 

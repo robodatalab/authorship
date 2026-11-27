@@ -24,9 +24,9 @@ import {
     type AuthorFileEditorOverviewRulerArrow,
     type AuthorFileEditorOverviewRulerMark,
 } from "./AuthorFileEditorOverviewRuler";
-import type { AuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
-import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
-import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
+import type { AuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
+import type { ProseCheckError } from "../../vscode_runtime/runtime_commands/check_prose";
+import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/runtime_commands/find_in_the_document";
 import type { StoryGeneration } from "../../vscode_runtime/story_generation/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
@@ -168,7 +168,9 @@ interface AuthorFileEditorCanvasProps {
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderer: CellVisitor<ReactNode>;
     proseErrors?: ProseCheckError[];
-    storyAnnotationsSelected?: Readonly<Record<string, StoryAnnotationSelected>>;
+    storyAnnotationsSelected?: Readonly<
+        Record<string, StoryAnnotationSelected>
+    >;
     storyTextShown?: StoryTextSpan | null;
     findMatches?: AuthorFileEditorFindMatch[];
     cellsBeingWritten?: Readonly<Record<string, number>>;
@@ -257,8 +259,8 @@ export function AuthorFileEditorCanvas({
                 );
                 const passagesOfTheAnnotation =
                     annotations[highlightColor]?.passages ?? [];
-                const passages = passagesOfTheAnnotation.map(
-                    (storyWordRange) => storyWords.spans(storyWordRange),
+                const passages = passagesOfTheAnnotation.map((storyWordRange) =>
+                    storyWords.spans(storyWordRange),
                 );
                 const passageIds = passagesOfTheAnnotation.map(
                     (storyWordRange) => storyWordRange.passageId,
@@ -280,10 +282,7 @@ export function AuthorFileEditorCanvas({
         [storyAsSuggested, storyWords, storyAnnotationsSelected],
     );
     const storyTextHighlightsByCellId = useMemo(() => {
-        const byCellId = new Map<
-            string,
-            MarkdownEditorStoryTextHighlight[]
-        >();
+        const byCellId = new Map<string, MarkdownEditorStoryTextHighlight[]>();
         for (const annotation of storyAnnotationsShown) {
             annotation.passages.forEach((passage, passageIndex) => {
                 for (const span of passage) {
@@ -336,7 +335,11 @@ export function AuthorFileEditorCanvas({
                 const touchesTheNodeSelected =
                     edge.fromNodeId === nodeSelected ||
                     edge.toNodeId === nodeSelected;
-                if (!touchesTheNodeSelected || fromPassage < 0 || toPassage < 0) {
+                if (
+                    !touchesTheNodeSelected ||
+                    fromPassage < 0 ||
+                    toPassage < 0
+                ) {
                     continue;
                 }
                 arrows.push({
@@ -379,9 +382,9 @@ export function AuthorFileEditorCanvas({
             : storyAsSuggested.cellWithId(cellIdDragged);
     const canvasDrawn = useRef<HTMLDivElement>(null);
     const suggestionShown = useRef<string | null>(null);
-    const [metadataPaneWidth, resizeTheMetadataPane] = useState<
-        number | null
-    >(null);
+    const [metadataPaneWidth, resizeTheMetadataPane] = useState<number | null>(
+        null,
+    );
     const columnsOfThePanesResized =
         metadataPaneWidth === null
             ? undefined
@@ -466,7 +469,9 @@ export function AuthorFileEditorCanvas({
     ): boolean {
         return (
             cellsAsSuggested.length > 0 &&
-            cellsAsSuggested.every((cell) => isDrawnOnCell(command, cell.folded))
+            cellsAsSuggested.every((cell) =>
+                isDrawnOnCell(command, cell.folded),
+            )
         );
     }
 
@@ -818,14 +823,12 @@ export function AuthorFileEditorCanvas({
             <AuthorFileEditorCellState
                 cellCommands={cellCommands}
                 runCommand={commands.find(
-                    (command) =>
-                        command.runsCellsOfKind === cell.kind,
+                    (command) => command.runsCellsOfKind === cell.kind,
                 )}
                 cellId={cell.uniqueId}
                 cellIsFolded={cell.folded}
                 timesTheHostWroteIt={
-                    timesTheHostWroteEachCell[cell.uniqueId] ??
-                    0
+                    timesTheHostWroteEachCell[cell.uniqueId] ?? 0
                 }
                 proseErrors={proseErrors.filter(
                     (proseError) =>
@@ -841,30 +844,16 @@ export function AuthorFileEditorCanvas({
                         : undefined
                 }
                 onStoryTextClicked={(clickedAt) =>
-                    selectThePassagesClicked(
-                        cell.uniqueId,
-                        clickedAt,
-                    )
+                    selectThePassagesClicked(cell.uniqueId, clickedAt)
                 }
                 onStoryTextShownAt={bringTheStoryTextIntoView}
-                findMatches={findMatchesByCellId.get(
-                    cell.uniqueId,
-                )}
+                findMatches={findMatchesByCellId.get(cell.uniqueId)}
                 currentFindMatch={
-                    find.current?.cellId === cell.uniqueId
-                        ? find.current
-                        : null
+                    find.current?.cellId === cell.uniqueId ? find.current : null
                 }
-                howFarTheCellHasBeenWritten={
-                    cellsBeingWritten[cell.uniqueId]
-                }
-                wordsInTheSection={
-                    wordsInEverySection[cell.uniqueId]
-                }
-                onStoryTextSelected={(
-                    selectedFrom,
-                    selectedTo,
-                ) =>
+                howFarTheCellHasBeenWritten={cellsBeingWritten[cell.uniqueId]}
+                wordsInTheSection={wordsInEverySection[cell.uniqueId]}
+                onStoryTextSelected={(selectedFrom, selectedTo) =>
                     sendMessagesToVscode({
                         type: "storyTextSelected",
                         storyTextSelected:
@@ -872,10 +861,8 @@ export function AuthorFileEditorCanvas({
                                 ? null
                                 : {
                                       cellId: cell.uniqueId,
-                                      startCharacterOffsetInCell:
-                                          selectedFrom,
-                                      endCharacterOffsetInCell:
-                                          selectedTo,
+                                      startCharacterOffsetInCell: selectedFrom,
+                                      endCharacterOffsetInCell: selectedTo,
                                   },
                     })
                 }

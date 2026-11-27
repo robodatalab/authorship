@@ -8,11 +8,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { isUnderstood } from "../../vscode_runtime/commands/find_in_the_document";
+import { isUnderstood } from "../../vscode_runtime/runtime_commands/find_in_the_document";
 import type {
     AuthorFileEditorFindMatch,
     AuthorFileEditorFindQuery,
-} from "../../vscode_runtime/commands/find_in_the_document";
+} from "../../vscode_runtime/runtime_commands/find_in_the_document";
 import {
     invokeAuthorDocumentCommand,
     type SendMessagesToVscode,
@@ -177,7 +177,9 @@ export function useAuthorFileEditorFind(
         const drawn = requestAnimationFrame(() => {
             const scrolled = cellsOnThePage.current;
             const shown =
-                document.querySelector(".author-file-editor-find-match-current") ??
+                document.querySelector(
+                    ".author-file-editor-find-match-current",
+                ) ??
                 (cellStoodOn
                     ? scrolled?.querySelector(
                           `li[data-cell-id="${cellStoodOn}"]`,

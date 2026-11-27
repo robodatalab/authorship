@@ -1,4 +1,4 @@
-import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { ProseCheckError } from "../../vscode_runtime/runtime_commands/check_prose";
 import "./LinterTooltip.css";
 
 interface LinterTooltipProps {

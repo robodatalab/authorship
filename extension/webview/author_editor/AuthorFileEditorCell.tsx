@@ -5,9 +5,9 @@ import {
     type SendMessagesToVscode,
     type WebviewAuthorDocumentCommandCard,
 } from "./AuthorFileEditorCanvas";
-import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { ProseCheckError } from "../../vscode_runtime/runtime_commands/check_prose";
 import type { AuthorFileEditorFindHighlight } from "./AuthorFileEditorFind";
-import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/commands/find_in_the_document";
+import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/runtime_commands/find_in_the_document";
 import type {
     MarkdownEditorStoryTextHighlight,
     MarkdownEditorStoryTextShown,
@@ -264,9 +264,9 @@ export function useAuthorFileEditorCellProseErrors(): ProseCheckError[] {
 }
 
 export function useAuthorFileEditorCellStoryTextHighlights():
-    MarkdownEditorStoryTextHighlight[] | undefined {
-    return useContext(AuthorFileEditorCellStateContext)
-        .storyTextHighlights;
+    | MarkdownEditorStoryTextHighlight[]
+    | undefined {
+    return useContext(AuthorFileEditorCellStateContext).storyTextHighlights;
 }
 
 export function useAuthorFileEditorCellStoryTextShown(): {

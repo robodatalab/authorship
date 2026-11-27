@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 
-import type { ProseCheckError } from "./commands/check_prose";
-import type { AuthorFileEditorFindMatch } from "./commands/find_in_the_document";
-import { authorDocumentCommandCards } from "./commands/author_document_commands";
+import type { ProseCheckError } from "./runtime_commands/check_prose";
+import type { AuthorFileEditorFindMatch } from "./runtime_commands/find_in_the_document";
+import { authorDocumentCommandCards } from "./runtime_commands/author_document_commands";
 import { CharacterRangeSynchronizer } from "authordoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
 import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";

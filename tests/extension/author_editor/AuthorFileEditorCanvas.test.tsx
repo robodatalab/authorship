@@ -14,7 +14,7 @@ import {
 import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
 import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation/story_generation";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
-import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/commands/author_document_cell_types";
+import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/runtime_commands/author_document_cell_types";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 import { MarkdownEditor } from "../../../extension/webview/markdown/MarkdownEditor";
 import { AboutCell } from "authordoc/cells/about_cell";
@@ -30,11 +30,7 @@ import { MarkdownCell } from "authordoc/cells/markdown_cell";
 import type { NoteCell } from "authordoc/cells/note_cell";
 import { PartCell } from "authordoc/cells/part_cell";
 import { PlaceCell } from "authordoc/cells/place_cell";
-import {
-    PlotCell,
-    PlotEdge,
-    PlotNode,
-} from "authordoc/cells/plot_cell";
+import { PlotCell, PlotEdge, PlotNode } from "authordoc/cells/plot_cell";
 import type { RecapCell } from "authordoc/cells/recap_cell";
 import {
     SalientConceptCell,
@@ -225,7 +221,9 @@ function insertMenus(): Element[] {
 
 function listItems(): Element[] {
     return [
-        ...document.querySelectorAll(".author-file-editor-manuscript-pane > ul > li"),
+        ...document.querySelectorAll(
+            ".author-file-editor-manuscript-pane > ul > li",
+        ),
     ];
 }
 
@@ -576,10 +574,7 @@ describe("the commands on a cell", () => {
 describe("the command that runs a cell", () => {
     it("goes to the cell of the kind it runs, and to no other", async () => {
         await mountCanvas({
-            cells: [
-                markdownCell("one"),
-                new BlurbCell("", false, null, "b1"),
-            ],
+            cells: [markdownCell("one"), new BlurbCell("", false, null, "b1")],
             cellDrawings: {
                 markdown: () => (
                     <AuthorFileEditorCell
@@ -659,15 +654,15 @@ describe("two commands drawn as one button", () => {
 
     it("asks for the command that was drawn, not the one that was not", async () => {
         await mountCanvas({
-            cells: [
-                new MarkdownCell("one", true, null, "one"),
-            ],
+            cells: [new MarkdownCell("one", true, null, "one")],
             cellDrawings: { markdown: () => <AuthorFileEditorCell /> },
             commands: FOLD_COMMANDS,
         });
 
         await click(
-            document.querySelector("button.author-file-editor-cell-actions-button")!,
+            document.querySelector(
+                "button.author-file-editor-cell-actions-button",
+            )!,
         );
 
         expect(posted).toEqual([
@@ -996,11 +991,8 @@ describe("the salient concepts the story holds", () => {
 
     function highlightsDrawnOnTheStory(): unknown {
         return JSON.parse(
-            (
-                document.querySelector(
-                    ".test-select-the-door",
-                ) as HTMLElement
-            ).dataset.highlights!,
+            (document.querySelector(".test-select-the-door") as HTMLElement)
+                .dataset.highlights!,
         );
     }
 
@@ -1045,11 +1037,8 @@ describe("the salient concepts the story holds", () => {
 
         expect(
             JSON.parse(
-                (
-                    document.querySelector(
-                        ".test-select-the-door",
-                    ) as HTMLElement
-                ).dataset.shown!,
+                (document.querySelector(".test-select-the-door") as HTMLElement)
+                    .dataset.shown!,
             ),
         ).toEqual({
             cellId: "m1",
@@ -1119,9 +1108,9 @@ describe("the plots the story weaves", () => {
             cellDrawings: { markdown: () => <ShowsTheHighlights /> },
         });
 
-        const highlightsDrawn = document.querySelector<HTMLElement>(
-            ".test-highlights",
-        )!.dataset.highlights!;
+        const highlightsDrawn =
+            document.querySelector<HTMLElement>(".test-highlights")!.dataset
+                .highlights!;
         expect(JSON.parse(highlightsDrawn)).toEqual([]);
     });
 
@@ -1134,9 +1123,9 @@ describe("the plots the story weaves", () => {
             },
         });
 
-        const highlightsDrawn = document.querySelector<HTMLElement>(
-            ".test-highlights",
-        )!.dataset.highlights!;
+        const highlightsDrawn =
+            document.querySelector<HTMLElement>(".test-highlights")!.dataset
+                .highlights!;
         expect(JSON.parse(highlightsDrawn)).toEqual([
             {
                 startCharacterOffsetInCell: 9,
@@ -1162,9 +1151,9 @@ describe("the plots the story weaves", () => {
             },
         });
 
-        const highlightsDrawn = document.querySelector<HTMLElement>(
-            ".test-highlights",
-        )!.dataset.highlights!;
+        const highlightsDrawn =
+            document.querySelector<HTMLElement>(".test-highlights")!.dataset
+                .highlights!;
         expect(JSON.parse(highlightsDrawn)).toEqual([
             {
                 startCharacterOffsetInCell: 9,
@@ -1192,8 +1181,16 @@ describe("the plots the story weaves", () => {
     }
 
     it.each([
-        { clicked: "inside the plot's first passage", clickedAt: 10, passageId: "n1" },
-        { clicked: "inside the plot's second passage", clickedAt: 2, passageId: "n2" },
+        {
+            clicked: "inside the plot's first passage",
+            clickedAt: 10,
+            passageId: "n1",
+        },
+        {
+            clicked: "inside the plot's second passage",
+            clickedAt: 2,
+            passageId: "n2",
+        },
     ])(
         "asks the host to select the passage when the author clicks $clicked",
         async ({ clickedAt, passageId }) => {
@@ -1204,7 +1201,9 @@ describe("the plots the story weaves", () => {
                     THE_DOOR,
                 ],
                 cellDrawings: {
-                    markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
+                    markdown: () => (
+                        <ClicksTheStoryText clickedAt={clickedAt} />
+                    ),
                 },
                 storyAnnotationsSelected: {
                     plot: { annotationCellId: "p2", passageId: null },
@@ -1228,7 +1227,12 @@ describe("the plots the story weaves", () => {
                 markdownCell("The door opens.", "m1"),
                 new SalientConceptCell(
                     "Door",
-                    [new SalientConceptReference("r1", new StoryWordRange(0, 1))],
+                    [
+                        new SalientConceptReference(
+                            "r1",
+                            new StoryWordRange(0, 1),
+                        ),
+                    ],
                     "What she saw.",
                     false,
                     null,
@@ -1245,14 +1249,16 @@ describe("the plots the story weaves", () => {
                 plot: { annotationCellId: "p2", passageId: null },
             },
         });
-        const storyText = document.querySelector(
-            ".test-click-the-story-text",
-        )!;
+        const storyText = document.querySelector(".test-click-the-story-text")!;
 
         await click(storyText);
 
         expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
+            {
+                type: "selectPassage",
+                cellKind: "salient-concept",
+                passageId: "r1",
+            },
             { type: "selectPassage", cellKind: "plot", passageId: "n2" },
         ]);
     });
@@ -1284,7 +1290,9 @@ describe("the plots the story weaves", () => {
                     THE_DOOR,
                 ],
                 cellDrawings: {
-                    markdown: () => <ClicksTheStoryText clickedAt={clickedAt} />,
+                    markdown: () => (
+                        <ClicksTheStoryText clickedAt={clickedAt} />
+                    ),
                 },
                 storyAnnotationsSelected,
             });
@@ -1299,16 +1307,15 @@ describe("the plots the story weaves", () => {
     );
 
     describe("the overview ruler beside the story", () => {
-        const MARKED = "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0";
+        const MARKED =
+            "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-color-0";
         const MARKED_DIMMED =
             "author-file-editor-overview-ruler-mark author-file-editor-overview-ruler-mark-dimmed author-file-editor-overview-ruler-color-0";
         const WHERE_THE_WORDS_ARE_DRAWN: Record<string, DOMRect[]> = {
             "opens.": [
                 { left: 100, right: 150, top: 20, bottom: 38 } as DOMRect,
             ],
-            "The door": [
-                { left: 0, right: 60, top: 0, bottom: 18 } as DOMRect,
-            ],
+            "The door": [{ left: 0, right: 60, top: 0, bottom: 18 } as DOMRect],
             "He heard": [
                 { left: 10, right: 70, top: 300, bottom: 318 } as DOMRect,
             ],
@@ -1324,12 +1331,20 @@ describe("the plots the story weaves", () => {
                         []) as unknown as DOMRectList;
                 },
             );
-            vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
-                { left: 0, top: 0, width: 32, height: 500 } as DOMRect,
-            );
-            vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(
-                1000,
-            );
+            vi.spyOn(
+                Element.prototype,
+                "getBoundingClientRect",
+            ).mockReturnValue({
+                left: 0,
+                top: 0,
+                width: 32,
+                height: 500,
+            } as DOMRect);
+            vi.spyOn(
+                HTMLElement.prototype,
+                "scrollHeight",
+                "get",
+            ).mockReturnValue(1000);
         }
 
         async function mountTheStoryOfTheDoor(
@@ -1342,8 +1357,14 @@ describe("the plots the story weaves", () => {
                     new SalientConceptCell(
                         "Hearing",
                         [
-                            new SalientConceptReference("r1", new StoryWordRange(0, 1)),
-                            new SalientConceptReference("r2", new StoryWordRange(3, 4)),
+                            new SalientConceptReference(
+                                "r1",
+                                new StoryWordRange(0, 1),
+                            ),
+                            new SalientConceptReference(
+                                "r2",
+                                new StoryWordRange(3, 4),
+                            ),
                         ],
                         "What he heard.",
                         false,
@@ -1398,7 +1419,14 @@ describe("the plots the story weaves", () => {
                     new PlotCell(
                         "Knocked first",
                         [
-                            new PlotNode("n0", null, "1.1", "", [], "Someone knocks."),
+                            new PlotNode(
+                                "n0",
+                                null,
+                                "1.1",
+                                "",
+                                [],
+                                "Someone knocks.",
+                            ),
                             new PlotNode("n1", new StoryWordRange(0, 1)),
                             new PlotNode("n2", new StoryWordRange(2, 2)),
                             new PlotNode("n3", new StoryWordRange(3, 4)),
@@ -1460,7 +1488,10 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passageId: null },
+                    "salient-concept": {
+                        annotationCellId: "k1",
+                        passageId: null,
+                    },
                 },
                 marks: [
                     [MARKED, "0", "9"],
@@ -1471,7 +1502,10 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept and one of its examples",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passageId: "r2" },
+                    "salient-concept": {
+                        annotationCellId: "k1",
+                        passageId: "r2",
+                    },
                 },
                 marks: [
                     [MARKED_DIMMED, "0", "9"],
@@ -1558,7 +1592,8 @@ describe("the plots the story weaves", () => {
                 arrows: ["M 16 6.75 H 22 V 152.25 H 16"],
             },
             {
-                selected: "the passage of a plot that leads back to an earlier one",
+                selected:
+                    "the passage of a plot that leads back to an earlier one",
                 storyAnnotationsSelected: {
                     plot: { annotationCellId: "p3", passageId: "n3" },
                 },
@@ -1606,7 +1641,8 @@ describe("the plots the story weaves", () => {
                 arrows: [],
             },
             {
-                selected: "a passage of a plot with an event the story does not tell",
+                selected:
+                    "a passage of a plot with an event the story does not tell",
                 storyAnnotationsSelected: {
                     plot: { annotationCellId: "p4", passageId: "n1" },
                 },
@@ -1632,7 +1668,10 @@ describe("the plots the story weaves", () => {
             {
                 selected: "a concept and a passage of a plot",
                 storyAnnotationsSelected: {
-                    "salient-concept": { annotationCellId: "k1", passageId: null },
+                    "salient-concept": {
+                        annotationCellId: "k1",
+                        passageId: null,
+                    },
                     plot: { annotationCellId: "p1", passageId: "n2" },
                 },
                 marks: [
@@ -1754,7 +1793,16 @@ describe("the metadata and the manuscript panes", () => {
                 markdownCell("Once upon a time", "m1"),
                 new PlotCell(
                     "Bell",
-                    [new PlotNode("e1", new StoryWordRange(0, 2), "1", "", [], "The bell rings.")],
+                    [
+                        new PlotNode(
+                            "e1",
+                            new StoryWordRange(0, 2),
+                            "1",
+                            "",
+                            [],
+                            "The bell rings.",
+                        ),
+                    ],
                     [],
                     "",
                     false,
@@ -1771,10 +1819,16 @@ describe("the metadata and the manuscript panes", () => {
         ].find((tab) => tab.textContent === "Graph")!;
         await click(graphTab);
 
-        await click(document.querySelector(".author-file-editor-story-graph-event")!);
+        await click(
+            document.querySelector(".author-file-editor-story-graph-event")!,
+        );
 
         expect(posted).toEqual([
-            { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId: "p1" },
+            {
+                type: "selectStoryAnnotation",
+                cellKind: "plot",
+                annotationCellId: "p1",
+            },
             { type: "selectPassage", cellKind: "plot", passageId: "e1" },
             { type: "showStoryWordRange", firstWord: 0, lastWord: 2 },
         ]);
@@ -1783,31 +1837,34 @@ describe("the metadata and the manuscript panes", () => {
     it.each([
         ["Metadata", ["p1", "k1"], false],
         ["Graph", [], true],
-    ])("shows in the metadata pane, once %s is chosen, its cells or the graph", async (chosen, cellsShown, graphShown) => {
-        await mountCanvas({
-            cells: [
-                markdownCell("Once", "m1"),
-                new PlotCell("Bell", [], [], "", false, null, "p1"),
-                new SalientConceptCell("Door", [], "", false, null, "k1"),
-            ],
-            cellDrawings: DRAWN_BY_THEIR_IDS,
-        });
-        const tab = [
-            ...document.querySelectorAll(
-                ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
-            ),
-        ].find((drawn) => drawn.textContent === chosen)!;
+    ])(
+        "shows in the metadata pane, once %s is chosen, its cells or the graph",
+        async (chosen, cellsShown, graphShown) => {
+            await mountCanvas({
+                cells: [
+                    markdownCell("Once", "m1"),
+                    new PlotCell("Bell", [], [], "", false, null, "p1"),
+                    new SalientConceptCell("Door", [], "", false, null, "k1"),
+                ],
+                cellDrawings: DRAWN_BY_THEIR_IDS,
+            });
+            const tab = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-metadata-pane .author-file-editor-pane-tab",
+                ),
+            ].find((drawn) => drawn.textContent === chosen)!;
 
-        await click(tab);
+            await click(tab);
 
-        const graph = document.querySelector(
-            ".author-file-editor-metadata-pane .author-file-editor-story-graph",
-        );
-        expect([cellsDrawnIn(".author-file-editor-metadata-pane"), graph !== null]).toEqual([
-            cellsShown,
-            graphShown,
-        ]);
-    });
+            const graph = document.querySelector(
+                ".author-file-editor-metadata-pane .author-file-editor-story-graph",
+            );
+            expect([
+                cellsDrawnIn(".author-file-editor-metadata-pane"),
+                graph !== null,
+            ]).toEqual([cellsShown, graphShown]);
+        },
+    );
 
     it.each([
         [".author-file-editor-metadata-pane", ["p1", "k1", "v1", "h1"]],
@@ -1829,7 +1886,10 @@ describe("the metadata and the manuscript panes", () => {
     });
 
     it.each([
-        [".author-file-editor-metadata-pane", ["plot", "salient-concept", "character", "place"]],
+        [
+            ".author-file-editor-metadata-pane",
+            ["plot", "salient-concept", "character", "place"],
+        ],
         [".author-file-editor-manuscript-pane", ["markdown", "chapter"]],
     ])("offers in %s the kinds it holds", async (pane, expected) => {
         await mountCanvas({
@@ -1888,8 +1948,16 @@ describe("the metadata and the manuscript panes", () => {
 
         it.each([
             ["where it is dragged to", 320, "300px auto minmax(0, 1fr) auto"],
-            ["no narrower than the narrowest pane", 50, "160px auto minmax(0, 1fr) auto"],
-            ["no wider than leaves the manuscript the narrowest pane", 1000, "840px auto minmax(0, 1fr) auto"],
+            [
+                "no narrower than the narrowest pane",
+                50,
+                "160px auto minmax(0, 1fr) auto",
+            ],
+            [
+                "no wider than leaves the manuscript the narrowest pane",
+                1000,
+                "840px auto minmax(0, 1fr) auto",
+            ],
         ])("makes the metadata pane %s", async (_, clientX, expected) => {
             await mountCanvas({ cellDrawings: DRAWN_BY_THEIR_IDS });
             canvasDrawnFrom20To1020();
@@ -1926,7 +1994,11 @@ describe("the metadata and the manuscript panes", () => {
     it.each([
         [
             "the button that adds the kind the story generation asks for, at the top of the metadata pane",
-            { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+            {
+                kind: "command",
+                cellKind: "salient-concept",
+                commandName: "insertCell",
+            },
             [["salient-concept"], []],
         ],
         [
@@ -1974,13 +2046,19 @@ describe("the metadata and the manuscript panes", () => {
                 stages: [{ name: "concept titles", done: false }],
                 asked: {
                     stage: "concept titles",
-                    shown: { kind: "command", cellKind: "salient-concept", commandName: "insertCell" },
+                    shown: {
+                        kind: "command",
+                        cellKind: "salient-concept",
+                        commandName: "insertCell",
+                    },
                 },
             },
         });
 
         const bubbles = [
-            ...document.querySelectorAll(".author-file-editor-insert-cell-menu-bubble"),
+            ...document.querySelectorAll(
+                ".author-file-editor-insert-cell-menu-bubble",
+            ),
         ].map((bubble) => bubble.textContent);
 
         expect(bubbles).toEqual([
@@ -2006,87 +2084,123 @@ describe("the metadata and the manuscript panes", () => {
                 suggestions: [ONE_CHANGED],
             });
 
-            const drawn = [...document.querySelectorAll(".author-file-editor-manuscript-pane .test-cell")].map(
-                (cell) => cell.textContent,
-            );
-            const suggestionsDrawn = [...document.querySelectorAll(".author-file-editor-suggestion")].map(
-                (drawnSuggestion) => [
-                    drawnSuggestion.getAttribute("data-suggestion-id"),
-                    drawnSuggestion.querySelector(".author-file-editor-suggestion-says")!.textContent,
-                    drawnSuggestion.querySelector(".author-file-editor-suggestion-proposed")!.textContent,
-                    [...drawnSuggestion.querySelectorAll(".author-file-editor-suggestion-footer button")].map((button) =>
-                        button.getAttribute("aria-label"),
+            const drawn = [
+                ...document.querySelectorAll(
+                    ".author-file-editor-manuscript-pane .test-cell",
+                ),
+            ].map((cell) => cell.textContent);
+            const suggestionsDrawn = [
+                ...document.querySelectorAll(".author-file-editor-suggestion"),
+            ].map((drawnSuggestion) => [
+                drawnSuggestion.getAttribute("data-suggestion-id"),
+                drawnSuggestion.querySelector(
+                    ".author-file-editor-suggestion-says",
+                )!.textContent,
+                drawnSuggestion.querySelector(
+                    ".author-file-editor-suggestion-proposed",
+                )!.textContent,
+                [
+                    ...drawnSuggestion.querySelectorAll(
+                        ".author-file-editor-suggestion-footer button",
                     ),
-                ],
-            );
+                ].map((button) => button.getAttribute("aria-label")),
+            ]);
             expect([drawn, suggestionsDrawn]).toEqual([
                 ["one, changed", "two"],
-                [["one", "Suggested change", "one, changed", ["Accept the suggestion", "Reject the suggestion"]]],
+                [
+                    [
+                        "one",
+                        "Suggested change",
+                        "one, changed",
+                        ["Accept the suggestion", "Reject the suggestion"],
+                    ],
+                ],
             ]);
         });
 
         it.each([
             ["accepting", "Accept the suggestion", "accept"],
             ["rejecting", "Reject the suggestion", "reject"],
-        ])("%s a suggestion answers for its cell", async (_, label, verdict) => {
-            await mountCanvas({
-                cells: [markdownCell("one")],
-                suggestions: [ONE_CHANGED],
-            });
-            const button = document.querySelector(
-                `[data-suggestion-id="one"] [aria-label="${label}"]`,
-            ) as HTMLButtonElement;
+        ])(
+            "%s a suggestion answers for its cell",
+            async (_, label, verdict) => {
+                await mountCanvas({
+                    cells: [markdownCell("one")],
+                    suggestions: [ONE_CHANGED],
+                });
+                const button = document.querySelector(
+                    `[data-suggestion-id="one"] [aria-label="${label}"]`,
+                ) as HTMLButtonElement;
 
-            await act(async () => button.click());
+                await act(async () => button.click());
 
-            expect(posted).toEqual([
-                {
-                    type: "invoke",
-                    commandName: "reviewTheSuggestion",
-                    commandArguments: { cellId: "one", verdict },
-                },
-            ]);
-        });
+                expect(posted).toEqual([
+                    {
+                        type: "invoke",
+                        commandName: "reviewTheSuggestion",
+                        commandArguments: { cellId: "one", verdict },
+                    },
+                ]);
+            },
+        );
 
         it.each([
             ["next", "Next suggestion", ["m", "h", "e", "m"]],
             ["previous", "Previous suggestion", ["e", "h", "m", "e"]],
-        ])("the %s suggestion button goes through the suggestions in the order they appear on the page, starting over after the last", async (_, label, expected) => {
-            const scrollIntoView = vi.fn();
-            Element.prototype.scrollIntoView = scrollIntoView;
-            const marsDescribed = new CellTextChanged("m", 0, "", "red");
-            const earthDescribed = new CellTextChanged("e", 0, "", "blue");
-            const hellasBasinDescribed = new CellTextChanged("h", 0, "", "dusty");
-            const marsDiff = new AuthorDocDiff([marsDescribed]);
-            const earthDiff = new AuthorDocDiff([earthDescribed]);
-            const hellasBasinDiff = new AuthorDocDiff([hellasBasinDescribed]);
-            await mountCanvas({
-                cells: [
-                    new PlaceCell("mars", "", false, null, "m"),
-                    new PlaceCell("earth", "", false, null, "e"),
-                    new PlaceCell("Hellas Basin", "", false, null, "h", "m"),
-                ],
-                cellDrawings: { place: () => <AuthorFileEditorCell /> },
-                suggestions: [
-                    new Suggestion("m", marsDiff),
-                    new Suggestion("e", earthDiff),
-                    new Suggestion("h", hellasBasinDiff),
-                ],
-            });
-            const button = document.querySelector(
-                `.author-file-editor-main-menu [aria-label="${label}"]`,
-            ) as HTMLButtonElement;
+        ])(
+            "the %s suggestion button goes through the suggestions in the order they appear on the page, starting over after the last",
+            async (_, label, expected) => {
+                const scrollIntoView = vi.fn();
+                Element.prototype.scrollIntoView = scrollIntoView;
+                const marsDescribed = new CellTextChanged("m", 0, "", "red");
+                const earthDescribed = new CellTextChanged("e", 0, "", "blue");
+                const hellasBasinDescribed = new CellTextChanged(
+                    "h",
+                    0,
+                    "",
+                    "dusty",
+                );
+                const marsDiff = new AuthorDocDiff([marsDescribed]);
+                const earthDiff = new AuthorDocDiff([earthDescribed]);
+                const hellasBasinDiff = new AuthorDocDiff([
+                    hellasBasinDescribed,
+                ]);
+                await mountCanvas({
+                    cells: [
+                        new PlaceCell("mars", "", false, null, "m"),
+                        new PlaceCell("earth", "", false, null, "e"),
+                        new PlaceCell(
+                            "Hellas Basin",
+                            "",
+                            false,
+                            null,
+                            "h",
+                            "m",
+                        ),
+                    ],
+                    cellDrawings: { place: () => <AuthorFileEditorCell /> },
+                    suggestions: [
+                        new Suggestion("m", marsDiff),
+                        new Suggestion("e", earthDiff),
+                        new Suggestion("h", hellasBasinDiff),
+                    ],
+                });
+                const button = document.querySelector(
+                    `.author-file-editor-main-menu [aria-label="${label}"]`,
+                ) as HTMLButtonElement;
 
-            await act(async () => button.click());
-            await act(async () => button.click());
-            await act(async () => button.click());
-            await act(async () => button.click());
+                await act(async () => button.click());
+                await act(async () => button.click());
+                await act(async () => button.click());
+                await act(async () => button.click());
 
-            const broughtIntoView = scrollIntoView.mock.contexts.map((drawn) =>
-                (drawn as Element).getAttribute("data-suggestion-id"),
-            );
-            expect(broughtIntoView).toEqual(expected);
-        });
+                const broughtIntoView = scrollIntoView.mock.contexts.map(
+                    (drawn) =>
+                        (drawn as Element).getAttribute("data-suggestion-id"),
+                );
+                expect(broughtIntoView).toEqual(expected);
+            },
+        );
 
         it("brings the next suggestion in with the top of its frame at the top of the pane", async () => {
             const scrollIntoView = vi.fn();
@@ -2101,7 +2215,9 @@ describe("the metadata and the manuscript panes", () => {
 
             await act(async () => button.click());
 
-            expect(scrollIntoView.mock.calls).toEqual([[{ block: "start", behavior: "smooth" }]]);
+            expect(scrollIntoView.mock.calls).toEqual([
+                [{ block: "start", behavior: "smooth" }],
+            ]);
         });
 
         it("counts the suggestions in the main menu", async () => {
@@ -2121,14 +2237,24 @@ describe("the metadata and the manuscript panes", () => {
         afterEach(() => vi.restoreAllMocks());
 
         it.each([
-            ["scrolls the metadata pane to the first cell of the kind", { kind: "cells", cellKind: "plot" }, 200],
-            ["leaves the metadata pane where it is for a review of the story", { kind: "editor" }, 0],
+            [
+                "scrolls the metadata pane to the first cell of the kind",
+                { kind: "cells", cellKind: "plot" },
+                200,
+            ],
+            [
+                "leaves the metadata pane where it is for a review of the story",
+                { kind: "editor" },
+                0,
+            ],
         ] as const)("%s", async (_, shown, expectedScrollTop) => {
             vi.spyOn(
                 HTMLElement.prototype,
                 "getBoundingClientRect",
             ).mockImplementation(function (this: HTMLElement) {
-                return { top: this.dataset.cellId === "p1" ? 300 : 100 } as DOMRect;
+                return {
+                    top: this.dataset.cellId === "p1" ? 300 : 100,
+                } as DOMRect;
             });
 
             await mountCanvas({
@@ -2165,33 +2291,36 @@ describe("the metadata and the manuscript panes", () => {
     it.each([
         [".author-file-editor-metadata-pane", ["p1", "k1", null]],
         [".author-file-editor-manuscript-pane", ["m1", "m2", "p1"]],
-    ])("inserts in %s before what follows each menu", async (pane, expected) => {
-        await mountCanvas({
-            cells: [
-                markdownCell("Once", "m1"),
-                markdownCell("Twice", "m2"),
-                new PlotCell("Bell", [], [], "", false, null, "p1"),
-                new SalientConceptCell("Door", [], "", false, null, "k1"),
-            ],
-            cellTypes: [
-                cellType("markdown", "primary"),
-                cellType("plot", "primary"),
-            ],
-            cellDrawings: DRAWN_BY_THEIR_IDS,
-        });
+    ])(
+        "inserts in %s before what follows each menu",
+        async (pane, expected) => {
+            await mountCanvas({
+                cells: [
+                    markdownCell("Once", "m1"),
+                    markdownCell("Twice", "m2"),
+                    new PlotCell("Bell", [], [], "", false, null, "p1"),
+                    new SalientConceptCell("Door", [], "", false, null, "k1"),
+                ],
+                cellTypes: [
+                    cellType("markdown", "primary"),
+                    cellType("plot", "primary"),
+                ],
+                cellDrawings: DRAWN_BY_THEIR_IDS,
+            });
 
-        for (const menu of document.querySelectorAll(
-            `${pane} .author-file-editor-insert-cell-menu`,
-        )) {
-            await click(menu.querySelector("button")!);
-        }
+            for (const menu of document.querySelectorAll(
+                `${pane} .author-file-editor-insert-cell-menu`,
+            )) {
+                await click(menu.querySelector("button")!);
+            }
 
-        expect(
-            posted.map(
-                (invocation) => invocation.commandArguments.beforeCellId,
-            ),
-        ).toEqual(expected);
-    });
+            expect(
+                posted.map(
+                    (invocation) => invocation.commandArguments.beforeCellId,
+                ),
+            ).toEqual(expected);
+        },
+    );
 });
 
 describe("moving cells by dragging them", () => {
@@ -2235,24 +2364,35 @@ describe("moving cells by dragging them", () => {
             handle.dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
         });
         await act(async () => {
-            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
-            droppedOn.dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
+            const draggedOver = new Event("dragover", {
+                bubbles: true,
+                cancelable: true,
+            });
+            droppedOn.dispatchEvent(
+                Object.assign(draggedOver, { dataTransfer }),
+            );
         });
         await act(async () => {
-            const dropped = new Event("drop", { bubbles: true, cancelable: true });
+            const dropped = new Event("drop", {
+                bubbles: true,
+                cancelable: true,
+            });
             droppedOn.dispatchEvent(Object.assign(dropped, { dataTransfer }));
         });
     }
 
     it("draws every place under the place it lies within", async () => {
-        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+        await mountCanvas({
+            cells: THE_STORY,
+            cellDrawings: DRAWN_WITH_THEIR_ACTIONS,
+        });
 
         const nestedUnder = [
             ...document.querySelectorAll(".author-file-editor-place-scope"),
         ].map((scope) => [
             scope.parentElement!.getAttribute("data-cell-id"),
-            [...scope.querySelectorAll(":scope > li[data-cell-id]")].map((nested) =>
-                nested.getAttribute("data-cell-id"),
+            [...scope.querySelectorAll(":scope > li[data-cell-id]")].map(
+                (nested) => nested.getAttribute("data-cell-id"),
             ),
         ]);
 
@@ -2267,33 +2407,97 @@ describe("moving cells by dragging them", () => {
             "a cell dropped in a gap, to stand before the cell after the gap",
             "v1",
             FIRST_GAP_OF_THE_METADATA,
-            [{ type: "invoke", commandName: "moveCell", commandArguments: { cellId: "v1", beforeCellId: "hg" } }],
+            [
+                {
+                    type: "invoke",
+                    commandName: "moveCell",
+                    commandArguments: { cellId: "v1", beforeCellId: "hg" },
+                },
+            ],
         ],
         [
             "a place dropped in a gap outside every place, out of the place it lies within",
             "ln",
             FIRST_GAP_OF_THE_METADATA,
-            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "ln", beforeCellId: "hg", parentCellId: "" } }],
+            [
+                {
+                    type: "invoke",
+                    commandName: "movePlace",
+                    commandArguments: {
+                        placeCellId: "ln",
+                        beforeCellId: "hg",
+                        parentCellId: "",
+                    },
+                },
+            ],
         ],
         [
             "a place dropped in a gap within a place, within that place",
             "hg",
             FIRST_GAP_WITHIN_ENGLAND,
-            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "hv", parentCellId: "en" } }],
+            [
+                {
+                    type: "invoke",
+                    commandName: "movePlace",
+                    commandArguments: {
+                        placeCellId: "hg",
+                        beforeCellId: "hv",
+                        parentCellId: "en",
+                    },
+                },
+            ],
         ],
         [
             "a place dropped onto a place, within it after the places already in it",
             "hg",
             "li[data-cell-id='hv']",
-            [{ type: "invoke", commandName: "movePlace", commandArguments: { placeCellId: "hg", beforeCellId: "v1", parentCellId: "hv" } }],
+            [
+                {
+                    type: "invoke",
+                    commandName: "movePlace",
+                    commandArguments: {
+                        placeCellId: "hg",
+                        beforeCellId: "v1",
+                        parentCellId: "hv",
+                    },
+                },
+            ],
         ],
-        ["nothing for a place dropped onto a place within it", "en", "li[data-cell-id='ln']", []],
-        ["nothing for a place dropped onto itself", "en", "li[data-cell-id='en']", []],
-        ["nothing for a cell dropped in the other pane", "v1", FIRST_GAP_OF_THE_MANUSCRIPT, []],
-        ["nothing for a cell that is not a place dropped within a place", "v1", FIRST_GAP_WITHIN_ENGLAND, []],
-        ["nothing for a cell that is not a place dropped onto a place", "v1", "li[data-cell-id='hg']", []],
+        [
+            "nothing for a place dropped onto a place within it",
+            "en",
+            "li[data-cell-id='ln']",
+            [],
+        ],
+        [
+            "nothing for a place dropped onto itself",
+            "en",
+            "li[data-cell-id='en']",
+            [],
+        ],
+        [
+            "nothing for a cell dropped in the other pane",
+            "v1",
+            FIRST_GAP_OF_THE_MANUSCRIPT,
+            [],
+        ],
+        [
+            "nothing for a cell that is not a place dropped within a place",
+            "v1",
+            FIRST_GAP_WITHIN_ENGLAND,
+            [],
+        ],
+        [
+            "nothing for a cell that is not a place dropped onto a place",
+            "v1",
+            "li[data-cell-id='hg']",
+            [],
+        ],
     ])("asks to move %s", async (_, draggedId, droppedOnSelector, expected) => {
-        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
+        await mountCanvas({
+            cells: THE_STORY,
+            cellDrawings: DRAWN_WITH_THEIR_ACTIONS,
+        });
 
         await dragAndDrop(draggedId, droppedOnSelector);
 
@@ -2301,24 +2505,38 @@ describe("moving cells by dragging them", () => {
     });
 
     it("outlines where the cell dragged would land", async () => {
-        await mountCanvas({ cells: THE_STORY, cellDrawings: DRAWN_WITH_THEIR_ACTIONS });
-        const dataTransfer = { setData: () => undefined, effectAllowed: "", dropEffect: "" };
+        await mountCanvas({
+            cells: THE_STORY,
+            cellDrawings: DRAWN_WITH_THEIR_ACTIONS,
+        });
+        const dataTransfer = {
+            setData: () => undefined,
+            effectAllowed: "",
+            dropEffect: "",
+        };
         await act(async () => {
             const dragStarted = new Event("dragstart", { bubbles: true });
             document
-                .querySelector("li[data-cell-id='hg'] .author-file-editor-cell-drag-handle")!
+                .querySelector(
+                    "li[data-cell-id='hg'] .author-file-editor-cell-drag-handle",
+                )!
                 .dispatchEvent(Object.assign(dragStarted, { dataTransfer }));
         });
 
         await act(async () => {
-            const draggedOver = new Event("dragover", { bubbles: true, cancelable: true });
+            const draggedOver = new Event("dragover", {
+                bubbles: true,
+                cancelable: true,
+            });
             document
                 .querySelector("li[data-cell-id='hv']")!
                 .dispatchEvent(Object.assign(draggedOver, { dataTransfer }));
         });
 
         const outlined = [
-            ...document.querySelectorAll(".author-file-editor-cell-drop-zone-aimed-at"),
+            ...document.querySelectorAll(
+                ".author-file-editor-cell-drop-zone-aimed-at",
+            ),
         ].map((aimedAt) => aimedAt.getAttribute("data-cell-id"));
         expect(outlined).toEqual(["hv"]);
     });

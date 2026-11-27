@@ -10,7 +10,7 @@ import {
     TheAuthorTypedInTheCell,
     ThePageIsReady,
 } from "./author_file_editor_messages";
-import { authorDocumentCommand } from "./commands/author_document_commands";
+import { authorDocumentCommand } from "./runtime_commands/author_document_commands";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 

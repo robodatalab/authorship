@@ -18,7 +18,7 @@ import { marked } from "marked";
 import { fenced, markedUp } from "../author_editor/AuthorFileEditorFind";
 import type { AuthorFileEditorFindHighlight } from "../author_editor/AuthorFileEditorFind";
 import { LinterTooltip } from "../linter/LinterTooltip";
-import type { ProseCheckError } from "../../vscode_runtime/commands/check_prose";
+import type { ProseCheckError } from "../../vscode_runtime/runtime_commands/check_prose";
 import {
     TextWordsIterator,
     type TextWord,
@@ -144,10 +144,8 @@ export function MarkdownEditorMediator({
                 countADrawing((times) => times + 1);
             },
             whereTheTextIsDrawn: (editorId, from, to) =>
-                whereEachEditorDrawsItsText.current.get(editorId)?.(
-                    from,
-                    to,
-                ) ?? null,
+                whereEachEditorDrawsItsText.current.get(editorId)?.(from, to) ??
+                null,
         }),
         [],
     );
@@ -423,13 +421,7 @@ export function MarkdownEditor({
                 highlight.delete(range);
             }
         };
-    }, [
-        isEditing,
-        children,
-        markdownShown,
-        renderedHtml,
-        storyTextHighlights,
-    ]);
+    }, [isEditing, children, markdownShown, renderedHtml, storyTextHighlights]);
 
     if (!isEditing && children) {
         return (
@@ -604,7 +596,11 @@ function textOnScreenOf(range: Range): MarkdownEditorTextOnScreen | null {
             top: firstLine.top,
             bottom: firstLine.bottom,
         },
-        endsAt: { x: lastLine.right, top: lastLine.top, bottom: lastLine.bottom },
+        endsAt: {
+            x: lastLine.right,
+            top: lastLine.top,
+            bottom: lastLine.bottom,
+        },
     };
 }
 
@@ -936,8 +932,9 @@ function MonacoMarkdownEditor({
 
         drawnMarks.current = editor.createDecorationsCollection([]);
         drawnHighlights.current = editor.createDecorationsCollection([]);
-        drawnStoryTextHighlights.current =
-            editor.createDecorationsCollection([]);
+        drawnStoryTextHighlights.current = editor.createDecorationsCollection(
+            [],
+        );
 
         const errorUnderPointer = (
             event: monaco.editor.IEditorMouseEvent,

@@ -10,7 +10,7 @@ import type {
     AuthorFileEditorCellCheckbox,
     AuthorFileEditorCellField,
 } from "../author_editor/AuthorFileEditorCellFields";
-import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
 import {
     replaceTheCell,
     type SendMessagesToVscode,

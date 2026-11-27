@@ -13,7 +13,7 @@ import {
 import { AuthorFileEditorCellFields } from "../author_editor/AuthorFileEditorCellFields";
 import type { AuthorFileEditorCellField } from "../author_editor/AuthorFileEditorCellFields";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
 import {
     invokeAuthorDocumentCommand,
     replaceTheCell,

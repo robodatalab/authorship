@@ -12,7 +12,7 @@ import {
     AuthorFileEditorCellWarning,
     AuthorFileEditorCellWords,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { ProseCheckError } from "../../../extension/vscode_runtime/commands/check_prose";
+import type { ProseCheckError } from "../../../extension/vscode_runtime/runtime_commands/check_prose";
 import type { WebviewAuthorDocumentCommandCard } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;

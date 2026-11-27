@@ -8,7 +8,7 @@ import {
 } from "../author_editor/AuthorFileEditorCell";
 import { markedText } from "../author_editor/AuthorFileEditorFind";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
-import { registerAuthorDocumentCellType } from "../../vscode_runtime/commands/author_document_cell_types";
+import { registerAuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
 import {
     sayTheAuthorTypedInTheCell,
     type SendMessagesToVscode,
