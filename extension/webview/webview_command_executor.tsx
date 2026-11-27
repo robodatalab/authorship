@@ -35,17 +35,6 @@ interface WebviewRenderState {
     suggestions: Suggestion[];
 }
 
-function cellsAsTheHostWroteThem(written: string[]): Cell[] {
-    return written.flatMap((writtenCell) => parse(writtenCell));
-}
-
-function theHostWrote(cells: Cell[], drawn: WebviewRenderState): void {
-    for (const cell of cells) {
-        const timesBefore = drawn.timesTheHostWroteEachCell[cell.uniqueId] ?? 0;
-        drawn.timesTheHostWroteEachCell[cell.uniqueId] = timesBefore + 1;
-    }
-}
-
 class WebviewCommandExecutor {
     private readonly drawn: WebviewRenderState = {
         cells: [],
@@ -71,19 +60,19 @@ class WebviewCommandExecutor {
     executeMessageReceivedFromVscodeRuntime(message: MessageEvent): void {
         const drawn = this.drawn;
         if (message.data?.type === "document") {
-            const cells = cellsAsTheHostWroteThem(
+            const cells = this.cellsAsTheHostWroteThem(
                 message.data.cells as string[],
             );
-            theHostWrote(cells, drawn);
+            this.theHostWrote(cells, drawn);
             drawn.cells = cells;
         } else if (message.data?.type === "cells") {
-            const changed = cellsAsTheHostWroteThem(
+            const changed = this.cellsAsTheHostWroteThem(
                 message.data.cells as string[],
             );
-            const typed = cellsAsTheHostWroteThem(
+            const typed = this.cellsAsTheHostWroteThem(
                 message.data.cellsThePageTyped as string[],
             );
-            theHostWrote(changed, drawn);
+            this.theHostWrote(changed, drawn);
             drawn.cells = drawn.cells.map(
                 (drawing) =>
                     changed.find(
@@ -134,7 +123,19 @@ class WebviewCommandExecutor {
         this.drawTheCanvas();
     }
 
-    drawTheCanvas(): void {
+    private theHostWrote(cells: Cell[], drawn: WebviewRenderState): void {
+        for (const cell of cells) {
+            const timesBefore =
+                drawn.timesTheHostWroteEachCell[cell.uniqueId] ?? 0;
+            drawn.timesTheHostWroteEachCell[cell.uniqueId] = timesBefore + 1;
+        }
+    }
+
+    private cellsAsTheHostWroteThem(written: string[]): Cell[] {
+        return written.flatMap((writtenCell) => parse(writtenCell));
+    }
+
+    private drawTheCanvas(): void {
         const drawn = this.drawn;
         const suggestionsOfTheCellsDrawn = drawn.suggestions.filter(
             (suggestion) =>
