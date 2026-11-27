@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 
-import type { AuthorFileEditorSession } from "./author_file_editor_session";
-import { TheFileChangedUnderneath } from "./author_file_editor_messages";
-import type { VsCodeCommandExecutor } from "./vscode_command_executor";
+import type { AuthorFileEditorSession } from "../author_file_editor_session";
+import { TheFileChangedUnderneath } from "../author_file_editor_messages";
+import type { VsCodeCommandExecutor } from "../vscode_command_executor";
 
 export function watchTheAuthorFileForChanges(
     session: AuthorFileEditorSession,
