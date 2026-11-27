@@ -44,13 +44,13 @@ async function openEditor(text: string): Promise<OpenEditor> {
                 cells?: string[];
                 cellsThePageTyped?: string[];
             }) => {
-                if (message.type === "document" && message.cells) {
+                if (message.type === "setAllCells" && message.cells) {
                     documentsSentToThePage.push(message.cells);
                     cellsOnThePage = message.cells.flatMap((written) =>
                         parse(written),
                     );
                 } else if (
-                    message.type === "cells" &&
+                    message.type === "updateCells" &&
                     message.cells &&
                     message.cellsThePageTyped
                 ) {

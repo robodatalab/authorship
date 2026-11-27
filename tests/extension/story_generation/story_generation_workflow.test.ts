@@ -309,7 +309,7 @@ describe("StoryGenerationWorkflow.runTheNextStage — runs the first stage not d
         await session.storyGenerationWorkflow.runTheNextStage();
 
         expect(sentToThePage).toContainEqual({
-            type: "storyGeneration",
+            type: "setStoryGeneration",
             storyGeneration: {
                 running: true,
                 progress: DESCRIBES_THE_CONCEPTS.progress,
@@ -820,7 +820,7 @@ stage: validity: False
         await session.storyGenerationWorkflow.showWhereItStands();
 
         expect(sentToThePage).toContainEqual({
-            type: "storyGeneration",
+            type: "setStoryGeneration",
             storyGeneration: {
                 running: true,
                 progress: DESCRIBES_THE_CONCEPTS.progress,

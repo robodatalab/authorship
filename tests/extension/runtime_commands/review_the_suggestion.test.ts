@@ -80,7 +80,7 @@ He heard the bell.
         });
 
         expect(sentToThePage).toContainEqual({
-            type: "suggestions",
+            type: "setSuggestions",
             suggestions:
                 '<!-- suggestion: id="c2" -->\n<!-- change: text from="17" removed="" written=" twice" -->\n',
         });

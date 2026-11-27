@@ -36,6 +36,19 @@ import {
     storyGenerationOf,
 } from "./story_generation/story_generation_workflow";
 import { withEverySuggestionApplied } from "./tools/suggestions_applied";
+import { UpdateCellsWebviewCommand } from "./webview_commands/update_cells";
+import { SetCellsBeingWrittenWebviewCommand } from "./webview_commands/set_cells_being_written";
+import { SetCommandCardsWebviewCommand } from "./webview_commands/set_command_cards";
+import { SetAllCellsWebviewCommand } from "./webview_commands/set_all_cells";
+import { SetFindMatchesWebviewCommand } from "./webview_commands/set_find_matches";
+import { SetProseErrorsWebviewCommand } from "./webview_commands/set_prose_errors";
+import { SetStoryAnnotationsSelectedWebviewCommand } from "./webview_commands/set_story_annotations_selected";
+import { SetStoryGenerationWebviewCommand } from "./webview_commands/set_story_generation";
+import { SetStoryTextSelectedWebviewCommand } from "./webview_commands/set_story_text_selected";
+import { SetStoryTextShownWebviewCommand } from "./webview_commands/set_story_text_shown";
+import { SetSuggestionsWebviewCommand } from "./webview_commands/set_suggestions";
+import type { WebviewCommand } from "./webview_commands/webview_command";
+import { SetWordCountsWebviewCommand } from "./webview_commands/set_word_counts";
 
 export class AuthorFileEditorSession implements vscode.CustomDocument {
     private readonly proseErrors: ProseCheckError[] = [];
@@ -149,10 +162,8 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
 
     private sendTheStoryGeneration(): void {
         const storyGeneration = this.theStoryGeneration;
-        void this.panel?.webview.postMessage({
-            type: "storyGeneration",
-            storyGeneration,
-        });
+        const command = new SetStoryGenerationWebviewCommand(storyGeneration);
+        this.sendToTheWebview(command);
     }
 
     selectTheStoryAnnotation(
@@ -186,10 +197,8 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         const storyWords = new StoryWordsIterator(this.documentAsItStands);
         const [storyTextShown] = storyWords.spans(storyWordRange);
         if (storyTextShown) {
-            void this.panel?.webview.postMessage({
-                type: "storyTextShown",
-                storyTextShown,
-            });
+            const command = new SetStoryTextShownWebviewCommand(storyTextShown);
+            this.sendToTheWebview(command);
         }
     }
 
@@ -360,11 +369,10 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
     }
 
     private sendSuggestions(): void {
-        const suggestions = serialize([], this.documentAsItStands.suggestions);
-        void this.panel?.webview.postMessage({
-            type: "suggestions",
-            suggestions,
-        });
+        const command = new SetSuggestionsWebviewCommand(
+            this.documentAsItStands.suggestions,
+        );
+        this.sendToTheWebview(command);
     }
 
     private recordAnEdit(everythingItChanged: {
@@ -433,62 +441,55 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
 
     sendCommandCards(): void {
         const commandCards = authorDocumentCommandCards();
-        void this.panel?.webview.postMessage({
-            type: "commands",
-            commands: commandCards,
-        });
+        const command = new SetCommandCardsWebviewCommand(commandCards);
+        this.sendToTheWebview(command);
     }
 
     sendCellsBeingWritten(): void {
-        void this.panel?.webview.postMessage({
-            type: "cellsBeingWritten",
-            cellsBeingWritten: Object.fromEntries(
-                this.howFarEachCellHasBeenWritten,
-            ),
-        });
+        const cellsBeingWritten = Object.fromEntries(
+            this.howFarEachCellHasBeenWritten,
+        );
+        const command = new SetCellsBeingWrittenWebviewCommand(cellsBeingWritten);
+        this.sendToTheWebview(command);
     }
 
     sendWordCounts(): void {
-        void this.panel?.webview.postMessage({
-            type: "wordCounts",
-            wordsInEverySection: this.wordCounter.wordsInEverySection,
-            wordsInTheDocument: this.wordCounter.wordsInTheDocument,
-        });
+        const command = new SetWordCountsWebviewCommand(
+            this.wordCounter.wordsInEverySection,
+            this.wordCounter.wordsInTheDocument,
+        );
+        this.sendToTheWebview(command);
     }
 
     sendProseErrors(): void {
-        void this.panel?.webview.postMessage({
-            type: "proseErrors",
-            proseErrors: [...this.proseErrors],
-        });
+        const command = new SetProseErrorsWebviewCommand([...this.proseErrors]);
+        this.sendToTheWebview(command);
     }
 
     sendStoryAnnotationsSelected(): void {
-        void this.panel?.webview.postMessage({
-            type: "storyAnnotationsSelected",
-            storyAnnotationsSelected: this.theStoryAnnotationsSelected,
-        });
+        const command = new SetStoryAnnotationsSelectedWebviewCommand(
+            this.theStoryAnnotationsSelected,
+        );
+        this.sendToTheWebview(command);
     }
 
     sendStoryTextSelected(): void {
-        void this.panel?.webview.postMessage({
-            type: "storyTextSelected",
-            storyTextSelected: this.storyTextSelected,
-        });
+        const command = new SetStoryTextSelectedWebviewCommand(
+            this.storyTextSelected,
+        );
+        this.sendToTheWebview(command);
     }
 
     sendFindMatches(): void {
-        void this.panel?.webview.postMessage({
-            type: "findMatches",
-            findMatches: [...this.findMatches],
-        });
+        const command = new SetFindMatchesWebviewCommand([...this.findMatches]);
+        this.sendToTheWebview(command);
     }
 
     sendDocument(): void {
-        void this.panel?.webview.postMessage({
-            type: "document",
-            cells: this.documentAsItStands.cells.map(asThePageDrawsIt),
-        });
+        const command = new SetAllCellsWebviewCommand(
+            this.documentAsItStands.cells,
+        );
+        this.sendToTheWebview(command);
         this.sendSuggestions();
         this.sendProseErrors();
         this.sendStoryAnnotationsSelected();
@@ -524,23 +525,26 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         const thePageTypedIt = (cell: Cell): boolean =>
             thePageDrewItAlready?.cellId === cell.uniqueId &&
             thePageDrewItAlready.markdown === cell.source;
-        const cellsTheHostWrote = changed
-            .filter((cell) => !thePageTypedIt(cell))
-            .map(asThePageDrawsIt);
-        const cellsThePageTyped = changed
-            .filter(thePageTypedIt)
-            .map(asThePageDrawsIt);
+        const cellsTheHostWrote = changed.filter(
+            (cell) => !thePageTypedIt(cell),
+        );
+        const cellsThePageTyped = changed.filter(thePageTypedIt);
         if (changed.length > 0) {
-            void this.panel?.webview.postMessage({
-                type: "cells",
-                cells: cellsTheHostWrote,
+            const command = new UpdateCellsWebviewCommand(
+                cellsTheHostWrote,
                 cellsThePageTyped,
-            });
+            );
+            this.sendToTheWebview(command);
         }
         this.sendProseErrors();
         this.sendFindMatches();
         this.sendWordCounts();
         this.sendTheStoryGeneration();
+    }
+
+    private sendToTheWebview(command: WebviewCommand): void {
+        const serialized = command.serialize();
+        void this.panel?.webview.postMessage(serialized);
     }
 }
 

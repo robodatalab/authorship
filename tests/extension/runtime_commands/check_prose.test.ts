@@ -66,9 +66,9 @@ describe("CheckProseCommand — checks the document's prose", () => {
         expect(asked[0]).toContain("/check/errors");
         expect(asked[1]).toContain("/check/errors/status?id=job-1");
         expect(sentToThePage).toEqual([
-            { type: "proseErrors", proseErrors: [A_STYLE_ERROR] },
+            { type: "setProseErrors", proseErrors: [A_STYLE_ERROR] },
             {
-                type: "proseErrors",
+                type: "setProseErrors",
                 proseErrors: [A_STYLE_ERROR, A_GRAMMAR_ERROR],
             },
         ]);

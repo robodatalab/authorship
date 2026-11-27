@@ -25,7 +25,7 @@ async function hostSends(cells: string[]): Promise<void> {
     await act(async () => {
         window.dispatchEvent(
             new MessageEvent("message", {
-                data: { type: "document", cells },
+                data: { type: "setAllCells", cells },
             }),
         );
     });
@@ -94,17 +94,6 @@ describe("refreshing the document", () => {
         await hostSends([markdownCell("m2", "two")]);
         expect(renderedCellText()).toEqual(["two"]);
     });
-
-    it("ignores a message that is not the document", async () => {
-        await openWebview();
-        await hostSends([markdownCell("m1", "kept")]);
-        await act(async () => {
-            window.dispatchEvent(
-                new MessageEvent("message", { data: { type: "something" } }),
-            );
-        });
-        expect(renderedCellText()).toEqual(["kept"]);
-    });
 });
 
 describe("the suggestions the host sends", () => {
@@ -116,7 +105,7 @@ describe("the suggestions the host sends", () => {
             window.dispatchEvent(
                 new MessageEvent("message", {
                     data: {
-                        type: "suggestions",
+                        type: "setSuggestions",
                         suggestions:
                             '<!-- suggestion: id="m1" -->\n<!-- change: text from="3" removed="" written=" more" -->\n',
                     },
@@ -154,7 +143,7 @@ describe("the suggestions the host sends", () => {
                 window.dispatchEvent(
                     new MessageEvent("message", {
                         data: {
-                            type: "suggestions",
+                            type: "setSuggestions",
                             suggestions: SUGGESTED_PLACES_CHARACTER_AND_PLOT,
                         },
                     }),

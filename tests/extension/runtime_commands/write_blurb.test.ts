@@ -60,15 +60,15 @@ describe("WriteBlurbCommand — writes the blurb", () => {
             "A woman loses her name.",
         );
         expect(sentToThePage).toContainEqual({
-            type: "cellsBeingWritten",
+            type: "setCellsBeingWritten",
             cellsBeingWritten: { b1: 0 },
         });
         expect(sentToThePage).toContainEqual({
-            type: "cellsBeingWritten",
+            type: "setCellsBeingWritten",
             cellsBeingWritten: { b1: 0.5 },
         });
         expect(sentToThePage.at(-1)).toEqual({
-            type: "cellsBeingWritten",
+            type: "setCellsBeingWritten",
             cellsBeingWritten: {},
         });
     });
