@@ -6,6 +6,12 @@ import type {
     ReactNode,
 } from "react";
 import { AuthorFileEditorMainMenu } from "./AuthorFileEditorMainMenu";
+import {
+    AuthorFileEditorSelectionFence,
+    NO_STORY_ANNOTATION_SELECTED,
+    STORY_ANNOTATION_KINDS,
+    useAuthorFileEditorSelection,
+} from "./AuthorFileEditorSelectionFence";
 import { AuthorFileEditorPartAndChapterInView } from "./AuthorFileEditorPartAndChapterInView";
 import { AuthorFileEditorStoryGeneration } from "./AuthorFileEditorStoryGeneration";
 import { AuthorFileEditorSuggestionNavigator } from "./AuthorFileEditorSuggestionNavigator";
@@ -25,9 +31,8 @@ import {
     type AuthorFileEditorOverviewRulerMark,
 } from "./AuthorFileEditorOverviewRuler";
 import type { AuthorDocumentCellType } from "../../vscode_runtime/runtime_commands/author_document_cell_types";
-import type { ProseCheckError } from "../../vscode_runtime/runtime_commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../../vscode_runtime/runtime_commands/find_in_the_document";
-import type { StoryGeneration } from "../../vscode_runtime/story_generation/story_generation";
+import type { WebviewRenderState } from "../../vscode_runtime/webview_commands/webview_render_state";
 import type { Cell } from "authordoc/cells/cell";
 import type { CellVisitor } from "authordoc/cells/cell_visitor";
 import { CHARACTER } from "authordoc/cells/character_cell";
@@ -36,10 +41,7 @@ import { PLACE, PlaceCell } from "authordoc/cells/place_cell";
 import { PLOT } from "authordoc/cells/plot_cell";
 import { SALIENT_CONCEPT } from "authordoc/cells/salient_concept_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
-import {
-    StoryWordsIterator,
-    type StoryTextSpan,
-} from "authordoc/iterators/story_words_iterator";
+import { StoryWordsIterator } from "authordoc/iterators/story_words_iterator";
 import {
     cellsBySection,
     opensASection,
@@ -47,15 +49,9 @@ import {
 } from "authordoc/story_sections";
 import { Document } from "authordoc/storydoc";
 import {
-    NO_STORY_ANNOTATION_SELECTED,
-    STORY_ANNOTATION_KINDS,
-    type StoryAnnotationSelected,
-} from "../../vscode_runtime/story_annotation_selection";
-import {
     MarkdownEditorMediator,
     type MarkdownEditorStoryTextHighlight,
 } from "../markdown/MarkdownEditor";
-import type { Suggestion } from "authordoc/suggestion";
 import "./AuthorFileEditorCanvas.css";
 
 const CELL_BUTTON_GROUP = "cell";
@@ -160,42 +156,45 @@ export function replaceTheCell(
 }
 
 interface AuthorFileEditorCanvasProps {
-    cells: Cell[];
-    timesTheHostWroteEachCell?: Readonly<Record<string, number>>;
-    commands: WebviewAuthorDocumentCommandCard[];
+    renderState: WebviewRenderState;
     cellTypes: AuthorDocumentCellType[];
     sendMessagesToVscode: SendMessagesToVscode;
     cellRenderer: CellVisitor<ReactNode>;
-    proseErrors?: ProseCheckError[];
-    storyAnnotationsSelected?: Readonly<
-        Record<string, StoryAnnotationSelected>
-    >;
-    storyTextShown?: StoryTextSpan | null;
-    findMatches?: AuthorFileEditorFindMatch[];
-    cellsBeingWritten?: Readonly<Record<string, number>>;
-    wordsInEverySection?: Readonly<Record<string, number>>;
-    wordsInTheDocument?: number;
-    storyGeneration?: StoryGeneration | null;
-    suggestions?: readonly Suggestion[];
 }
 
-export function AuthorFileEditorCanvas({
-    cells,
-    timesTheHostWroteEachCell = {},
-    commands,
+export function AuthorFileEditorCanvas(props: AuthorFileEditorCanvasProps) {
+    return (
+        <AuthorFileEditorSelectionFence>
+            <AuthorFileEditorPanes {...props} />
+        </AuthorFileEditorSelectionFence>
+    );
+}
+
+function AuthorFileEditorPanes({
+    renderState,
     cellTypes,
     sendMessagesToVscode,
     cellRenderer,
-    proseErrors = [],
-    storyAnnotationsSelected = {},
-    storyTextShown = null,
-    findMatches = [],
-    cellsBeingWritten = {},
-    wordsInEverySection = {},
-    wordsInTheDocument = 0,
-    storyGeneration = null,
-    suggestions = [],
 }: AuthorFileEditorCanvasProps) {
+    const {
+        cells,
+        timesTheHostWroteEachCell,
+        commands,
+        proseErrors,
+        storyTextShown,
+        findMatches,
+        cellsBeingWritten,
+        wordsInEverySection,
+        wordsInTheDocument,
+        storyGeneration,
+        suggestions,
+    } = renderState;
+    const {
+        storyAnnotationsSelected,
+        selectTheStoryAnnotation,
+        selectThePassage,
+        selectTheStoryText,
+    } = useAuthorFileEditorSelection();
     const cellCommands = commands.filter(
         (command) => command.buttonGroup === CELL_BUTTON_GROUP,
     );
@@ -351,11 +350,10 @@ export function AuthorFileEditorCanvas({
                 ),
             );
             if (passageClicked >= 0) {
-                sendMessagesToVscode({
-                    type: "selectPassage",
-                    cellKind: annotation.cellKind,
-                    passageId: annotation.passageIds[passageClicked],
-                });
+                selectThePassage(
+                    annotation.cellKind,
+                    annotation.passageIds[passageClicked],
+                );
             }
         }
     }
@@ -488,16 +486,8 @@ export function AuthorFileEditorCanvas({
     );
 
     function showTheEventInTheManuscript(plotNode: StoryGraphPlotNode): void {
-        sendMessagesToVscode({
-            type: "selectStoryAnnotation",
-            cellKind: PLOT,
-            annotationCellId: plotNode.plotId,
-        });
-        sendMessagesToVscode({
-            type: "selectPassage",
-            cellKind: PLOT,
-            passageId: plotNode.nodeId,
-        });
+        selectTheStoryAnnotation(PLOT, plotNode.plotId);
+        selectThePassage(PLOT, plotNode.nodeId);
         if (plotNode.storyWordRange === null) {
             return;
         }
@@ -843,17 +833,15 @@ export function AuthorFileEditorCanvas({
                 howFarTheCellHasBeenWritten={cellsBeingWritten[cell.uniqueId]}
                 wordsInTheSection={wordsInEverySection[cell.uniqueId]}
                 onStoryTextSelected={(selectedFrom, selectedTo) =>
-                    sendMessagesToVscode({
-                        type: "storyTextSelected",
-                        storyTextSelected:
-                            selectedFrom === selectedTo
-                                ? null
-                                : {
-                                      cellId: cell.uniqueId,
-                                      startCharacterOffsetInCell: selectedFrom,
-                                      endCharacterOffsetInCell: selectedTo,
-                                  },
-                    })
+                    selectTheStoryText(
+                        selectedFrom === selectedTo
+                            ? null
+                            : {
+                                  cellId: cell.uniqueId,
+                                  startCharacterOffsetInCell: selectedFrom,
+                                  endCharacterOffsetInCell: selectedTo,
+                              },
+                    )
                 }
                 onDragStarted={(event) => startDraggingTheCell(cell, event)}
                 onDragEnded={stopDraggingTheCell}

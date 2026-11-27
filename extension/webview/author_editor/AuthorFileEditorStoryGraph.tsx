@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { CharacterCell } from "authordoc/cells/character_cell";
 import { DepthFirstPlacesIterator } from "authordoc/iterators/depth_first_places_iterator";
 import type { Document } from "authordoc/storydoc";
-import type { StoryAnnotationSelected } from "../../vscode_runtime/story_annotation_selection";
+import type { StoryAnnotationSelected } from "./AuthorFileEditorSelectionFence";
 import {
     StoryGraphLayout,
     type StoryGraphBox,

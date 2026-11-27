@@ -1,7 +1,6 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
 import type { ProseCheckError } from "../runtime_commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../runtime_commands/find_in_the_document";
-import type { StoryAnnotationSelected } from "../story_annotation_selection";
 import type { StoryGeneration } from "../story_generation/story_generation";
 import type { Cell } from "authordoc/cells/cell";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
@@ -12,10 +11,7 @@ export class WebviewRenderState {
     readonly timesTheHostWroteEachCell: Record<string, number> = {};
     readonly commands: WebviewAuthorDocumentCommandCard[] = [];
     readonly proseErrors: ProseCheckError[] = [];
-    readonly storyAnnotationsSelected: Record<string, StoryAnnotationSelected> =
-        {};
     readonly storyTextShown: StoryTextSpan | null = null;
-    readonly storyTextSelected: StoryTextSpan | null = null;
     readonly findMatches: AuthorFileEditorFindMatch[] = [];
     readonly cellsBeingWritten: Record<string, number> = {};
     readonly wordsInEverySection: Record<string, number> = {};

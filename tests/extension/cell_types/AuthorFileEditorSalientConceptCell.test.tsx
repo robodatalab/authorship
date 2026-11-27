@@ -22,6 +22,9 @@ vi.mock("monaco-editor/editor/editor.api", async () => {
 const { AuthorFileEditorSalientConceptCell } = await import(
     "../../../extension/webview/cell_types/AuthorFileEditorSalientConceptCell"
 );
+const { AuthorFileEditorSelectionContext } = await import(
+    "../../../extension/webview/author_editor/AuthorFileEditorSelectionFence"
+);
 const { MarkdownEditorMediator } = await import(
     "../../../extension/webview/markdown/MarkdownEditor"
 );
@@ -54,6 +57,7 @@ She finds the door.
 
 describe("a salient concept cell", () => {
     let posted: unknown[] = [];
+    let selected: unknown[] = [];
     let root: Root;
 
     interface WhatTheCellIsGiven {
@@ -65,6 +69,7 @@ describe("a salient concept cell", () => {
 
     async function mountSalientConcepts(options: WhatTheCellIsGiven): Promise<void> {
         posted = [];
+        selected = [];
         document.body.innerHTML = "";
         const container = document.createElement("div");
         document.body.append(container);
@@ -72,18 +77,33 @@ describe("a salient concept cell", () => {
         const story = new Document(options.story);
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
-                    <AuthorFileEditorSalientConceptCell
-                        cell={story.cellWithId("k1") as SalientConceptCell}
-                        story={story}
-                        isShownInTheManuscript={
-                            options.isShownInTheManuscript ?? false
-                        }
-                        referenceIdSelected={options.referenceIdSelected ?? null}
-                        storyTextSelected={options.storyTextSelected ?? null}
-                        sendMessagesToVscode={(message) => posted.push(message)}
-                    />
-                </MarkdownEditorMediator>,
+                <AuthorFileEditorSelectionContext.Provider
+                    value={{
+                        storyAnnotationsSelected: {
+                            "salient-concept": {
+                                annotationCellId: options.isShownInTheManuscript
+                                    ? "k1"
+                                    : null,
+                                passageId: options.referenceIdSelected ?? null,
+                            },
+                        },
+                        storyTextSelected: options.storyTextSelected ?? null,
+                        selectTheStoryAnnotation: (cellKind, annotationCellId) =>
+                            selected.push({ cellKind, annotationCellId }),
+                        selectThePassage: (cellKind, passageId) =>
+                            selected.push({ cellKind, passageId }),
+                        selectTheStoryText: (storyTextSelected) =>
+                            selected.push(storyTextSelected),
+                    }}
+                >
+                    <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                        <AuthorFileEditorSalientConceptCell
+                            cell={story.cellWithId("k1") as SalientConceptCell}
+                            story={story}
+                            sendMessagesToVscode={(message) => posted.push(message)}
+                        />
+                    </MarkdownEditorMediator>
+                </AuthorFileEditorSelectionContext.Provider>,
             );
         });
     }
@@ -175,7 +195,7 @@ describe("a salient concept cell", () => {
         expect(reactSaid).not.toHaveBeenCalled();
     });
 
-    it("asks the host to select the second reference listed, and to show its words", async () => {
+    it("selects the second reference listed, and asks the host to show its words", async () => {
         await mountSalientConcepts({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             isShownInTheManuscript: true,
@@ -187,9 +207,9 @@ describe("a salient concept cell", () => {
 
         await click(secondReference);
 
-        expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
-            { type: "showStoryWordRange", firstWord: 2, lastWord: 3 },
+        expect([selected, posted]).toEqual([
+            [{ cellKind: "salient-concept", passageId: "r1" }],
+            [{ type: "showStoryWordRange", firstWord: 2, lastWord: 3 }],
         ]);
     });
 
@@ -322,8 +342,9 @@ describe("a salient concept cell", () => {
 
         await click(shownInTheManuscript);
 
-        expect(posted).toEqual([
-            { type: "selectStoryAnnotation", cellKind: "salient-concept", annotationCellId },
+        expect([selected, posted]).toEqual([
+            [{ cellKind: "salient-concept", annotationCellId }],
+            [],
         ]);
     });
 
@@ -353,10 +374,12 @@ describe("a salient concept cell", () => {
 
         await click(secondReference);
 
-        expect(posted).toEqual([
-            { type: "selectStoryAnnotation", cellKind: "salient-concept", annotationCellId: "k1" },
-            { type: "selectPassage", cellKind: "salient-concept", passageId: "r1" },
-            { type: "showStoryWordRange", firstWord: 2, lastWord: 3 },
+        expect([selected, posted]).toEqual([
+            [
+                { cellKind: "salient-concept", annotationCellId: "k1" },
+                { cellKind: "salient-concept", passageId: "r1" },
+            ],
+            [{ type: "showStoryWordRange", firstWord: 2, lastWord: 3 }],
         ]);
     });
 

@@ -27,38 +27,17 @@ class WebviewCommandExecutor {
     }
 
     private drawTheCanvas(renderState: WebviewRenderState): void {
-        const suggestionsOfTheCellsDrawn = renderState.suggestions.filter(
-            (suggestion) =>
-                renderState.cells.some(
-                    (cell) => cell.uniqueId === suggestion.cellId,
-                ),
-        );
         const authorDocument = Document.fromCells(renderState.cells);
         const cellRenderer = new AuthorFileEditorCellRenderer(
             this.sendMessagesToVscode,
             authorDocument,
-            renderState.storyAnnotationsSelected,
-            renderState.storyTextSelected,
         );
         this.root.render(
             <AuthorFileEditorCanvas
-                cells={renderState.cells}
-                timesTheHostWroteEachCell={
-                    renderState.timesTheHostWroteEachCell
-                }
-                commands={renderState.commands}
+                renderState={renderState}
                 cellTypes={authorDocumentCellTypes()}
                 sendMessagesToVscode={this.sendMessagesToVscode}
                 cellRenderer={cellRenderer}
-                proseErrors={renderState.proseErrors}
-                storyAnnotationsSelected={renderState.storyAnnotationsSelected}
-                storyTextShown={renderState.storyTextShown}
-                findMatches={renderState.findMatches}
-                cellsBeingWritten={renderState.cellsBeingWritten}
-                wordsInEverySection={renderState.wordsInEverySection}
-                wordsInTheDocument={renderState.wordsInTheDocument}
-                storyGeneration={renderState.storyGeneration}
-                suggestions={suggestionsOfTheCellsDrawn}
             />,
         );
     }

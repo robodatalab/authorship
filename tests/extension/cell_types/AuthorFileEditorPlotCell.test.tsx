@@ -22,6 +22,9 @@ vi.mock("monaco-editor/editor/editor.api", async () => {
 const { AuthorFileEditorPlotCell } = await import(
     "../../../extension/webview/cell_types/AuthorFileEditorPlotCell"
 );
+const { AuthorFileEditorSelectionContext } = await import(
+    "../../../extension/webview/author_editor/AuthorFileEditorSelectionFence"
+);
 const { MarkdownEditorMediator } = await import(
     "../../../extension/webview/markdown/MarkdownEditor"
 );
@@ -98,6 +101,7 @@ She finds the door.
 
 describe("a plot cell", () => {
     let posted: unknown[] = [];
+    let selected: unknown[] = [];
     let root: Root;
 
     afterEach(() => vi.restoreAllMocks());
@@ -111,6 +115,7 @@ describe("a plot cell", () => {
 
     async function mountPlots(options: WhatTheCellIsGiven): Promise<void> {
         posted = [];
+        selected = [];
         document.body.innerHTML = "";
         const container = document.createElement("div");
         document.body.append(container);
@@ -118,18 +123,33 @@ describe("a plot cell", () => {
         const story = new Document(options.story);
         await act(async () => {
             root.render(
-                <MarkdownEditorMediator onEditingTheCell={() => undefined}>
-                    <AuthorFileEditorPlotCell
-                        cell={story.cellWithId("p1") as PlotCell}
-                        story={story}
-                        isShownInTheManuscript={
-                            options.isShownInTheManuscript ?? false
-                        }
-                        eventIdSelected={options.eventIdSelected ?? null}
-                        storyTextSelected={options.storyTextSelected ?? null}
-                        sendMessagesToVscode={(message) => posted.push(message)}
-                    />
-                </MarkdownEditorMediator>,
+                <AuthorFileEditorSelectionContext.Provider
+                    value={{
+                        storyAnnotationsSelected: {
+                            plot: {
+                                annotationCellId: options.isShownInTheManuscript
+                                    ? "p1"
+                                    : null,
+                                passageId: options.eventIdSelected ?? null,
+                            },
+                        },
+                        storyTextSelected: options.storyTextSelected ?? null,
+                        selectTheStoryAnnotation: (cellKind, annotationCellId) =>
+                            selected.push({ cellKind, annotationCellId }),
+                        selectThePassage: (cellKind, passageId) =>
+                            selected.push({ cellKind, passageId }),
+                        selectTheStoryText: (storyTextSelected) =>
+                            selected.push(storyTextSelected),
+                    }}
+                >
+                    <MarkdownEditorMediator onEditingTheCell={() => undefined}>
+                        <AuthorFileEditorPlotCell
+                            cell={story.cellWithId("p1") as PlotCell}
+                            story={story}
+                            sendMessagesToVscode={(message) => posted.push(message)}
+                        />
+                    </MarkdownEditorMediator>
+                </AuthorFileEditorSelectionContext.Provider>,
             );
         });
     }
@@ -239,8 +259,9 @@ describe("a plot cell", () => {
 
         await click(nodeOfTheEventUntold);
 
-        expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "plot", passageId: "e2" },
+        expect([selected, posted]).toEqual([
+            [{ cellKind: "plot", passageId: "e2" }],
+            [],
         ]);
     });
 
@@ -444,7 +465,7 @@ describe("a plot cell", () => {
         expect(reactSaid).not.toHaveBeenCalled();
     });
 
-    it("asks the host to select the second node of the trajectory, and to show its words", async () => {
+    it("selects the second node of the trajectory, and asks the host to show its words", async () => {
         await mountPlots({
             story: [THE_STORY, THE_DOOR_ON_BOTH_PASSAGES].join("\n"),
             isShownInTheManuscript: true,
@@ -456,9 +477,9 @@ describe("a plot cell", () => {
 
         await click(wordsOfTheSecondNode);
 
-        expect(posted).toEqual([
-            { type: "selectPassage", cellKind: "plot", passageId: "n2" },
-            { type: "showStoryWordRange", firstWord: 6, lastWord: 7 },
+        expect([selected, posted]).toEqual([
+            [{ cellKind: "plot", passageId: "n2" }],
+            [{ type: "showStoryWordRange", firstWord: 6, lastWord: 7 }],
         ]);
     });
 
@@ -548,20 +569,23 @@ describe("a plot cell", () => {
 
         await click(addButton);
 
-        expect(posted).toEqual([
-            {
-                type: "invoke",
-                commandName: "addEventToPlot",
-                commandArguments: {
-                    annotationCellId: "p1",
-                    nodeId: "3f1c0e2a-0000-4000-8000-000000000001",
+        expect([selected, posted]).toEqual([
+            [
+                {
+                    cellKind: "plot",
+                    passageId: "3f1c0e2a-0000-4000-8000-000000000001",
                 },
-            },
-            {
-                type: "selectPassage",
-                cellKind: "plot",
-                passageId: "3f1c0e2a-0000-4000-8000-000000000001",
-            },
+            ],
+            [
+                {
+                    type: "invoke",
+                    commandName: "addEventToPlot",
+                    commandArguments: {
+                        annotationCellId: "p1",
+                        nodeId: "3f1c0e2a-0000-4000-8000-000000000001",
+                    },
+                },
+            ],
         ]);
     });
 
@@ -713,8 +737,9 @@ describe("a plot cell", () => {
 
         await click(shownInTheManuscript);
 
-        expect(posted).toEqual([
-            { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId },
+        expect([selected, posted]).toEqual([
+            [{ cellKind: "plot", annotationCellId }],
+            [],
         ]);
     });
 
@@ -744,10 +769,12 @@ describe("a plot cell", () => {
 
         await click(wordsOfTheSecondNode);
 
-        expect(posted).toEqual([
-            { type: "selectStoryAnnotation", cellKind: "plot", annotationCellId: "p1" },
-            { type: "selectPassage", cellKind: "plot", passageId: "n2" },
-            { type: "showStoryWordRange", firstWord: 6, lastWord: 7 },
+        expect([selected, posted]).toEqual([
+            [
+                { cellKind: "plot", annotationCellId: "p1" },
+                { cellKind: "plot", passageId: "n2" },
+            ],
+            [{ type: "showStoryWordRange", firstWord: 6, lastWord: 7 }],
         ]);
     });
 

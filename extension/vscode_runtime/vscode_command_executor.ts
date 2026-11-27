@@ -4,15 +4,11 @@ import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import {
     TheAuthorAskedToSeeTheStoryWords,
     TheAuthorIsEditingTheCell,
-    TheAuthorSelectedStoryText,
-    TheAuthorSelectedTheStoryAnnotation,
-    TheAuthorSelectedThePassage,
     TheAuthorTypedInTheCell,
     ThePageIsReady,
 } from "./author_file_editor_messages";
 import { authorDocumentCommand } from "./runtime_commands/author_document_commands";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 
 export interface AuthorFileEditorMessage {
     invoke(session: AuthorFileEditorSession): void | Promise<void>;
@@ -24,10 +20,6 @@ export interface MessageReceivedFromWebview {
     commandName?: string;
     commandArguments?: Record<string, unknown>;
     markdown?: string;
-    storyTextSelected?: StoryTextSpan | null;
-    cellKind?: string;
-    annotationCellId?: string | null;
-    passageId?: string | null;
     firstWord?: number;
     lastWord?: number;
 }
@@ -55,21 +47,6 @@ export class VsCodeCommandExecutor {
                 message.cellId ?? null,
             );
             void this.post(editing);
-        } else if (message?.type === "storyTextSelected") {
-            const storyTextSelected = new TheAuthorSelectedStoryText(
-                message.storyTextSelected ?? null,
-            );
-            void this.post(storyTextSelected);
-        } else if (
-            message?.type === "selectStoryAnnotation" &&
-            message.cellKind
-        ) {
-            const storyAnnotationSelected =
-                new TheAuthorSelectedTheStoryAnnotation(
-                    message.cellKind,
-                    message.annotationCellId ?? null,
-                );
-            void this.post(storyAnnotationSelected);
         } else if (
             message?.type === "showStoryWordRange" &&
             message.firstWord !== undefined &&
@@ -83,12 +60,6 @@ export class VsCodeCommandExecutor {
                 storyWordRange,
             );
             void this.post(storyWordsAskedFor);
-        } else if (message?.type === "selectPassage" && message.cellKind) {
-            const passageSelected = new TheAuthorSelectedThePassage(
-                message.cellKind,
-                message.passageId ?? null,
-            );
-            void this.post(passageSelected);
         } else if (message?.type === "ready") {
             this.session.sendCommandCards();
             const pageReady = new ThePageIsReady();

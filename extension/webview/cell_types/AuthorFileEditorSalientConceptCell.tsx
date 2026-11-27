@@ -20,11 +20,14 @@ import {
 } from "../author_editor/AuthorFileEditorCanvas";
 import { AuthorFileEditorStoryAnnotationShownInTheManuscript } from "./AuthorFileEditorStoryAnnotationShownInTheManuscript";
 import {
+    NO_STORY_ANNOTATION_SELECTED,
+    useAuthorFileEditorSelection,
+} from "../author_editor/AuthorFileEditorSelectionFence";
+import {
     SALIENT_CONCEPT,
     SalientConceptCell,
 } from "authordoc/cells/salient_concept_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { Document } from "authordoc/storydoc";
 import "./StoryAnnotationCells.css";
 
@@ -34,20 +37,28 @@ const TAKE_THE_REFERENCE_OUT = "Take these words out of the concept";
 interface AuthorFileEditorSalientConceptCellProps {
     cell: SalientConceptCell;
     story: Document;
-    isShownInTheManuscript: boolean;
-    referenceIdSelected: string | null;
-    storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorSalientConceptCell({
     cell,
     story,
-    isShownInTheManuscript,
-    referenceIdSelected,
-    storyTextSelected,
     sendMessagesToVscode,
 }: AuthorFileEditorSalientConceptCellProps) {
+    const {
+        storyAnnotationsSelected,
+        storyTextSelected,
+        selectTheStoryAnnotation,
+        selectThePassage,
+    } = useAuthorFileEditorSelection();
+    const conceptSelected =
+        storyAnnotationsSelected[SALIENT_CONCEPT] ??
+        NO_STORY_ANNOTATION_SELECTED;
+    const isShownInTheManuscript =
+        conceptSelected.annotationCellId === cell.uniqueId;
+    const referenceIdSelected = isShownInTheManuscript
+        ? conceptSelected.passageId
+        : null;
     const findHighlights = useAuthorFileEditorCellFindHighlights();
     const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
     const referencesNewestFirst = useMemo(() => {
@@ -81,17 +92,9 @@ export function AuthorFileEditorSalientConceptCell({
 
     function selectTheReference(referenceId: string): void {
         if (!isShownInTheManuscript) {
-            sendMessagesToVscode({
-                type: "selectStoryAnnotation",
-                cellKind: SALIENT_CONCEPT,
-                annotationCellId: cell.uniqueId,
-            });
+            selectTheStoryAnnotation(SALIENT_CONCEPT, cell.uniqueId);
         }
-        sendMessagesToVscode({
-            type: "selectPassage",
-            cellKind: SALIENT_CONCEPT,
-            passageId: referenceId,
-        });
+        selectThePassage(SALIENT_CONCEPT, referenceId);
     }
 
     return (
@@ -101,7 +104,6 @@ export function AuthorFileEditorSalientConceptCell({
                     cellKind={SALIENT_CONCEPT}
                     annotationCellId={cell.uniqueId}
                     isShown={isShownInTheManuscript}
-                    sendMessagesToVscode={sendMessagesToVscode}
                 />
             }
         >

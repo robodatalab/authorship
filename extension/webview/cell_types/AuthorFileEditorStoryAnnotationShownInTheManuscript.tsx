@@ -1,4 +1,4 @@
-import type { SendMessagesToVscode } from "../author_editor/AuthorFileEditorCanvas";
+import { useAuthorFileEditorSelection } from "../author_editor/AuthorFileEditorSelectionFence";
 import "./StoryAnnotationCells.css";
 
 const SHOW_IN_THE_MANUSCRIPT = "Highlight its words in the manuscript";
@@ -8,15 +8,14 @@ interface AuthorFileEditorStoryAnnotationShownInTheManuscriptProps {
     cellKind: string;
     annotationCellId: string;
     isShown: boolean;
-    sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorStoryAnnotationShownInTheManuscript({
     cellKind,
     annotationCellId,
     isShown,
-    sendMessagesToVscode,
 }: AuthorFileEditorStoryAnnotationShownInTheManuscriptProps) {
+    const { selectTheStoryAnnotation } = useAuthorFileEditorSelection();
     const said = isShown ? STOP_SHOWING_IN_THE_MANUSCRIPT : SHOW_IN_THE_MANUSCRIPT;
 
     return (
@@ -27,11 +26,10 @@ export function AuthorFileEditorStoryAnnotationShownInTheManuscript({
             aria-label={said}
             aria-pressed={isShown}
             onClick={() =>
-                sendMessagesToVscode({
-                    type: "selectStoryAnnotation",
+                selectTheStoryAnnotation(
                     cellKind,
-                    annotationCellId: isShown ? null : annotationCellId,
-                })
+                    isShown ? null : annotationCellId,
+                )
             }
         >
             <i className={isShown ? "codicon codicon-eye" : "codicon codicon-eye-closed"} />

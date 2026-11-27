@@ -6,7 +6,7 @@ import { Document } from "authordoc/storydoc";
 import { AuthorFileEditorStoryGraph } from "../../../extension/webview/author_editor/AuthorFileEditorStoryGraph";
 import type { StoryGraphPlotNode } from "../../../extension/webview/author_editor/StoryGraphLayout";
 import { StoryWordRange } from "authordoc/cells/story_word_range";
-import { NO_STORY_ANNOTATION_SELECTED } from "../../../extension/vscode_runtime/story_annotation_selection";
+import { NO_STORY_ANNOTATION_SELECTED } from "../../../extension/webview/author_editor/AuthorFileEditorSelectionFence";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 

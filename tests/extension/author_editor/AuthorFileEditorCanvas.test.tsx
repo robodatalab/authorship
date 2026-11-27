@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import { AuthorFileEditorCanvas } from "../../../extension/webview/author_editor/AuthorFileEditorCanvas";
@@ -11,7 +12,11 @@ import {
     useAuthorFileEditorCellStoryTextSelected,
     useAuthorFileEditorCellStoryTextShown,
 } from "../../../extension/webview/author_editor/AuthorFileEditorCell";
-import type { StoryAnnotationSelected } from "../../../extension/vscode_runtime/story_annotation_selection";
+import {
+    useAuthorFileEditorSelection,
+    type StoryAnnotationSelected,
+} from "../../../extension/webview/author_editor/AuthorFileEditorSelectionFence";
+import { WebviewRenderState } from "../../../extension/vscode_runtime/webview_commands/webview_render_state";
 import type { StoryGeneration } from "../../../extension/vscode_runtime/story_generation/story_generation";
 import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { AuthorDocumentCellType } from "../../../extension/vscode_runtime/runtime_commands/author_document_cell_types";
@@ -70,8 +75,53 @@ function suggestionThatFolds(source: string): Suggestion {
 
 type CellDrawings = Partial<Record<string, (cell: Cell) => ReactNode>>;
 
+function SelectsTheStoryAnnotations({
+    storyAnnotationsSelected,
+}: {
+    storyAnnotationsSelected: Record<string, StoryAnnotationSelected>;
+}) {
+    const selection = useAuthorFileEditorSelection();
+    return createPortal(
+        <button
+            className="test-select-the-story-annotations"
+            data-selection={JSON.stringify({
+                storyAnnotationsSelected: selection.storyAnnotationsSelected,
+                storyTextSelected: selection.storyTextSelected,
+            })}
+            onClick={() => {
+                for (const [cellKind, selected] of Object.entries(
+                    storyAnnotationsSelected,
+                )) {
+                    selection.selectTheStoryAnnotation(
+                        cellKind,
+                        selected.annotationCellId,
+                    );
+                    selection.selectThePassage(cellKind, selected.passageId);
+                }
+            }}
+        />,
+        document.body,
+    );
+}
+
+function selectionShown(): unknown {
+    return JSON.parse(
+        (
+            document.querySelector(
+                ".test-select-the-story-annotations",
+            ) as HTMLElement
+        ).dataset.selection!,
+    );
+}
+
 class CellsDrawnAs implements CellVisitor<ReactNode> {
-    constructor(private readonly drawings: CellDrawings) {}
+    constructor(
+        private readonly drawings: CellDrawings,
+        private readonly storyAnnotationsSelected: Record<
+            string,
+            StoryAnnotationSelected
+        >,
+    ) {}
 
     visitMarkdown(cell: MarkdownCell): ReactNode {
         return this.drawn(cell);
@@ -143,7 +193,17 @@ class CellsDrawnAs implements CellVisitor<ReactNode> {
 
     private drawn(cell: Cell): ReactNode {
         const drawing = this.drawings[cell.kind];
-        return drawing ? drawing(cell) : null;
+        if (!drawing) {
+            return null;
+        }
+        return (
+            <>
+                {drawing(cell)}
+                <SelectsTheStoryAnnotations
+                    storyAnnotationsSelected={this.storyAnnotationsSelected}
+                />
+            </>
+        );
     }
 }
 
@@ -190,11 +250,17 @@ async function mountCanvas(options: {
     document.body.innerHTML = "";
     const container = document.createElement("div");
     document.body.append(container);
+    const renderState = new WebviewRenderState().with({
+        cells: options.cells ?? [],
+        commands: options.commands ?? [INSERT_COMMAND],
+        storyTextShown: options.storyTextShown ?? null,
+        storyGeneration: options.storyGeneration ?? null,
+        suggestions: options.suggestions ?? [],
+    });
     await act(async () => {
         createRoot(container).render(
             <AuthorFileEditorCanvas
-                cells={options.cells ?? []}
-                commands={options.commands ?? [INSERT_COMMAND]}
+                renderState={renderState}
                 cellTypes={
                     options.cellTypes ?? [cellType("markdown", "primary")]
                 }
@@ -202,15 +268,20 @@ async function mountCanvas(options: {
                     posted.push(message as Invocation)
                 }
                 cellRenderer={
-                    new CellsDrawnAs(options.cellDrawings ?? CELL_DRAWINGS)
+                    new CellsDrawnAs(
+                        options.cellDrawings ?? CELL_DRAWINGS,
+                        options.storyAnnotationsSelected ?? {},
+                    )
                 }
-                storyAnnotationsSelected={options.storyAnnotationsSelected}
-                storyTextShown={options.storyTextShown}
-                storyGeneration={options.storyGeneration}
-                suggestions={options.suggestions}
             />,
         );
     });
+    const selectsTheStoryAnnotations = document.querySelector(
+        ".test-select-the-story-annotations",
+    );
+    if (selectsTheStoryAnnotations !== null) {
+        await click(selectsTheStoryAnnotations);
+    }
 }
 
 function insertMenus(): Element[] {
@@ -1047,7 +1118,7 @@ describe("the salient concepts the story holds", () => {
         });
     });
 
-    it("tells the host which words the author selected", async () => {
+    it("selects the words the author selected", async () => {
         await mountCanvas({
             cells: [markdownCell("The door opens.", "m1"), THE_DOOR],
             cellDrawings: { markdown: () => <SelectsTheDoor /> },
@@ -1055,15 +1126,16 @@ describe("the salient concepts the story holds", () => {
 
         await click(document.querySelector(".test-select-the-door")!);
 
-        expect(posted).toEqual([
+        expect([selectionShown(), posted]).toEqual([
             {
-                type: "storyTextSelected",
+                storyAnnotationsSelected: {},
                 storyTextSelected: {
                     cellId: "m1",
                     startCharacterOffsetInCell: 4,
                     endCharacterOffsetInCell: 8,
                 },
             },
+            [],
         ]);
     });
 });
@@ -1192,7 +1264,7 @@ describe("the plots the story weaves", () => {
             passageId: "n2",
         },
     ])(
-        "asks the host to select the passage when the author clicks $clicked",
+        "selects the passage when the author clicks $clicked",
         async ({ clickedAt, passageId }) => {
             await mountCanvas({
                 cells: [
@@ -1215,13 +1287,19 @@ describe("the plots the story weaves", () => {
 
             await click(storyText);
 
-            expect(posted).toEqual([
-                { type: "selectPassage", cellKind: "plot", passageId },
+            expect([selectionShown(), posted]).toEqual([
+                {
+                    storyAnnotationsSelected: {
+                        plot: { annotationCellId: "p2", passageId },
+                    },
+                    storyTextSelected: null,
+                },
+                [],
             ]);
         },
     );
 
-    it("asks the host to select the passage of every annotation selected that the author clicks", async () => {
+    it("selects the passage of every annotation selected that the author clicks", async () => {
         await mountCanvas({
             cells: [
                 markdownCell("The door opens.", "m1"),
@@ -1253,13 +1331,18 @@ describe("the plots the story weaves", () => {
 
         await click(storyText);
 
-        expect(posted).toEqual([
+        expect([selectionShown(), posted]).toEqual([
             {
-                type: "selectPassage",
-                cellKind: "salient-concept",
-                passageId: "r1",
+                storyAnnotationsSelected: {
+                    "salient-concept": {
+                        annotationCellId: "k1",
+                        passageId: "r1",
+                    },
+                    plot: { annotationCellId: "p2", passageId: "n2" },
+                },
+                storyTextSelected: null,
             },
-            { type: "selectPassage", cellKind: "plot", passageId: "n2" },
+            [],
         ]);
     });
 
@@ -1823,14 +1906,14 @@ describe("the metadata and the manuscript panes", () => {
             document.querySelector(".author-file-editor-story-graph-event")!,
         );
 
-        expect(posted).toEqual([
+        expect([selectionShown(), posted]).toEqual([
             {
-                type: "selectStoryAnnotation",
-                cellKind: "plot",
-                annotationCellId: "p1",
+                storyAnnotationsSelected: {
+                    plot: { annotationCellId: "p1", passageId: "e1" },
+                },
+                storyTextSelected: null,
             },
-            { type: "selectPassage", cellKind: "plot", passageId: "e1" },
-            { type: "showStoryWordRange", firstWord: 0, lastWord: 2 },
+            [{ type: "showStoryWordRange", firstWord: 0, lastWord: 2 }],
         ]);
     });
 

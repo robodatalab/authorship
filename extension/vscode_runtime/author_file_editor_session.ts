@@ -16,15 +16,7 @@ import { Document } from "authordoc/storydoc";
 import { serialize } from "authordoc/parser";
 import type { Suggestion } from "authordoc/suggestion";
 import type { Cell } from "authordoc/cells/cell";
-import {
-    NO_STORY_ANNOTATION_SELECTED,
-    STORY_ANNOTATION_KINDS,
-    type StoryAnnotationSelected,
-} from "./story_annotation_selection";
-import {
-    StoryWordsIterator,
-    type StoryTextSpan,
-} from "authordoc/iterators/story_words_iterator";
+import { StoryWordsIterator } from "authordoc/iterators/story_words_iterator";
 import type { StoryWordRange } from "authordoc/cells/story_word_range";
 import { WordCounter } from "authordoc/synchronizers/word_counter";
 import type {
@@ -41,9 +33,7 @@ import { SetCommandCardsWebviewCommand } from "./webview_commands/set_command_ca
 import { SetAllCellsWebviewCommand } from "./webview_commands/set_all_cells";
 import { SetFindMatchesWebviewCommand } from "./webview_commands/set_find_matches";
 import { SetProseErrorsWebviewCommand } from "./webview_commands/set_prose_errors";
-import { SetStoryAnnotationsSelectedWebviewCommand } from "./webview_commands/set_story_annotations_selected";
 import { SetStoryGenerationWebviewCommand } from "./webview_commands/set_story_generation";
-import { SetStoryTextSelectedWebviewCommand } from "./webview_commands/set_story_text_selected";
 import { SetStoryTextShownWebviewCommand } from "./webview_commands/set_story_text_shown";
 import { SetSuggestionsWebviewCommand } from "./webview_commands/set_suggestions";
 import type { WebviewCommand } from "./webview_commands/webview_command";
@@ -65,13 +55,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         null;
 
     private burstBeingTyped: TypingBurst | null = null;
-
-    private readonly storyAnnotationsSelected = new Map<
-        string,
-        StoryAnnotationSelected
-    >();
-
-    private storyTextSelected: StoryTextSpan | null = null;
 
     private progressOfTheStageRunning:
         | StoryGenerationStageJob["progress"]
@@ -132,15 +115,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         return documentAsSuggested;
     }
 
-    get theStoryAnnotationsSelected(): Record<string, StoryAnnotationSelected> {
-        const selectedOfEachKind = STORY_ANNOTATION_KINDS.map((cellKind) => [
-            cellKind,
-            this.storyAnnotationsSelected.get(cellKind) ??
-                NO_STORY_ANNOTATION_SELECTED,
-        ]);
-        return Object.fromEntries(selectedOfEachKind);
-    }
-
     get theStoryGeneration(): StoryGeneration | null {
         const storyGeneration = storyGenerationOf(
             this.documentAsItStands,
@@ -163,33 +137,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         const storyGeneration = this.theStoryGeneration;
         const command = new SetStoryGenerationWebviewCommand(storyGeneration);
         this.sendToTheWebview(command);
-    }
-
-    selectTheStoryAnnotation(
-        cellKind: string,
-        annotationCellId: string | null,
-    ): void {
-        this.storyAnnotationsSelected.set(cellKind, {
-            annotationCellId,
-            passageId: null,
-        });
-        this.sendStoryAnnotationsSelected();
-    }
-
-    selectThePassage(cellKind: string, passageId: string | null): void {
-        const annotationSelected =
-            this.storyAnnotationsSelected.get(cellKind) ??
-            NO_STORY_ANNOTATION_SELECTED;
-        this.storyAnnotationsSelected.set(cellKind, {
-            annotationCellId: annotationSelected.annotationCellId,
-            passageId,
-        });
-        this.sendStoryAnnotationsSelected();
-    }
-
-    theAuthorSelectedStoryText(storyTextSelected: StoryTextSpan | null): void {
-        this.storyTextSelected = storyTextSelected;
-        this.sendStoryTextSelected();
     }
 
     showTheStoryWordRange(storyWordRange: StoryWordRange): void {
@@ -464,20 +411,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         this.sendToTheWebview(command);
     }
 
-    sendStoryAnnotationsSelected(): void {
-        const command = new SetStoryAnnotationsSelectedWebviewCommand(
-            this.theStoryAnnotationsSelected,
-        );
-        this.sendToTheWebview(command);
-    }
-
-    sendStoryTextSelected(): void {
-        const command = new SetStoryTextSelectedWebviewCommand(
-            this.storyTextSelected,
-        );
-        this.sendToTheWebview(command);
-    }
-
     sendFindMatches(): void {
         const command = new SetFindMatchesWebviewCommand([...this.findMatches]);
         this.sendToTheWebview(command);
@@ -490,8 +423,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         this.sendToTheWebview(command);
         this.sendSuggestions();
         this.sendProseErrors();
-        this.sendStoryAnnotationsSelected();
-        this.sendStoryTextSelected();
         this.sendFindMatches();
         this.sendWordCounts();
         this.sendTheStoryGeneration();
@@ -545,7 +476,7 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         this.sendTheStoryGeneration();
     }
 
-    private sendToTheWebview(command: WebviewCommand): void {
+    sendToTheWebview(command: WebviewCommand): void {
         const serialized = command.serialize();
         void this.panel?.webview.postMessage(serialized);
     }

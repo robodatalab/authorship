@@ -17,17 +17,9 @@ import {
     SetProseErrorsWebviewCommand,
 } from "./set_prose_errors";
 import {
-    SET_STORY_ANNOTATIONS_SELECTED,
-    SetStoryAnnotationsSelectedWebviewCommand,
-} from "./set_story_annotations_selected";
-import {
     SET_STORY_GENERATION,
     SetStoryGenerationWebviewCommand,
 } from "./set_story_generation";
-import {
-    SET_STORY_TEXT_SELECTED,
-    SetStoryTextSelectedWebviewCommand,
-} from "./set_story_text_selected";
 import {
     SET_STORY_TEXT_SHOWN,
     SetStoryTextShownWebviewCommand,
@@ -55,12 +47,7 @@ const WEBVIEW_COMMAND_DESERIALIZERS = new Map<
     [UPDATE_CELLS, UpdateCellsWebviewCommand.deserialize],
     [SET_COMMAND_CARDS, SetCommandCardsWebviewCommand.deserialize],
     [SET_PROSE_ERRORS, SetProseErrorsWebviewCommand.deserialize],
-    [
-        SET_STORY_ANNOTATIONS_SELECTED,
-        SetStoryAnnotationsSelectedWebviewCommand.deserialize,
-    ],
     [SET_STORY_TEXT_SHOWN, SetStoryTextShownWebviewCommand.deserialize],
-    [SET_STORY_TEXT_SELECTED, SetStoryTextSelectedWebviewCommand.deserialize],
     [SET_FIND_MATCHES, SetFindMatchesWebviewCommand.deserialize],
     [SET_CELLS_BEING_WRITTEN, SetCellsBeingWrittenWebviewCommand.deserialize],
     [SET_WORD_COUNTS, SetWordCountsWebviewCommand.deserialize],

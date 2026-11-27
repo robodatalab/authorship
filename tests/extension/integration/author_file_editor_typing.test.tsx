@@ -44,10 +44,7 @@ interface OpenEditor {
     documentText(): string;
     undoTheNewestEdit(): Promise<void>;
     redoTheNewestEdit(): Promise<void>;
-    selectTheStoryAnnotation(
-        cellKind: string,
-        annotationCellId: string,
-    ): Promise<void>;
+    selectTheStoryAnnotation(annotationCellId: string): Promise<void>;
 }
 
 async function openEditor(text: string): Promise<OpenEditor> {
@@ -144,12 +141,14 @@ async function openEditor(text: string): Promise<OpenEditor> {
             await watchersOnTheFiles[0].theFileChanged();
             await settle();
         },
-        selectTheStoryAnnotation: async (
-            cellKind: string,
-            annotationCellId: string,
-        ) => {
+        selectTheStoryAnnotation: async (annotationCellId: string) => {
+            const shownInTheManuscript = document.querySelector(
+                `li[data-cell-id="${annotationCellId}"] .author-file-editor-story-annotation-shown-in-the-manuscript`,
+            )!;
             await act(async () => {
-                session.selectTheStoryAnnotation(cellKind, annotationCellId);
+                shownInTheManuscript.dispatchEvent(
+                    new MouseEvent("click", { bubbles: true }),
+                );
             });
             await settle();
         },
@@ -490,7 +489,7 @@ describe("the words of a salient concept while the author types", () => {
                     "",
                 ].join("\n"),
             );
-            await editor.selectTheStoryAnnotation("salient-concept", "k1");
+            await editor.selectTheStoryAnnotation("k1");
             await openTheCellForTyping();
 
             expect(theCellBeingTyped().marks()).toEqual([
@@ -540,7 +539,7 @@ describe("the trajectory of a plot while the author types", () => {
                 "",
             ].join("\n"),
         );
-        await editor.selectTheStoryAnnotation("plot", "p2");
+        await editor.selectTheStoryAnnotation("p2");
         await openTheCellForTyping();
         theCellBeingTyped().putTheCursorAt(0);
         await typeCharacter("So ");
@@ -1022,22 +1021,9 @@ describe("a salient concept's cell beside the manuscript", () => {
                 "",
             ].join("\n"),
         );
-        const thePage = (
-            globalThis as unknown as {
-                acquireVsCodeApi: () => {
-                    postMessage: (message: unknown) => void;
-                };
-            }
-        ).acquireVsCodeApi();
+        await openTheCellForTyping();
         await act(async () => {
-            thePage.postMessage({
-                type: "storyTextSelected",
-                storyTextSelected: {
-                    cellId: "m1",
-                    startCharacterOffsetInCell: 4,
-                    endCharacterOffsetInCell: 10,
-                },
-            });
+            theCellBeingTyped().select(4, 10);
         });
         await settle();
         const assign = document.querySelector(

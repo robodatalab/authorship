@@ -27,10 +27,13 @@ import {
 import { AuthorFileEditorPlotEvent } from "./AuthorFileEditorPlotEvent";
 import { AuthorFileEditorPlotTrajectoryLanes } from "./AuthorFileEditorPlotTrajectoryLanes";
 import { AuthorFileEditorStoryAnnotationShownInTheManuscript } from "./AuthorFileEditorStoryAnnotationShownInTheManuscript";
+import {
+    NO_STORY_ANNOTATION_SELECTED,
+    useAuthorFileEditorSelection,
+} from "../author_editor/AuthorFileEditorSelectionFence";
 import { CharacterCell } from "authordoc/cells/character_cell";
 import { PLOT, type PlotCell } from "authordoc/cells/plot_cell";
 import { StoryAnnotationsIterator } from "authordoc/iterators/story_annotations_iterator";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 import type { Document } from "authordoc/storydoc";
 import "./StoryAnnotationCells.css";
 
@@ -54,20 +57,27 @@ const PLOT_CHARACTERS_WORDING: AuthorFileEditorCellReferencesWording = {
 interface AuthorFileEditorPlotCellProps {
     cell: PlotCell;
     story: Document;
-    isShownInTheManuscript: boolean;
-    eventIdSelected: string | null;
-    storyTextSelected: StoryTextSpan | null;
     sendMessagesToVscode: SendMessagesToVscode;
 }
 
 export function AuthorFileEditorPlotCell({
     cell,
     story,
-    isShownInTheManuscript,
-    eventIdSelected,
-    storyTextSelected,
     sendMessagesToVscode,
 }: AuthorFileEditorPlotCellProps) {
+    const {
+        storyAnnotationsSelected,
+        storyTextSelected,
+        selectTheStoryAnnotation,
+        selectThePassage,
+    } = useAuthorFileEditorSelection();
+    const plotSelected =
+        storyAnnotationsSelected[PLOT] ?? NO_STORY_ANNOTATION_SELECTED;
+    const isShownInTheManuscript =
+        plotSelected.annotationCellId === cell.uniqueId;
+    const eventIdSelected = isShownInTheManuscript
+        ? plotSelected.passageId
+        : null;
     const timesTheHostWroteIt = useAuthorFileEditorCellTimesTheHostWroteIt();
     const passages = useMemo(() => {
         const plotsInTheStory = new StoryAnnotationsIterator(story, PLOT);
@@ -107,17 +117,9 @@ export function AuthorFileEditorPlotCell({
 
     function selectTheEvent(nodeId: string): void {
         if (!isShownInTheManuscript) {
-            sendMessagesToVscode({
-                type: "selectStoryAnnotation",
-                cellKind: PLOT,
-                annotationCellId: cell.uniqueId,
-            });
+            selectTheStoryAnnotation(PLOT, cell.uniqueId);
         }
-        sendMessagesToVscode({
-            type: "selectPassage",
-            cellKind: PLOT,
-            passageId: nodeId,
-        });
+        selectThePassage(PLOT, nodeId);
     }
 
     // Selected words tell the event added; with none selected, the event is
@@ -229,7 +231,6 @@ export function AuthorFileEditorPlotCell({
                     cellKind={PLOT}
                     annotationCellId={cell.uniqueId}
                     isShown={isShownInTheManuscript}
-                    sendMessagesToVscode={sendMessagesToVscode}
                 />
             }
         >

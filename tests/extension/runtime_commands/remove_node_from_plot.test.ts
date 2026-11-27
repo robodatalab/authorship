@@ -54,7 +54,7 @@ She finds the door.
         });
     });
 
-    it("brings the node back, still selected, when its removal is undone", () => {
+    it("brings the node back when its removal is undone", () => {
         const edits: { undo(): void }[] = [];
         const edited = new vscode.EventEmitter<{ undo(): void }>();
         edited.event((edit) => edits.push(edit));
@@ -70,8 +70,6 @@ She finds the door.
 `,
             edited as never,
         );
-        session.selectTheStoryAnnotation("plot", "p1");
-        session.selectThePassage("plot", "n2");
         new RemoveNodeFromPlotCommand().invoke(session, {
             annotationCellId: "p1",
             nodeId: "n2",
@@ -84,10 +82,6 @@ She finds the door.
                 new PlotNode("n1", new StoryWordRange(2, 3)),
                 new PlotNode("n2", new StoryWordRange(6, 7)),
             ],
-        });
-        expect(session.theStoryAnnotationsSelected).toEqual({
-            "salient-concept": { annotationCellId: null, passageId: null },
-            plot: { annotationCellId: "p1", passageId: "n2" },
         });
     });
 

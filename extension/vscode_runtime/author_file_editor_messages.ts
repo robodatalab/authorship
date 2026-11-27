@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import type { AuthorFileEditorMessage } from "./vscode_command_executor";
 import type { StoryWordRange } from "authordoc/cells/story_word_range";
-import type { StoryTextSpan } from "authordoc/iterators/story_words_iterator";
 
 export class ThePageIsReady implements AuthorFileEditorMessage {
     invoke(session: AuthorFileEditorSession): void {
@@ -30,41 +29,11 @@ export class TheAuthorIsEditingTheCell implements AuthorFileEditorMessage {
     }
 }
 
-export class TheAuthorSelectedStoryText implements AuthorFileEditorMessage {
-    constructor(private readonly storyTextSelected: StoryTextSpan | null) {}
-
-    invoke(session: AuthorFileEditorSession): void {
-        session.theAuthorSelectedStoryText(this.storyTextSelected);
-    }
-}
-
-export class TheAuthorSelectedTheStoryAnnotation implements AuthorFileEditorMessage {
-    constructor(
-        private readonly cellKind: string,
-        private readonly annotationCellId: string | null,
-    ) {}
-
-    invoke(session: AuthorFileEditorSession): void {
-        session.selectTheStoryAnnotation(this.cellKind, this.annotationCellId);
-    }
-}
-
 export class TheAuthorAskedToSeeTheStoryWords implements AuthorFileEditorMessage {
     constructor(private readonly storyWordRange: StoryWordRange) {}
 
     invoke(session: AuthorFileEditorSession): void {
         session.showTheStoryWordRange(this.storyWordRange);
-    }
-}
-
-export class TheAuthorSelectedThePassage implements AuthorFileEditorMessage {
-    constructor(
-        private readonly cellKind: string,
-        private readonly passageId: string | null,
-    ) {}
-
-    invoke(session: AuthorFileEditorSession): void {
-        session.selectThePassage(this.cellKind, this.passageId);
     }
 }
 
