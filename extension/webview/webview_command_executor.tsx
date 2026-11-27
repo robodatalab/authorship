@@ -19,7 +19,7 @@ import { Document } from "authordoc/storydoc";
 
 declare function acquireVsCodeApi(): { postMessage: SendMessagesToVscode };
 
-interface WhatTheWebviewDraws {
+interface WebviewRenderState {
     cells: Cell[];
     timesTheHostWroteEachCell: Record<string, number>;
     commands: WebviewAuthorDocumentCommandCard[];
@@ -39,7 +39,7 @@ function cellsAsTheHostWroteThem(written: string[]): Cell[] {
     return written.flatMap((writtenCell) => parse(writtenCell));
 }
 
-function theHostWrote(cells: Cell[], drawn: WhatTheWebviewDraws): void {
+function theHostWrote(cells: Cell[], drawn: WebviewRenderState): void {
     for (const cell of cells) {
         const timesBefore = drawn.timesTheHostWroteEachCell[cell.uniqueId] ?? 0;
         drawn.timesTheHostWroteEachCell[cell.uniqueId] = timesBefore + 1;
@@ -47,7 +47,7 @@ function theHostWrote(cells: Cell[], drawn: WhatTheWebviewDraws): void {
 }
 
 class WebviewCommandExecutor {
-    private readonly drawn: WhatTheWebviewDraws = {
+    private readonly drawn: WebviewRenderState = {
         cells: [],
         timesTheHostWroteEachCell: {},
         commands: [],
