@@ -412,7 +412,7 @@ describe("invoking a main menu command", () => {
         ).toHaveLength(1);
     });
 
-    it("shows Unfold all when every cell is folded, counting a cell folded by its suggestion, and Fold all otherwise", async () => {
+    it("shows Unfold all when every cell is folded, a suggested one among them, and Fold all otherwise", async () => {
         const foldAll = {
             ...command("foldAll", "fold"),
             drawnWhenTheCellIsFolded: false,
@@ -435,7 +435,7 @@ describe("invoking a main menu command", () => {
         await mountCanvas({
             cells: [
                 new MarkdownCell("one", true, null, "one"),
-                markdownCell("two"),
+                new MarkdownCell("two", true, null, "two"),
             ],
             suggestions: [suggestionThatFolds("two")],
             commands: [foldAll, unfoldAll],
@@ -946,12 +946,12 @@ describe("the scope of a part and of a chapter", () => {
 });
 
 describe("a folded cell", () => {
-    it("is drawn folded, also when its suggestion folds it", async () => {
+    it("is drawn folded, also when it is suggested", async () => {
         await mountCanvas({
             cells: [
                 markdownCell("one"),
                 new MarkdownCell("two", true, null, "two"),
-                markdownCell("three"),
+                new MarkdownCell("three", true, null, "three"),
             ],
             suggestions: [suggestionThatFolds("three")],
         });
@@ -2078,9 +2078,12 @@ describe("the metadata and the manuscript panes", () => {
 
         afterEach(() => vi.restoreAllMocks());
 
-        it("draws every cell with a suggestion as the suggestion makes it, in a frame with buttons to accept and reject it in its footer", async () => {
+        it("draws every suggested cell as it is given, in a frame with buttons to accept and reject it in its footer", async () => {
             await mountCanvas({
-                cells: [markdownCell("one"), markdownCell("two")],
+                cells: [
+                    markdownCell("one, changed", "one"),
+                    markdownCell("two"),
+                ],
                 suggestions: [ONE_CHANGED],
             });
 

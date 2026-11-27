@@ -85,4 +85,33 @@ He heard the bell.
                 '<!-- suggestion: id="c2" -->\n<!-- change: text from="17" removed="" written=" twice" -->\n',
         });
     });
+
+    it("sends the page the cell as it stands once its suggestion is rejected", async () => {
+        const session = openStory(THE_STORY_WITH_TWO_SUGGESTIONS);
+
+        await new ReviewTheSuggestionCommand().invoke(session, {
+            cellId: "c1",
+            verdict: "reject",
+        });
+
+        expect(sentToThePage).toContainEqual({
+            type: "updateCells",
+            cells: ['<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n'],
+            cellsThePageTyped: [],
+        });
+    });
+
+    it("sends the page every cell as its suggestion makes it", () => {
+        const session = openStory(THE_STORY_WITH_TWO_SUGGESTIONS);
+
+        session.sendDocument();
+
+        expect(sentToThePage[0]).toEqual({
+            type: "setAllCells",
+            cells: [
+                '<!-- cell: markdown id="c1" -->\n\nShe saw the door at last.\n',
+                '<!-- cell: markdown id="c2" -->\n\nHe heard the bell twice.\n',
+            ],
+        });
+    });
 });

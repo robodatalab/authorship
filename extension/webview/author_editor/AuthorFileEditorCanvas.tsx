@@ -51,7 +51,6 @@ import {
     STORY_ANNOTATION_KINDS,
     type StoryAnnotationSelected,
 } from "../../vscode_runtime/story_annotation_selection";
-import { withEverySuggestionApplied } from "../../vscode_runtime/tools/suggestions_applied";
 import {
     MarkdownEditorMediator,
     type MarkdownEditorStoryTextHighlight,
@@ -203,17 +202,7 @@ export function AuthorFileEditorCanvas({
     const insertCommand = commands.find(
         (command) => command.buttonGroup === INSERT_BUTTON_GROUP,
     );
-    const storyAsSuggested = useMemo(() => {
-        const storyWithTheSuggestions = Document.fromCells(
-            cells,
-            null,
-            suggestions,
-        );
-        const storySuggested = withEverySuggestionApplied(
-            storyWithTheSuggestions,
-        );
-        return storySuggested;
-    }, [cells, suggestions]);
+    const authorDocument = useMemo(() => Document.fromCells(cells), [cells]);
     const suggestionForEachCell = useMemo(
         () =>
             new Map(
@@ -224,28 +213,28 @@ export function AuthorFileEditorCanvas({
             ),
         [suggestions],
     );
-    const cellsAsSuggested = useMemo(
-        () => [...storyAsSuggested.cells],
-        [storyAsSuggested],
+    const authorDocumentCells = useMemo(
+        () => [...authorDocument.cells],
+        [authorDocument],
     );
     const sections = useMemo(
-        () => cellsBySection(cellsAsSuggested),
-        [cellsAsSuggested],
+        () => cellsBySection(authorDocumentCells),
+        [authorDocumentCells],
     );
     const topLevelPlaceIds = useMemo(() => {
-        const topLevelPlaces = storyAsSuggested.places();
+        const topLevelPlaces = authorDocument.places();
         const ids = topLevelPlaces.map((place) => place.uniqueId);
         return new Set(ids);
-    }, [storyAsSuggested]);
+    }, [authorDocument]);
     const storyWords = useMemo(
-        () => new StoryWordsIterator(storyAsSuggested),
-        [storyAsSuggested],
+        () => new StoryWordsIterator(authorDocument),
+        [authorDocument],
     );
     const storyAnnotationsShown = useMemo(
         () =>
             STORY_ANNOTATION_KINDS.map((cellKind) => {
                 const storyAnnotations = new StoryAnnotationsIterator(
-                    storyAsSuggested,
+                    authorDocument,
                     cellKind,
                 );
                 const annotations = Array.from(storyAnnotations);
@@ -279,7 +268,7 @@ export function AuthorFileEditorCanvas({
                         passageSelected === -1 ? null : passageSelected,
                 };
             }),
-        [storyAsSuggested, storyWords, storyAnnotationsSelected],
+        [authorDocument, storyWords, storyAnnotationsSelected],
     );
     const storyTextHighlightsByCellId = useMemo(() => {
         const byCellId = new Map<string, MarkdownEditorStoryTextHighlight[]>();
@@ -318,7 +307,7 @@ export function AuthorFileEditorCanvas({
                 }),
             );
             const passageSelected = annotation.passageSelected;
-            const plotCell = storyAsSuggested
+            const plotCell = authorDocument
                 .plots()
                 .find((plot) => plot.uniqueId === annotation.annotationCellId);
             if (plotCell === undefined || passageSelected === null) {
@@ -349,7 +338,7 @@ export function AuthorFileEditorCanvas({
             }
         }
         return { marks, arrows };
-    }, [storyAnnotationsShown, storyAsSuggested]);
+    }, [storyAnnotationsShown, authorDocument]);
 
     function selectThePassagesClicked(cellId: string, clickedAt: number): void {
         for (const annotation of storyAnnotationsShown) {
@@ -379,7 +368,7 @@ export function AuthorFileEditorCanvas({
     const cellDragged =
         cellIdDragged === null
             ? undefined
-            : storyAsSuggested.cellWithId(cellIdDragged);
+            : authorDocument.cellWithId(cellIdDragged);
     const canvasDrawn = useRef<HTMLDivElement>(null);
     const suggestionShown = useRef<string | null>(null);
     const [metadataPaneWidth, resizeTheMetadataPane] = useState<number | null>(
@@ -468,8 +457,8 @@ export function AuthorFileEditorCanvas({
         command: WebviewAuthorDocumentCommandCard,
     ): boolean {
         return (
-            cellsAsSuggested.length > 0 &&
-            cellsAsSuggested.every((cell) =>
+            authorDocumentCells.length > 0 &&
+            authorDocumentCells.every((cell) =>
                 isDrawnOnCell(command, cell.folded),
             )
         );
@@ -538,7 +527,7 @@ export function AuthorFileEditorCanvas({
 
     useEffect(() => {
         const scrolled = metadataOnThePage.current;
-        const firstOfTheKind = cellsAsSuggested.find(
+        const firstOfTheKind = authorDocumentCells.find(
             (cell) => cell.kind === cellKindTheAuthorIsToReview,
         );
         if (!scrolled || firstOfTheKind === undefined) {
@@ -636,10 +625,10 @@ export function AuthorFileEditorCanvas({
     }
 
     function cellFollowing(cell: Cell): string | null {
-        const standsAt = storyAsSuggested.cells.findIndex(
+        const standsAt = authorDocument.cells.findIndex(
             (inTheStory) => inTheStory.uniqueId === cell.uniqueId,
         );
-        const following = storyAsSuggested.cells[standsAt + 1];
+        const following = authorDocument.cells[standsAt + 1];
         return following?.uniqueId ?? null;
     }
 
@@ -678,7 +667,7 @@ export function AuthorFileEditorCanvas({
                   canBeMovedInto(
                       cellDragged,
                       placeHoldingTheGap,
-                      storyAsSuggested,
+                      authorDocument,
                   );
         return (
             <div
@@ -709,8 +698,8 @@ export function AuthorFileEditorCanvas({
         }
         const landsHere =
             cellDragged instanceof PlaceCell &&
-            canBeMovedInto(cellDragged, cell, storyAsSuggested);
-        const nestedInIt = cell.children(storyAsSuggested);
+            canBeMovedInto(cellDragged, cell, authorDocument);
+        const nestedInIt = cell.children(authorDocument);
         const lastNested = nestedInIt[nestedInIt.length - 1];
         const beforeCellId = cellFollowing(lastNested ?? cell);
         return dropZone(cell.uniqueId, landsHere, () =>
@@ -876,7 +865,7 @@ export function AuthorFileEditorCanvas({
     }
 
     function placesWithinThePlace(place: PlaceCell): ReactNode {
-        const within = place.children(storyAsSuggested);
+        const within = place.children(authorDocument);
         if (within.length === 0 || place.folded) {
             return null;
         }
@@ -1005,7 +994,7 @@ export function AuthorFileEditorCanvas({
                     goToTheNextSuggestion={() => bringTheSuggestionIntoView(1)}
                 />
                 <AuthorFileEditorPartAndChapterInView
-                    cells={cellsAsSuggested}
+                    cells={authorDocumentCells}
                     cellIdInView={cellIdInView}
                     wordsInTheDocument={wordsInTheDocument}
                 />
@@ -1046,7 +1035,7 @@ export function AuthorFileEditorCanvas({
                         cellsInScope(sections, null, METADATA_PANE)
                     ) : (
                         <AuthorFileEditorStoryGraph
-                            story={storyAsSuggested}
+                            story={authorDocument}
                             plotEventSelected={
                                 storyAnnotationsSelected[PLOT] ??
                                 NO_STORY_ANNOTATION_SELECTED

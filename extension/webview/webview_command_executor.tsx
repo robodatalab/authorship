@@ -3,7 +3,6 @@ import { AuthorFileEditorCanvas } from "./author_editor/AuthorFileEditorCanvas";
 import type { SendMessagesToVscode } from "./author_editor/AuthorFileEditorCanvas";
 import { AuthorFileEditorCellRenderer } from "./author_editor/AuthorFileEditorCellRenderer";
 import { authorDocumentCellTypes } from "../vscode_runtime/runtime_commands/author_document_cell_types";
-import { withEverySuggestionApplied } from "../vscode_runtime/tools/suggestions_applied";
 import { deserializeWebviewCommand } from "../vscode_runtime/webview_commands/webview_command";
 import { WebviewRenderState } from "../vscode_runtime/webview_commands/webview_render_state";
 import { Document } from "authordoc/storydoc";
@@ -34,17 +33,10 @@ class WebviewCommandExecutor {
                     (cell) => cell.uniqueId === suggestion.cellId,
                 ),
         );
-        const storyWithTheSuggestions = Document.fromCells(
-            renderState.cells,
-            null,
-            suggestionsOfTheCellsDrawn,
-        );
-        const storyAsSuggested = withEverySuggestionApplied(
-            storyWithTheSuggestions,
-        );
+        const authorDocument = Document.fromCells(renderState.cells);
         const cellRenderer = new AuthorFileEditorCellRenderer(
             this.sendMessagesToVscode,
-            storyAsSuggested,
+            authorDocument,
             renderState.storyAnnotationsSelected,
             renderState.storyTextSelected,
         );

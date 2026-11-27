@@ -97,9 +97,9 @@ describe("refreshing the document", () => {
 });
 
 describe("the suggestions the host sends", () => {
-    it("draws the cell a suggestion is on as the suggestion makes it, in its frame", async () => {
+    it("draws a suggested cell as the host sends it, in its frame", async () => {
         await openWebview();
-        await hostSends([markdownCell("m1", "one")]);
+        await hostSends([markdownCell("m1", "one more")]);
 
         await act(async () => {
             window.dispatchEvent(
@@ -119,14 +119,14 @@ describe("the suggestions the host sends", () => {
         expect(proposed?.textContent).toContain("one more");
     });
 
-    describe("drawing every cell in the story as the suggestions make it", () => {
+    describe("drawing every suggested cell in the document as the host sends it", () => {
         const MARKUS =
             '<!-- cell: character id="mv" title="Markus Vader" -->\n';
-        const EMPTY_PLACES_CHARACTER_AND_PLOT = [
-            '<!-- cell: place id="ms" -->\n',
-            '<!-- cell: place id="hb" -->\n',
-            '<!-- cell: character id="tl" -->\n',
-            '<!-- cell: plot id="dd" -->\n',
+        const PLACES_CHARACTER_AND_PLOT_AS_SUGGESTED = [
+            '<!-- cell: place id="ms" title="Mars" -->\n',
+            '<!-- cell: place id="hb" title="Hellas Basin" parent="ms" -->\n',
+            '<!-- cell: character id="tl" title="Teodor Lin" -->\n\nA drill operator in debt to the company.\n',
+            '<!-- cell: plot id="dd" title="Drilling deeper" -->\n\n<ol>\n<li id="e1" timestamp="2.4" place="hb" characters="mv, tl">They drive the drill deeper.</li>\n</ol>\n',
         ];
         const SUGGESTED_PLACES_CHARACTER_AND_PLOT =
             '<!-- suggestion: id="ms" -->\n<!-- change: header kind="place" after-title="Mars" -->\n\n' +
@@ -138,7 +138,10 @@ describe("the suggestions the host sends", () => {
 
         async function hostSendsMarkusAndTheSuggestions(): Promise<void> {
             await openWebview();
-            await hostSends([MARKUS, ...EMPTY_PLACES_CHARACTER_AND_PLOT]);
+            await hostSends([
+                MARKUS,
+                ...PLACES_CHARACTER_AND_PLOT_AS_SUGGESTED,
+            ]);
             await act(async () => {
                 window.dispatchEvent(
                     new MessageEvent("message", {

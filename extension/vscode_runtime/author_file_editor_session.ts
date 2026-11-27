@@ -35,7 +35,6 @@ import {
     StoryGenerationWorkflow,
     storyGenerationOf,
 } from "./story_generation/story_generation_workflow";
-import { withEverySuggestionApplied } from "./tools/suggestions_applied";
 import { UpdateCellsWebviewCommand } from "./webview_commands/update_cells";
 import { SetCellsBeingWrittenWebviewCommand } from "./webview_commands/set_cells_being_written";
 import { SetCommandCardsWebviewCommand } from "./webview_commands/set_command_cards";
@@ -214,9 +213,7 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
         };
         const cellIsSuggested =
             this.documentAsItStands.suggestionFor(cellId) !== undefined;
-        if (!cellIsSuggested) {
-            this.whatThePageJustTyped = { cellId, markdown };
-        }
+        this.whatThePageJustTyped = { cellId, markdown };
         const documentTyped = cellIsSuggested
             ? this.documentChangedAsSuggested(typeIt)
             : typeIt(this.documentAsItStands);
@@ -272,22 +269,23 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
             documentImported =
                 documentAsTheFileHasIt.withCell(cellAsTheAuthorHasIt);
         }
-        const fileChange = AuthorDocDiff.diff(
-            this.documentAsItStands,
-            documentImported,
-        );
+        const documentBefore = this.documentAsItStands;
+        const fileChange = AuthorDocDiff.diff(documentBefore, documentImported);
         this.makeTheChange(fileChange);
         this.takeTheSuggestions(documentImported.suggestions);
+        this.sendWhatChanged(documentBefore);
     }
 
     importDocumentFromText(text: string): void {
         const documentImported = new Document(text, this.uri.fsPath);
+        const documentBefore = this.documentAsItStands;
         const importChange = AuthorDocDiff.diff(
-            this.documentAsItStands,
+            documentBefore,
             documentImported,
         );
         this.makeTheChange(importChange);
         this.takeTheSuggestions(documentImported.suggestions);
+        this.sendWhatChanged(documentBefore);
     }
 
     changeTheDocument(change: (document: Document) => Document): void {
@@ -342,6 +340,7 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
     }
 
     private makeTheEdit(edit: AuthorFileEditorEdit): void {
+        const documentBefore = this.documentAsItStands;
         if (!edit.theChange.empty()) {
             this.makeTheChange(edit.theChange);
         }
@@ -349,6 +348,7 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
             this.documentAsItStands.suggestions,
         );
         this.takeTheSuggestions(suggestionsLeft);
+        this.sendWhatChanged(documentBefore);
     }
 
     private takeTheSuggestions(suggestions: readonly Suggestion[]): void {
@@ -365,7 +365,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
             this.documentAsItStands.path,
             suggestions,
         );
-        this.sendSuggestions();
     }
 
     private sendSuggestions(): void {
@@ -400,7 +399,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
             synchronizer.synchronize(before, change);
         }
         this.documentAsItStands = change.applyTheDiff(before);
-        this.sendWhatChanged(before);
     }
 
     async writeTheDocumentToItsFile(): Promise<void> {
@@ -487,7 +485,7 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
 
     sendDocument(): void {
         const command = new SetAllCellsWebviewCommand(
-            this.documentAsItStands.cells,
+            this.documentAsSuggested.cells,
         );
         this.sendToTheWebview(command);
         this.sendSuggestions();
@@ -502,21 +500,21 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
     private sendWhatChanged(asItStoodBefore: Document): void {
         const thePageDrewItAlready = this.whatThePageJustTyped;
         this.whatThePageJustTyped = null;
+        const asSuggestedBefore = withEverySuggestionApplied(asItStoodBefore);
+        const asSuggestedNow = this.documentAsSuggested;
         const theSameCellsInTheSameOrder =
-            asItStoodBefore.cells.length ===
-                this.documentAsItStands.cells.length &&
-            asItStoodBefore.cells.every(
+            asSuggestedBefore.cells.length === asSuggestedNow.cells.length &&
+            asSuggestedBefore.cells.every(
                 (cell, standing) =>
-                    cell.uniqueId ===
-                    this.documentAsItStands.cells[standing].uniqueId,
+                    cell.uniqueId === asSuggestedNow.cells[standing].uniqueId,
             );
         if (!theSameCellsInTheSameOrder) {
             this.sendDocument();
             return;
         }
-        const changed = this.documentAsItStands.cells.filter(
+        const changed = asSuggestedNow.cells.filter(
             (cell, standing) => {
-                const before = asItStoodBefore.cells[standing];
+                const before = asSuggestedBefore.cells[standing];
                 const writtenBefore = asThePageDrawsIt(before);
                 const writtenNow = asThePageDrawsIt(cell);
                 return writtenNow !== writtenBefore;
@@ -535,6 +533,11 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
                 cellsThePageTyped,
             );
             this.sendToTheWebview(command);
+        }
+        const suggestionsBefore = serialize([], asItStoodBefore.suggestions);
+        const suggestionsNow = serialize([], this.documentAsItStands.suggestions);
+        if (suggestionsNow !== suggestionsBefore) {
+            this.sendSuggestions();
         }
         this.sendProseErrors();
         this.sendFindMatches();
@@ -781,6 +784,23 @@ function withTheEditsOfTheSuggestedCells(
 function asThePageDrawsIt(cell: Cell): string {
     const written = Document.fromCells([cell]);
     return written.text;
+}
+
+function withTheSuggestionApplied(
+    document: Document,
+    suggestion: Suggestion,
+): Document {
+    const diff = suggestion.diff();
+    const documentSuggested = diff.applyTheDiff(document);
+    return documentSuggested;
+}
+
+function withEverySuggestionApplied(document: Document): Document {
+    const documentSuggested = document.suggestions.reduce(
+        withTheSuggestionApplied,
+        document,
+    );
+    return documentSuggested;
 }
 
 export function openAuthorFileEditorSession(
