@@ -21,17 +21,17 @@ She saw the door.
 describe("RedescribePlotCommand — gives a plot a new overview", () => {
     it("keeps its events, and what was said of them since", () => {
         const session = openStory(THE_STORY);
-        new ChangePlotEventCommand().invoke(session, {
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             field: "timestamp",
             said: "2.1",
-        });
+        }).invoke(session);
 
-        new RedescribePlotCommand().invoke(session, {
+        RedescribePlotCommand.deserialize({
             annotationCellId: "p1",
             overview: "She finds a door.",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             overview: "She finds a door.",

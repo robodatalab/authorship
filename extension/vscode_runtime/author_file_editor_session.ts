@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 
 import type { ProseCheckError } from "./runtime_commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "./runtime_commands/find_in_the_document";
-import { authorDocumentCommandCards } from "./runtime_commands/author_document_commands";
 import { CharacterRangeSynchronizer } from "authordoc/synchronizers/character_range_synchronizer";
 import type { AuthorDocSynchronizer } from "authordoc/author_doc_synchronizer";
 import type { AuthorDocChangeVisitor } from "authordoc/author_doc_change_visitor";
@@ -29,7 +28,6 @@ import {
 } from "./story_generation/story_generation_workflow";
 import { UpdateCellsWebviewCommand } from "./webview_commands/update_cells";
 import { SetCellsBeingWrittenWebviewCommand } from "./webview_commands/set_cells_being_written";
-import { SetCommandCardsWebviewCommand } from "./webview_commands/set_command_cards";
 import { SetAllCellsWebviewCommand } from "./webview_commands/set_all_cells";
 import { SetFindMatchesWebviewCommand } from "./webview_commands/set_find_matches";
 import { SetProseErrorsWebviewCommand } from "./webview_commands/set_prose_errors";
@@ -382,12 +380,6 @@ export class AuthorFileEditorSession implements vscode.CustomDocument {
     stopWritingCell(cellId: string): void {
         this.howFarEachCellHasBeenWritten.delete(cellId);
         this.sendCellsBeingWritten();
-    }
-
-    sendCommandCards(): void {
-        const commandCards = authorDocumentCommandCards();
-        const command = new SetCommandCardsWebviewCommand(commandCards);
-        this.sendToTheWebview(command);
     }
 
     sendCellsBeingWritten(): void {

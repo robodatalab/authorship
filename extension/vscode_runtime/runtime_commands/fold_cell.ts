@@ -1,26 +1,34 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class FoldCellCommand implements AuthorDocumentCommand {
-    readonly buttonGroup = "cell";
-    readonly drawnWhenTheCellIsFolded: boolean;
+export const FOLD_CELL = "foldCell";
+export const UNFOLD_CELL = "unfoldCell";
 
+export class FoldCellCommand implements RuntimeCommand {
     constructor(
-        readonly commandName: string,
-        readonly iconClassName: string,
-        readonly tooltip: string,
+        private readonly cellId: string,
         private readonly folded: boolean,
-    ) {
-        this.drawnWhenTheCellIsFolded = !folded;
+    ) {}
+
+    static deserializeFoldCell(
+        serialized: Record<string, unknown>,
+    ): FoldCellCommand {
+        const cellId = serialized.cellId as string;
+        const command = new FoldCellCommand(cellId, true);
+        return command;
     }
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const cellId = commandArguments.cellId as string;
+    static deserializeUnfoldCell(
+        serialized: Record<string, unknown>,
+    ): FoldCellCommand {
+        const cellId = serialized.cellId as string;
+        const command = new FoldCellCommand(cellId, false);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const cell = story.cellWithId(cellId);
+            const cell = story.cellWithId(this.cellId);
             if (!cell) {
                 return story;
             }

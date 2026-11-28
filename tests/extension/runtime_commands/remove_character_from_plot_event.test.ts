@@ -43,11 +43,11 @@ describe("RemoveCharacterFromPlotEventCommand — takes a character out of one e
     ])("takes out %s", (_, characterCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new RemoveCharacterFromPlotEventCommand().invoke(session, {
+        RemoveCharacterFromPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             characterCellId,
-        });
+        }).invoke(session);
 
         expect(charactersOfTheEvent(session)).toEqual(expected);
     });
@@ -64,11 +64,11 @@ describe("RemoveCharacterFromPlotEventCommand — takes a character out of one e
             THE_STORY,
             edited as never,
         );
-        new RemoveCharacterFromPlotEventCommand().invoke(session, {
+        RemoveCharacterFromPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             characterCellId: "v1",
-        });
+        }).invoke(session);
 
         edits[0].undo();
         const charactersUndone = charactersOfTheEvent(session);

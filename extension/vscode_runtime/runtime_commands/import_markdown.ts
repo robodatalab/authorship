@@ -1,15 +1,16 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { fromMarkdown } from "../markdown/exporter";
 
-export class ImportMarkdownCommand implements AuthorDocumentCommand {
-    readonly commandName = "importMarkdown";
-    readonly buttonGroup = "transfer";
-    readonly iconClassName = "aicon aicon-import-markdown";
-    readonly tooltip =
-        "Import Markdown — replace this session.document with an existing markdown manuscript";
+export const IMPORT_MARKDOWN = "importMarkdown";
+
+export class ImportMarkdownCommand implements RuntimeCommand {
+    static deserialize(): ImportMarkdownCommand {
+        const command = new ImportMarkdownCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         const chosenFiles = await vscode.window.showOpenDialog({

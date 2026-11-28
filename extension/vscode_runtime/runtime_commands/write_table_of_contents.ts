@@ -1,5 +1,5 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { type Document } from "authordoc/storydoc";
 import type { Cell } from "authordoc/cells/cell";
 import { ChapterCell } from "authordoc/cells/chapter_cell";
@@ -37,21 +37,23 @@ function linesOfTheContents(
     });
 }
 
-export class WriteTableOfContentsCommand implements AuthorDocumentCommand {
-    readonly commandName = "writeTableOfContents";
-    readonly buttonGroup = "run";
-    readonly iconClassName = "";
-    readonly tooltip = "";
-    readonly runsCellsOfKind = TABLE_OF_CONTENTS;
+export const WRITE_TABLE_OF_CONTENTS = "writeTableOfContents";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const cellId = commandArguments.cellId as string;
+export class WriteTableOfContentsCommand implements RuntimeCommand {
+    constructor(private readonly cellId: string) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): WriteTableOfContentsCommand {
+        const cellId = serialized.cellId as string;
+        const command = new WriteTableOfContentsCommand(cellId);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         const tableOfContents = tableOfContentsOf(session.document);
         session.changeTheDocument((story) => {
-            const cell = story.cellWithId(cellId);
+            const cell = story.cellWithId(this.cellId);
             if (!cell) {
                 return story;
             }

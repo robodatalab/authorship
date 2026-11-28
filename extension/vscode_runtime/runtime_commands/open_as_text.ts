@@ -1,13 +1,15 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class OpenAsTextCommand implements AuthorDocumentCommand {
-    readonly commandName = "openAsText";
-    readonly buttonGroup = "view";
-    readonly iconClassName = "codicon codicon-file-code";
-    readonly tooltip = "View Source — open the same file as plain text";
+export const OPEN_AS_TEXT = "openAsText";
+
+export class OpenAsTextCommand implements RuntimeCommand {
+    static deserialize(): OpenAsTextCommand {
+        const command = new OpenAsTextCommand();
+        return command;
+    }
 
     invoke(session: AuthorFileEditorSession): void {
         void vscode.commands.executeCommand(

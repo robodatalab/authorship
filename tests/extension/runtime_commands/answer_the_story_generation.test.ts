@@ -36,9 +36,9 @@ She saw the door at last.
 stage: concept titles: Review
 `);
 
-        await new AnswerTheStoryGenerationCommand().invoke(session, {
+        await AnswerTheStoryGenerationCommand.deserialize({
             verdict: "accept",
-        });
+        }).invoke(session);
 
         expect(files.get(STORY_FILE)).toBe(`<!-- cell: markdown id="c1" -->
 
@@ -64,9 +64,9 @@ stage: validity: False
         vi.stubGlobal("fetch", fetched);
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
-        await new AnswerTheStoryGenerationCommand().invoke(session, {
+        await AnswerTheStoryGenerationCommand.deserialize({
             verdict: "reject",
-        });
+        }).invoke(session);
 
         const [, started] = fetched.mock.calls[0];
         expect(JSON.parse(started.body)).toEqual({

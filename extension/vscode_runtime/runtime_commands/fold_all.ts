@@ -1,17 +1,20 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class FoldAllCommand implements AuthorDocumentCommand {
-    readonly buttonGroup = "all_cells";
-    readonly drawnWhenTheCellIsFolded: boolean;
+export const FOLD_ALL = "foldAll";
+export const UNFOLD_ALL = "unfoldAll";
 
-    constructor(
-        readonly commandName: string,
-        readonly iconClassName: string,
-        readonly tooltip: string,
-        private readonly folded: boolean,
-    ) {
-        this.drawnWhenTheCellIsFolded = !folded;
+export class FoldAllCommand implements RuntimeCommand {
+    constructor(private readonly folded: boolean) {}
+
+    static deserializeFoldAll(): FoldAllCommand {
+        const command = new FoldAllCommand(true);
+        return command;
+    }
+
+    static deserializeUnfoldAll(): FoldAllCommand {
+        const command = new FoldAllCommand(false);
+        return command;
     }
 
     invoke(session: AuthorFileEditorSession): void {

@@ -1,7 +1,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import type { SynchronizedRepresentation } from "authordoc/synchronizers/character_range_synchronizer";
 
@@ -16,12 +16,13 @@ interface CheckErrorsJob extends ServerJob {
     findings: ProseCheckError[];
 }
 
-export class CheckProseCommand implements AuthorDocumentCommand {
-    readonly commandName = "checkProse";
-    readonly buttonGroup = "check";
-    readonly iconClassName = "codicon codicon-checklist";
-    readonly tooltip =
-        "Check Prose — read the whole session.document for faults of usage and style";
+export const CHECK_PROSE = "checkProse";
+
+export class CheckProseCommand implements RuntimeCommand {
+    static deserialize(): CheckProseCommand {
+        const command = new CheckProseCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         try {

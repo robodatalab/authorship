@@ -568,14 +568,14 @@ describe("StoryGenerationWorkflow — watches the author review the suggestions 
     it("deletes a cell the stage proposed once its suggestion is rejected, and leaves a cell the stage only changed", async () => {
         const session = openStory(THE_STORY_AWAITING_REVIEW);
 
-        await new ReviewTheSuggestionCommand().invoke(session, {
+        await ReviewTheSuggestionCommand.deserialize({
             cellId: "k1",
             verdict: "reject",
-        });
-        await new ReviewTheSuggestionCommand().invoke(session, {
+        }).invoke(session);
+        await ReviewTheSuggestionCommand.deserialize({
             cellId: "c1",
             verdict: "reject",
-        });
+        }).invoke(session);
 
         expect(files.get(STORY_FILE)).toBe(`<!-- cell: markdown id="c1" -->
 

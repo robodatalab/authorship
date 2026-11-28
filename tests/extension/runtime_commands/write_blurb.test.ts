@@ -47,7 +47,7 @@ describe("WriteBlurbCommand — writes the blurb", () => {
         const session = openStory(A_STORY_WITH_A_BLURB_CELL);
         const asItStoodWhenAsked = session.document.text;
 
-        await new WriteBlurbCommand().invoke(session, { cellId: "b1" });
+        await WriteBlurbCommand.deserialize({ cellId: "b1" }).invoke(session);
 
         expect(files.get(STORY_FILE)).toBeUndefined();
         expect(asked[0].url).toContain("/generate/blurb");
@@ -103,7 +103,7 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
             });
         });
 
-        await new WriteBlurbCommand().invoke(session, { cellId: "b1" });
+        await WriteBlurbCommand.deserialize({ cellId: "b1" }).invoke(session);
 
         expect(session.document.cells[0].source).toBe(
             "A woman loses her name.",
@@ -118,7 +118,9 @@ describe("WriteBlurbCommand — while the author keeps working", () => {
         });
         const session = openStory(A_STORY_WITH_A_BLURB_CELL);
 
-        await new WriteBlurbCommand().invoke(session, { cellId: "nowhere" });
+        await WriteBlurbCommand.deserialize({ cellId: "nowhere" }).invoke(
+            session,
+        );
 
         expect(asked).toEqual([]);
     });

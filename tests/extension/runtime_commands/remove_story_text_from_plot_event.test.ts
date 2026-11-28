@@ -20,17 +20,17 @@ She saw the door.
 describe("RemoveStoryTextFromPlotEventCommand — leaves an event told by no story text", () => {
     it("takes the words away and keeps the event, and what was said of it", () => {
         const session = openStory(THE_STORY);
-        new ChangePlotEventCommand().invoke(session, {
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             field: "summary",
             said: "She finds it.",
-        });
+        }).invoke(session);
 
-        new RemoveStoryTextFromPlotEventCommand().invoke(session, {
+        RemoveStoryTextFromPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [new PlotNode("e1", null, "1.1", "h1", [], "She finds it.")],
@@ -41,10 +41,10 @@ describe("RemoveStoryTextFromPlotEventCommand — leaves an event told by no sto
         const session = openStory(THE_STORY);
         const plotBefore = session.document.cellWithId("p1");
 
-        new RemoveStoryTextFromPlotEventCommand().invoke(session, {
+        RemoveStoryTextFromPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e9",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toEqual(plotBefore);
     });

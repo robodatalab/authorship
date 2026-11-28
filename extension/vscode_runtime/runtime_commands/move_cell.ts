@@ -5,7 +5,7 @@ import {
     whereACellStands,
 } from "authordoc/story_sections";
 import type { Document } from "authordoc/storydoc";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
 export function moveTheSection(
     story: Document,
@@ -39,20 +39,24 @@ export function moveTheSection(
     return storyChanged;
 }
 
-export class MoveCellCommand implements AuthorDocumentCommand {
-    readonly commandName = "moveCell";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const MOVE_CELL = "moveCell";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const cellId = commandArguments.cellId as string;
-        const beforeCellId = commandArguments.beforeCellId as string | null;
+export class MoveCellCommand implements RuntimeCommand {
+    constructor(
+        private readonly cellId: string,
+        private readonly beforeCellId: string | null,
+    ) {}
+
+    static deserialize(serialized: Record<string, unknown>): MoveCellCommand {
+        const cellId = serialized.cellId as string;
+        const beforeCellId = serialized.beforeCellId as string | null;
+        const command = new MoveCellCommand(cellId, beforeCellId);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) =>
-            moveTheSection(story, cellId, beforeCellId),
+            moveTheSection(story, this.cellId, this.beforeCellId),
         );
     }
 }

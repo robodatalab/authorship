@@ -1,32 +1,33 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import type { ProseCheckError } from "./check_prose";
 
-export class FixProseCommand implements AuthorDocumentCommand {
-    readonly commandName = "fixProse";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const FIX_PROSE = "fixProse";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const error = commandArguments as unknown as ProseCheckError;
+export class FixProseCommand implements RuntimeCommand {
+    constructor(private readonly error: ProseCheckError) {}
+
+    static deserialize(serialized: Record<string, unknown>): FixProseCommand {
+        const error = serialized as unknown as ProseCheckError;
+        const command = new FixProseCommand(error);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const cell = story.cellWithId(error.cellId);
-            if (!cell || error.correctVersion === "") {
+            const cell = story.cellWithId(this.error.cellId);
+            if (!cell || this.error.correctVersion === "") {
                 return story;
             }
             const proseBefore = cell.source.slice(
                 0,
-                error.startCharacterOffsetInCell,
+                this.error.startCharacterOffsetInCell,
             );
             const proseAfter = cell.source.slice(
-                error.endCharacterOffsetInCell,
+                this.error.endCharacterOffsetInCell,
             );
             const proseFixed =
-                proseBefore + error.correctVersion + proseAfter;
+                proseBefore + this.error.correctVersion + proseAfter;
             const cellFixed = cell.withSource(proseFixed);
             const storyFixed = story.withCell(cellFixed);
             return storyFixed;

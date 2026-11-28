@@ -1,26 +1,36 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class RemoveReferenceFromSalientConceptCommand implements AuthorDocumentCommand {
-    readonly commandName = "removeReferenceFromSalientConcept";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const REMOVE_REFERENCE_FROM_SALIENT_CONCEPT =
+    "removeReferenceFromSalientConcept";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const annotationCellId = commandArguments.annotationCellId as string;
-        const referenceId = commandArguments.referenceId as string;
+export class RemoveReferenceFromSalientConceptCommand implements RuntimeCommand {
+    constructor(
+        private readonly annotationCellId: string,
+        private readonly referenceId: string,
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): RemoveReferenceFromSalientConceptCommand {
+        const annotationCellId = serialized.annotationCellId as string;
+        const referenceId = serialized.referenceId as string;
+        const command = new RemoveReferenceFromSalientConceptCommand(
+            annotationCellId,
+            referenceId,
+        );
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const annotation = story.cellWithId(annotationCellId);
+            const annotation = story.cellWithId(this.annotationCellId);
             if (!(annotation instanceof SalientConceptCell)) {
                 return story;
             }
             const referencesKept = annotation.references.filter(
-                (reference) => reference.referenceId !== referenceId,
+                (reference) => reference.referenceId !== this.referenceId,
             );
             const annotationKept = new SalientConceptCell(
                 annotation.title,

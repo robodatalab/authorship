@@ -7,10 +7,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("puts the new cell before the one it was asked to precede", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: "c2",
             cellKind: "note",
-        });
+        }).invoke(session);
 
         expect(session.document.cells.map((cell) => cell.kind)).toEqual([
             "chapter",
@@ -23,10 +23,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("starts it as a blank of its kind", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: "c2",
             cellKind: "chapter",
-        });
+        }).invoke(session);
 
         expect(session.document.cells[1]).toMatchObject({
             kind: "chapter",
@@ -38,10 +38,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("starts a salient concept untitled", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: "c2",
             cellKind: "salient-concept",
-        });
+        }).invoke(session);
 
         expect(session.document.cells[1]).toMatchObject({
             kind: "salient-concept",
@@ -53,10 +53,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("puts it at the end when it precedes no cell at all", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: null,
             cellKind: "note",
-        });
+        }).invoke(session);
 
         expect(session.document.cells[3].kind).toBe("note");
     });
@@ -64,10 +64,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("puts it at the top when it precedes the first cell", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: "c1",
             cellKind: "note",
-        });
+        }).invoke(session);
 
         expect(session.document.cells[0].kind).toBe("note");
     });
@@ -75,10 +75,10 @@ describe("InsertCellCommand — inserts a cell", () => {
     it("puts it at the end when it precedes a cell the document has not got", () => {
         const session = storyOfThreeCells();
 
-        new InsertCellCommand().invoke(session, {
+        InsertCellCommand.deserialize({
             beforeCellId: "nowhere",
             cellKind: "note",
-        });
+        }).invoke(session);
 
         expect(session.document.cells[3].kind).toBe("note");
     });

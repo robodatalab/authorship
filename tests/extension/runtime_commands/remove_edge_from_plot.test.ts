@@ -16,10 +16,10 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new RemoveEdgeFromPlotCommand().invoke(session, {
+        RemoveEdgeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             edgeId: "e1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [new PlotEdge("e2", "n3", "n1")],
@@ -41,10 +41,10 @@ A mother puts her child first.
 She finds the door.
 `);
 
-        new RemoveEdgeFromPlotCommand().invoke(session, {
+        RemoveEdgeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             edgeId: "e1",
-        });
+        }).invoke(session);
 
         const plot = session.document.cellWithId("p1") as PlotCell;
         const concepts = plot.concepts(session.document);

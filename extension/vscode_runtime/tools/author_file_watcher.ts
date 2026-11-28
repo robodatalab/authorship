@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import { TheFileChangedUnderneath } from "../author_file_editor_messages";
+import { ImportChangedFileCommand } from "../runtime_commands/import_changed_file";
 import type { VsCodeCommandExecutor } from "../vscode_command_executor";
 
 export function watchTheAuthorFileForChanges(
@@ -20,7 +20,7 @@ export function watchTheAuthorFileForChanges(
         if (savedText === session.document.text) {
             return;
         }
-        await commandExecutor.post(new TheFileChangedUnderneath(savedText));
+        await commandExecutor.post(new ImportChangedFileCommand(savedText));
     });
     return vscode.Disposable.from(changed, watcher);
 }

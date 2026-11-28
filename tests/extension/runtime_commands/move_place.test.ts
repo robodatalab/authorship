@@ -61,11 +61,11 @@ describe("MovePlaceCommand — moves a place within another", () => {
         ) => {
             const session = openStory(THE_STORY);
 
-            new MovePlaceCommand().invoke(session, {
+            MovePlaceCommand.deserialize({
                 placeCellId,
                 beforeCellId,
                 parentCellId,
-            });
+            }).invoke(session);
 
             const cellIds = session.document.cells.map((cell) => cell.uniqueId);
             const place = session.document.cellWithId(placeCellId) as PlaceCell;

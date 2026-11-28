@@ -1,7 +1,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import { RECAP, RecapCell } from "authordoc/cells/recap_cell";
 
@@ -16,19 +16,21 @@ function howFarAlong(section: WrittenSection): number {
         : section.progress.written / section.progress.chapters;
 }
 
-export class WriteStorySoFarCommand implements AuthorDocumentCommand {
-    readonly commandName = "writeStorySoFar";
-    readonly buttonGroup = "run";
-    readonly iconClassName = "";
-    readonly tooltip = "";
-    readonly runsCellsOfKind = RECAP;
+export const WRITE_STORY_SO_FAR = "writeStorySoFar";
 
-    async invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): Promise<void> {
-        const cellId = commandArguments.cellId as string;
-        const cell = session.document.cellWithId(cellId);
+export class WriteStorySoFarCommand implements RuntimeCommand {
+    constructor(private readonly cellId: string) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): WriteStorySoFarCommand {
+        const cellId = serialized.cellId as string;
+        const command = new WriteStorySoFarCommand(cellId);
+        return command;
+    }
+
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
+        const cell = session.document.cellWithId(this.cellId);
         if (!(cell instanceof RecapCell)) {
             return;
         }
@@ -44,7 +46,7 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
         }
 
         try {
-            session?.writingCell(cellId, 0);
+            session?.writingCell(this.cellId, 0);
             const jobId = await startServerJob("/generate/recap", {
                 path: session.document.path,
                 text: session.document.text,
@@ -53,10 +55,11 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
             const storySoFar = await awaitServerJob<WrittenSection>(
                 "/generate/recap/status",
                 jobId,
-                (written) => session?.writingCell(cellId, howFarAlong(written)),
+                (written) =>
+                    session?.writingCell(this.cellId, howFarAlong(written)),
             );
             session?.changeTheDocument((story) => {
-                const cell = story.cellWithId(cellId);
+                const cell = story.cellWithId(this.cellId);
                 if (!cell) {
                     return story;
                 }
@@ -69,7 +72,7 @@ export class WriteStorySoFarCommand implements AuthorDocumentCommand {
                 `Cannot write the story so far — is the server running? (${failure instanceof Error ? failure.message : String(failure)})`,
             );
         } finally {
-            session?.stopWritingCell(cellId);
+            session?.stopWritingCell(this.cellId);
         }
     }
 }

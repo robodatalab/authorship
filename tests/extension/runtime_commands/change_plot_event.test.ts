@@ -65,12 +65,12 @@ describe("ChangePlotEventCommand — says one thing of one event of a plot", () 
     ])("says its %s, and nothing else", (field, said, eventChanged) => {
         const session = openStory(THE_STORY);
 
-        new ChangePlotEventCommand().invoke(session, {
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             field,
             said,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -96,12 +96,12 @@ describe("ChangePlotEventCommand — says one thing of one event of a plot", () 
         (_, said) => {
             const session = openStory(THE_STORY);
 
-            new ChangePlotEventCommand().invoke(session, {
+            ChangePlotEventCommand.deserialize({
                 annotationCellId: "p1",
                 nodeId: "e1",
                 field: "place",
                 said,
-            });
+            }).invoke(session);
 
             expect(session.document.cellWithId("p1")).toMatchObject({
                 nodes: [
@@ -128,20 +128,19 @@ describe("ChangePlotEventCommand — says one thing of one event of a plot", () 
 
     it("keeps what was said of the event before, which the page may not have drawn yet", () => {
         const session = openStory(THE_STORY);
-        const command = new ChangePlotEventCommand();
 
-        command.invoke(session, {
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e2",
             field: "summary",
             said: "She opens it.",
-        });
-        command.invoke(session, {
+        }).invoke(session);
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e2",
             field: "timestamp",
             said: "1.3",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -165,12 +164,12 @@ describe("ChangePlotEventCommand — says one thing of one event of a plot", () 
         const session = openStory(THE_STORY);
         const plotBefore = session.document.cellWithId("p1");
 
-        new ChangePlotEventCommand().invoke(session, {
+        ChangePlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId,
             field,
             said: "red",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toEqual(plotBefore);
     });

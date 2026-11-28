@@ -2,31 +2,13 @@ import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "./author_file_editor_session";
 import {
-    TheAuthorAskedToSeeTheStoryWords,
-    TheAuthorIsEditingTheCell,
-    TheAuthorTypedInTheCell,
-    ThePageIsReady,
-} from "./author_file_editor_messages";
-import { authorDocumentCommand } from "./runtime_commands/author_document_commands";
-import { StoryWordRange } from "authordoc/cells/story_word_range";
-
-export interface AuthorFileEditorMessage {
-    invoke(session: AuthorFileEditorSession): void | Promise<void>;
-}
-
-export interface MessageReceivedFromWebview {
-    type?: string;
-    cellId?: string | null;
-    commandName?: string;
-    commandArguments?: Record<string, unknown>;
-    markdown?: string;
-    firstWord?: number;
-    lastWord?: number;
-}
+    deserializeRuntimeCommand,
+    type RuntimeCommand,
+} from "./runtime_commands/runtime_command";
 
 export class VsCodeCommandExecutor {
-    private theMessageBeforeThisOne: Promise<void> = Promise.resolve();
-    private messagesStillWaiting = 0;
+    private theCommandBeforeThisOne: Promise<void> = Promise.resolve();
+    private commandsStillWaiting = 0;
 
     constructor(
         private readonly session: AuthorFileEditorSession,
@@ -34,63 +16,33 @@ export class VsCodeCommandExecutor {
     ) {}
 
     executeMessageReceivedFromWebview(
-        message: MessageReceivedFromWebview,
+        serialized: Record<string, unknown>,
     ): void {
-        if (message?.type === "typed" && message.cellId) {
-            const typed = new TheAuthorTypedInTheCell(
-                message.cellId,
-                message.markdown ?? "",
-            );
-            void this.post(typed);
-        } else if (message?.type === "editing") {
-            const editing = new TheAuthorIsEditingTheCell(
-                message.cellId ?? null,
-            );
-            void this.post(editing);
-        } else if (
-            message?.type === "showStoryWordRange" &&
-            message.firstWord !== undefined &&
-            message.lastWord !== undefined
-        ) {
-            const storyWordRange = new StoryWordRange(
-                message.firstWord,
-                message.lastWord,
-            );
-            const storyWordsAskedFor = new TheAuthorAskedToSeeTheStoryWords(
-                storyWordRange,
-            );
-            void this.post(storyWordsAskedFor);
-        } else if (message?.type === "ready") {
-            this.session.sendCommandCards();
-            const pageReady = new ThePageIsReady();
-            void this.post(pageReady);
-        } else if (message?.type === "invoke" && message.commandName) {
-            const command = authorDocumentCommand(message.commandName);
-            void command?.invoke(this.session, message.commandArguments ?? {});
-        }
+        const command = deserializeRuntimeCommand(serialized);
+        void this.post(command);
     }
 
-    post(message: AuthorFileEditorMessage): Promise<void> {
-        this.messagesStillWaiting += 1;
+    post(command: RuntimeCommand): Promise<void> {
+        this.commandsStillWaiting += 1;
         this.log.debug(
-            `${message.constructor.name} joins the queue, ${this.messagesStillWaiting} waiting`,
+            `${command.constructor.name} joins the queue, ${this.commandsStillWaiting} waiting`,
         );
-        const invoked = this.theMessageBeforeThisOne.then(() =>
-            this.execute(message),
+        const invoked = this.theCommandBeforeThisOne.then(() =>
+            this.execute(command),
         );
-        this.theMessageBeforeThisOne = invoked.then(
+        this.theCommandBeforeThisOne = invoked.then(
             () => undefined,
             () => undefined,
         );
         return invoked;
     }
 
-    private async execute(message: AuthorFileEditorMessage): Promise<void> {
-        const name = message.constructor.name;
+    private async execute(command: RuntimeCommand): Promise<void> {
+        const name = command.constructor.name;
         const began = Date.now();
         this.log.debug(`${name} begins`);
         try {
-            await message.invoke(this.session);
+            await command.invoke(this.session);
             this.log.debug(`${name} ends after ${Date.now() - began}ms`);
         } catch (failure) {
             this.log.error(
@@ -99,7 +51,7 @@ export class VsCodeCommandExecutor {
             );
             throw failure;
         } finally {
-            this.messagesStillWaiting -= 1;
+            this.commandsStillWaiting -= 1;
         }
     }
 }

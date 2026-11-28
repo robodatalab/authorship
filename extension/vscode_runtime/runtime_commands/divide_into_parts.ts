@@ -1,15 +1,16 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { divideManuscript } from "../parts/divide_manuscript";
 
-export class DivideIntoPartsCommand implements AuthorDocumentCommand {
-    readonly commandName = "divideIntoParts";
-    readonly buttonGroup = "transfer";
-    readonly iconClassName = "aicon aicon-export-parts";
-    readonly tooltip =
-        "Divide into Parts — cut the story into part_1.author, part_2.author… beside it";
+export const DIVIDE_INTO_PARTS = "divideIntoParts";
+
+export class DivideIntoPartsCommand implements RuntimeCommand {
+    static deserialize(): DivideIntoPartsCommand {
+        const command = new DivideIntoPartsCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         const dividedManuscript = await divideManuscript(

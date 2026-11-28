@@ -8,7 +8,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import type { Document } from "authordoc/storydoc";
 import type { SynchronizedRepresentation } from "authordoc/synchronizers/character_range_synchronizer";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
 export interface AuthorFileEditorFindQuery {
     text: string;
@@ -26,38 +26,51 @@ export interface AuthorFileEditorFindMatch extends SynchronizedRepresentation {}
  */
 const SEPARATORS = "`~!@#$%^&*()-=+[{]}\\|;:'\",.<>/?";
 
-export class FindInTheDocumentCommand implements AuthorDocumentCommand {
-    readonly commandName = "findInTheDocument";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const FIND_IN_THE_DOCUMENT = "findInTheDocument";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const findMatches = findMatchesIn(
-            session.document,
-            commandArguments.query as AuthorFileEditorFindQuery,
-        );
+export class FindInTheDocumentCommand implements RuntimeCommand {
+    constructor(private readonly query: AuthorFileEditorFindQuery) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): FindInTheDocumentCommand {
+        const query = serialized.query as AuthorFileEditorFindQuery;
+        const command = new FindInTheDocumentCommand(query);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
+        const findMatches = findMatchesIn(session.document, this.query);
         session.showFindMatches(findMatches);
     }
 }
 
-export class ReplaceFindMatchesCommand implements AuthorDocumentCommand {
-    readonly commandName = "replaceFindMatches";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const REPLACE_FIND_MATCHES = "replaceFindMatches";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const query = commandArguments.query as AuthorFileEditorFindQuery;
-        const replacement = commandArguments.replacement as string;
+export class ReplaceFindMatchesCommand implements RuntimeCommand {
+    constructor(
+        private readonly query: AuthorFileEditorFindQuery,
+        private readonly replacement: string,
+        private readonly findMatches: AuthorFileEditorFindMatch[],
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): ReplaceFindMatchesCommand {
+        const query = serialized.query as AuthorFileEditorFindQuery;
+        const replacement = serialized.replacement as string;
         const findMatches =
-            commandArguments.findMatches as AuthorFileEditorFindMatch[];
+            serialized.findMatches as AuthorFileEditorFindMatch[];
+        const command = new ReplaceFindMatchesCommand(
+            query,
+            replacement,
+            findMatches,
+        );
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
+        const findMatches = this.findMatches;
         const findMatchesFromTheLast = [...findMatches].reverse();
         session.changeTheDocument((story) => {
             const cells = [...story.cells];
@@ -75,8 +88,8 @@ export class ReplaceFindMatchesCommand implements AuthorDocumentCommand {
                     findMatch.startCharacterOffsetInCell,
                     findMatch.endCharacterOffsetInCell,
                     findMatch.wordsInTheCell,
-                    query,
-                    replacement,
+                    this.query,
+                    this.replacement,
                 );
                 cells[cellIndex] = cell.withSource(proseReplaced);
             }

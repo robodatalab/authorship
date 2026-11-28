@@ -1,31 +1,44 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlotCell } from "authordoc/cells/plot_cell";
 import { CharacterCell } from "authordoc/cells/character_cell";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class AddCharacterToPlotCommand implements AuthorDocumentCommand {
-    readonly commandName = "addCharacterToPlot";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const ADD_CHARACTER_TO_PLOT = "addCharacterToPlot";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const annotationCellId = commandArguments.annotationCellId as string;
-        const characterCellId = commandArguments.characterCellId as string;
+export class AddCharacterToPlotCommand implements RuntimeCommand {
+    constructor(
+        private readonly annotationCellId: string,
+        private readonly characterCellId: string,
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): AddCharacterToPlotCommand {
+        const annotationCellId = serialized.annotationCellId as string;
+        const characterCellId = serialized.characterCellId as string;
+        const command = new AddCharacterToPlotCommand(
+            annotationCellId,
+            characterCellId,
+        );
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const plot = story.cellWithId(annotationCellId);
+            const plot = story.cellWithId(this.annotationCellId);
             if (!(plot instanceof PlotCell)) {
                 return story;
             }
-            const character = story.cellWithId(characterCellId);
+            const character = story.cellWithId(this.characterCellId);
             if (!(character instanceof CharacterCell)) {
                 return story;
             }
             const referenced = plot.characters(story);
-            if (referenced.some((cell) => cell.uniqueId === characterCellId)) {
+            if (
+                referenced.some(
+                    (cell) => cell.uniqueId === this.characterCellId,
+                )
+            ) {
                 return story;
             }
             const characters = [...referenced, character];

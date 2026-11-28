@@ -47,7 +47,7 @@ describe("MoveCellCommand — moves a cell to stand before another", () => {
     ])("%s", (_, cellId, beforeCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new MoveCellCommand().invoke(session, { cellId, beforeCellId });
+        MoveCellCommand.deserialize({ cellId, beforeCellId }).invoke(session);
 
         const cellIds = session.document.cells.map((cell) => cell.uniqueId);
         expect(cellIds).toEqual(expected);

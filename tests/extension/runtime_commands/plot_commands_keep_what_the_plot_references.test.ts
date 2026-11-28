@@ -5,7 +5,7 @@ import { AddEventToPlotCommand } from "../../../extension/vscode_runtime/runtime
 import { AssignStoryTextToPlotCommand } from "../../../extension/vscode_runtime/runtime_commands/assign_story_text_to_plot";
 import { RemoveEdgeFromPlotCommand } from "../../../extension/vscode_runtime/runtime_commands/remove_edge_from_plot";
 import { RemoveNodeFromPlotCommand } from "../../../extension/vscode_runtime/runtime_commands/remove_node_from_plot";
-import type { AuthorDocumentCommand } from "../../../extension/vscode_runtime/runtime_commands/author_document_command";
+import type { RuntimeCommand } from "../../../extension/vscode_runtime/runtime_commands/runtime_command";
 import type { PlotCell } from "authordoc/cells/plot_cell";
 import { openStory } from "./open_story";
 
@@ -29,40 +29,48 @@ describe("the commands that change a plot's events and edges", () => {
     it.each([
         [
             "adding an edge",
-            new AddEdgeToPlotCommand(),
-            { annotationCellId: "p1", fromNodeId: "e2", toNodeId: "e1" },
+            AddEdgeToPlotCommand.deserialize({
+                annotationCellId: "p1",
+                fromNodeId: "e2",
+                toNodeId: "e1",
+            }),
         ],
         [
             "adding an event",
-            new AddEventToPlotCommand(),
-            { annotationCellId: "p1", nodeId: "e3" },
+            AddEventToPlotCommand.deserialize({
+                annotationCellId: "p1",
+                nodeId: "e3",
+            }),
         ],
         [
             "telling an event with the words selected",
-            new AssignStoryTextToPlotCommand(),
-            {
+            AssignStoryTextToPlotCommand.deserialize({
                 annotationCellId: "p1",
                 cellId: "c1",
                 startCharacterOffsetInCell: 8,
                 endCharacterOffsetInCell: 17,
-            },
+            }),
         ],
         [
             "removing an edge",
-            new RemoveEdgeFromPlotCommand(),
-            { annotationCellId: "p1", edgeId: "x1" },
+            RemoveEdgeFromPlotCommand.deserialize({
+                annotationCellId: "p1",
+                edgeId: "x1",
+            }),
         ],
         [
             "removing an event",
-            new RemoveNodeFromPlotCommand(),
-            { annotationCellId: "p1", nodeId: "e2" },
+            RemoveNodeFromPlotCommand.deserialize({
+                annotationCellId: "p1",
+                nodeId: "e2",
+            }),
         ],
-    ] as [string, AuthorDocumentCommand, Record<string, unknown>][])(
+    ] as [string, RuntimeCommand][])(
         "keep the concepts and the characters the plot references when %s",
-        (_, command, commandArguments) => {
+        (_, command) => {
             const session = openStory(THE_STORY);
 
-            void command.invoke(session, commandArguments);
+            void command.invoke(session);
 
             const plot = session.document.cellWithId("p1") as PlotCell;
             expect([plot._concepts, plot._characters]).toEqual([

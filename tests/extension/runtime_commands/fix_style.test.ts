@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authorDocumentCommandCards } from "../../../extension/vscode_runtime/runtime_commands/author_document_commands";
+import { AUTHOR_FILE_EDITOR_COMMAND_CARDS } from "../../../extension/webview/author_editor/author_file_editor_command_cards";
 import { FixStyleCommand } from "../../../extension/vscode_runtime/runtime_commands/fix_style";
 import { shownMessages } from "../vscode";
 import { forgetWhatTheEditorDid, openStory, STORY_FILE } from "./open_story";
@@ -51,7 +51,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("FixStyleCommand — the pass over the whole manuscript", () => {
     it("is in the main menu as the sparkle", () => {
         expect(
-            authorDocumentCommandCards().find(
+            AUTHOR_FILE_EDITOR_COMMAND_CARDS.find(
                 (card) => card.commandName === "fixStyle",
             )?.iconClassName,
         ).toBe("codicon codicon-sparkle");

@@ -90,11 +90,11 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-            new MoveNodeInPlotCommand().invoke(session, {
+            MoveNodeInPlotCommand.deserialize({
                 annotationCellId: "p1",
                 nodeId,
                 inPlaceOfNodeId,
-            });
+            }).invoke(session);
 
             expect(session.document.cellWithId("p1")).toMatchObject({
                 nodes: nodesAfter,
@@ -113,11 +113,11 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new MoveNodeInPlotCommand().invoke(session, {
+        MoveNodeInPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "n1",
             inPlaceOfNodeId: "n3",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [

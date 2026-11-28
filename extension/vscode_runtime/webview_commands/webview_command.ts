@@ -3,10 +3,6 @@ import {
     SET_CELLS_BEING_WRITTEN,
     SetCellsBeingWrittenWebviewCommand,
 } from "./set_cells_being_written";
-import {
-    SET_COMMAND_CARDS,
-    SetCommandCardsWebviewCommand,
-} from "./set_command_cards";
 import { SET_ALL_CELLS, SetAllCellsWebviewCommand } from "./set_all_cells";
 import {
     SET_FIND_MATCHES,
@@ -45,7 +41,6 @@ const WEBVIEW_COMMAND_DESERIALIZERS = new Map<
 >([
     [SET_ALL_CELLS, SetAllCellsWebviewCommand.deserialize],
     [UPDATE_CELLS, UpdateCellsWebviewCommand.deserialize],
-    [SET_COMMAND_CARDS, SetCommandCardsWebviewCommand.deserialize],
     [SET_PROSE_ERRORS, SetProseErrorsWebviewCommand.deserialize],
     [SET_STORY_TEXT_SHOWN, SetStoryTextShownWebviewCommand.deserialize],
     [SET_FIND_MATCHES, SetFindMatchesWebviewCommand.deserialize],

@@ -1,19 +1,23 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
+
+export const ANSWER_THE_STORY_GENERATION = "answerTheStoryGeneration";
 
 // The author's answer to what the story generation asks, from the main menu: a
 // verdict, "accept" or "reject", and the story as the author leaves it.
-export class AnswerTheStoryGenerationCommand implements AuthorDocumentCommand {
-    readonly commandName = "answerTheStoryGeneration";
-    readonly buttonGroup = "generate";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export class AnswerTheStoryGenerationCommand implements RuntimeCommand {
+    constructor(private readonly verdict: string) {}
 
-    async invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): Promise<void> {
-        if (commandArguments.verdict === "accept") {
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): AnswerTheStoryGenerationCommand {
+        const verdict = serialized.verdict as string;
+        const command = new AnswerTheStoryGenerationCommand(verdict);
+        return command;
+    }
+
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
+        if (this.verdict === "accept") {
             await session.storyGenerationWorkflow.accept();
             return;
         }

@@ -21,10 +21,10 @@ describe("RemoveReferenceFromSalientConceptCommand — takes a reference out of 
     it("removes the reference it was asked to and keeps the others", () => {
         const session = storyWithTheDoor("r1:1-1, r2:2-3");
 
-        new RemoveReferenceFromSalientConceptCommand().invoke(session, {
+        RemoveReferenceFromSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             referenceId: "r2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -36,10 +36,10 @@ describe("RemoveReferenceFromSalientConceptCommand — takes a reference out of 
     it("keeps the references it was not asked to remove in the order they are written", () => {
         const session = storyWithTheDoor("r1:3-3, r2:1-1, r3:0-0");
 
-        new RemoveReferenceFromSalientConceptCommand().invoke(session, {
+        RemoveReferenceFromSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             referenceId: "r2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -52,10 +52,10 @@ describe("RemoveReferenceFromSalientConceptCommand — takes a reference out of 
     it("keeps a reference to the same words as the one it removes", () => {
         const session = storyWithTheDoor("r1:2-3, r2:2-3");
 
-        new RemoveReferenceFromSalientConceptCommand().invoke(session, {
+        RemoveReferenceFromSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             referenceId: "r2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -67,10 +67,10 @@ describe("RemoveReferenceFromSalientConceptCommand — takes a reference out of 
     it("leaves the concept without words once its last reference is removed", () => {
         const session = storyWithTheDoor("r1:2-3");
 
-        new RemoveReferenceFromSalientConceptCommand().invoke(session, {
+        RemoveReferenceFromSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             referenceId: "r1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [],

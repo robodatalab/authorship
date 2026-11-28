@@ -19,11 +19,11 @@ She finds the door.
             "3f1c0e2a-0000-4000-8000-000000000001",
         );
 
-        new AddEdgeToPlotCommand().invoke(session, {
+        AddEdgeToPlotCommand.deserialize({
             annotationCellId: "p1",
             fromNodeId: "n2",
             toNodeId: "n1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [
@@ -47,11 +47,11 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new AddEdgeToPlotCommand().invoke(session, {
+        AddEdgeToPlotCommand.deserialize({
             annotationCellId: "p1",
             fromNodeId: "n1",
             toNodeId: "n2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [new PlotEdge("e1", "n1", "n2")],
@@ -72,11 +72,11 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new AddEdgeToPlotCommand().invoke(session, {
+        AddEdgeToPlotCommand.deserialize({
             annotationCellId: "p1",
             fromNodeId: "n1",
             toNodeId,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             edges: [],
@@ -98,11 +98,11 @@ A mother puts her child first.
 She finds the door.
 `);
 
-        new AddEdgeToPlotCommand().invoke(session, {
+        AddEdgeToPlotCommand.deserialize({
             annotationCellId: "p1",
             fromNodeId: "n2",
             toNodeId: "n1",
-        });
+        }).invoke(session);
 
         const plot = session.document.cellWithId("p1") as PlotCell;
         const concepts = plot.concepts(session.document);

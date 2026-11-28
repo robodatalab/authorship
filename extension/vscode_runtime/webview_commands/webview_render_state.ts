@@ -1,4 +1,5 @@
 import type { WebviewAuthorDocumentCommandCard } from "../../webview/author_editor/AuthorFileEditorCanvas";
+import { AUTHOR_FILE_EDITOR_COMMAND_CARDS } from "../../webview/author_editor/author_file_editor_command_cards";
 import type { ProseCheckError } from "../runtime_commands/check_prose";
 import type { AuthorFileEditorFindMatch } from "../runtime_commands/find_in_the_document";
 import type { StoryGeneration } from "../story_generation/story_generation";
@@ -9,7 +10,8 @@ import type { Suggestion } from "authordoc/suggestion";
 export class WebviewRenderState {
     readonly cells: Cell[] = [];
     readonly timesTheHostWroteEachCell: Record<string, number> = {};
-    readonly commands: WebviewAuthorDocumentCommandCard[] = [];
+    readonly commands: WebviewAuthorDocumentCommandCard[] =
+        AUTHOR_FILE_EDITOR_COMMAND_CARDS;
     readonly proseErrors: ProseCheckError[] = [];
     readonly storyTextShown: StoryTextSpan | null = null;
     readonly findMatches: AuthorFileEditorFindMatch[] = [];

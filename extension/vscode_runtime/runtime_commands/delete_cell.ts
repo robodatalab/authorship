@@ -12,7 +12,7 @@ import {
     whereACellStands,
     type CellsInASection,
 } from "authordoc/story_sections";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
 const EVERYTHING_UNDER_IT = "Delete All";
 const THE_CELL_ALONE = "Only This One";
@@ -37,20 +37,21 @@ async function theAuthorWantsTheWholeSectionGone(
     return answer === undefined ? undefined : answer === EVERYTHING_UNDER_IT;
 }
 
-export class DeleteCellCommand implements AuthorDocumentCommand {
-    readonly commandName = "deleteCell";
-    readonly buttonGroup = "cell";
-    readonly iconClassName = "codicon codicon-trash";
-    readonly tooltip = "Delete this section";
+export const DELETE_CELL = "deleteCell";
 
-    async invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): Promise<void> {
-        const cellId = commandArguments.cellId as string;
+export class DeleteCellCommand implements RuntimeCommand {
+    constructor(private readonly cellId: string) {}
+
+    static deserialize(serialized: Record<string, unknown>): DeleteCellCommand {
+        const cellId = serialized.cellId as string;
+        const command = new DeleteCellCommand(cellId);
+        return command;
+    }
+
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
         const standing = whereACellStands(
             cellsBySection(session.documentAsSuggested.cells),
-            cellId,
+            this.cellId,
         );
         if (!standing) {
             return;
@@ -59,7 +60,7 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
         if (standing.section.within.length === 0) {
             session?.changeTheDocument((story) => {
                 const cellsKept = story.cells.filter(
-                    (cell) => cell.uniqueId !== cellId,
+                    (cell) => cell.uniqueId !== this.cellId,
                 );
                 const storyKept = story.withCells(cellsKept);
                 return storyKept;
@@ -74,13 +75,13 @@ export class DeleteCellCommand implements AuthorDocumentCommand {
         }
         if (withEverythingUnderIt) {
             session?.changeTheDocument((story) =>
-                removeTheSection(story, cellId),
+                removeTheSection(story, this.cellId),
             );
             return;
         }
         session?.changeTheDocument((story) => {
             const cellsKept = story.cells.filter(
-                (cell) => cell.uniqueId !== cellId,
+                (cell) => cell.uniqueId !== this.cellId,
             );
             const storyKept = story.withCells(cellsKept);
             return storyKept;

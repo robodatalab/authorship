@@ -1,20 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { FoldAllCommand } from "../../../extension/vscode_runtime/runtime_commands/fold_all";
+import { AUTHOR_FILE_EDITOR_COMMAND_CARDS } from "../../../extension/webview/author_editor/author_file_editor_command_cards";
 import { openStory, storyOfThreeCells } from "./open_story";
 
-const FOLD_ALL = new FoldAllCommand(
-    "foldAll",
-    "codicon codicon-collapse-all",
-    "Fold every section away",
-    true,
-);
-const UNFOLD_ALL = new FoldAllCommand(
-    "unfoldAll",
-    "codicon codicon-expand-all",
-    "Unfold every section",
-    false,
-);
+const FOLD_ALL = new FoldAllCommand(true);
+const UNFOLD_ALL = new FoldAllCommand(false);
 
 describe("FoldAllCommand — folds and unfolds the whole document", () => {
     it("folds every cell away", () => {
@@ -63,10 +54,18 @@ describe("FoldAllCommand — folds and unfolds the whole document", () => {
 
 describe("FoldAllCommand — which of the two is drawn", () => {
     it("offers to fold a cell that is not folded", () => {
-        expect(FOLD_ALL.drawnWhenTheCellIsFolded).toBe(false);
+        expect(
+            AUTHOR_FILE_EDITOR_COMMAND_CARDS.find(
+                (card) => card.commandName === "foldAll",
+            )?.drawnWhenTheCellIsFolded,
+        ).toBe(false);
     });
 
     it("offers to unfold a cell that is folded", () => {
-        expect(UNFOLD_ALL.drawnWhenTheCellIsFolded).toBe(true);
+        expect(
+            AUTHOR_FILE_EDITOR_COMMAND_CARDS.find(
+                (card) => card.commandName === "unfoldAll",
+            )?.drawnWhenTheCellIsFolded,
+        ).toBe(true);
     });
 });

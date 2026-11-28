@@ -20,12 +20,12 @@ She finds the door.
             "3f1c0e2a-0000-4000-8000-000000000001",
         );
 
-        new AssignStoryTextToPlotCommand().invoke(session, {
+        AssignStoryTextToPlotCommand.deserialize({
             annotationCellId: "p1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -48,12 +48,12 @@ She saw the door.
 She finds the door.
 `);
 
-        new AssignStoryTextToPlotCommand().invoke(session, {
+        AssignStoryTextToPlotCommand.deserialize({
             annotationCellId: "p1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [new PlotNode("n1", new StoryWordRange(1, 3))],
@@ -71,12 +71,12 @@ She saw the door.
 She finds the door.
 `);
 
-        new AssignStoryTextToPlotCommand().invoke(session, {
+        AssignStoryTextToPlotCommand.deserialize({
             annotationCellId: "p1",
             cellId: "c1",
             startCharacterOffsetInCell: 3,
             endCharacterOffsetInCell: 4,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [],
@@ -98,12 +98,12 @@ A mother puts her child first.
 She finds the door.
 `);
 
-        new AssignStoryTextToPlotCommand().invoke(session, {
+        AssignStoryTextToPlotCommand.deserialize({
             annotationCellId: "p1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         const plot = session.document.cellWithId("p1") as PlotCell;
         const concepts = plot.concepts(session.document);

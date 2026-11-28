@@ -63,10 +63,10 @@ He heard the bell.
     ])("%s", async (_, verdict, expected) => {
         const session = openStory(THE_STORY_WITH_TWO_SUGGESTIONS);
 
-        await new ReviewTheSuggestionCommand().invoke(session, {
+        await ReviewTheSuggestionCommand.deserialize({
             cellId: "c1",
             verdict,
-        });
+        }).invoke(session);
 
         expect(files.get(STORY_FILE)).toBe(expected);
     });
@@ -74,10 +74,10 @@ He heard the bell.
     it("tells the page the suggestions left", async () => {
         const session = openStory(THE_STORY_WITH_TWO_SUGGESTIONS);
 
-        await new ReviewTheSuggestionCommand().invoke(session, {
+        await ReviewTheSuggestionCommand.deserialize({
             cellId: "c1",
             verdict: "reject",
-        });
+        }).invoke(session);
 
         expect(sentToThePage).toContainEqual({
             type: "setSuggestions",
@@ -89,10 +89,10 @@ He heard the bell.
     it("sends the page the cell as it stands once its suggestion is rejected", async () => {
         const session = openStory(THE_STORY_WITH_TWO_SUGGESTIONS);
 
-        await new ReviewTheSuggestionCommand().invoke(session, {
+        await ReviewTheSuggestionCommand.deserialize({
             cellId: "c1",
             verdict: "reject",
-        });
+        }).invoke(session);
 
         expect(sentToThePage).toContainEqual({
             type: "updateCells",

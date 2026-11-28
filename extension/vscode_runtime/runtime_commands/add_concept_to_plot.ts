@@ -1,31 +1,42 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlotCell } from "authordoc/cells/plot_cell";
 import { SalientConceptCell } from "authordoc/cells/salient_concept_cell";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class AddConceptToPlotCommand implements AuthorDocumentCommand {
-    readonly commandName = "addConceptToPlot";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const ADD_CONCEPT_TO_PLOT = "addConceptToPlot";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const annotationCellId = commandArguments.annotationCellId as string;
-        const conceptCellId = commandArguments.conceptCellId as string;
+export class AddConceptToPlotCommand implements RuntimeCommand {
+    constructor(
+        private readonly annotationCellId: string,
+        private readonly conceptCellId: string,
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): AddConceptToPlotCommand {
+        const annotationCellId = serialized.annotationCellId as string;
+        const conceptCellId = serialized.conceptCellId as string;
+        const command = new AddConceptToPlotCommand(
+            annotationCellId,
+            conceptCellId,
+        );
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const plot = story.cellWithId(annotationCellId);
+            const plot = story.cellWithId(this.annotationCellId);
             if (!(plot instanceof PlotCell)) {
                 return story;
             }
-            const concept = story.cellWithId(conceptCellId);
+            const concept = story.cellWithId(this.conceptCellId);
             if (!(concept instanceof SalientConceptCell)) {
                 return story;
             }
             const referenced = plot.concepts(story);
-            if (referenced.some((cell) => cell.uniqueId === conceptCellId)) {
+            if (
+                referenced.some((cell) => cell.uniqueId === this.conceptCellId)
+            ) {
                 return story;
             }
             const concepts = [...referenced, concept];

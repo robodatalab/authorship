@@ -34,10 +34,10 @@ describe("AddConceptToCharacterCommand — has a character support a salient con
     ])("supports the concept %s", (_, conceptCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new AddConceptToCharacterCommand().invoke(session, {
+        AddConceptToCharacterCommand.deserialize({
             characterCellId: "v1",
             conceptCellId,
-        });
+        }).invoke(session);
 
         expect(conceptsOfTheCharacter(session)).toEqual(expected);
     });

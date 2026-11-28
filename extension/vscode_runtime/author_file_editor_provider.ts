@@ -7,17 +7,12 @@ import {
     openAuthorFileEditorSession,
     type AuthorFileEditorSession,
 } from "./author_file_editor_session";
-import {
-    ReadTheDocumentBackFromItsFile,
-    WriteTheDocumentTo,
-    WriteTheDocumentToItsFile,
-} from "./author_file_editor_messages";
-import {
-    VsCodeCommandExecutor,
-    type MessageReceivedFromWebview,
-} from "./vscode_command_executor";
+import { RevertDocumentCommand } from "./runtime_commands/revert_document";
+import { SaveDocumentCommand } from "./runtime_commands/save_document";
+import { SaveDocumentAsCommand } from "./runtime_commands/save_document_as";
+import { VsCodeCommandExecutor } from "./vscode_command_executor";
 import { loadTemplates, watchSettings } from "./settings/file";
-import { watchTheAuthorFileForChanges } from "./author_file_watcher";
+import { watchTheAuthorFileForChanges } from "./tools/author_file_watcher";
 import { useTemplates } from "./settings/model";
 
 export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<AuthorFileEditorSession> {
@@ -83,16 +78,8 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
         const templatesWatcher = watchSettings(session.uri, readTemplates);
 
         const onMessageFromWebView = panel.webview.onDidReceiveMessage(
-            (message: MessageReceivedFromWebview) => {
+            (message: Record<string, unknown>) => {
                 commandExecutor.executeMessageReceivedFromWebview(message);
-            },
-        );
-
-        const settingsChanged = vscode.workspace.onDidChangeConfiguration(
-            (changed) => {
-                if (changed.affectsConfiguration("authorship")) {
-                    session.sendCommandCards();
-                }
             },
         );
 
@@ -103,7 +90,6 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
 
         panel.onDidDispose(() => {
             templatesWatcher.dispose();
-            settingsChanged.dispose();
             watchingTheFile.dispose();
             onMessageFromWebView.dispose();
             this.commandExecutors.delete(session.uri.toString());
@@ -113,7 +99,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     async saveCustomDocument(session: AuthorFileEditorSession): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new WriteTheDocumentToItsFile());
+            ?.post(new SaveDocumentCommand());
     }
 
     async saveCustomDocumentAs(
@@ -122,7 +108,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new WriteTheDocumentTo(destination));
+            ?.post(new SaveDocumentAsCommand(destination));
     }
 
     async revertCustomDocument(
@@ -130,7 +116,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new ReadTheDocumentBackFromItsFile());
+            ?.post(new RevertDocumentCommand());
     }
 
     async backupCustomDocument(
@@ -139,7 +125,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<vscode.CustomDocumentBackup> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new WriteTheDocumentTo(context.destination));
+            ?.post(new SaveDocumentAsCommand(context.destination));
         return {
             id: context.destination.toString(),
             delete: () =>

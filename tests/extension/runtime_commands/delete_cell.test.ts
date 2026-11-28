@@ -30,20 +30,22 @@ beforeEach(forgetWhatTheEditorDid);
 describe("DeleteCellCommand — deletes a cell", () => {
     it("takes out the cell it is given and leaves the rest where they were", async () => {
         const session = storyOfThreeCells();
-        await new DeleteCellCommand().invoke(session, { cellId: "c2" });
+        await DeleteCellCommand.deserialize({ cellId: "c2" }).invoke(session);
         expect(cellIds(session)).toEqual(["c1", "c3"]);
     });
 
     it("leaves the document alone when there is no cell at that index", async () => {
         const session = storyOfThreeCells();
-        await new DeleteCellCommand().invoke(session, { cellId: "nowhere" });
+        await DeleteCellCommand.deserialize({ cellId: "nowhere" }).invoke(
+            session,
+        );
         expect(cellIds(session)).toEqual(["c1", "c2", "c3"]);
     });
 
     it("asks nothing about a section holding nothing", async () => {
         const session = openStory(A_STORY_IN_A_PART);
 
-        await new DeleteCellCommand().invoke(session, { cellId: "c2" });
+        await DeleteCellCommand.deserialize({ cellId: "c2" }).invoke(session);
 
         expect(shownMessages).toEqual([]);
         expect(cellIds(session)).toEqual(["p1", "c1", "m1"]);
@@ -54,7 +56,7 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
     it("asks the author what is to go with it", async () => {
         const session = openStory(A_STORY_IN_A_PART);
 
-        await new DeleteCellCommand().invoke(session, { cellId: "c1" });
+        await DeleteCellCommand.deserialize({ cellId: "c1" }).invoke(session);
 
         expect(shownMessages[0]).toBe(
             "Delete “The Door” and the 1 section under it?",
@@ -64,7 +66,7 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
     it("counts everything under it, however deep it stands", async () => {
         const session = openStory(A_STORY_IN_A_PART);
 
-        await new DeleteCellCommand().invoke(session, { cellId: "p1" });
+        await DeleteCellCommand.deserialize({ cellId: "p1" }).invoke(session);
 
         expect(shownMessages[0]).toBe(
             "Delete “Book One” and the 3 sections under it?",
@@ -75,7 +77,7 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
         const session = openStory(A_STORY_IN_A_PART);
         dialogs.answerToTheWarning = "Delete All";
 
-        await new DeleteCellCommand().invoke(session, { cellId: "c1" });
+        await DeleteCellCommand.deserialize({ cellId: "c1" }).invoke(session);
 
         expect(cellIds(session)).toEqual(["p1", "c2"]);
     });
@@ -84,7 +86,7 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
         const session = openStory(A_STORY_IN_A_PART);
         dialogs.answerToTheWarning = "Only This One";
 
-        await new DeleteCellCommand().invoke(session, { cellId: "c1" });
+        await DeleteCellCommand.deserialize({ cellId: "c1" }).invoke(session);
 
         expect(cellIds(session)).toEqual(["p1", "m1", "c2"]);
     });
@@ -92,7 +94,7 @@ describe("DeleteCellCommand — deletes a section that holds other cells", () =>
     it("deletes nothing when the author answers neither", async () => {
         const session = openStory(A_STORY_IN_A_PART);
 
-        await new DeleteCellCommand().invoke(session, { cellId: "p1" });
+        await DeleteCellCommand.deserialize({ cellId: "p1" }).invoke(session);
 
         expect(cellIds(session)).toEqual(["p1", "c1", "m1", "c2"]);
     });
@@ -106,7 +108,7 @@ describe("DeleteCellCommand — deletes a cell with a suggestion", () => {
                 '<!-- suggestion: id="c2" -->\n<!-- change: text from="16" removed="" written=" at last" -->\n',
         );
 
-        await new DeleteCellCommand().invoke(session, { cellId: "c2" });
+        await DeleteCellCommand.deserialize({ cellId: "c2" }).invoke(session);
 
         expect(session.document.serialize()).toBe(
             '<!-- cell: chapter id="c1" title="One" -->\n',

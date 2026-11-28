@@ -19,10 +19,10 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new RemoveNodeFromPlotCommand().invoke(session, {
+        RemoveNodeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "n2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -44,10 +44,10 @@ She saw the door. He heard the bell.
 She finds the door.
 `);
 
-        new RemoveNodeFromPlotCommand().invoke(session, {
+        RemoveNodeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "n2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [new PlotNode("n1", new StoryWordRange(2, 3))],
@@ -70,10 +70,10 @@ She finds the door.
 `,
             edited as never,
         );
-        new RemoveNodeFromPlotCommand().invoke(session, {
+        RemoveNodeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "n2",
-        });
+        }).invoke(session);
 
         edits[0].undo();
 
@@ -100,10 +100,10 @@ A mother puts her child first.
 She finds the door.
 `);
 
-        new RemoveNodeFromPlotCommand().invoke(session, {
+        RemoveNodeFromPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "n2",
-        });
+        }).invoke(session);
 
         const plot = session.document.cellWithId("p1") as PlotCell;
         const concepts = plot.concepts(session.document);

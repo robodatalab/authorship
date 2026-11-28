@@ -21,10 +21,10 @@ describe("AddEventToPlotCommand — adds an event no story text tells yet", () =
     it("adds it, with the id it is given, at the end of the trajectory", () => {
         const session = openStory(THE_STORY);
 
-        new AddEventToPlotCommand().invoke(session, {
+        AddEventToPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e2",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -45,10 +45,10 @@ describe("AddEventToPlotCommand — adds an event no story text tells yet", () =
         const session = openStory(THE_STORY);
         const plotBefore = session.document.cellWithId("p1");
 
-        new AddEventToPlotCommand().invoke(session, {
+        AddEventToPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toEqual(plotBefore);
     });
@@ -68,10 +68,10 @@ A mother puts her child first.
 She finds the door.
 `);
 
-        new AddEventToPlotCommand().invoke(session, {
+        AddEventToPlotCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e2",
-        });
+        }).invoke(session);
 
         const plot = session.document.cellWithId("p1") as PlotCell;
         const concepts = plot.concepts(session.document);

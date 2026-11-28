@@ -36,10 +36,10 @@ describe("RemoveConceptFromCharacterCommand — has a character stop supporting 
     ])("stops supporting %s", (_, conceptCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new RemoveConceptFromCharacterCommand().invoke(session, {
+        RemoveConceptFromCharacterCommand.deserialize({
             characterCellId: "v1",
             conceptCellId,
-        });
+        }).invoke(session);
 
         expect(conceptsOfTheCharacter(session)).toEqual(expected);
     });

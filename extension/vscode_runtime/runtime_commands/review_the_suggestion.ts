@@ -1,21 +1,28 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class ReviewTheSuggestionCommand implements AuthorDocumentCommand {
-    readonly commandName = "reviewTheSuggestion";
-    readonly buttonGroup = "suggestion";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const REVIEW_THE_SUGGESTION = "reviewTheSuggestion";
 
-    async invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): Promise<void> {
-        const cellId = commandArguments.cellId as string;
-        if (commandArguments.verdict === "accept") {
-            session.acceptTheSuggestion(cellId);
+export class ReviewTheSuggestionCommand implements RuntimeCommand {
+    constructor(
+        private readonly cellId: string,
+        private readonly verdict: string,
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): ReviewTheSuggestionCommand {
+        const cellId = serialized.cellId as string;
+        const verdict = serialized.verdict as string;
+        const command = new ReviewTheSuggestionCommand(cellId, verdict);
+        return command;
+    }
+
+    async invoke(session: AuthorFileEditorSession): Promise<void> {
+        if (this.verdict === "accept") {
+            session.acceptTheSuggestion(this.cellId);
         } else {
-            session.rejectTheSuggestion(cellId);
+            session.rejectTheSuggestion(this.cellId);
         }
         await session.writeTheDocumentToItsFile();
     }

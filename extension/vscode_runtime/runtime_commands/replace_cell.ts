@@ -1,19 +1,22 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { parse } from "authordoc/parser";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class ReplaceCellCommand implements AuthorDocumentCommand {
-    readonly commandName = "replaceCell";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const REPLACE_CELL = "replaceCell";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const written = commandArguments.cell as string;
-        const [cellReplacing] = parse(written);
+export class ReplaceCellCommand implements RuntimeCommand {
+    constructor(private readonly cell: string) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): ReplaceCellCommand {
+        const cell = serialized.cell as string;
+        const command = new ReplaceCellCommand(cell);
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
+        const [cellReplacing] = parse(this.cell);
         session.changeTheDocument((story) => {
             const storyChanged = story.withCell(cellReplacing);
             return storyChanged;

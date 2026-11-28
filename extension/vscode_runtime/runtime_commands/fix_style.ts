@@ -1,7 +1,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import { awaitServerJob, startServerJob, type ServerJob } from "../server/jobs";
 import { MARKDOWN } from "authordoc/cells/markdown_cell";
 
@@ -64,12 +64,13 @@ function sayWhichSectionsWereLeftAlone(leftAlone: SectionLeftAlone[]): void {
     );
 }
 
-export class FixStyleCommand implements AuthorDocumentCommand {
-    readonly commandName = "fixStyle";
-    readonly buttonGroup = "check";
-    readonly iconClassName = "codicon codicon-sparkle";
-    readonly tooltip =
-        "Fix Style and Grammar — send every section to be copy-edited";
+export const FIX_STYLE = "fixStyle";
+
+export class FixStyleCommand implements RuntimeCommand {
+    static deserialize(): FixStyleCommand {
+        const command = new FixStyleCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         try {

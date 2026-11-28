@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authorDocumentCommandThatRunsCellsOfKind } from "../../../extension/vscode_runtime/runtime_commands/author_document_commands";
 import { RunAllCommand } from "../../../extension/vscode_runtime/runtime_commands/run_all";
 import { BlurbCell } from "authordoc/cells/blurb_cell";
 import { forgetWhatTheEditorDid, openStory } from "./open_story";
@@ -62,9 +61,7 @@ describe("RunAllCommand — runs every cell that writes itself", () => {
             A_STORY_OF_TWO_BLURBS_AND_A_TABLE_OF_CONTENTS,
         );
 
-        await new RunAllCommand(
-            authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(session);
+        await new RunAllCommand().invoke(session);
 
         expect(blurbsAsked(asked)).toBe(2);
         expect(session.document.cellWithId("b1")?.source).toBe(
@@ -85,9 +82,7 @@ describe("RunAllCommand — runs every cell that writes itself", () => {
             '<!-- cell: markdown id="c1" -->\n\nShe saw the door.\n',
         );
 
-        await new RunAllCommand(
-            authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(session);
+        await new RunAllCommand().invoke(session);
 
         expect(asked).toEqual([]);
     });
@@ -111,9 +106,7 @@ describe("RunAllCommand — while it runs", () => {
             }),
         );
 
-        await new RunAllCommand(
-            authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(session);
+        await new RunAllCommand().invoke(session);
 
         expect(blurbsAsked(asked)).toBe(2);
         expect(session.document.cellWithId("b3")?.source).toBe("");
@@ -133,9 +126,7 @@ describe("RunAllCommand — while it runs", () => {
             }),
         );
 
-        await new RunAllCommand(
-            authorDocumentCommandThatRunsCellsOfKind,
-        ).invoke(session);
+        await new RunAllCommand().invoke(session);
 
         expect(blurbsAsked(asked)).toBe(1);
         expect(session.document.cellWithId("b2")).toBeUndefined();

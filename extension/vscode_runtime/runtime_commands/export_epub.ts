@@ -1,7 +1,7 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import * as vscode from "vscode";
 
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 import {
     askedBeforeBinding,
     cellsWithMissingCellsAppended,
@@ -18,12 +18,13 @@ function whatWentWrong(failure: unknown): string {
     return failure instanceof Error ? failure.message : String(failure);
 }
 
-export class ExportEpubCommand implements AuthorDocumentCommand {
-    readonly commandName = "exportEpub";
-    readonly buttonGroup = "transfer";
-    readonly iconClassName = "aicon aicon-export-epub";
-    readonly tooltip =
-        "Export EPUB — build the book beside this session.document";
+export const EXPORT_EPUB = "exportEpub";
+
+export class ExportEpubCommand implements RuntimeCommand {
+    static deserialize(): ExportEpubCommand {
+        const command = new ExportEpubCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         await this.bindTheBook(session, false);

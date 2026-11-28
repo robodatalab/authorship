@@ -22,13 +22,13 @@ describe("AssignStoryTextToPlotEventCommand — makes the selected words the sto
     it("gives an event the story does not tell yet every word the selection touches", () => {
         const session = openStory(THE_STORY);
 
-        new AssignStoryTextToPlotEventCommand().invoke(session, {
+        AssignStoryTextToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -55,13 +55,13 @@ describe("AssignStoryTextToPlotEventCommand — makes the selected words the sto
     it("puts the words selected in place of the ones that told the event", () => {
         const session = openStory(THE_STORY);
 
-        new AssignStoryTextToPlotEventCommand().invoke(session, {
+        AssignStoryTextToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e2",
             cellId: "c1",
             startCharacterOffsetInCell: 8,
             endCharacterOffsetInCell: 17,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toMatchObject({
             nodes: [
@@ -92,13 +92,13 @@ describe("AssignStoryTextToPlotEventCommand — makes the selected words the sto
         const session = openStory(THE_STORY);
         const plotBefore = session.document.cellWithId("p1");
 
-        new AssignStoryTextToPlotEventCommand().invoke(session, {
+        AssignStoryTextToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId,
             cellId: "c1",
             startCharacterOffsetInCell: start,
             endCharacterOffsetInCell: end,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toEqual(plotBefore);
     });

@@ -33,10 +33,10 @@ describe("RemoveConceptFromPlotCommand — makes a plot stop referencing a salie
     it("stops referencing the concept it was asked to, and keeps the others", () => {
         const session = openStory(THE_STORY);
 
-        new RemoveConceptFromPlotCommand().invoke(session, {
+        RemoveConceptFromPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "k1",
-        });
+        }).invoke(session);
 
         expect(conceptsOfThePlot(session)).toEqual(["The promise"]);
     });
@@ -53,10 +53,10 @@ describe("RemoveConceptFromPlotCommand — makes a plot stop referencing a salie
             THE_STORY,
             edited as never,
         );
-        new RemoveConceptFromPlotCommand().invoke(session, {
+        RemoveConceptFromPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "k1",
-        });
+        }).invoke(session);
 
         edits[0].undo();
         const conceptsUndone = conceptsOfThePlot(session);

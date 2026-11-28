@@ -24,12 +24,12 @@ describe("AssignStoryTextToSalientConceptCommand — assigns the selected words 
             "3f1c0e2a-0000-4000-8000-000000000001",
         );
 
-        new AssignStoryTextToSalientConceptCommand().invoke(session, {
+        AssignStoryTextToSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -47,12 +47,12 @@ describe("AssignStoryTextToSalientConceptCommand — assigns the selected words 
             "3f1c0e2a-0000-4000-8000-000000000001",
         );
 
-        new AssignStoryTextToSalientConceptCommand().invoke(session, {
+        AssignStoryTextToSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -68,12 +68,12 @@ describe("AssignStoryTextToSalientConceptCommand — assigns the selected words 
     it("leaves the words as they are when they are assigned already", () => {
         const session = storyWithTheDoor('words="r1:1-3"');
 
-        new AssignStoryTextToSalientConceptCommand().invoke(session, {
+        AssignStoryTextToSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 5,
             endCharacterOffsetInCell: 13,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [
@@ -85,12 +85,12 @@ describe("AssignStoryTextToSalientConceptCommand — assigns the selected words 
     it("assigns nothing when the selection touches no word", () => {
         const session = storyWithTheDoor("");
 
-        new AssignStoryTextToSalientConceptCommand().invoke(session, {
+        AssignStoryTextToSalientConceptCommand.deserialize({
             annotationCellId: "k1",
             cellId: "c1",
             startCharacterOffsetInCell: 3,
             endCharacterOffsetInCell: 4,
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("k1")).toMatchObject({
             references: [],

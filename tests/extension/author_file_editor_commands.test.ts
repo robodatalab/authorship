@@ -76,9 +76,12 @@ describe("a command still waiting for the model server", () => {
         editor.theAuthorAsksFor("checkProse");
 
         editor.theAuthorTypes("The lantern burned");
-        await Promise.resolve();
 
-        expect(editor.session.document.text).toContain("The lantern burned");
+        await vi.waitFor(() =>
+            expect(editor.session.document.text).toContain(
+                "The lantern burned",
+            ),
+        );
     });
 
     it("leaves the author free to save", async () => {

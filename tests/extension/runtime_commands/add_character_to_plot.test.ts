@@ -36,10 +36,10 @@ describe("AddCharacterToPlotCommand — has a plot follow a character", () => {
     ])("follows the character %s", (_, characterCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new AddCharacterToPlotCommand().invoke(session, {
+        AddCharacterToPlotCommand.deserialize({
             annotationCellId: "p1",
             characterCellId,
-        });
+        }).invoke(session);
 
         expect(charactersOfThePlot(session)).toEqual(expected);
     });

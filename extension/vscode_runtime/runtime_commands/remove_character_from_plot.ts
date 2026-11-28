@@ -1,27 +1,36 @@
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
 import { PlotCell } from "authordoc/cells/plot_cell";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
-export class RemoveCharacterFromPlotCommand implements AuthorDocumentCommand {
-    readonly commandName = "removeCharacterFromPlot";
-    readonly buttonGroup = "edit";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const REMOVE_CHARACTER_FROM_PLOT = "removeCharacterFromPlot";
 
-    invoke(
-        session: AuthorFileEditorSession,
-        commandArguments: Record<string, unknown>,
-    ): void {
-        const annotationCellId = commandArguments.annotationCellId as string;
-        const characterCellId = commandArguments.characterCellId as string;
+export class RemoveCharacterFromPlotCommand implements RuntimeCommand {
+    constructor(
+        private readonly annotationCellId: string,
+        private readonly characterCellId: string,
+    ) {}
+
+    static deserialize(
+        serialized: Record<string, unknown>,
+    ): RemoveCharacterFromPlotCommand {
+        const annotationCellId = serialized.annotationCellId as string;
+        const characterCellId = serialized.characterCellId as string;
+        const command = new RemoveCharacterFromPlotCommand(
+            annotationCellId,
+            characterCellId,
+        );
+        return command;
+    }
+
+    invoke(session: AuthorFileEditorSession): void {
         session.changeTheDocument((story) => {
-            const plot = story.cellWithId(annotationCellId);
+            const plot = story.cellWithId(this.annotationCellId);
             if (!(plot instanceof PlotCell)) {
                 return story;
             }
             const referenced = plot.characters(story);
             const charactersKept = referenced.filter(
-                (character) => character.uniqueId !== characterCellId,
+                (character) => character.uniqueId !== this.characterCellId,
             );
             const plotKept = plot.withCharacters(charactersKept);
             const storyChanged = story.withCell(plotKept);

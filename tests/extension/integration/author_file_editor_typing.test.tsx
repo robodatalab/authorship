@@ -946,7 +946,7 @@ describe("the prose errors marked while the author types", () => {
             await act(async () => {
                 document
                     .querySelector<HTMLButtonElement>(
-                        'button[aria-label="Check Prose — read the whole session.document for faults of usage and style"]',
+                        'button[aria-label="Check Prose — read the whole document for faults of usage and style"]',
                     )!
                     .click();
             });

@@ -33,10 +33,10 @@ describe("AddConceptToPlotCommand — makes a plot reference a salient concept",
     it("references the concept it was asked to, after the ones the plot references", () => {
         const session = openStory(THE_STORY);
 
-        new AddConceptToPlotCommand().invoke(session, {
+        AddConceptToPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "k2",
-        });
+        }).invoke(session);
 
         expect(conceptsOfThePlot(session)).toEqual([
             "Motherhood",
@@ -47,10 +47,10 @@ describe("AddConceptToPlotCommand — makes a plot reference a salient concept",
     it("references a concept only once", () => {
         const session = openStory(THE_STORY);
 
-        new AddConceptToPlotCommand().invoke(session, {
+        AddConceptToPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "k1",
-        });
+        }).invoke(session);
 
         expect(conceptsOfThePlot(session)).toEqual(["Motherhood"]);
     });
@@ -58,10 +58,10 @@ describe("AddConceptToPlotCommand — makes a plot reference a salient concept",
     it("references nothing that is not a salient concept", () => {
         const session = openStory(THE_STORY);
 
-        new AddConceptToPlotCommand().invoke(session, {
+        AddConceptToPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "p1",
-        });
+        }).invoke(session);
 
         expect(conceptsOfThePlot(session)).toEqual(["Motherhood"]);
     });
@@ -78,10 +78,10 @@ describe("AddConceptToPlotCommand — makes a plot reference a salient concept",
             THE_STORY,
             edited as never,
         );
-        new AddConceptToPlotCommand().invoke(session, {
+        AddConceptToPlotCommand.deserialize({
             annotationCellId: "p1",
             conceptCellId: "k2",
-        });
+        }).invoke(session);
 
         edits[0].undo();
         const conceptsUndone = conceptsOfThePlot(session);

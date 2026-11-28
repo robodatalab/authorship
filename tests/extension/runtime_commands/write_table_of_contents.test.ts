@@ -21,7 +21,9 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("lists the chapters, in the order they stand in", () => {
         const session = openStory(A_STORY_WITH_A_TABLE_OF_CONTENTS_CELL);
 
-        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
+        WriteTableOfContentsCommand.deserialize({ cellId: "toc" }).invoke(
+            session,
+        );
 
         expect(session.document.cells[0].source).toBe(
             "1. The Door\n1. The Bell",
@@ -33,7 +35,9 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
             '<!-- cell: contents id="toc" -->\n\n<!-- cell: chapter id="c1" -->\n',
         );
 
-        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
+        WriteTableOfContentsCommand.deserialize({ cellId: "toc" }).invoke(
+            session,
+        );
 
         expect(session.document.cells[0].source).toBe("1. Untitled");
     });
@@ -51,7 +55,9 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
 <!-- cell: chapter title="The Bell" id="c2" -->
 `);
 
-        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
+        WriteTableOfContentsCommand.deserialize({ cellId: "toc" }).invoke(
+            session,
+        );
 
         expect(session.document.cells[0].source).toBe(
             "1. Book One\n    1. The Door\n1. Book Two\n    1. The Bell",
@@ -69,7 +75,9 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
 <!-- cell: chapter title="The Bell" id="c2" -->
 `);
 
-        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
+        WriteTableOfContentsCommand.deserialize({ cellId: "toc" }).invoke(
+            session,
+        );
 
         expect(session.document.cells[0].source).toBe(
             "1. The Door\n1. The Bell",
@@ -79,16 +87,18 @@ describe("WriteTableOfContentsCommand — writes the table of contents", () => {
     it("writes nothing into a story with no chapters", () => {
         const session = openStory('<!-- cell: contents id="toc" -->\n');
 
-        new WriteTableOfContentsCommand().invoke(session, { cellId: "toc" });
+        WriteTableOfContentsCommand.deserialize({ cellId: "toc" }).invoke(
+            session,
+        );
 
         expect(session.document.cells[0].source).toBe("");
     });
 
     it("writes nothing when there is no cell at that index", () => {
         const session = openStory(A_STORY_WITH_A_TABLE_OF_CONTENTS_CELL);
-        new WriteTableOfContentsCommand().invoke(session, {
+        WriteTableOfContentsCommand.deserialize({
             cellId: "nowhere",
-        });
+        }).invoke(session);
         expect(session.document.cells[0].source).toBe("");
     });
 });

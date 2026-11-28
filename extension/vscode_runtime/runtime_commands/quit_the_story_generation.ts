@@ -1,15 +1,17 @@
 import * as vscode from "vscode";
 
 import type { AuthorFileEditorSession } from "../author_file_editor_session";
-import type { AuthorDocumentCommand } from "./author_document_command";
+import type { RuntimeCommand } from "./runtime_command";
 
 const QUIT_THE_GENERATION = "Quit the Generation";
 
-export class QuitTheStoryGenerationCommand implements AuthorDocumentCommand {
-    readonly commandName = "quitTheStoryGeneration";
-    readonly buttonGroup = "generate";
-    readonly iconClassName = "";
-    readonly tooltip = "";
+export const QUIT_THE_STORY_GENERATION = "quitTheStoryGeneration";
+
+export class QuitTheStoryGenerationCommand implements RuntimeCommand {
+    static deserialize(): QuitTheStoryGenerationCommand {
+        const command = new QuitTheStoryGenerationCommand();
+        return command;
+    }
 
     async invoke(session: AuthorFileEditorSession): Promise<void> {
         const answer = await vscode.window.showWarningMessage(

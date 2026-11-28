@@ -48,11 +48,11 @@ describe("AddCharacterToPlotEventCommand — puts a character in one event of a 
     ])("puts the character in %s", (_, nodeId, characterCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new AddCharacterToPlotEventCommand().invoke(session, {
+        AddCharacterToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId,
             characterCellId,
-        });
+        }).invoke(session);
 
         expect(charactersOfTheEvent(session, nodeId)).toEqual(expected);
     });
@@ -61,11 +61,11 @@ describe("AddCharacterToPlotEventCommand — puts a character in one event of a 
         const session = openStory(THE_STORY);
         const plotBefore = session.document.cellWithId("p1");
 
-        new AddCharacterToPlotEventCommand().invoke(session, {
+        AddCharacterToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e9",
             characterCellId: "d1",
-        });
+        }).invoke(session);
 
         expect(session.document.cellWithId("p1")).toEqual(plotBefore);
     });
@@ -82,11 +82,11 @@ describe("AddCharacterToPlotEventCommand — puts a character in one event of a 
             THE_STORY,
             edited as never,
         );
-        new AddCharacterToPlotEventCommand().invoke(session, {
+        AddCharacterToPlotEventCommand.deserialize({
             annotationCellId: "p1",
             nodeId: "e1",
             characterCellId: "d1",
-        });
+        }).invoke(session);
 
         edits[0].undo();
         const charactersUndone = charactersOfTheEvent(session, "e1");

@@ -36,10 +36,10 @@ describe("RemoveCharacterFromPlotCommand — has a plot stop following a charact
     ])("stops following %s", (_, characterCellId, expected) => {
         const session = openStory(THE_STORY);
 
-        new RemoveCharacterFromPlotCommand().invoke(session, {
+        RemoveCharacterFromPlotCommand.deserialize({
             annotationCellId: "p1",
             characterCellId,
-        });
+        }).invoke(session);
 
         expect(charactersOfThePlot(session)).toEqual(expected);
     });
