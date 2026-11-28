@@ -20,7 +20,9 @@ export function watchTheAuthorFileForChanges(
         if (savedText === session.document.text) {
             return;
         }
-        await commandExecutor.post(new ImportChangedFileCommand(savedText));
+        await commandExecutor.processCommand(
+            new ImportChangedFileCommand(savedText),
+        );
     });
     return vscode.Disposable.from(changed, watcher);
 }

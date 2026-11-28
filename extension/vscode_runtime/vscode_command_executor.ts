@@ -15,26 +15,26 @@ export class VsCodeCommandExecutor {
         private readonly log: vscode.LogOutputChannel,
     ) {}
 
-    executeMessageReceivedFromWebview(
-        serialized: Record<string, unknown>,
-    ): void {
+    deserializeAndExecuteMessage(serialized: Record<string, unknown>): void {
         const command = deserializeRuntimeCommand(serialized);
-        void this.post(command);
+        void this.processCommand(command);
     }
 
-    post(command: RuntimeCommand): Promise<void> {
+    processCommand(command: RuntimeCommand): Promise<void> {
         this.commandsStillWaiting += 1;
         this.log.debug(
             `${command.constructor.name} joins the queue, ${this.commandsStillWaiting} waiting`,
         );
-        const invoked = this.theCommandBeforeThisOne.then(() =>
-            this.execute(command),
-        );
-        this.theCommandBeforeThisOne = invoked.then(
+        const executed = this.theCommandBeforeThisOne
+            .then(() => this.execute(command))
+            .finally(() => {
+                this.commandsStillWaiting -= 1;
+            });
+        this.theCommandBeforeThisOne = executed.then(
             () => undefined,
             () => undefined,
         );
-        return invoked;
+        return executed;
     }
 
     private async execute(command: RuntimeCommand): Promise<void> {
@@ -50,8 +50,6 @@ export class VsCodeCommandExecutor {
                 failure,
             );
             throw failure;
-        } finally {
-            this.commandsStillWaiting -= 1;
         }
     }
 }

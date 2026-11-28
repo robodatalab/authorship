@@ -79,7 +79,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
 
         const onMessageFromWebView = panel.webview.onDidReceiveMessage(
             (message: Record<string, unknown>) => {
-                commandExecutor.executeMessageReceivedFromWebview(message);
+                commandExecutor.deserializeAndExecuteMessage(message);
             },
         );
 
@@ -99,7 +99,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     async saveCustomDocument(session: AuthorFileEditorSession): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new SaveDocumentCommand());
+            ?.processCommand(new SaveDocumentCommand());
     }
 
     async saveCustomDocumentAs(
@@ -108,7 +108,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new SaveDocumentAsCommand(destination));
+            ?.processCommand(new SaveDocumentAsCommand(destination));
     }
 
     async revertCustomDocument(
@@ -116,7 +116,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<void> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new RevertDocumentCommand());
+            ?.processCommand(new RevertDocumentCommand());
     }
 
     async backupCustomDocument(
@@ -125,7 +125,7 @@ export class AuthorFileEditorProvider implements vscode.CustomEditorProvider<Aut
     ): Promise<vscode.CustomDocumentBackup> {
         await this.commandExecutors
             .get(session.uri.toString())
-            ?.post(new SaveDocumentAsCommand(context.destination));
+            ?.processCommand(new SaveDocumentAsCommand(context.destination));
         return {
             id: context.destination.toString(),
             delete: () =>
